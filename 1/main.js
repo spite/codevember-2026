@@ -470,6 +470,7 @@ const paperOptions = (item, fold) => ({
   // Lighter meshes on touch devices: folding updates every vertex on the CPU.
   creaseSegments: touch ? 4 : 6,
   faceSubdivisions: touch ? 1 : 2,
+  adaptiveRings: true,
   pillow: 0.012,
   creaseJitter: 0.35,
   cornerRound: 0.04,

@@ -57,7 +57,8 @@ export class FoldedPaper extends BufferGeometry {
   // edge over which a crease narrows to its vertex. The `crease` attribute is the
   // fillet weight (0 on flat faces, 1 mid-fold), negative on valley folds.
   // Opt-in: foldingCreaseRadius (radius while a hinge is open, eased to creaseRadius when shut),
-  // faceSubdivisions (each face becomes 4x this many rings around its centroid so `pillow` can bow it), pillow (max face bow, fraction
+  // faceSubdivisions (each face becomes 4x this many rings around its centroid so `pillow` can bow it; with
+  // adaptiveRings, faces smaller than half the circumradius in inradius get proportionally fewer, at least 2), pillow (max face bow, fraction
   // of the mean edge, seeded per face), hingeJitter (max degrees each hinge stops short of shut;
   // opens the seams), creaseJitter (± fraction of per-hinge crease radius variation), cornerRound
 // (blunts convex peaks once folded: tip pulled in by this fraction of the mean edge).
@@ -100,6 +101,7 @@ export class FoldedPaper extends BufferGeometry {
       fold: 1,
       foldingCreaseRadius: null,
       faceSubdivisions: 0,
+      adaptiveRings: false,
       pillow: 0,
       hingeJitter: 0,
       creaseJitter: 0,
@@ -254,17 +256,24 @@ export class FoldedPaper extends BufferGeometry {
   }
 
   _mesh(c) {
-    const { o, V, F, meanEdge, S, rows, rowS, profile, normals, centroids, random, hinges, hingeOfEdge, H } = c;
+    const { o, V, F, meanEdge, S, rows, rowS, profile, normals, centroids, inradius, random, hinges, hingeOfEdge, H } = c;
     const solid = this.solid;
     // Vertex counts: face parts (boundary, then centre and rings) are contiguous per face, then crease grids.
     const R = Math.max(0, Math.round(o.faceSubdivisions));
     const rings = 4 * R;
+    // Small faces barely bow, so they need fewer rings than big ones.
+    const faceRings = new Int32Array(F.length).fill(rings);
+    if (o.adaptiveRings && R > 0) {
+      F.forEach((f, fi) => {
+        faceRings[fi] = Math.max(2, Math.min(rings, Math.round((rings * inradius[fi]) / (0.5 * o.size))));
+      });
+    }
     const faceStart = new Int32Array(F.length + 1);
     let triCount = 0;
     F.forEach((f, fi) => {
       const m = f.length * (rows - 1);
-      faceStart[fi + 1] = faceStart[fi] + m + (R > 0 ? 1 + (rings - 1) * m : 0);
-      triCount += R > 0 ? m * (2 * rings - 1) : Math.max(0, m - 2);
+      faceStart[fi + 1] = faceStart[fi] + m + (R > 0 ? 1 + (faceRings[fi] - 1) * m : 0);
+      triCount += R > 0 ? m * (2 * faceRings[fi] - 1) : Math.max(0, m - 2);
     });
     const NF = faceStart[F.length];
     const N = NF + H * rows * (S + 1);
@@ -296,12 +305,12 @@ export class FoldedPaper extends BufferGeometry {
     const ring0 = new Int32Array(maxM);
     const ring1 = new Int32Array(maxM);
     const lines = f64(F.reduce((m, f) => Math.max(m, f.length), 0) * 7);
-    Object.assign(c, { R, rings, faceStart, NF, N, kind, vRest, vDir, vHinge, vTaper, vCorner, lerpA, lerpB, lerpT, bubH, bubG, P0, faceIdArr, creaseArr, tris, nt: 0, boundary, ring0, ring1, lines });
+    Object.assign(c, { R, rings, faceRings, faceStart, NF, N, kind, vRest, vDir, vHinge, vTaper, vCorner, lerpA, lerpB, lerpT, bubH, bubG, P0, faceIdArr, creaseArr, tris, nt: 0, boundary, ring0, ring1, lines });
   }
 
   // Faces f0..f1-1: boundary points, centre and rings, and their triangles.
   _meshFaces(c, f0, f1) {
-    const { V, F, rows, rowS, profile, normals, centroids, hinges, hingeOfEdge, R, rings, faceStart, kind, vRest, vDir, vHinge, vTaper, vCorner } = c;
+    const { V, F, rows, rowS, profile, normals, centroids, hinges, hingeOfEdge, R, faceRings, faceStart, kind, vRest, vDir, vHinge, vTaper, vCorner } = c;
     const { lerpA, lerpB, lerpT, bubH, bubG, P0, faceIdArr, tris, boundary, ring0, ring1, lines } = c;
     const solid = this.solid;
     let nt = c.nt;
@@ -434,6 +443,7 @@ export class FoldedPaper extends BufferGeometry {
       k++;
       let inner = ring0;
       let outer = ring1;
+      const rings = faceRings[fi];
       for (let r = 1; r <= rings; r++) {
         // Denser toward the rim, where the creases and rounded corners bend.
         const t = 1 - (1 - r / rings) ** 2;

@@ -97,7 +97,7 @@
       import { days } from "./modules/days.js";
 
       const gallery = document.querySelector(".gallery");
-      for (const { day, title } of days) {
+      for (const { day, prompt, title } of days) {
         const li = document.createElement("li");
         if (title) {
           li.style.backgroundImage = `url(screenshots/${day}.jpg)`;
@@ -110,7 +110,7 @@
         number.className = "number";
         number.textContent = day;
         const label = document.createElement("span");
-        label.textContent = title;
+        label.textContent = prompt;
         a.append(number, label);
         li.append(a);
         gallery.append(li);
