@@ -1,6 +1,6 @@
 November 1, 2026
 
-"Folded"
+"Fold"
 
 Paper polyhedra generated with Conway operators, unfolded into flat nets and
 folded back with rounded creases. Each one is a convex hull in Ammo (Bullet),
