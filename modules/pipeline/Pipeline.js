@@ -1,0 +1,765 @@
+import {
+  BufferGeometry,
+  Float32BufferAttribute,
+  InstancedBufferAttribute,
+  DynamicDrawUsage,
+  Mesh,
+  Scene,
+  OrthographicCamera,
+  RawShaderMaterial,
+  WebGLRenderTarget,
+  DepthTexture,
+  GLSL3,
+  RGBAFormat,
+  HalfFloatType,
+  FloatType,
+  UnsignedByteType,
+  LinearFilter,
+  NearestFilter,
+  ClampToEdgeWrapping,
+  NoColorSpace,
+  NoToneMapping,
+  CustomBlending,
+  AddEquation,
+  OneFactor,
+  NoBlending,
+  Color,
+  Vector2,
+  Vector3,
+  Matrix4,
+  Quaternion,
+  Box3,
+  Sphere,
+} from "three";
+import { globalUniforms } from "./uniforms.js";
+import { renderVariant, compileVariant } from "./variants.js";
+import { prevMatrixSource } from "./PipelineMaterial.js";
+import { ShadowPass } from "./ShadowPass.js";
+import { GIPass } from "./GIPass.js";
+import { ShadowMaskPass } from "./ShadowMaskPass.js";
+import { fullscreenVertex, copyFragment } from "shaders/pipeline/copy.js";
+import { bloomDownFragment, bloomUpFragment } from "shaders/pipeline/bloom.js";
+import { finalFragment } from "shaders/pipeline/final.js";
+import { fxaaFragment } from "shaders/pipeline/fxaa.js";
+import { tileMaxFragment, neighborMaxFragment, reconstructFragment } from "shaders/pipeline/motionBlur.js";
+
+const TIERS = {
+  low: { msaa: 0, shadowMapSize: 1024, gi: { slices: 1, steps: 8, blurPasses: 3, maxHistory: 48 }, samples: 1 },
+  medium: { msaa: 2, shadowMapSize: 2048, gi: { slices: 1, steps: 8 }, samples: 1 },
+  high: { msaa: 4, shadowMapSize: 2048, gi: { slices: 2, steps: 8 }, samples: 1 },
+  capture: { msaa: 4, shadowMapSize: 4096, gi: { slices: 3, steps: 12 }, samples: 16 },
+};
+
+const TONEMAPPERS = ["agx", "aces", "neutral", "none"];
+const DEBUG_VIEWS = ["none", "normals", "depth", "velocity", "shadow", "ao", "gi", "albedo", "clipping"];
+// Views the material writes into the HDR target (pipelineDebug), shown untonemapped.
+const MATERIAL_DEBUG = { shadow: 1, ao: 2, gi: 3, albedo: 4 };
+const FINAL_DEBUG = { normals: 1, depth: 2, velocity: 3, clipping: 5 };
+
+function resolveQuality(quality) {
+  const query = new URLSearchParams(window.location.search);
+  if (TIERS[query.get("quality")]) return query.get("quality");
+  if (query.has("capture")) return "capture";
+  if (TIERS[quality]) return quality;
+  const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || matchMedia("(pointer: coarse)").matches;
+  return mobile ? "medium" : "high";
+}
+
+function usesInstanceMotion(material) {
+  return Array.isArray(material) ? material.some((m) => m.instanceMotion) : !!material.instanceMotion;
+}
+
+function halton(index, base) {
+  let f = 1;
+  let r = 0;
+  while (index > 0) {
+    f /= base;
+    r += f * (index % base);
+    index = Math.floor(index / base);
+  }
+  return r;
+}
+
+function colorTarget(type = HalfFloatType, options = {}) {
+  return new WebGLRenderTarget(1, 1, {
+    type,
+    format: RGBAFormat,
+    minFilter: LinearFilter,
+    magFilter: LinearFilter,
+    wrapS: ClampToEdgeWrapping,
+    wrapT: ClampToEdgeWrapping,
+    colorSpace: NoColorSpace,
+    depthBuffer: false,
+    stencilBuffer: false,
+    generateMipmaps: false,
+    ...options,
+  });
+}
+
+function quadMaterial(fragmentShader, uniforms, options = {}) {
+  return new RawShaderMaterial({
+    glslVersion: GLSL3,
+    vertexShader: fullscreenVertex,
+    fragmentShader,
+    uniforms,
+    depthTest: false,
+    depthWrite: false,
+    ...options,
+  });
+}
+
+const _size = new Vector2();
+const _box = new Box3();
+const _meshBox = new Box3();
+const _sphere = new Sphere();
+const _projection = new Matrix4();
+const _viewProjection = new Matrix4();
+const _p0 = new Vector3();
+const _p1 = new Vector3();
+const _s1 = new Vector3();
+const _q0 = new Quaternion();
+const _q1 = new Quaternion();
+const _dq = new Quaternion();
+const _axis = new Vector3();
+
+class Pipeline {
+  constructor(renderer, options = {}) {
+    this.renderer = renderer;
+    this.quality = resolveQuality(options.quality ?? "auto");
+    const tier = TIERS[this.quality];
+
+    this.msaa = Math.min(options.msaa ?? tier.msaa, renderer.capabilities.maxSamples);
+    this.samples = options.samples ?? tier.samples;
+    this.shadows = options.shadows ?? true;
+    this.giEnabled = options.gi ?? true;
+    this.bloom = options.bloom ?? true;
+    this.background = new Color(options.background ?? 0xf2efe9);
+    this.exposure = options.exposure ?? 1;
+    this.bloomStrength = options.bloomStrength ?? 0.04;
+    this.bloomRadius = options.bloomRadius ?? 0.6;
+    this.vignette = options.vignette ?? 0.25;
+    this.grain = options.grain ?? 0.03;
+    this.aberration = options.aberration ?? 0;
+    this.saturation = options.saturation ?? 1;
+    this.contrast = options.contrast ?? 1;
+    this.tonemapper = options.tonemapper ?? "agx";
+    this.debug = "none";
+    // Tints displayed luminance above 0.97 yellow on the normal image (exposure check).
+    this.clipWarning = options.clipWarning ?? false;
+    const shadowOptions = { mapSize: tier.shadowMapSize, autoFit: true, ...options.shadow };
+    // Fits the shadow camera to the casters every frame; set false after calling shadow.fit() yourself.
+    this.shadowAutoFit = shadowOptions.autoFit;
+    // Opt-in: shadows computed at half res and denoised over time (see ShadowMaskPass).
+    this.shadowDenoise = shadowOptions.denoise ?? false;
+    this.shadowMaskOptions = shadowOptions.mask ?? {};
+    this.shadowMask = null;
+
+    // Opt-in motion blur over a shutter window in scene time, so it holds while time is paused.
+    // Meshes may set userData.shutterMatrixWorld (pose at time - shutter / 2) with userData.shutterManual;
+    // otherwise it is extrapolated from their last measured motion. The camera is not blurred.
+    const motionOptions = options.motionBlur;
+    this.motionBlurAvailable = !!motionOptions;
+    this.motionBlur = motionOptions ? (motionOptions.enabled ?? true) : false;
+    this.shutter = motionOptions?.shutter ?? 1 / 30;
+    this.motionSamples = motionOptions?.samples ?? (this.quality === "capture" ? 32 : 16);
+    this.motionMaxBlur = motionOptions?.maxBlur ?? 0.03; // half-length cap, as a fraction of the height
+    this.motionSoftZ = motionOptions?.softZ ?? 0.1;
+
+    this.shadow = new ShadowPass({ mapSize: shadowOptions.mapSize });
+    this.gi = new GIPass({ ...tier.gi, ...options.giOptions });
+
+    this.width = 0;
+    this.height = 0;
+    this.frame = 0;
+    this.hasPrevColor = false;
+    this.hasPrevFrame = false;
+    this.meshes = [];
+    this.instanceMotion = [];
+
+    this.depthTexture = new DepthTexture(1, 1, FloatType);
+    this.prepassTarget = colorTarget(HalfFloatType, {
+      minFilter: NearestFilter,
+      magFilter: NearestFilter,
+      depthBuffer: true,
+      depthTexture: this.depthTexture,
+    });
+    this.mainTarget = colorTarget(HalfFloatType, { depthBuffer: true, samples: this.msaa });
+    this.prevColorTarget = colorTarget(HalfFloatType);
+    this.accumTarget = colorTarget(HalfFloatType);
+    this.ldrTarget = colorTarget(UnsignedByteType);
+    if (this.motionBlurAvailable) {
+      const nearest = { minFilter: NearestFilter, magFilter: NearestFilter };
+      this.motionTarget = colorTarget(HalfFloatType, { ...nearest, depthBuffer: true });
+      this.tileTarget = colorTarget(HalfFloatType, nearest);
+      this.neighborTarget = colorTarget(HalfFloatType, nearest);
+      this.blurTarget = colorTarget(HalfFloatType);
+      const velocity = { tVelocity: { value: this.motionTarget.texture }, resolution: { value: new Vector2() }, maxRadius: { value: 32 } };
+      this.tileMaxMaterial = quadMaterial(tileMaxFragment, { ...velocity, tile: { value: 32 } });
+      this.neighborMaxMaterial = quadMaterial(neighborMaxFragment, { tTiles: { value: this.tileTarget.texture } });
+      this.reconstructMaterial = quadMaterial(reconstructFragment, {
+        ...velocity,
+        tColor: { value: null },
+        tDepth: { value: this.depthTexture },
+        tNeighbor: { value: this.neighborTarget.texture },
+        tile: { value: 32 },
+        samples: { value: 16 },
+        softZ: { value: 0.1 },
+        cameraNear: globalUniforms.cameraNear,
+        cameraFar: globalUniforms.cameraFar,
+        isOrtho: { value: 0 },
+        frame: { value: 0 },
+      });
+    }
+
+    this.bloomLevels = [];
+    this.bloomNorm = 1;
+
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new Float32BufferAttribute([-1, -1, 0, 3, -1, 0, -1, 3, 0], 3));
+    this.quad = new Mesh(geometry);
+    this.quad.frustumCulled = false;
+    this.quadScene = new Scene();
+    this.quadScene.add(this.quad);
+    this.quadCamera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+    this.copyMaterial = quadMaterial(copyFragment, { tInput: { value: null }, weight: { value: 1 } }, { blending: NoBlending });
+    this.accumMaterial = quadMaterial(
+      copyFragment,
+      { tInput: { value: null }, weight: { value: 1 } },
+      {
+        blending: CustomBlending,
+        blendEquation: AddEquation,
+        blendSrc: OneFactor,
+        blendDst: OneFactor,
+        blendEquationAlpha: AddEquation,
+        blendSrcAlpha: OneFactor,
+        blendDstAlpha: OneFactor,
+      },
+    );
+    this.downMaterial = quadMaterial(bloomDownFragment, {
+      tInput: { value: null },
+      texel: { value: new Vector2() },
+      karis: { value: 1 },
+      clampMax: { value: 64 },
+    });
+    this.upMaterial = quadMaterial(bloomUpFragment, {
+      tLow: { value: null },
+      tHigh: { value: null },
+      texel: { value: new Vector2() },
+      radius: { value: 1 },
+    });
+    this.finalMaterial = quadMaterial(finalFragment, {
+      tColor: { value: null },
+      tBloom: { value: null },
+      tNormalVelocity: { value: this.prepassTarget.texture },
+      tDepth: { value: this.depthTexture },
+      bloomStrength: { value: 0 },
+      bloomScale: { value: 1 },
+      exposure: { value: 1 },
+      vignette: { value: 0 },
+      grain: { value: 0 },
+      aberration: { value: 0 },
+      saturation: { value: 1 },
+      contrast: { value: 1 },
+      tonemapper: { value: 0 },
+      frame: { value: 0 },
+      debugView: { value: 0 },
+      clipWarning: { value: 0 },
+      cameraNear: globalUniforms.cameraNear,
+      cameraFar: globalUniforms.cameraFar,
+      isOrtho: { value: 0 },
+    });
+    this.fxaaMaterial = quadMaterial(fxaaFragment, { tInput: { value: this.ldrTarget.texture } });
+
+    renderer.getDrawingBufferSize(_size);
+    this._resize(_size.x, _size.y);
+
+    if (this.shadows && this.shadowDenoise) this.shadowMask = new ShadowMaskPass(this.gi, this.shadowMaskOptions);
+    this._passesCompiled = this._compilePasses();
+  }
+
+  setSize(width, height, dpr = this.renderer.getPixelRatio()) {
+    this._resize(Math.floor(width * dpr), Math.floor(height * dpr));
+  }
+
+  _resize(w, h) {
+    w = Math.max(1, w);
+    h = Math.max(1, h);
+    if (w === this.width && h === this.height) return;
+    this.width = w;
+    this.height = h;
+    for (const rt of [this.prepassTarget, this.mainTarget, this.prevColorTarget, this.accumTarget, this.ldrTarget]) {
+      rt.setSize(w, h);
+    }
+    this.gi.setSize(w, h);
+    if (this.motionBlurAvailable) {
+      this.motionTarget.setSize(w, h);
+      this.blurTarget.setSize(w, h);
+      const tile = Math.max(8, Math.ceil(this.motionMaxBlur * h));
+      this.tileTarget.setSize(Math.ceil(w / tile), Math.ceil(h / tile));
+      this.neighborTarget.setSize(Math.ceil(w / tile), Math.ceil(h / tile));
+      for (const m of [this.tileMaxMaterial, this.reconstructMaterial]) {
+        m.uniforms.tile.value = tile;
+        m.uniforms.maxRadius.value = tile;
+        m.uniforms.resolution.value.set(w, h);
+      }
+    }
+    globalUniforms.resolution.value.set(w, h);
+    this.hasPrevColor = false;
+    this._buildBloom(w, h);
+  }
+
+  _buildBloom(w, h) {
+    for (const level of this.bloomLevels) {
+      level.down.dispose();
+      level.up.dispose();
+    }
+    this.bloomLevels = [];
+    let lw = w;
+    let lh = h;
+    for (let i = 0; i < 7; i++) {
+      lw = Math.max(1, Math.floor(lw / 2));
+      lh = Math.max(1, Math.floor(lh / 2));
+      const down = colorTarget();
+      const up = colorTarget();
+      down.setSize(lw, lh);
+      up.setSize(lw, lh);
+      this.bloomLevels.push({ down, up, width: lw, height: lh });
+      if (Math.min(lw, lh) <= 8) break;
+    }
+  }
+
+  _pass(material, target) {
+    this.quad.material = material;
+    this.renderer.setRenderTarget(target);
+    this.renderer.render(this.quadScene, this.quadCamera);
+  }
+
+  // Pose at time - shutter / 2, extrapolated from the motion measured while time last advanced.
+  _updateShutter(object, dt) {
+    const d = object.userData;
+    if (d.shutterManual) return;
+    d.shutterMatrixWorld ??= object.matrixWorld.clone();
+    d.motionLinear ??= new Vector3();
+    d.motionAngular ??= new Vector3();
+    object.matrixWorld.decompose(_p1, _q1, _s1);
+    if (dt > 1e-6) {
+      d.prevMatrixWorld.decompose(_p0, _q0, _axis);
+      d.motionLinear.subVectors(_p1, _p0).divideScalar(dt);
+      _dq.copy(_q1).multiply(_q0.invert());
+      if (_dq.w < 0) _dq.set(-_dq.x, -_dq.y, -_dq.z, -_dq.w);
+      const angle = 2 * Math.acos(Math.min(_dq.w, 1));
+      const sin = Math.sqrt(Math.max(1 - _dq.w * _dq.w, 0));
+      if (sin > 1e-6) d.motionAngular.set(_dq.x / sin, _dq.y / sin, _dq.z / sin).multiplyScalar(angle / dt);
+      else d.motionAngular.set(0, 0, 0);
+    }
+    const half = this.shutter / 2;
+    _p1.addScaledVector(d.motionLinear, -half);
+    const rate = d.motionAngular.length();
+    if (rate > 1e-6) _q1.premultiply(_dq.setFromAxisAngle(_axis.copy(d.motionAngular).divideScalar(rate), -rate * half));
+    d.shutterMatrixWorld.compose(_p1, _q1, _s1);
+  }
+
+  _renderMotion(scene, camera) {
+    const u = globalUniforms;
+    _viewProjection.copy(u.prevViewProjection.value);
+    const prevTime = u.prevTime.value;
+    u.prevViewProjection.value.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    u.prevTime.value = u.time.value - this.shutter / 2;
+    prevMatrixSource.key = "shutterMatrixWorld";
+    u.motionPass.value = 1;
+    try {
+      this.renderer.setRenderTarget(this.motionTarget);
+      this.renderer.setClearColor(0x000000, 0);
+      this.renderer.clear(true, true, true);
+      renderVariant(this.renderer, scene, camera, "prepass", this.motionTarget);
+    } finally {
+      prevMatrixSource.key = "prevMatrixWorld";
+      u.motionPass.value = 0;
+      u.prevViewProjection.value.copy(_viewProjection);
+      u.prevTime.value = prevTime;
+    }
+  }
+
+  _renderMotionBlur(hdr) {
+    this._pass(this.tileMaxMaterial, this.tileTarget);
+    this._pass(this.neighborMaxMaterial, this.neighborTarget);
+    const r = this.reconstructMaterial.uniforms;
+    r.tColor.value = hdr;
+    r.samples.value = Math.max(2, Math.round(this.motionSamples));
+    r.softZ.value = this.motionSoftZ;
+    r.isOrtho.value = this.finalMaterial.uniforms.isOrtho.value;
+    r.frame.value = this.frame;
+    this._pass(this.reconstructMaterial, this.blurTarget);
+    return this.blurTarget.texture;
+  }
+
+  // Collects the meshes once per frame: previous matrices, and the shadow casters' bounds.
+  _gatherScene(scene, time = globalUniforms.time.value) {
+    const motion = this.motionBlur && this.motionBlurAvailable;
+    const dt = time - globalUniforms.prevTime.value;
+    const meshes = this.meshes;
+    meshes.length = 0;
+    this.instanceMotion.length = 0;
+    _box.makeEmpty();
+    scene.traverseVisible((object) => {
+      if (!object.material) return;
+      meshes.push(object);
+      if (!object.userData.prevMatrixWorld) object.userData.prevMatrixWorld = object.matrixWorld.clone();
+      if (motion) this._updateShutter(object, dt);
+      if (object.isInstancedMesh && usesInstanceMotion(object.material)) this._trackInstances(object);
+      if (!this.shadowAutoFit || object.userData.noShadow || !object.geometry) return;
+      const material = object.material;
+      const pipeline = Array.isArray(material) ? material.some((m) => m.isPipelineMaterial) : material.isPipelineMaterial;
+      if (!pipeline) return;
+      if (object.isInstancedMesh) {
+        if (!object.boundingSphere) object.computeBoundingSphere();
+        _sphere.copy(object.boundingSphere).applyMatrix4(object.matrixWorld);
+        _sphere.getBoundingBox(_meshBox);
+      } else {
+        if (!object.geometry.boundingSphere) object.geometry.computeBoundingSphere();
+        _sphere.copy(object.geometry.boundingSphere).applyMatrix4(object.matrixWorld);
+        _sphere.getBoundingBox(_meshBox);
+      }
+      _box.union(_meshBox);
+    });
+  }
+
+  _trackInstances(object) {
+    const current = object.instanceMatrix.array;
+    const prev = object.geometry.getAttribute("prevInstanceMatrix");
+    if (!prev || prev.array.length !== current.length) {
+      const attribute = new InstancedBufferAttribute(new Float32Array(current), 16);
+      attribute.setUsage(DynamicDrawUsage);
+      object.geometry.setAttribute("prevInstanceMatrix", attribute);
+    }
+    this.instanceMotion.push(object);
+  }
+
+  _updateCameraUniforms(camera) {
+    const u = globalUniforms;
+    u.cameraNear.value = camera.near;
+    u.cameraFar.value = camera.far;
+    u.projectionMatrixInverse.value.copy(camera.projectionMatrix).invert();
+    u.viewMatrixInverse.value.copy(camera.matrixWorld);
+    this.finalMaterial.uniforms.isOrtho.value = camera.isOrthographicCamera ? 1 : 0;
+  }
+
+  _storePrevious(camera) {
+    globalUniforms.prevViewProjection.value.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    for (const object of this.meshes) object.userData.prevMatrixWorld.copy(object.matrixWorld);
+    for (const object of this.instanceMotion) {
+      const prev = object.geometry.getAttribute("prevInstanceMatrix");
+      prev.array.set(object.instanceMatrix.array);
+      prev.needsUpdate = true;
+    }
+    globalUniforms.prevTime.value = globalUniforms.time.value;
+  }
+
+  _setJitter(camera, jx, jy) {
+    globalUniforms.jitter.value.set(jx, jy);
+    const e = camera.projectionMatrix.elements;
+    if (camera.isOrthographicCamera) {
+      e[12] += jx;
+      e[13] += jy;
+    } else {
+      // NDC.x = -e0*x/z - e8 under perspective, so the sign flips.
+      e[8] -= jx;
+      e[9] -= jy;
+    }
+  }
+
+  _renderFrame(scene, camera, renderShadow = true) {
+    const renderer = this.renderer;
+    const u = globalUniforms;
+    u.frame.value = this.frame;
+    this._updateCameraUniforms(camera);
+
+    if (this.shadows) {
+      if (renderShadow) {
+        if (this.shadowAutoFit && !_box.isEmpty()) this.shadow.fit(_box);
+        this.shadow.render(renderer, scene);
+      }
+    } else {
+      u.shadowEnabled.value = 0;
+    }
+
+    renderer.setRenderTarget(this.prepassTarget);
+    renderer.setClearColor(0x000000, 0);
+    renderer.clear(true, true, true);
+    renderVariant(renderer, scene, camera, "prepass", this.prepassTarget);
+    u.depthTexture.value = this.depthTexture;
+
+    if (this.giEnabled && !this._giWasEnabled) this.gi.resetHistory();
+    this._giWasEnabled = this.giEnabled;
+    const denoise = this.shadows && this.shadowDenoise;
+    if (denoise && !this._denoiseWasEnabled) this.shadowMask?.resetHistory();
+    this._denoiseWasEnabled = denoise;
+
+    if (this.giEnabled) {
+      this.gi.render(renderer, {
+        depthTexture: this.depthTexture,
+        normalVelocity: this.prepassTarget.texture,
+        prevColor: this.hasPrevColor ? this.prevColorTarget.texture : null,
+        camera,
+      });
+    } else {
+      u.giEnabled.value = 0;
+    }
+
+    if (denoise) {
+      if (!this.giEnabled) {
+        this.gi.renderGeometry(renderer, { depthTexture: this.depthTexture, normalVelocity: this.prepassTarget.texture, camera });
+      }
+      this.shadowMask ??= new ShadowMaskPass(this.gi, this.shadowMaskOptions);
+      this.shadowMask.render(renderer, { normalVelocity: this.prepassTarget.texture });
+    } else {
+      u.shadowMaskEnabled.value = 0;
+    }
+
+    // Material debug views redraw after the copy so next frame's GI still sees the beauty pass.
+    const debug = u.pipelineDebug.value;
+    u.pipelineDebug.value = 0;
+    this._renderMain(scene, camera);
+    this.copyMaterial.uniforms.tInput.value = this.mainTarget.texture;
+    this.copyMaterial.uniforms.weight.value = 1;
+    this._pass(this.copyMaterial, this.prevColorTarget);
+    this.hasPrevColor = true;
+    u.pipelineDebug.value = debug;
+    if (debug > 0) this._renderMain(scene, camera);
+    this.frame++;
+  }
+
+  _renderMain(scene, camera) {
+    const renderer = this.renderer;
+    renderer.setRenderTarget(this.mainTarget);
+    renderer.setClearColor(this.background, 1);
+    renderer.clear(true, true, true);
+    renderer.render(scene, camera);
+  }
+
+  _renderBloom(source) {
+    const levels = this.bloomLevels;
+    const down = this.downMaterial.uniforms;
+    let input = source;
+    let iw = this.width;
+    let ih = this.height;
+    levels.forEach((level, i) => {
+      down.tInput.value = input;
+      down.texel.value.set(1 / iw, 1 / ih);
+      down.karis.value = i === 0 ? 1 : 0;
+      this._pass(this.downMaterial, level.down);
+      input = level.down.texture;
+      iw = level.width;
+      ih = level.height;
+    });
+    const up = this.upMaterial.uniforms;
+    const radius = this.bloomRadius;
+    let low = levels[levels.length - 1].down;
+    let norm = 1;
+    for (let i = levels.length - 2; i >= 0; i--) {
+      const lowLevel = levels[i + 1];
+      up.tLow.value = low.texture;
+      up.tHigh.value = levels[i].down.texture;
+      up.texel.value.set(1 / lowLevel.width, 1 / lowLevel.height);
+      up.radius.value = radius;
+      this._pass(this.upMaterial, levels[i].up);
+      low = levels[i].up;
+      norm = 1 + radius * norm;
+    }
+    this.bloomNorm = norm;
+    return low.texture;
+  }
+
+  // time (seconds) drives the `time` uniform; defaults to the page clock.
+  render(scene, camera, time = performance.now() / 1000) {
+    const renderer = this.renderer;
+    renderer.getDrawingBufferSize(_size);
+    this._resize(_size.x, _size.y);
+
+    const prevTarget = renderer.getRenderTarget();
+    const prevAutoClear = renderer.autoClear;
+    const prevToneMapping = renderer.toneMapping;
+    const prevClearColor = renderer.getClearColor(new Color());
+    const prevClearAlpha = renderer.getClearAlpha();
+    renderer.autoClear = false;
+    renderer.toneMapping = NoToneMapping;
+
+    try {
+      if (scene.matrixWorldAutoUpdate) scene.updateMatrixWorld();
+      if (camera.parent === null && camera.matrixWorldAutoUpdate) camera.updateMatrixWorld();
+      this._gatherScene(scene, this.hasPrevFrame ? time : globalUniforms.prevTime.value);
+      if (!this.hasPrevFrame) {
+        globalUniforms.time.value = time;
+        this._storePrevious(camera);
+        this.hasPrevFrame = true;
+      }
+
+      const debug = DEBUG_VIEWS.includes(this.debug) ? this.debug : "none";
+      globalUniforms.pipelineDebug.value = MATERIAL_DEBUG[debug] ?? 0;
+      globalUniforms.time.value = time;
+
+      let hdr;
+      const samples = Math.max(1, Math.round(this.samples));
+      if (samples > 1) {
+        _projection.copy(camera.projectionMatrix);
+        const accum = this.accumMaterial.uniforms;
+        renderer.setRenderTarget(this.accumTarget);
+        renderer.setClearColor(0x000000, 0);
+        renderer.clear(true, false, false);
+        for (let i = 0; i < samples; i++) {
+          const jx = (halton(i + 1, 2) - 0.5) * 2 / this.width;
+          const jy = (halton(i + 1, 3) - 0.5) * 2 / this.height;
+          this._setJitter(camera, jx, jy);
+          this._renderFrame(scene, camera, i === 0);
+          camera.projectionMatrix.copy(_projection);
+          globalUniforms.jitter.value.set(0, 0);
+          // Later sub-frames see no motion: same instant, only the jitter moves.
+          if (i === 0) this._storePrevious(camera);
+          accum.tInput.value = this.mainTarget.texture;
+          accum.weight.value = 1 / samples;
+          this._pass(this.accumMaterial, this.accumTarget);
+        }
+        this._updateCameraUniforms(camera);
+        hdr = this.accumTarget.texture;
+      } else {
+        globalUniforms.jitter.value.set(0, 0);
+        this._renderFrame(scene, camera);
+        hdr = this.mainTarget.texture;
+      }
+      const motionOn = this.motionBlur && this.motionBlurAvailable && debug === "none";
+      if (motionOn) this._renderMotion(scene, camera);
+      this._storePrevious(camera);
+      if (motionOn) hdr = this._renderMotionBlur(hdr);
+
+      const bloomOn = this.bloom && this.bloomStrength > 0 && (debug === "none" || debug === "clipping");
+      const f = this.finalMaterial.uniforms;
+      f.tColor.value = hdr;
+      f.tBloom.value = bloomOn ? this._renderBloom(hdr) : null;
+      f.bloomStrength.value = bloomOn ? this.bloomStrength : 0;
+      f.exposure.value = this.exposure;
+      f.vignette.value = this.vignette;
+      f.grain.value = this.grain;
+      f.aberration.value = this.aberration;
+      f.saturation.value = this.saturation;
+      f.contrast.value = this.contrast;
+      f.tonemapper.value = Math.max(0, TONEMAPPERS.indexOf(this.tonemapper));
+      f.frame.value = this.frame;
+      f.debugView.value = FINAL_DEBUG[debug] ?? (MATERIAL_DEBUG[debug] ? 4 : 0);
+      f.clipWarning.value = this.clipWarning && debug === "none" ? 1 : 0;
+      f.bloomScale.value = 1 / this.bloomNorm;
+
+      if (this.msaa === 0) {
+        this._pass(this.finalMaterial, this.ldrTarget);
+        this._pass(this.fxaaMaterial, null);
+      } else {
+        this._pass(this.finalMaterial, null);
+      }
+    } finally {
+      renderer.setRenderTarget(prevTarget);
+      renderer.autoClear = prevAutoClear;
+      renderer.toneMapping = prevToneMapping;
+      renderer.setClearColor(prevClearColor, prevClearAlpha);
+    }
+  }
+
+  // Fullscreen-pass programs, started in the constructor so they compile alongside the day's setup.
+  _compilePasses() {
+    const gi = this.gi;
+    const materials = [this.copyMaterial, this.accumMaterial, this.downMaterial, this.upMaterial, this.finalMaterial, this.fxaaMaterial];
+    if (this.motionBlurAvailable) materials.push(this.tileMaxMaterial, this.neighborMaxMaterial, this.reconstructMaterial);
+    materials.push(gi.geometryMaterial, gi.traceMaterial, gi.temporalMaterial, gi.blurMaterial);
+    const mask = this.shadowMask;
+    if (mask) materials.push(mask.traceMaterial, mask.temporalMaterial, mask.blurMaterial);
+    const scene = new Scene();
+    for (const material of materials) {
+      const mesh = new Mesh(this.quad.geometry, material);
+      mesh.frustumCulled = false;
+      scene.add(mesh);
+    }
+    return this.renderer.compileAsync(scene, this.quadCamera);
+  }
+
+  // Optional: builds the scene's programs (and their variants) without blocking, in parallel where
+  // KHR_parallel_shader_compile is available. Await it before the first render to avoid a stall.
+  async compileAsync(scene, camera) {
+    const renderer = this.renderer;
+    const prevTarget = renderer.getRenderTarget();
+    const jobs = [this._passesCompiled];
+    try {
+      // Programs depend on the target's colour space: every scene pass draws into a render target.
+      renderer.setRenderTarget(this.mainTarget);
+      jobs.push(renderer.compileAsync(scene, camera));
+      jobs.push(compileVariant(renderer, scene, camera, "prepass"));
+      jobs.push(compileVariant(renderer, scene, this.shadow.camera, "shadow", this.shadow.filter));
+      if (this.shadows && this.shadowDenoise && !this.shadowMask) {
+        this.shadowMask = new ShadowMaskPass(this.gi, this.shadowMaskOptions);
+        this._passesCompiled = this._compilePasses();
+        jobs.push(this._passesCompiled);
+      }
+    } finally {
+      renderer.setRenderTarget(prevTarget);
+    }
+    await Promise.all(jobs);
+  }
+
+  // Guspira section bound to the settings; none of it is randomizable.
+  addGUI(gui, { title = "Rendering", open = false } = {}) {
+    const u = globalUniforms;
+    const opts = (onChange) => ({ randomizable: false, onChange });
+    const section = gui.addSection(title, { open });
+    const add = (label, get, set, min, max, step) => gui.addSlider(label, get(), min, max, step, opts(set));
+    add("Exposure", () => this.exposure, (v) => (this.exposure = v), 0.1, 4, 0.01);
+    gui.addSelect("Tonemapper", this.tonemapper, TONEMAPPERS, opts((v) => (this.tonemapper = v)));
+    add("Environment", () => u.envIntensity.value, (v) => (u.envIntensity.value = v), 0, 3, 0.01);
+    add("Bloom", () => this.bloomStrength, (v) => (this.bloomStrength = v), 0, 0.3, 0.001);
+    add("Bloom radius", () => this.bloomRadius, (v) => (this.bloomRadius = v), 0, 1, 0.01);
+    add("Vignette", () => this.vignette, (v) => (this.vignette = v), 0, 1, 0.01);
+    add("Grain", () => this.grain, (v) => (this.grain = v), 0, 0.15, 0.001);
+    add("Aberration", () => this.aberration, (v) => (this.aberration = v), 0, 1, 0.01);
+    add("Saturation", () => this.saturation, (v) => (this.saturation = v), 0, 2, 0.01);
+    add("Contrast", () => this.contrast, (v) => (this.contrast = v), 0.5, 1.5, 0.01);
+    gui.addCheckbox("Shadows", this.shadows, opts((v) => (this.shadows = v)));
+    gui.addCheckbox("Shadow denoise", this.shadowDenoise, opts((v) => (this.shadowDenoise = v)));
+    add("Shadow softness", () => u.shadowSoftness.value, (v) => (u.shadowSoftness.value = v), 0, 4, 0.01);
+    add("Light size", () => u.shadowLightSize.value, (v) => (u.shadowLightSize.value = v), 0, 0.6, 0.001);
+    gui.addCheckbox("AO + GI", this.giEnabled, opts((v) => (this.giEnabled = v)));
+    add("AO", () => u.aoIntensity.value, (v) => (u.aoIntensity.value = v), 0, 2, 0.01);
+    add("AO power", () => u.aoPower.value, (v) => (u.aoPower.value = v), 0.5, 4, 0.01);
+    add("GI", () => u.giIntensity.value, (v) => (u.giIntensity.value = v), 0, 4, 0.01);
+    add("GI radius", () => this.gi.radius, (v) => (this.gi.radius = v), 0.05, 4, 0.01);
+    if (this.motionBlurAvailable) {
+      gui.addCheckbox("Motion blur", this.motionBlur, opts((v) => (this.motionBlur = v)));
+      add("Shutter", () => this.shutter, (v) => (this.shutter = v), 0, 0.2, 0.001);
+      add("Blur samples", () => this.motionSamples, (v) => (this.motionSamples = v), 2, 64, 1);
+    }
+    gui.addSelect("Debug", this.debug, DEBUG_VIEWS, opts((v) => (this.debug = v)));
+    gui.addCheckbox("Clip warning", this.clipWarning, opts((v) => (this.clipWarning = v)));
+    gui.endSection();
+    return section;
+  }
+
+  dispose() {
+    for (const rt of [this.prepassTarget, this.mainTarget, this.prevColorTarget, this.accumTarget, this.ldrTarget]) {
+      rt.dispose();
+    }
+    if (this.motionBlurAvailable) {
+      for (const rt of [this.motionTarget, this.tileTarget, this.neighborTarget, this.blurTarget]) rt.dispose();
+      for (const m of [this.tileMaxMaterial, this.neighborMaxMaterial, this.reconstructMaterial]) m.dispose();
+    }
+    for (const level of this.bloomLevels) {
+      level.down.dispose();
+      level.up.dispose();
+    }
+    this.depthTexture.dispose();
+    for (const m of [this.copyMaterial, this.accumMaterial, this.downMaterial, this.upMaterial, this.finalMaterial, this.fxaaMaterial]) {
+      m.dispose();
+    }
+    this.quad.geometry.dispose();
+    this.shadow.dispose();
+    this.shadowMask?.dispose();
+    this.gi.dispose();
+  }
+}
+
+export { Pipeline, TIERS };
