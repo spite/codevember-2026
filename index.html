@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Codevember 2026</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Codevember 2026 by Jaume Sanchez Elias" />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        font-size: 16px;
+        padding: 1em;
+        color: #333;
+      }
+      h1 {
+        font-size: 1.4em;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+
+        &:hover {
+          text-decoration: underline;
+        }
+      }
+      .gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 10px;
+        margin: 2em 0;
+        list-style-type: none;
+      }
+      .gallery li {
+        position: relative;
+        aspect-ratio: 1;
+        background: #eee center / cover no-repeat;
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .gallery a {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        height: 100%;
+        padding: 0.6em;
+        color: #fff;
+        background: linear-gradient(transparent 50%, rgba(0, 0, 0, 0.6));
+      }
+      .gallery .number {
+        font-size: 2em;
+        font-weight: bold;
+        line-height: 1;
+      }
+      .gallery .soon {
+        opacity: 0.4;
+        pointer-events: none;
+      }
+      .gallery .soon a {
+        color: #333;
+        background: none;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Codevember 2026</h1>
+    <ul class="gallery"></ul>
+    <p>
+      Jaume Sanchez Elias
+      <a href="https://twitter.com/thespite">twitter</a>
+      <a href="https://github.com/spite">github</a>
+    </p>
+    <script type="module">
+      import { days } from "./modules/days.js";
+
+      const gallery = document.querySelector(".gallery");
+      for (const { day, title } of days) {
+        const li = document.createElement("li");
+        if (title) {
+          li.style.backgroundImage = `url(screenshots/${day}.jpg)`;
+        } else {
+          li.className = "soon";
+        }
+        const a = document.createElement("a");
+        a.href = `./${day}/`;
+        const number = document.createElement("span");
+        number.className = "number";
+        number.textContent = day;
+        const label = document.createElement("span");
+        label.textContent = title;
+        a.append(number, label);
+        li.append(a);
+        gallery.append(li);
+      }
+    </script>
+  </body>
+</html>
