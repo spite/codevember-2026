@@ -275,6 +275,8 @@ export class NetMorph extends BufferGeometry {
 
   // 0 = net A, 1 = net B.
   setMorph(t) {
+    if (t === this.morph) return this;
+    this.morph = t;
     const { field, nx, nz, gx, gz } = this;
     let a = this.a;
     let b = this.b;

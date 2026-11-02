@@ -186,8 +186,13 @@ const paper = new PipelineMaterial({
     creaseAmount: { value: defaults.creaseAmount },
   },
   varyings: { vCrease: "float", vValley: "vec2" },
-  vertexPars: "in float crease;\nin vec2 valley;",
-  vertexMain: "vCrease = crease; vValley = valley;",
+  vertexPars: "in float crease;\nin vec2 valley;\nuniform float paperFold;",
+  // Valley depth eases in with the fold (FoldedPaper's staticValley; same curve as easeInOutCubic).
+  vertexMain: /* glsl */ `
+vCrease = crease;
+float paperRise = 2.0 - 2.0 * paperFold;
+vValley = vec2(valley.x, valley.y * (paperFold < 0.5 ? 4.0 * paperFold * paperFold * paperFold : 1.0 - 0.5 * paperRise * paperRise * paperRise));
+`,
   fragmentPars: paperGLSL + "uniform float paperFold;\nuniform float creaseAmount;",
   surface: /* glsl */ `
 void surface(inout Surface s) {
@@ -307,6 +312,8 @@ void surface(inout Surface s) {
 
 const cyc = new Mesh(cycGeometry(), backdrop);
 cyc.userData.noShadow = true;
+// Drawn after the shapes, so its shading is skipped where they cover it.
+cyc.renderOrder = 1;
 scene.add(cyc);
 
 const physics = await Physics.create({ damping: 0.08, angularDamping: 0.12 });
@@ -474,6 +481,7 @@ const paperOptions = (item, fold) => ({
   pillow: 0.012,
   creaseJitter: 0.35,
   cornerRound: 0.04,
+  staticValley: true,
   seed: item.seed,
   fold,
 });
@@ -540,6 +548,24 @@ function setKinematic(kinematic) {
   for (const s of shapes) physics.setKinematic(s.entry, kinematic);
 }
 
+// New geometry is drawn empty for one frame while the old shapes unfold, so its upload doesn't land on the frame it first shows.
+const uploads = [];
+const uploader = new Group();
+scene.add(uploader);
+function startUploads() {
+  for (const geometry of uploads.splice(0, 2)) {
+    const mesh = new Mesh(geometry, paper);
+    mesh.frustumCulled = false;
+    mesh.userData.count = geometry.drawRange.count;
+    geometry.drawRange.count = 0;
+    uploader.add(mesh);
+  }
+}
+function endUploads() {
+  for (const mesh of uploader.children) mesh.geometry.drawRange.count = mesh.userData.count;
+  uploader.clear();
+}
+
 // One flat sheet per pair (old shape, new plan item), either side possibly missing.
 function buildSheet(tr, i, geometry) {
   const from = shapes[i];
@@ -564,9 +590,12 @@ function buildSheet(tr, i, geometry) {
     toPos: (to ? to.home : from.object.position).clone(),
     toQuat: (to ? to.quaternion : from.object.quaternion).clone(),
   };
+  uploads.push(geometry);
+  if (to) uploads.push(to.geometry);
 }
 
 function disposeSheets(tr) {
+  uploads.length = 0;
   for (const sh of tr.sheets) {
     if (!sh) continue;
     group.remove(sh.object);
@@ -646,6 +675,8 @@ function updateTransition(dt) {
     applyFold(t);
     pumpBuild(tr, performance.now() - start);
     if (t === 0 && tr.built) {
+      // Sheets about to show must keep their draw range; what's left uploads as they first draw.
+      uploads.length = 0;
       // The sheets start where the old flat nets are.
       tr.sheets.forEach((sh, i) => {
         const from = shapes[i];
@@ -834,5 +865,7 @@ render(({ time, dt }) => {
   keepInsideCyc();
   fitShadow();
   updateOccluders();
+  startUploads();
   pipeline.render(scene, camera, time);
+  endUploads();
 });

@@ -37,16 +37,6 @@ const angleAt = (V, f, i) => {
   return Math.acos(Math.min(1, Math.max(-1, dot(a, b))));
 };
 
-// True if p lies within the rounding radius of any corner ids[start..end).
-const nearCorner = (px, py, pz, ids, start, end, C, R2) => {
-  for (let q = start; q < end; q++) {
-    const c = ids[q] * 3;
-    const dx = px - C[c], dy = py - C[c + 1], dz = pz - C[c + 2];
-    if (dx * dx + dy * dy + dz * dz < R2[ids[q]]) return true;
-  }
-  return false;
-};
-
 // Set while FoldedPaper.create() runs the constructor, which then leaves the build steps to it.
 let deferring = false;
 
@@ -61,7 +51,8 @@ export class FoldedPaper extends BufferGeometry {
   // adaptiveRings, faces smaller than half the circumradius in inradius get proportionally fewer, at least 2), pillow (max face bow, fraction
   // of the mean edge, seeded per face), hingeJitter (max degrees each hinge stops short of shut;
   // opens the seams), creaseJitter (± fraction of per-hinge crease radius variation), cornerRound
-// (blunts convex peaks once folded: tip pulled in by this fraction of the mean edge).
+// (blunts convex peaks once folded: tip pulled in by this fraction of the mean edge), staticValley (the
+  // `valley` attribute keeps its folded depth instead of scaling it by easing(fold) each frame; for shaders that do it).
   constructor(solid, options = {}) {
     super();
     const steps = this._build(solid, options);
@@ -106,6 +97,7 @@ export class FoldedPaper extends BufferGeometry {
       hingeJitter: 0,
       creaseJitter: 0,
       cornerRound: 0,
+      staticValley: false,
       ...options,
     };
     this.options = o;
@@ -650,13 +642,11 @@ export class FoldedPaper extends BufferGeometry {
     const cN = f64(nV * 3);
     const cD = f64(nV);
     const cR = f64(nV);
-    const cR2 = f64(nV);
     this._corners.forEach((c, k) => {
       cC.set(c.C, k * 3);
       cN.set(c.n, k * 3);
       cD[k] = c.D;
       cR[k] = c.R;
-      cR2[k] = c.R * c.R;
     });
     const on = (k) => this._corners[k].on;
     const faceCornerStart = new Int32Array(nF + 1);
@@ -718,7 +708,7 @@ export class FoldedPaper extends BufferGeometry {
 
     this._d = {
       faceN, restV, amp, faceStart, kind, vRest, vDir, vHinge, vTaper, vCorner, lerpA, lerpB, lerpT, bubH, bubG,
-      cC, cN, cD, cR, cR2, faceCornerStart, faceCorners: Int32Array.from(faceCorners), hCorners,
+      cC, cN, cD, cR, faceCornerStart, faceCorners: Int32Array.from(faceCorners), hCorners,
       hTheta, hJitter, hDelay, hOff, hOffMax, hOffPer, hU, hDA, hE1, hE2, hA, hB, hParent, hStart, hEdge,
       order: Int32Array.from(order),
       faceParent: Int32Array.from(this.net.faces.map((f) => f.parent)),
@@ -734,7 +724,6 @@ export class FoldedPaper extends BufferGeometry {
       colN: f64((S + 1) * 3),
       colS: f64(S + 1),
       colC: f64(S + 1),
-      s: f64(6),
     };
   }
 
@@ -806,12 +795,15 @@ export class FoldedPaper extends BufferGeometry {
     this.fold = t;
     this._evaluate(t);
     // Valley depth follows the fold: none on the flat net.
-    const valley = this.attributes.valley;
-    const va = valley.array;
-    const vr = this._valleyRest;
-    const e = this.options.easing(t);
-    for (let i = 1, n = valley.count * 2; i < n; i += 2) va[i] = vr[i] * e;
-    valley.needsUpdate = true;
+    const e = this.options.staticValley ? 1 : this.options.easing(t);
+    if (e !== this._valleyScale) {
+      this._valleyScale = e;
+      const valley = this.attributes.valley;
+      const va = valley.array;
+      const vr = this._valleyRest;
+      for (let i = 1, n = valley.count * 2; i < n; i += 2) va[i] = vr[i] * e;
+      valley.needsUpdate = true;
+    }
     this.attributes.position.needsUpdate = true;
     this.attributes.normal.needsUpdate = true;
     this._boundingSphere();
@@ -913,7 +905,7 @@ export class FoldedPaper extends BufferGeometry {
     } else M.set(T);
 
     const { faceN, amp, faceStart, kind, vRest, vDir, vHinge, vTaper, lerpA, lerpB, lerpT, bubH, bubG } = d;
-    const { faceCornerStart, faceCorners, rest, s, cC, cR2 } = d;
+    const { faceCornerStart, faceCorners, rest, cC, cN, cD, cR } = d;
     const nF = faceStart.length - 1;
     for (let fi = 0; fi < nF; fi++) {
       const m = fi * 12;
@@ -968,10 +960,39 @@ export class FoldedPaper extends BufferGeometry {
           ny /= l;
           nz /= l;
         }
-        if (round > 0 && nearCorner(px, py, pz, faceCorners, c0, c1, cC, cR2)) {
-          s[0] = px; s[1] = py; s[2] = pz; s[3] = nx; s[4] = ny; s[5] = nz;
-          this._round(s, faceCorners, c0, c1, round);
-          px = s[0]; py = s[1]; pz = s[2]; nx = s[3]; ny = s[4]; nz = s[5];
+        // Rounded corners, inlined here and in the crease loop: tips sink by sqrt(z^2 + D^2) - z, z below the tip.
+        if (round > 0) {
+          for (let q = c0; q < c1; q++) {
+            const vi = faceCorners[q];
+            const R = cR[vi];
+            const c3 = vi * 3;
+            const dx = px - cC[c3], dy = py - cC[c3 + 1], dz0 = pz - cC[c3 + 2];
+            const d2 = dx * dx + dy * dy + dz0 * dz0;
+            if (d2 >= R * R) continue;
+            const dd = Math.sqrt(d2);
+            const cnx = cN[c3], cny = cN[c3 + 1], cnz = cN[c3 + 2];
+            const D = cD[vi] * round;
+            const z = Math.max(-(dx * cnx + dy * cny + dz0 * cnz), 0);
+            const hyp = Math.sqrt(z * z + D * D);
+            const x = clamp01((dd - 0.4 * R) / (0.6 * R));
+            const win = 1 - x * x * (3 - 2 * x);
+            const dwin = dd > 1e-9 && x > 0 && x < 1 ? (-6 * x * (1 - x)) / (0.6 * R * dd) : 0;
+            const f = (hyp - z) * win;
+            const dz = z > 0 ? (z / hyp - 1) * win : 0;
+            const kk = (hyp - z) * dwin;
+            const gx = -cnx * dz + dx * kk, gy = -cny * dz + dy * kk, gz = -cnz * dz + dz0 * kk;
+            px -= cnx * f;
+            py -= cny * f;
+            pz -= cnz * f;
+            // Exact normal under p -> p - n_c f(p): J^-T n is proportional to (1 - n_c.g) n + (n_c.n) g.
+            const a = 1 - (cnx * gx + cny * gy + cnz * gz);
+            const b = cnx * nx + cny * ny + cnz * nz;
+            const mx = nx * a + gx * b, my = ny * a + gy * b, mz = nz * a + gz * b;
+            const l = Math.sqrt(mx * mx + my * my + mz * mz) || 1;
+            nx = mx / l;
+            ny = my / l;
+            nz = mz / l;
+          }
         }
         P[i3] = m0 * px + m1 * py + m2 * pz + m3;
         P[i3 + 1] = m4 * px + m5 * py + m6 * pz + m7;
@@ -1036,10 +1057,37 @@ export class FoldedPaper extends BufferGeometry {
             pz = az + (e1z * ws + e2z * wc);
           }
           let nx = colN[j * 3], ny = colN[j * 3 + 1], nz = colN[j * 3 + 2];
-          if (round > 0 && nearCorner(px, py, pz, hCorners, hi * 2, hi * 2 + nc, cC, cR2)) {
-            s[0] = px; s[1] = py; s[2] = pz; s[3] = nx; s[4] = ny; s[5] = nz;
-            this._round(s, hCorners, hi * 2, hi * 2 + nc, round);
-            px = s[0]; py = s[1]; pz = s[2]; nx = s[3]; ny = s[4]; nz = s[5];
+          if (round > 0) {
+            for (let q = hi * 2, qe = q + nc; q < qe; q++) {
+              const vi = hCorners[q];
+              const R = cR[vi];
+              const c3 = vi * 3;
+              const dx = px - cC[c3], dy = py - cC[c3 + 1], dz0 = pz - cC[c3 + 2];
+              const d2 = dx * dx + dy * dy + dz0 * dz0;
+              if (d2 >= R * R) continue;
+              const dd = Math.sqrt(d2);
+              const cnx = cN[c3], cny = cN[c3 + 1], cnz = cN[c3 + 2];
+              const D = cD[vi] * round;
+              const z = Math.max(-(dx * cnx + dy * cny + dz0 * cnz), 0);
+              const hyp = Math.sqrt(z * z + D * D);
+              const x = clamp01((dd - 0.4 * R) / (0.6 * R));
+              const win = 1 - x * x * (3 - 2 * x);
+              const dwin = dd > 1e-9 && x > 0 && x < 1 ? (-6 * x * (1 - x)) / (0.6 * R * dd) : 0;
+              const f = (hyp - z) * win;
+              const dz = z > 0 ? (z / hyp - 1) * win : 0;
+              const kk = (hyp - z) * dwin;
+              const gx = -cnx * dz + dx * kk, gy = -cny * dz + dy * kk, gz = -cnz * dz + dz0 * kk;
+              px -= cnx * f;
+              py -= cny * f;
+              pz -= cnz * f;
+              const a = 1 - (cnx * gx + cny * gy + cnz * gz);
+              const b = cnx * nx + cny * ny + cnz * nz;
+              const mx = nx * a + gx * b, my = ny * a + gy * b, mz = nz * a + gz * b;
+              const l = Math.sqrt(mx * mx + my * my + mz * mz) || 1;
+              nx = mx / l;
+              ny = my / l;
+              nz = mz / l;
+            }
           }
           const i3 = i * 3;
           P[i3] = m0 * px + m1 * py + m2 * pz + m3;
@@ -1097,44 +1145,6 @@ export class FoldedPaper extends BufferGeometry {
         Nr[at + 1] = oy;
         Nr[at + 2] = oz;
       }
-    }
-  }
-
-  // Pulls points near convex corners in along the corner normal: depth sqrt(z^2 + D^2) - z for
-  // z = height below the tip, so the peak becomes a smooth cap. The normal follows the gradient.
-  // s holds [p, n] and is updated in place; ids[start..end) are the candidate corners.
-  _round(s, ids, start, end, w) {
-    const { cC, cN, cD, cR } = this._d;
-    for (let q = start; q < end; q++) {
-      const vi = ids[q];
-      const R = cR[vi];
-      const c3 = vi * 3;
-      const dx = s[0] - cC[c3], dy = s[1] - cC[c3 + 1], dz0 = s[2] - cC[c3 + 2];
-      const d2 = dx * dx + dy * dy + dz0 * dz0;
-      if (d2 >= R * R) continue;
-      const d = Math.sqrt(d2);
-      const cnx = cN[c3], cny = cN[c3 + 1], cnz = cN[c3 + 2];
-      const D = cD[vi] * w;
-      const z = Math.max(-(dx * cnx + dy * cny + dz0 * cnz), 0);
-      const hyp = Math.sqrt(z * z + D * D);
-      const x = clamp01((d - 0.4 * R) / (0.6 * R));
-      const win = 1 - x * x * (3 - 2 * x);
-      const dwin = d > 1e-9 && x > 0 && x < 1 ? (-6 * x * (1 - x)) / (0.6 * R * d) : 0;
-      const f = (hyp - z) * win;
-      const dz = z > 0 ? (z / hyp - 1) * win : 0;
-      const k = (hyp - z) * dwin;
-      const gx = -cnx * dz + dx * k, gy = -cny * dz + dy * k, gz = -cnz * dz + dz0 * k;
-      s[0] -= cnx * f;
-      s[1] -= cny * f;
-      s[2] -= cnz * f;
-      // Exact normal under p -> p - n_c f(p): J^-T n is proportional to (1 - n_c.g) n + (n_c.n) g.
-      const a = 1 - (cnx * gx + cny * gy + cnz * gz);
-      const b = cnx * s[3] + cny * s[4] + cnz * s[5];
-      const nx = s[3] * a + gx * b, ny = s[4] * a + gy * b, nz = s[5] * a + gz * b;
-      const l = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
-      s[3] = nx / l;
-      s[4] = ny / l;
-      s[5] = nz / l;
     }
   }
 
