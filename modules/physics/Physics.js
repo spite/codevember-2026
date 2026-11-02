@@ -82,6 +82,7 @@ class Physics {
     this.vec2 = new ammo.btVector3(0, 0, 0);
     this.quat = new ammo.btQuaternion(0, 0, 0, 1);
     this.tmpQ = new Quaternion();
+    this.tmpV = new Vector3();
 
     this.contacts = [];
     this.cooldown = new Map();
@@ -351,7 +352,9 @@ class Physics {
   }
 
   // Critically damped spring of one body toward target (used for grabbing).
-  drive(entry, target, strength) {
+  // Springs the body toward target. With anchor (a point in the body's own frame) the spring pulls
+  // that point instead of the centre, so dragging by a corner swings and spins the body.
+  drive(entry, target, strength, anchor = null) {
     if (entry.kinematic) return;
     const kp = strength;
     const kd = 2 * Math.sqrt(kp);
@@ -359,12 +362,29 @@ class Physics {
     const o = this.transform.getOrigin();
     const v = entry.body.getLinearVelocity();
     entry.body.activate();
+    if (!anchor) {
+      this.vec.setValue(
+        entry.mass * ((target.x - o.x()) * kp - v.x() * kd),
+        entry.mass * ((target.y - o.y()) * kp - v.y() * kd),
+        entry.mass * ((target.z - o.z()) * kp - v.z() * kd),
+      );
+      entry.body.applyCentralForce(this.vec);
+      return;
+    }
+    const q = this.transform.getRotation();
+    const r = this.tmpV.set(anchor.x, anchor.y, anchor.z).applyQuaternion(this.tmpQ.set(q.x(), q.y(), q.z(), q.w()));
+    const w = entry.body.getAngularVelocity();
+    // Velocity of the anchor point: v + w x r.
+    const vx = v.x() + w.y() * r.z - w.z() * r.y;
+    const vy = v.y() + w.z() * r.x - w.x() * r.z;
+    const vz = v.z() + w.x() * r.y - w.y() * r.x;
     this.vec.setValue(
-      entry.mass * ((target.x - o.x()) * kp - v.x() * kd),
-      entry.mass * ((target.y - o.y()) * kp - v.y() * kd),
-      entry.mass * ((target.z - o.z()) * kp - v.z() * kd),
+      entry.mass * ((target.x - o.x() - r.x) * kp - vx * kd),
+      entry.mass * ((target.y - o.y() - r.y) * kp - vy * kd),
+      entry.mass * ((target.z - o.z() - r.z) * kp - vz * kd),
     );
-    entry.body.applyCentralForce(this.vec);
+    this.vec2.setValue(r.x, r.y, r.z);
+    entry.body.applyForce(this.vec, this.vec2);
   }
 
   applyForces() {
@@ -409,7 +429,8 @@ class Physics {
       let ty = 0;
       let tz = 0;
 
-      const homeTorque = entry.homeTorque ?? this.homeTorque;
+      // freeSpin (set while dragged by a point) lets the body tumble instead of righting itself.
+      const homeTorque = entry.freeSpin ? 0 : (entry.homeTorque ?? this.homeTorque);
       if (homeTorque > 0) {
         const r = this.transform.getRotation();
         // Error rotation home * conj(current), in world space.

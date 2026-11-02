@@ -47,4 +47,9 @@ if (urlSeed) {
   setSeed(Math.floor(nativeRandom() * 0xffffffff).toString(36));
 }
 
-export { setSeed, getSeed, newSeed, nativeRandom, urlSeed };
+// An independent stream for a given string, unaffected by whatever drew from Math.random before.
+function seededRandom(s) {
+  return mulberry32(hash(String(s)));
+}
+
+export { setSeed, getSeed, newSeed, nativeRandom, urlSeed, seededRandom };

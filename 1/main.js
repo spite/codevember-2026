@@ -12,6 +12,8 @@ import {
   addActionButton,
   isRunning,
   onPause,
+  loadSeed,
+  getSeed,
 } from "common";
 import { GUI } from "guspira";
 import {
@@ -40,7 +42,10 @@ import { NetMorph } from "modules/polyhedra/NetMorph.js";
 import { Physics } from "modules/physics/Physics.js";
 import { createPointer } from "modules/physics/pointer.js";
 import { createPaperSound } from "./sound.js";
-import { nativeRandom } from "modules/random.js";
+import { nativeRandom, seededRandom } from "modules/random.js";
+
+// What "mixed" draws from.
+const MIXED = [...families.platonic, "truncatedDodecahedron", "truncatedIcosahedron"];
 
 const shapeNames = [
   "mixed",
@@ -48,6 +53,8 @@ const shapeNames = [
   "cuboctahedron",
   "truncatedTetrahedron",
   "truncatedOctahedron",
+  "truncatedDodecahedron",
+  "truncatedIcosahedron",
   "rhombicDodecahedron",
   "triakisTetrahedron",
   "smallStellatedDodecahedron",
@@ -63,6 +70,7 @@ const defaults = {
   bounce: 0.35,
   drift: 1.5,
   spin: 0.3,
+  creaseAmount: 0.6,
 };
 
 const params = fromDefaults(defaults);
@@ -149,6 +157,7 @@ gui.addSlider("Home spring", params.homeStrength, 0.2, 6, 0.01);
 gui.addSlider("Bounce", params.bounce, 0, 0.9, 0.01);
 gui.addSlider("Drift", params.drift, 0, 4, 0.01);
 gui.addSlider("Spin", params.spin, 0, 1, 0.01, { randomizable: false });
+gui.addSlider("Crease", params.creaseAmount, 0, 1, 0.01);
 pipeline.addGUI(gui);
 gui.addSeparator();
 gui.addText(
@@ -174,11 +183,12 @@ const paper = new PipelineMaterial({
   uniforms: {
     ...paperUniforms(paperTexture, { bump: 0.14, tone: 0.035, fibreTone: 0.035, bumpRoughness: 0.5, bumpGrazing: 1 }),
     paperFold: { value: 1 },
+    creaseAmount: { value: defaults.creaseAmount },
   },
   varyings: { vCrease: "float", vValley: "vec2" },
   vertexPars: "in float crease;\nin vec2 valley;",
   vertexMain: "vCrease = crease; vValley = valley;",
-  fragmentPars: paperGLSL + "uniform float paperFold;",
+  fragmentPars: paperGLSL + "uniform float paperFold;\nuniform float creaseAmount;",
   surface: /* glsl */ `
 void surface(inout Surface s) {
   float c = abs(vCrease);
@@ -189,7 +199,7 @@ void surface(inout Surface s) {
   s.roughness = clamp(s.roughness - 0.08 * max(vCrease, 0.0) * grain, 0.0, 1.0);
   if (vCrease < 0.0) s.occlusion *= 1.0 - 0.15 * c;
   // Long soft gradient into concave creases, deeper for sharper bends.
-  s.occlusion *= mix(1.0 - 0.6 * sqrt(vValley.y), 1.0, smoothstep(0.0, 0.8, vValley.x));
+  s.occlusion *= mix(1.0 - creaseAmount * sqrt(vValley.y), 1.0, smoothstep(0.0, 0.8, vValley.x));
   s.albedo *= 1.0 - 0.03 * smoothstep(0.85, 1.0, c);
   // The inside of a closed shape, seen through a seam, is dim.
   if (!gl_FrontFacing) {
@@ -306,6 +316,7 @@ const pointer = createPointer({
   camera,
   domElement: renderer.domElement,
   controls,
+  grabAtPoint: true,
 });
 
 camera.near = 0.5;
@@ -411,14 +422,24 @@ function pickColors(count) {
   return shuffle(colors);
 }
 
-// Every random draw for a layout happens here, so geometry can be built later without shifting the seed.
+// Every random draw for a layout happens here, from the seed alone, so a link with the same seed and params rebuilds it.
 function planShapes() {
+  const random = Math.random;
+  Math.random = seededRandom(`${getSeed()}:layout`);
+  try {
+    return planLayout();
+  } finally {
+    Math.random = random;
+  }
+}
+
+function planLayout() {
   const count = Math.round(params.count());
-  const name = params.solid();
+  const name = shapeNames.includes(params.solid()) ? params.solid() : "mixed";
   const radii = [];
   const picks = [];
   for (let i = 0; i < count; i++) {
-    picks.push(name === "mixed" ? families.platonic[Math.floor(Math.random() * 5)] : name);
+    picks.push(name === "mixed" ? MIXED[Math.floor(Math.random() * MIXED.length)] : name);
     radii.push(params.size() * (0.75 + Math.random() * 0.45));
   }
   const homes = placeHomes(radii);
@@ -439,10 +460,13 @@ function planShapes() {
   }));
 }
 
+// Crease sets the fold fillet width: 0 is a sharp fold, the default 0.6 gives 0.07 of the edge.
+const creaseRadius = () => 0.12 * params.creaseAmount();
+
 const paperOptions = (item, fold) => ({
   size: item.radius,
-  creaseRadius: 0.07,
-  foldingCreaseRadius: 0.1,
+  creaseRadius: creaseRadius(),
+  foldingCreaseRadius: Math.max(0.1, 1.43 * creaseRadius()),
   // Lighter meshes on touch devices: folding updates every vertex on the CPU.
   creaseSegments: touch ? 4 : 6,
   faceSubdivisions: touch ? 1 : 2,
@@ -461,6 +485,7 @@ function planGeometry(item, fold) {
 function setPaperFold(mesh) {
   mesh.onBeforeRender = (r, sc, cam, geo, material) => {
     material.uniforms.paperFold.value = geo.fold;
+    material.uniforms.creaseAmount.value = params.creaseAmount();
     material.uniformsNeedUpdate = true;
   };
 }
@@ -595,7 +620,7 @@ function startTransition() {
   transition = { phase: "unfold", time: 0, plan, sheets: [], built: false, total: Math.max(plan.length, shapes.length) };
   transition.build = buildSteps(transition);
   setKinematic(true);
-  sound.play("crumple", { gain: 0.35 });
+  sound.play("open", { gain: 0.45 });
   creaseSounds(shapes.map((s) => s.object), UNFOLD, 0.5);
 }
 
@@ -723,11 +748,52 @@ builtKey = key();
 
 onRandomize(() => gui.randomizeAll());
 
+// Rebuilds the paper in place once the Crease slider settles: same shapes and layout, new fillets.
+let builtCrease = params.creaseAmount();
+let seenCrease = builtCrease;
+let creaseChanged = 0;
+function updateCrease(time) {
+  const value = params.creaseAmount();
+  if (value !== seenCrease) {
+    seenCrease = value;
+    creaseChanged = time;
+  }
+  if (value === builtCrease || transition || time - creaseChanged < 0.25) return;
+  builtCrease = value;
+  for (const s of shapes) {
+    const old = s.paper;
+    const options = { ...old.options, creaseRadius: creaseRadius(), foldingCreaseRadius: Math.max(0.1, 1.43 * creaseRadius()), fold: old.fold };
+    s.paper = s.mesh.geometry = new FoldedPaper(old.solid, options);
+    old.dispose();
+  }
+}
+
 const dq = new Quaternion();
 let started = false;
 
 await studio;
 await pipeline.compileAsync(scene, camera);
+
+// Handle for scripted capture and the console: nextLook() transitions to a seed or a set of settings.
+window.app = {
+  canvas: renderer.domElement,
+  pipeline,
+  controls,
+  sound,
+  // Throws every shape outward from the middle of the cluster, like a tap on empty space.
+  scatter(strength = 2.2) {
+    physics.burst(new Vector3(0, -0.3, 0.6), new Vector3(0, 0.35, 0.25), strength, 9, "soft", 1.2);
+    sound.play("rustle", { gain: 0.5 });
+  },
+  // A seed string, or settings ({ solid, count, ... }) applied over the defaults, like a url without a seed.
+  nextLook(look) {
+    if (typeof look === "string") loadSeed(look);
+    else if (look) {
+      params.$reset();
+      params.$apply(look);
+    }
+  },
+};
 
 render(({ time, dt }) => {
   if (key() !== builtKey) {
@@ -742,6 +808,7 @@ render(({ time, dt }) => {
   started = true;
   try {
     updateTransition(dt);
+    updateCrease(performance.now() / 1000);
   } catch (error) {
     cancelTransition(error);
   }

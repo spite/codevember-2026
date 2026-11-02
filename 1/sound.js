@@ -3,7 +3,7 @@
 
 import { nativeRandom } from "modules/random.js";
 
-const SETS = { crease: 6, crumple: 3, rustle: 6, tap: 8 };
+const SETS = { crease: 10, open: 2, rustle: 4, tap: 8 };
 const MAX_VOICES = 10;
 
 export function createPaperSound({ base = "./sounds/", enabled = true } = {}) {
@@ -12,6 +12,7 @@ export function createPaperSound({ base = "./sounds/", enabled = true } = {}) {
   let on = enabled;
   let voices = 0;
   let paused = false;
+  let logger = null;
   const buffers = {};
   const last = {};
 
@@ -48,6 +49,14 @@ export function createPaperSound({ base = "./sounds/", enabled = true } = {}) {
 
   // gain 0..1, pan -1..1, delay in seconds; never repeats the previous variant of a set.
   function play(name, { gain = 1, pan = 0, delay = 0, rate = 1 } = {}) {
+    // Offline renders (video capture) get every event, with its variant and pitch, whether or not audio runs.
+    if (logger && on && !paused && gain > 0.001 && SETS[name]) {
+      let i = Math.floor(nativeRandom() * SETS[name]);
+      if (SETS[name] > 1 && i === last[name]) i = (i + 1) % SETS[name];
+      last[name] = i;
+      logger({ name, variant: i, gain: Math.min(1, gain), pan, rate: rate * (0.9 + nativeRandom() * 0.2), time: performance.now() / 1000 + delay });
+      return;
+    }
     if (!ctx || !on || paused || ctx.state !== "running" || voices >= MAX_VOICES) return;
     const list = (buffers[name] || []).filter(Boolean);
     if (!list.length || gain <= 0.001) return;
@@ -79,5 +88,10 @@ export function createPaperSound({ base = "./sounds/", enabled = true } = {}) {
     else ctx.resume();
   }
 
-  return { play, setEnabled, setPaused, get enabled() { return on; } };
+  // fn(event) receives each sound instead of it playing; null restores playback.
+  function setLogger(fn) {
+    logger = fn;
+  }
+
+  return { play, setEnabled, setPaused, setLogger, get enabled() { return on; } };
 }

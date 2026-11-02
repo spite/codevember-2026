@@ -18,8 +18,85 @@ const query = new URLSearchParams(window.location.search);
 // UI stuff
 
 // One signal per key, with guspira's $ helpers (options as in createParams).
+// Every set is also mirrored in the url: the seed plus whatever differs from what that seed gives.
+const paramSets = [];
+const baselines = new Map();
+const rerolled = new Map();
+
 function fromDefaults(defaults, options) {
-  return createParams(defaults, options);
+  const params = createParams(defaults, options);
+  paramSets.push(params);
+  baselines.set(params, { ...defaults });
+  return params;
+}
+
+// Query keys the base itself uses.
+const reservedKeys = new Set(["seed", "size", "w", "h", "dpr", "capture", "quality"]);
+// A param named like a reserved key goes in the url with a leading underscore.
+const urlKey = (k) => (reservedKeys.has(k) ? `_${k}` : k);
+const sameValue = (a, b) => String(a) === String(b);
+
+function coerceParam(raw, def) {
+  if (typeof def === "number") {
+    const v = parseFloat(raw);
+    return Number.isFinite(v) ? v : undefined;
+  }
+  if (typeof def === "boolean") return raw === "true" || raw === "1";
+  if (Array.isArray(def)) {
+    const v = raw.split(",").map(Number);
+    return v.every(Number.isFinite) ? v : undefined;
+  }
+  return raw;
+}
+
+// Runs the randomize handlers and records what the seed produced. Keys the handlers have
+// never changed (not randomizable) keep their default as the baseline, as a fresh load would.
+function applySeedHandlers(value) {
+  const before = paramSets.map((p) => p.$snapshot(p.$keys));
+  for (const fn of randomizeFns) fn(value);
+  paramSets.forEach((p, i) => {
+    const after = p.$snapshot(p.$keys);
+    if (!rerolled.has(p)) rerolled.set(p, new Set());
+    const seen = rerolled.get(p);
+    const base = {};
+    for (const k of p.$keys) {
+      if (!sameValue(after[k], before[i][k])) seen.add(k);
+      base[k] = seen.has(k) ? after[k] : p.$defaults[k];
+    }
+    baselines.set(p, base);
+  });
+}
+
+function applyUrlParams() {
+  for (const p of paramSets) {
+    const values = {};
+    for (const k of p.$keys) {
+      if (!query.has(urlKey(k))) continue;
+      const v = coerceParam(query.get(urlKey(k)), p.$defaults[k]);
+      if (v !== undefined) values[k] = v;
+    }
+    p.$apply(values);
+  }
+}
+
+let seeded = !!urlSeed;
+let lastUrl = "";
+
+function writeUrl() {
+  const url = new URL(window.location.href);
+  if (seeded) url.searchParams.set("seed", getSeed());
+  for (const p of paramSets) {
+    const base = baselines.get(p);
+    for (const k of p.$keys) {
+      const v = p[k].target();
+      if (sameValue(v, base[k])) url.searchParams.delete(urlKey(k));
+      else url.searchParams.set(urlKey(k), Array.isArray(v) ? v.join(",") : String(v));
+    }
+  }
+  const href = url.toString();
+  if (href === lastUrl) return;
+  lastUrl = href;
+  if (href !== window.location.href) history.replaceState(null, "", href);
 }
 
 // Guspira's rerolls follow the seeded Math.random whatever order modules load in.
@@ -45,13 +122,16 @@ document.body.appendChild(renderer.domElement);
 
 let composer = null;
 
+// ?size=N renders an exact N x N canvas at pixel ratio 1, whatever the window (for recording).
+const fixedSize = parseInt(query.get("size")) || 0;
+
 function getPixelRatio() {
-  return pixelRatioOverride ?? Math.min(window.devicePixelRatio, maxDPR);
+  return pixelRatioOverride ?? (fixedSize ? 1 : Math.min(window.devicePixelRatio, maxDPR));
 }
 
 function getSize() {
-  const w = parseInt(query.get("w")) || window.innerWidth;
-  const h = parseInt(query.get("h")) || window.innerHeight;
+  const w = fixedSize || parseInt(query.get("w")) || window.innerWidth;
+  const h = fixedSize || parseInt(query.get("h")) || window.innerHeight;
   return { w, h };
 }
 
@@ -181,7 +261,17 @@ function onRandomize(fn) {
 
 function randomize() {
   newSeed();
-  for (const fn of randomizeFns) fn(getSeed());
+  seeded = true;
+  applySeedHandlers(getSeed());
+  writeUrl();
+}
+
+// Jumps to a known seed, as if the page had been loaded with ?seed=.
+function loadSeed(seed) {
+  setSeed(seed);
+  seeded = true;
+  applySeedHandlers(getSeed());
+  writeUrl();
 }
 
 // Keyboard
@@ -291,9 +381,13 @@ let frameFn = null;
 // fn({ time, dt, frame }) is called every frame; time and dt stop while paused.
 function render(fn) {
   // A ?seed= url replays the randomize handlers so it reproduces the result.
-  if (urlSeed && frame === 0) {
-    setSeed(urlSeed);
-    for (const f of randomizeFns) f(urlSeed);
+  // Then any params in the url go on top, so a copied link reproduces edits made after randomizing.
+  if (frame === 0) {
+    if (urlSeed) {
+      setSeed(urlSeed);
+      applySeedHandlers(urlSeed);
+    }
+    applyUrlParams();
   }
   frameFn = fn;
   renderer.setAnimationLoop((timestamp) => {
@@ -302,6 +396,8 @@ function render(fn) {
     time += dt;
     fn({ time, dt, frame });
     if (frame === 0) ready();
+    // Cheap enough to check twice a second; GUI edits show up in the url without hooks per param.
+    if (frame % 30 === 0) writeUrl();
     frame++;
   });
   return () => renderer.setAnimationLoop(null);
@@ -342,6 +438,7 @@ export {
   pause,
   onPause,
   randomize,
+  loadSeed,
   onRandomize,
   getSeed,
   addKey,

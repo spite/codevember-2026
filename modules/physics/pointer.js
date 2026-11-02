@@ -1,4 +1,4 @@
-import { Raycaster, Vector2, Vector3, Plane, Matrix4 } from "three";
+import { Raycaster, Vector2, Vector3, Plane, Matrix4, Quaternion } from "three";
 
 const defaults = {
   enabled: true,
@@ -13,6 +13,7 @@ const defaults = {
   falloff: "soft",
   tapDistance: 6, // px of movement still counted as a tap
   tapTime: 300, // ms
+  grabAtPoint: false, // drag by the grabbed point (shapes swing and spin) instead of the centre
 };
 
 // Drag a body to shove others, release to throw it; tap empty space to burst, hover to nudge.
@@ -32,6 +33,8 @@ export function createPointer({ physics, camera, domElement, controls = null, sp
   const tmp = new Vector3();
   const viewDir = new Vector3();
   const inverse = new Matrix4();
+  const anchor = new Vector3();
+  const unrotate = new Quaternion();
 
   let over = false;
   let grabbed = null;
@@ -102,6 +105,7 @@ export function createPointer({ physics, camera, domElement, controls = null, sp
     if (!grabbed) return;
     const entry = grabbed;
     entry.grabbed = false;
+    entry.freeSpin = false;
     grabbed = null;
     if (throwIt && settings.throwStrength > 0) {
       const speed = velocity.length();
@@ -130,6 +134,11 @@ export function createPointer({ physics, camera, domElement, controls = null, sp
     const parent = spaceOf(grabbed);
     toLocal(local.copy(found.point), parent);
     offset.copy(grabbed.object.position).sub(local);
+    if (settings.grabAtPoint) {
+      // The grabbed point in the body's own frame, so it stays put on the shape as it turns.
+      anchor.copy(local).sub(grabbed.object.position).applyQuaternion(unrotate.copy(grabbed.object.quaternion).invert());
+      grabbed.freeSpin = true;
+    }
     prevLocal.copy(local);
     velocity.set(0, 0, 0);
     hasPrev = true;
@@ -199,9 +208,13 @@ export function createPointer({ physics, camera, domElement, controls = null, sp
       }
       prevLocal.copy(local);
       hasPrev = true;
-      target.copy(local).add(offset);
       // Paused frames never step, so a drive force would pile up in Bullet until the next step.
-      if (dt > 0) physics.drive(grabbed, target, settings.grabStrength);
+      if (settings.grabAtPoint) {
+        if (dt > 0) physics.drive(grabbed, local, settings.grabStrength, anchor);
+      } else {
+        target.copy(local).add(offset);
+        if (dt > 0) physics.drive(grabbed, target, settings.grabStrength);
+      }
       return;
     }
     if (over && settings.hoverStrength > 0 && dt > 0) {

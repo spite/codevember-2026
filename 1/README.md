@@ -16,11 +16,13 @@ a procedural studio environment, soft denoised PCSS shadows, analytic sphere
 occlusion under the floating shapes, screen-space AO and indirect light, and
 AgX tonemapping.
 
-Sound (M or the speaker button toggles it; it starts on the first click or key): creases while the
-shapes fold and unfold, a rustle as the flat sheets morph, and soft taps when shapes bump, scaled by
-the contact impulse. One-shots cut from CC0 recordings on freesound.org:
-"Folding paper" by bojan_t95 (507009), "Paper rustle/Plane Ticket" by puppetmaster685719 (627059),
-"PAPER RUSTLING" by stevielematt (707835), "Paper in hands" by Aurelon (693923),
-"20 Cardboard Folding" by Coral_Island_Studios (459447), "Office paper crumple folding handling" by
-WavJunction.com (456769), "FX_Paper moving but not folding" by ssugg (588320), and
-"handle_paper_2/3" by jakobhandersen (181054, 181053).
+Sound (M or the speaker button toggles it; it starts on the first click or key): soft page-turn
+swishes as the shapes fold and unfold and as the flat sheets morph, and paper taps when shapes bump,
+scaled by the contact impulse. One-shots cut from CC0 recordings on freesound.org: "Turned page" by
+MBPL (667180), "Book_Turning_Pages_01" by moai15 (336374), "book_pages" by drummy (458887),
+"Turn Page" by KikeVilaplana (511402), "Turning pages" by Suspirias (795507),
+"book_page_paper_handling_fingerOnPaper" by EricsSoundschmiede (709263), "PAGES TURNING" by
+ThatMisfit (388782), "page turn sound effect" by stumpbutt (431871), "Paper in hands" by Aurelon
+(693923), "20 Cardboard Folding" by Coral_Island_Studios (459447), "FX_Paper moving but not
+folding" by ssugg (588320), "Paper play and crease foldn" by 9thHOLLOWProductions (705165) and
+"creasing paper" by krb21 (118606).
