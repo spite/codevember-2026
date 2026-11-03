@@ -87,13 +87,17 @@ export class ShadowMaskPass {
       normalThreshold: { value: gi.normalThreshold },
       historyClamp: { value: historyClamp },
     });
-    this.blurMaterial = make(blurFragment, {
-      tInput: { value: null },
-      tGeo: { value: null },
-      stepSize: { value: 1 },
-      planeSigma: { value: gi.planeSigma },
-      normalPower: { value: gi.normalPower },
-    });
+    this.blurMaterial = make(
+      blurFragment,
+      {
+        tInput: { value: null },
+        tGeo: { value: null },
+        stepSize: { value: 1 },
+        planeSigma: { value: gi.planeSigma },
+        normalPower: { value: gi.normalPower },
+      },
+      { PENUMBRA_LIMIT: "" },
+    );
 
     this.traceTarget = target(HalfFloatType);
     this.history = [0, 1].map(() => {

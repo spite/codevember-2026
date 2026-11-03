@@ -184,9 +184,6 @@ void main() {
         float rnd = fract(n1 * 7.13 + float(s) * 0.618034 + float(side) * 0.5 + float(i) * 0.31);
         if (dist > radius * mix(0.5, 1.0, rnd)) continue;
 
-        // Samples far in front of P belong to another surface (silhouette halos): skip them.
-        if (dot(delta, V) > thick) continue;
-
         vec3 deltaDir = delta / dist;
         vec2 fb = vec2(dot(deltaDir, V), dot(normalize(delta - V * thick), V));
         fb = sd * acos(clamp(fb, -1.0, 1.0));
@@ -269,10 +266,9 @@ void main() {
     vec3 nw = octDecode(g.yz);
     vec3 V = isOrtho > 0.5 ? vec3(0.0, 0.0, 1.0) : normalize(-P);
     float expectZ = g.x;
-    if (isOrtho < 0.5) {
-      vec4 pc = uPrevViewProjection * (uViewInverse * vec4(P, 1.0));
-      expectZ = pc.w > 0.0 ? pc.w : g.x;
-    }
+    vec4 pc = uPrevViewProjection * (uViewInverse * vec4(P, 1.0));
+    if (isOrtho > 0.5) expectZ = max((-1.0 - pc.z / pc.w) / depthInfo.x + 1e-3, 1e-3);
+    else if (pc.w > 0.0) expectZ = pc.w;
     // Grazing surfaces change depth fast across a texel, so widen the tolerance there.
     float grazing = max(abs(dot(mat3(uView) * nw, V)), 0.05);
     float tol = depthTolerance / grazing;
@@ -354,6 +350,10 @@ void main() {
   float k[3] = float[3](0.375, 0.25, 0.0625);
   int st = int(stepSize);
   float sigma = max(planeSigma * stepSize * g.x, 1e-6);
+#ifdef PENUMBRA_LIMIT
+  // Shadow mask: taps stay within the PCF kernel radius (.g), so hard and contact edges aren't smeared.
+  float reach = max(texelFetch(tInput, h, 0).g, 0.5);
+#endif
 
   vec4 sum = vec4(0.0);
   float wsum = 0.0;
@@ -361,6 +361,9 @@ void main() {
     for (int x = -2; x <= 2; x++) {
       ivec2 t = h + ivec2(x, y) * st;
       if (any(lessThan(t, ivec2(0))) || any(greaterThanEqual(t, ivec2(halfRes)))) continue;
+#ifdef PENUMBRA_LIMIT
+      if (float(max(abs(x), abs(y)) * st) > reach) continue;
+#endif
       vec4 tg = texelFetch(tGeo, t, 0);
       if (tg.x <= 0.0) continue;
       vec3 Pt = viewPosition(halfToUv(t), tg.x);
@@ -413,7 +416,10 @@ float giDepthTolerance() {
   return 0.02 * z + 2.0 * fwidth(z);
 }
 
-vec4 giUpsample(sampler2D map, vec3 worldNormal, float zTol) {
+// match is 1 when a texel matched this pixel, else the fallback's weight (thin geometry missing from
+// the half-res buffer gets a low match).
+vec4 giUpsample(sampler2D map, vec3 worldNormal, float zTol, out float match) {
+  match = 1.0;
   ivec2 hs = textureSize(map, 0);
   float z = giLinearDepth(gl_FragCoord.z);
   // A zero normal (the no-argument overload) disables the normal weight.
@@ -454,7 +460,13 @@ vec4 giUpsample(sampler2D map, vec3 worldNormal, float zTol) {
       }
     }
   }
+  match = bestW;
   return best;
+}
+
+vec4 giUpsample(sampler2D map, vec3 worldNormal, float zTol) {
+  float match;
+  return giUpsample(map, worldNormal, zTol, match);
 }
 
 vec4 giUpsample(sampler2D map, vec3 worldNormal) {

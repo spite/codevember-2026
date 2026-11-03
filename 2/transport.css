@@ -1,0 +1,114 @@
+#transport {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(560px, calc(100% - 40px));
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px 6px 6px;
+  background-color: #2c2c2c;
+  color: #e0e0e0;
+  font-family: "Segoe UI", sans-serif;
+  font-size: 13px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hide-ui #transport {
+  display: none;
+}
+
+.transport-button {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #3a3a3a;
+  }
+
+  &:active {
+    background-color: #1e1e1e;
+  }
+
+  &:focus-visible {
+    outline: 1px solid #8a8a8a;
+  }
+}
+
+.transport-readout {
+  flex-shrink: 0;
+  width: 3.2em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #bdbdbd;
+}
+
+#transport input[type="range"] {
+  --progress: 0%;
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  margin-left: 10px;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  touch-action: none;
+
+  &::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(to right, #e0e0e0 var(--progress), #555 var(--progress));
+  }
+
+  &::-moz-range-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(to right, #e0e0e0 var(--progress), #555 var(--progress));
+  }
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  }
+
+  &::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: 0;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+/* Phones: the panel takes the bottom, so the transport sits under the top row of buttons. */
+@media (max-width: 950px) {
+  #transport {
+    top: calc(64px + env(safe-area-inset-top));
+    bottom: auto;
+    width: calc(100% - 20px - env(safe-area-inset-left) - env(safe-area-inset-right));
+  }
+}

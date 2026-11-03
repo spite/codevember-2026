@@ -197,8 +197,8 @@ float sphereOcclusion(vec3 p, vec3 n) {
     vec3 D = o.xyz - p;
     float d = length(D);
     float r = max(o.w, 1e-6);
-    // Points inside the sphere (the occluder's own surface) are left alone.
-    float outside = smoothstep(0.8 * r, 1.2 * r, d);
+    // Points deep inside the sphere (the occluder's own surface) are left alone; contact at d ~ r is not.
+    float outside = smoothstep(0.3 * r, 0.6 * r, d);
     float occ = (r * r) / max(d * d, r * r) * clamp(dot(n, D / max(d, 1e-4)), 0.0, 1.0);
     occ *= outside * (1.0 - smoothstep(0.5 * occluderReach * r, occluderReach * r, d));
     vis *= o.w > 0.0 ? exp(-occ * occluderStrength) : 1.0;
@@ -267,12 +267,17 @@ void main() {
   // Direct key light; lightColor is irradiance, so diffuse = lightColor * NdotL * albedo / pi.
   vec3 L = normalize(lightDirection);
   vec3 H = normalize(L + V);
-  float NdotL = clamp(dot(n, L), 0.0, 1.0);
+  // A geometric back face gets no key, even where the shading normal tilts toward it.
+  float NdotL = clamp(dot(n, L), 0.0, 1.0) * step(0.0, dot(N, L));
   float NdotH = clamp(dot(n, H), 0.0, 1.0);
   float VdotH = clamp(dot(V, H), 0.0, 1.0);
   #ifdef OPAQUE
   float zTol = giDepthTolerance();
-  float shadow = shadowMaskEnabled > 0.5 ? giUpsample(shadowMask, N, zTol).a : getShadow(P, N);
+  // Pixels the half-res mask has no match for (thin geometry) trace their own shadow.
+  float maskMatch = 0.0;
+  float shadow = 1.0;
+  if (shadowMaskEnabled > 0.5) shadow = giUpsample(shadowMask, N, zTol, maskMatch).a;
+  if (maskMatch < 0.05) shadow = getShadow(P, N);
   #else
   float shadow = getShadow(P, N);
   #endif
@@ -310,7 +315,7 @@ void main() {
   vec3 R = reflect(-V, n);
   R = normalize(mix(R, n, alpha * alpha));
   vec3 radiance = textureLod(envMap, envRotation * R, envMapMaxLod * rough * (2.0 - rough)).rgb * envIntensity;
-  float so = specularOcclusion(NdotV, ao, rough);
+  float so = specularOcclusion(NdotV, ao, alpha);
 
   vec3 indirectDiffuse = kD * (irradiance * aoTint + gi.rgb * giIntensity);
   vec3 indirectSpecular = (radiance * FssEss + multiScatter * irradiance) * so;

@@ -37,6 +37,7 @@ import { prevMatrixSource } from "./PipelineMaterial.js";
 import { ShadowPass } from "./ShadowPass.js";
 import { GIPass } from "./GIPass.js";
 import { ShadowMaskPass } from "./ShadowMaskPass.js";
+import { DepthOfFieldPass } from "./DepthOfFieldPass.js";
 import { fullscreenVertex, copyFragment } from "shaders/pipeline/copy.js";
 import { bloomDownFragment, bloomUpFragment } from "shaders/pipeline/bloom.js";
 import { finalFragment } from "shaders/pipeline/final.js";
@@ -121,6 +122,9 @@ const _q0 = new Quaternion();
 const _q1 = new Quaternion();
 const _dq = new Quaternion();
 const _axis = new Vector3();
+const _lens = { x: 0, y: 0, jx: 0, jy: 0 };
+const _right = new Vector3();
+const _up = new Vector3();
 
 class Pipeline {
   constructor(renderer, options = {}) {
@@ -161,9 +165,22 @@ class Pipeline {
     this.motionBlurAvailable = !!motionOptions;
     this.motionBlur = motionOptions ? (motionOptions.enabled ?? true) : false;
     this.shutter = motionOptions?.shutter ?? 1 / 30;
-    this.motionSamples = motionOptions?.samples ?? (this.quality === "capture" ? 32 : 16);
+    this.motionSamples = motionOptions?.samples ?? (this.quality === "capture" ? 32 : 24);
     this.motionMaxBlur = motionOptions?.maxBlur ?? 0.03; // half-length cap, as a fraction of the height
     this.motionSoftZ = motionOptions?.softZ ?? 0.1;
+
+    // (hdrTexture, { depthTexture, camera, width, height }) => texture, run before bloom; see render().
+    this.composite = options.composite ?? null;
+
+    // Opt-in depth of field (perspective cameras). Set dof.focus (distance) and dof.aperture (blur of
+    // infinity, as a fraction of the height). Live frames are blurred by depth; while nothing changes,
+    // frames from across the lens are averaged up to lensSamples for the exact result.
+    const dofOptions = options.depthOfField;
+    this.dof = dofOptions ? new DepthOfFieldPass(dofOptions) : null;
+    this.dofEnabled = !!dofOptions && (dofOptions.enabled ?? true);
+    this.lensSamples = dofOptions?.lensSamples ?? 256;
+    this.lensCount = 0;
+    this._stillKey = [];
 
     this.shadow = new ShadowPass({ mapSize: shadowOptions.mapSize });
     this.gi = new GIPass({ ...tier.gi, ...options.giOptions });
@@ -195,7 +212,7 @@ class Pipeline {
       this.blurTarget = colorTarget(HalfFloatType);
       const velocity = { tVelocity: { value: this.motionTarget.texture }, resolution: { value: new Vector2() }, maxRadius: { value: 32 } };
       this.tileMaxMaterial = quadMaterial(tileMaxFragment, { ...velocity, tile: { value: 32 } });
-      this.neighborMaxMaterial = quadMaterial(neighborMaxFragment, { tTiles: { value: this.tileTarget.texture } });
+      this.neighborMaxMaterial = quadMaterial(neighborMaxFragment, { tTiles: { value: this.tileTarget.texture }, reach: { value: 4 } });
       this.reconstructMaterial = quadMaterial(reconstructFragment, {
         ...velocity,
         tColor: { value: null },
@@ -292,15 +309,20 @@ class Pipeline {
       rt.setSize(w, h);
     }
     this.gi.setSize(w, h);
+    this.dof?.setSize(w, h);
+    this.lensCount = 0;
     if (this.motionBlurAvailable) {
       this.motionTarget.setSize(w, h);
       this.blurTarget.setSize(w, h);
-      const tile = Math.max(8, Math.ceil(this.motionMaxBlur * h));
+      // Small tiles, with the neighbourhood max reaching as far as the longest blur, keep tile edges fine.
+      const tile = 8;
+      const maxRadius = Math.max(tile, Math.ceil(this.motionMaxBlur * h));
       this.tileTarget.setSize(Math.ceil(w / tile), Math.ceil(h / tile));
       this.neighborTarget.setSize(Math.ceil(w / tile), Math.ceil(h / tile));
+      this.neighborMaxMaterial.uniforms.reach.value = Math.ceil(maxRadius / tile);
       for (const m of [this.tileMaxMaterial, this.reconstructMaterial]) {
         m.uniforms.tile.value = tile;
-        m.uniforms.maxRadius.value = tile;
+        m.uniforms.maxRadius.value = maxRadius;
         m.uniforms.resolution.value.set(w, h);
       }
     }
@@ -402,10 +424,14 @@ class Pipeline {
     meshes.length = 0;
     this.instanceMotion.length = 0;
     _box.makeEmpty();
+    // Anything that changes the picture, for telling when the view holds still.
+    let signature = 0;
     scene.traverseVisible((object) => {
       if (!object.material) return;
       meshes.push(object);
       if (!object.userData.prevMatrixWorld) object.userData.prevMatrixWorld = object.matrixWorld.clone();
+      else if (!object.matrixWorld.equals(object.userData.prevMatrixWorld)) signature += 1e9;
+      signature += object.id * 31 + (object.geometry?.id ?? 0) * 7 + (object.instanceMatrix?.version ?? 0) + (object.count ?? 0);
       if (motion) this._updateShutter(object, dt);
       if (object.isInstancedMesh && usesInstanceMotion(object.material)) this._trackInstances(object);
       if (!this.shadowAutoFit || object.userData.noShadow || !object.geometry) return;
@@ -423,6 +449,59 @@ class Pipeline {
       }
       _box.union(_meshBox);
     });
+    this.sceneSignature = signature + meshes.length;
+  }
+
+  // True while the camera, the scene, time and focus have not changed since the last frame.
+  _isStill(camera, time) {
+    const key = [...camera.matrixWorld.elements, ...camera.projectionMatrix.elements, time, this.sceneSignature, this.dof.focus, this.dof.aperture, this.width, this.height];
+    const last = this._stillKey;
+    let still = key.length === last.length;
+    for (let i = 0; still && i < key.length; i++) still = Math.abs(key[i] - last[i]) <= 1e-6 * Math.max(1, Math.abs(key[i]));
+    this._stillKey = key;
+    return still;
+  }
+
+  // Restarts the lens average, for changes the pipeline cannot see (uniforms, materials).
+  restartAccumulation() {
+    this.lensCount = 0;
+  }
+
+  // One more frame from across the lens, folded into the mean; the gathered frame stands in until
+  // there are enough of them.
+  _renderLens(scene, camera) {
+    const dof = this.dof;
+    if (this.lensCount >= this.lensSamples) return dof.lensResult;
+    const n = ++this.lensCount;
+    dof.lensSample(n, camera, _lens);
+    _p0.copy(camera.position);
+    _right.setFromMatrixColumn(camera.matrixWorld, 0).multiplyScalar(_lens.x);
+    _up.setFromMatrixColumn(camera.matrixWorld, 1).multiplyScalar(_lens.y);
+    camera.position.add(_right).add(_up);
+    camera.updateMatrixWorld();
+    _projection.copy(camera.projectionMatrix);
+    this._setJitter(camera, _lens.jx, _lens.jy);
+    let hdr;
+    try {
+      this._renderFrame(scene, camera, n === 1);
+      hdr = this.mainTarget.texture;
+      if (this.motionBlur && this.motionBlurAvailable) {
+        this._renderMotion(scene, camera);
+        hdr = this._renderMotionBlur(hdr);
+      }
+      if (this.composite) hdr = this.composite(hdr, { depthTexture: this.depthTexture, camera, width: this.width, height: this.height }) ?? hdr;
+      this._storePrevious(camera);
+    } finally {
+      camera.projectionMatrix.copy(_projection);
+      globalUniforms.jitter.value.set(0, 0);
+      camera.position.copy(_p0);
+      camera.updateMatrixWorld();
+      this._updateCameraUniforms(camera);
+    }
+    const mean = dof.accumulate(this.renderer, hdr, n);
+    const fade = Math.min(1, Math.max(0, (n - 8) / 24));
+    if (fade >= 1) return mean;
+    return dof.blend(this.renderer, dof.gather(this.renderer, hdr, this.depthTexture, camera), mean, fade);
   }
 
   _trackInstances(object) {
@@ -601,7 +680,12 @@ class Pipeline {
 
       let hdr;
       const samples = Math.max(1, Math.round(this.samples));
-      if (samples > 1) {
+      const dof = this.dof && this.dofEnabled && this.dof.active && camera.isPerspectiveCamera && debug === "none" ? this.dof : null;
+      const still = dof ? this._isStill(camera, time) : false;
+      if (!still) this.lensCount = 0;
+      if (dof && still && this.lensSamples > 0) {
+        hdr = this._renderLens(scene, camera);
+      } else if (samples > 1) {
         _projection.copy(camera.projectionMatrix);
         const accum = this.accumMaterial.uniforms;
         renderer.setRenderTarget(this.accumTarget);
@@ -627,10 +711,15 @@ class Pipeline {
         this._renderFrame(scene, camera);
         hdr = this.mainTarget.texture;
       }
-      const motionOn = this.motionBlur && this.motionBlurAvailable && debug === "none";
-      if (motionOn) this._renderMotion(scene, camera);
-      this._storePrevious(camera);
-      if (motionOn) hdr = this._renderMotionBlur(hdr);
+      if (!(dof && still && this.lensSamples > 0)) {
+        const motionOn = this.motionBlur && this.motionBlurAvailable && debug === "none";
+        if (motionOn) this._renderMotion(scene, camera);
+        this._storePrevious(camera);
+        if (motionOn) hdr = this._renderMotionBlur(hdr);
+        // Opt-in hook for a day's own full-screen pass over the lit HDR image (e.g. ray-traced glass).
+        if (this.composite && debug === "none") hdr = this.composite(hdr, { depthTexture: this.depthTexture, camera, width: this.width, height: this.height }) ?? hdr;
+        if (dof) hdr = dof.gather(renderer, hdr, this.depthTexture, camera);
+      }
 
       const bloomOn = this.bloom && this.bloomStrength > 0 && (debug === "none" || debug === "clipping");
       const f = this.finalMaterial.uniforms;
@@ -668,6 +757,7 @@ class Pipeline {
     const gi = this.gi;
     const materials = [this.copyMaterial, this.accumMaterial, this.downMaterial, this.upMaterial, this.finalMaterial, this.fxaaMaterial];
     if (this.motionBlurAvailable) materials.push(this.tileMaxMaterial, this.neighborMaxMaterial, this.reconstructMaterial);
+    if (this.dof) materials.push(...this.dof.materials);
     materials.push(gi.geometryMaterial, gi.traceMaterial, gi.temporalMaterial, gi.blurMaterial);
     const mask = this.shadowMask;
     if (mask) materials.push(mask.traceMaterial, mask.temporalMaterial, mask.blurMaterial);
@@ -706,7 +796,13 @@ class Pipeline {
   // Guspira section bound to the settings; none of it is randomizable.
   addGUI(gui, { title = "Rendering", open = false } = {}) {
     const u = globalUniforms;
-    const opts = (onChange) => ({ randomizable: false, onChange });
+    const opts = (onChange) => ({
+      randomizable: false,
+      onChange: (v) => {
+        onChange(v);
+        this.lensCount = 0;
+      },
+    });
     const section = gui.addSection(title, { open });
     const add = (label, get, set, min, max, step) => gui.addSlider(label, get(), min, max, step, opts(set));
     add("Exposure", () => this.exposure, (v) => (this.exposure = v), 0.1, 4, 0.01);
@@ -733,6 +829,10 @@ class Pipeline {
       add("Shutter", () => this.shutter, (v) => (this.shutter = v), 0, 0.2, 0.001);
       add("Blur samples", () => this.motionSamples, (v) => (this.motionSamples = v), 2, 64, 1);
     }
+    if (this.dof) {
+      gui.addCheckbox("Depth of field", this.dofEnabled, opts((v) => (this.dofEnabled = v)));
+      add("Lens samples", () => this.lensSamples, (v) => (this.lensSamples = v), 0, 1024, 1);
+    }
     gui.addSelect("Debug", this.debug, DEBUG_VIEWS, opts((v) => (this.debug = v)));
     gui.addCheckbox("Clip warning", this.clipWarning, opts((v) => (this.clipWarning = v)));
     gui.endSection();
@@ -758,6 +858,7 @@ class Pipeline {
     this.quad.geometry.dispose();
     this.shadow.dispose();
     this.shadowMask?.dispose();
+    this.dof?.dispose();
     this.gi.dispose();
   }
 }

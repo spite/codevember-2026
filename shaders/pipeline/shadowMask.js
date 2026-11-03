@@ -2,7 +2,8 @@ import { giCommon } from "./gi.js";
 import { shadowChunk } from "./shadow.js";
 
 // Evaluates getShadow() at the half-res geometry with per-frame noise; temporal + a-trous
-// passes (from gi.js) then denoise it. The result is written to every channel.
+// passes (from gi.js) then denoise it. The shadow is in .a (and .r, .b); .g holds the PCF kernel
+// radius in half-res texels, which limits the blur so hard and contact shadows stay sharp.
 export const shadowMaskFragment = /* glsl */ `${giCommon}
 uniform sampler2D tGeo;
 uniform mat4 uView;
@@ -22,6 +23,12 @@ void main() {
     return;
   }
   vec3 P = (uViewInverse * vec4(viewPosition(halfToUv(h), g.x), 1.0)).xyz;
-  outShadow = vec4(getShadow(P, octDecode(g.yz)));
+  float s = getShadow(P, octDecode(g.yz));
+  // Kernel radius in world, then in half-res texels at this depth.
+  vec3 row0 = vec3(shadowMatrix[0][0], shadowMatrix[1][0], shadowMatrix[2][0]);
+  float radiusWorld = shadowKernelRadius * 2.0 / length(row0);
+  vec3 Pv = viewPosition(halfToUv(h), g.x);
+  float texelWorld = length(viewPosition(halfToUv(h + ivec2(0, 1)), g.x) - Pv);
+  outShadow = vec4(s, radiusWorld / max(texelWorld, 1e-6), s, s);
 }
 `;
