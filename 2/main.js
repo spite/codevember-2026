@@ -1,4 +1,4 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, randomize, isRunning, setRunning, keysHelp, setDay } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, randomize, isRunning, setRunning, applyUrlState, keysHelp, setDay } from "common";
 import { GUI } from "guspira";
 import { Scene, Mesh, Group, InstancedMesh, Matrix4, Quaternion, Vector3, IcosahedronGeometry, BufferGeometry } from "three";
 import { mergeVertices } from "third_party/BufferGeometryUtils.js";
@@ -56,7 +56,7 @@ const SETS = {
 };
 
 const gui = new GUI(setDay(), document.querySelector("#gui-container"));
-gui.addSelect("Subject", params.subject, Object.keys(SUBJECTS));
+gui.addSelect("Subject", params.subject, Object.keys(SUBJECTS).filter((k) => !SUBJECTS[k].disabled));
 gui.addSelect("Shape", params.shape, Object.keys(SHAPES));
 gui.addSlider("Explosion", params.explosion, 0, 1, 0.01);
 gui.addSlider("Spray", params.spray, 0, 1, 0.01);
@@ -340,7 +340,8 @@ function update() {
     placedKey = pk;
     place();
   }
-  if (pieces.length) {
+  if (focusOverride !== null) pipeline.dof.focus = focusOverride;
+  else if (pieces.length) {
     const [near, far] = depthRange(camera.position);
     pipeline.dof.focus = Math.max(camera.near * 2, near + (far - near) * params.focus());
   }
@@ -391,6 +392,62 @@ const transport = createTransport({
   onPlay: () => isRunning() || setRunning(true),
 });
 
+let focusOverride = null;
+let firstFrame;
+const rendered = new Promise((resolve) => (firstFrame = resolve));
+
+// A handle for recording tools: the canvas, and switching to a look and replaying its burst.
+window.app = {
+  canvas: renderer.domElement,
+  params,
+  pipeline,
+  camera,
+  controls,
+  transport,
+  side: SIDE,
+  get subject() {
+    return subject;
+  },
+  // Every shape loaded and the first frame drawn.
+  async preload() {
+    for (const name of Object.keys(SHAPES)) if (!shapes.has(name)) shapes.set(name, await loadShape(name));
+    await rendered;
+  },
+  // look: { subject, shape, seed }
+  nextLook(look) {
+    if (!look) return;
+    seed = look.seed ?? seed;
+    params.subject.set(look.subject);
+    params.shape.set(look.shape);
+    update();
+    this.bounce();
+  },
+  bounce() {
+    params.explosion.set(0);
+    transport.play();
+  },
+  // Orbit at `distance` round `target`, from `direction` or the current one.
+  frame(distance, target, direction = camera.position.clone().sub(controls.target)) {
+    direction = direction.clone().normalize();
+    controls.target.copy(target);
+    camera.position.copy(target).addScaledVector(direction, distance);
+    controls.update();
+  },
+  // Focus at a fixed distance, or (null) back on the pieces as the panel sets it.
+  focusAt(distance) {
+    focusOverride = distance;
+  },
+  // Renders n still frames, so the temporal buffers (shadows, AO, GI) settle after a switch.
+  warm(n) {
+    for (let i = 0; i < n; i++) {
+      update();
+      pipeline.render(scene, camera, 0);
+    }
+  },
+};
+
+// The url's subject and shape, so the first build is the one asked for.
+applyUrlState();
 shapes.set(params.shape(), await loadShape(params.shape()));
 update();
 await pipeline.compileAsync(scene, camera);
@@ -402,4 +459,5 @@ render(({ dt }) => {
   controls.update(dt);
   // Nothing animates with time, so whenever the view holds still the lens average refines it.
   pipeline.render(scene, camera, 0);
+  firstFrame();
 });

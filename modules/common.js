@@ -378,17 +378,24 @@ let time = 0;
 let frame = 0;
 let frameFn = null;
 
+// A ?seed= url replays the randomize handlers so it reproduces the result.
+// Then any params in the url go on top, so a copied link reproduces edits made after randomizing.
+// render() does this on its first frame; a day that builds from its params before rendering can call
+// it earlier (after registering its randomize handlers), so it never builds the defaults first.
+let urlStateApplied = false;
+function applyUrlState() {
+  if (urlStateApplied) return;
+  urlStateApplied = true;
+  if (urlSeed) {
+    setSeed(urlSeed);
+    applySeedHandlers(urlSeed);
+  }
+  applyUrlParams();
+}
+
 // fn({ time, dt, frame }) is called every frame; time and dt stop while paused.
 function render(fn) {
-  // A ?seed= url replays the randomize handlers so it reproduces the result.
-  // Then any params in the url go on top, so a copied link reproduces edits made after randomizing.
-  if (frame === 0) {
-    if (urlSeed) {
-      setSeed(urlSeed);
-      applySeedHandlers(urlSeed);
-    }
-    applyUrlParams();
-  }
+  if (frame === 0) applyUrlState();
   frameFn = fn;
   renderer.setAnimationLoop((timestamp) => {
     timer.update(timestamp);
@@ -438,6 +445,7 @@ export {
   pause,
   onPause,
   randomize,
+  applyUrlState,
   loadSeed,
   onRandomize,
   getSeed,

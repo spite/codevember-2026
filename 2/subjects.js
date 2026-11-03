@@ -16,6 +16,7 @@
 //   pointing away from the side burst's impact.
 // fill/core: glowColor, glow, molten (0 all glowing, 1 crust with glowing cracks), burn (turbulent flame).
 // spray.dropGlow: drops as embers ({ glowColor, glow }).
+// disabled: kept, but not offered in the panel (or to randomize).
 // set: "white" (high key), "grey" (studio gradient), "slate" (dark grey, more bloom) or "dark".
 const SUBJECTS = {
   shell: {
@@ -63,6 +64,7 @@ const SUBJECTS = {
     spray: { drops: 1, dropColor: 0xc86a14, chips: 1, flecks: 0 },
   },
   lava: {
+    disabled: true,
     thickness: 0.16,
     pieces: 34,
     burst: "radial",

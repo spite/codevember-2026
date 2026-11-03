@@ -7,10 +7,10 @@ curved pieces with real thickness, along wandering cracks or drawn out into spli
 out with their filling, drops and chips of shell. Everything sits at position = start + velocity × t,
 so any moment of the burst can be shown, scrubbed or played back in slow motion.
 
-Subjects: a white shell over a dark core, grapefruit, porcelain, egg, chocolate, plaster over
-molten rock, aged bronze with verdigris, obsidian glowing from inside, and an iridescent
-thin-film coating. Shapes: sphere, torus, rounded cube, icosahedron, dodecahedron and Suzanne. Side
-bursts blow off one side, in a direction each seed picks; radial ones go everywhere.
+Subjects: a white shell over a dark core, grapefruit, porcelain, egg, chocolate, aged bronze with
+verdigris, obsidian glowing from inside, and an iridescent thin-film coating. Shapes: sphere,
+torus, rounded cube, icosahedron, dodecahedron and Suzanne. Side bursts blow off one side, in a
+direction each seed picks; radial ones go everywhere.
 
 Controls: the bar at the bottom rewinds, plays, randomizes and scrubs the burst. The panel picks
 the subject and shape, how far into the burst, how much spray, the rotation, and the depth of field

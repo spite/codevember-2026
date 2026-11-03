@@ -78,7 +78,20 @@ function createTransport({ value, duration = 4, onRandomize, onPlay }) {
     readout.textContent = `${Math.round(v * 100)}%`;
   }
 
-  return { update, get playing() { return playing; }, setPlaying };
+  return {
+    update,
+    setPlaying,
+    play: () => setPlaying(true),
+    get playing() {
+      return playing;
+    },
+    get duration() {
+      return duration;
+    },
+    set duration(v) {
+      duration = v;
+    },
+  };
 }
 
 export { createTransport };
