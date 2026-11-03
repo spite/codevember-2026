@@ -357,13 +357,14 @@ function setDay(day = getDay()) {
 
   const info = document.createElement("nav");
   info.id = "info";
-  const link = (href, text) => `<a href="${href}">${text}</a>`;
+  const link = (href, text, label) =>
+    `<a href="${href}"${label ? ` title="${label}" aria-label="${label}"` : ""}>${text}</a>`;
+  const prev = days.find((d) => d.day === day - 1);
+  const next = days.find((d) => d.day === day + 1);
   info.innerHTML = [
-    day > 1 ? link(`../${day - 1}/`, "&larr;") : "",
+    prev?.title ? link(`../${prev.day}/`, `&larr; ${prev.day}`, `Previous: ${prev.day}. ${prev.title}`) : "",
     link("../", `${event} ${year}`),
-    days.find((d) => d.day === day + 1)?.title
-      ? link(`../${day + 1}/`, "&rarr;")
-      : "",
+    next?.title ? link(`../${next.day}/`, `${next.day} &rarr;`, `Next: ${next.day}. ${next.title}`) : "",
   ].join("");
   document.body.append(info);
 
