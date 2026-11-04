@@ -192,8 +192,8 @@ ${shGLSL}
 float sphereOcclusion(vec3 p, vec3 n) {
   float vis = 1.0;
   for (int i = 0; i < 16; i++) {
+    if (i >= occluderCount) break;
     vec4 o = occluders[i];
-    if (i >= occluderCount) o.w = 0.0;
     vec3 D = o.xyz - p;
     float d = length(D);
     float r = max(o.w, 1e-6);
@@ -240,7 +240,8 @@ void main() {
 
 #if defined(PIPELINE_SHADOW)
   if (s.alpha < 0.5) discard;
-  outColor = vec4(1.0);
+  // The shadow map's raw depth (ShadowPass).
+  outColor = vec4(gl_FragCoord.z);
 #elif defined(PIPELINE_PREPASS)
   if (s.alpha < 0.5) discard;
   vec3 nv = normalize(mat3(viewMatrix) * normalize(s.normal));

@@ -99,14 +99,19 @@ export function createBodyBake(field, pools) {
   scene.add(points);
   const camera = new OrthographicCamera();
   let source = null;
+  const wrappers = new WeakMap();
 
-  // Shares the body geometry's attributes, unindexed, so each vertex is drawn once.
+  // Shares the body geometry's attributes, unindexed, so each vertex is drawn once. Never disposed: that would free
+  // the body's own GL buffers.
   function setGeometry(geometry) {
     if (geometry === source) return;
     source = geometry;
-    points.geometry.dispose();
-    const g = new BufferGeometry();
-    for (const name of ["position", "normal", "fade", "clearance"]) if (geometry.attributes[name]) g.setAttribute(name, geometry.attributes[name]);
+    let g = wrappers.get(geometry);
+    if (!g) {
+      g = new BufferGeometry();
+      for (const name of ["position", "normal", "fade", "clearance"]) if (geometry.attributes[name]) g.setAttribute(name, geometry.attributes[name]);
+      wrappers.set(geometry, g);
+    }
     points.geometry = g;
     const n = geometry.attributes.position?.count ?? 0;
     const rows = Math.max(1, Math.ceil(n / WIDTH));

@@ -2,7 +2,6 @@ import {
   WebGLRenderTarget,
   DepthTexture,
   FloatType,
-  UnsignedByteType,
   RedFormat,
   NearestFilter,
   LinearFilter,
@@ -13,6 +12,7 @@ import {
   Quaternion,
   Sphere,
   Vector3,
+  Color,
 } from "three";
 import { globalUniforms } from "./uniforms.js";
 import { renderVariant } from "./variants.js";
@@ -23,39 +23,33 @@ const _qi = new Quaternion();
 const _c = new Vector3();
 const _up = new Vector3();
 const _origin = new Vector3();
+const _clearColor = new Color();
 
 const castsShadow = (object) => !object.userData.noShadow;
 
 class ShadowPass {
   constructor({ mapSize = 2048 } = {}) {
     this.mapSize = mapSize;
-    this.depthTexture = new DepthTexture(mapSize, mapSize, FloatType);
-    this.depthTexture.minFilter = NearestFilter;
-    this.depthTexture.magFilter = NearestFilter;
-    this.depthTexture.wrapS = ClampToEdgeWrapping;
-    this.depthTexture.wrapT = ClampToEdgeWrapping;
-    // Colour is never read; the smallest format keeps the attachment cheap.
-    this.target = new WebGLRenderTarget(mapSize, mapSize, {
-      format: RedFormat,
-      type: UnsignedByteType,
-      depthBuffer: true,
-      depthTexture: this.depthTexture,
-      generateMipmaps: false,
-    });
-    // Copy of the depth with hardware comparison; a texture can't be sampled both ways.
+    // A texture can't be sampled both raw and with hardware comparison, so the shadow variant also writes its depth
+    // (gl_FragCoord.z, the value the depth buffer stores) to a float colour target for the raw reads.
     this.compareTexture = new DepthTexture(mapSize, mapSize, FloatType);
     this.compareTexture.minFilter = LinearFilter;
     this.compareTexture.magFilter = LinearFilter;
     this.compareTexture.wrapS = ClampToEdgeWrapping;
     this.compareTexture.wrapT = ClampToEdgeWrapping;
     this.compareTexture.compareFunction = LessEqualCompare;
-    this.compareTarget = new WebGLRenderTarget(mapSize, mapSize, {
+    this.target = new WebGLRenderTarget(mapSize, mapSize, {
       format: RedFormat,
-      type: UnsignedByteType,
+      type: FloatType,
+      minFilter: NearestFilter,
+      magFilter: NearestFilter,
+      wrapS: ClampToEdgeWrapping,
+      wrapT: ClampToEdgeWrapping,
       depthBuffer: true,
       depthTexture: this.compareTexture,
       generateMipmaps: false,
     });
+    this.depthTexture = this.target.texture;
     this.camera = new OrthographicCamera(-1, 1, 1, -1, 0, 3);
     this.bounds = new Sphere(new Vector3(), 5);
     this.filter = castsShadow;
@@ -104,16 +98,16 @@ class ShadowPass {
 
     const prevTarget = renderer.getRenderTarget();
     const autoClear = renderer.autoClear;
+    renderer.getClearColor(_clearColor);
+    const clearAlpha = renderer.getClearAlpha();
     renderer.setRenderTarget(this.target);
+    // The raw map clears to the far plane, like the depth.
+    renderer.setClearColor(0xffffff, 1);
     renderer.clear(true, true, false);
+    renderer.setClearColor(_clearColor, clearAlpha);
     renderer.autoClear = false;
     renderVariant(renderer, scene, camera, "shadow", this.target, this.filter);
     renderer.autoClear = autoClear;
-    if (!this.compareReady) {
-      renderer.initRenderTarget(this.compareTarget);
-      this.compareReady = true;
-    }
-    renderer.copyTextureToTexture(this.depthTexture, this.compareTexture);
     renderer.setRenderTarget(prevTarget);
 
     const u = globalUniforms;
@@ -126,8 +120,6 @@ class ShadowPass {
 
   dispose() {
     this.target.dispose();
-    this.depthTexture.dispose();
-    this.compareTarget.dispose();
     this.compareTexture.dispose();
     if (globalUniforms.shadowMap.value === this.depthTexture) {
       globalUniforms.shadowMap.value = null;

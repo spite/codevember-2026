@@ -110,8 +110,12 @@ const cameras = [];
 const resizeFns = [];
 let pixelRatioOverride = null;
 
+// <html data-canvas="pipeline">: only a full-screen pass draws to the canvas (the pipeline's final pass), so it needs no
+// MSAA or depth of its own; the picture is the same.
+const pipelineCanvas = document.documentElement.dataset.canvas === "pipeline";
 const renderer = new WebGLRenderer({
-  antialias: true,
+  antialias: !pipelineCanvas,
+  depth: !pipelineCanvas,
   alpha: true,
   preserveDrawingBuffer: true,
 });

@@ -200,7 +200,8 @@ class Pipeline {
       depthBuffer: true,
       depthTexture: this.depthTexture,
     });
-    this.mainTarget = colorTarget(HalfFloatType, { depthBuffer: true, samples: this.msaa });
+    // Nothing reads the main pass's depth (passes use the prepass's), so MSAA depth is neither resolved nor kept.
+    this.mainTarget = colorTarget(HalfFloatType, { depthBuffer: true, samples: this.msaa, resolveDepthBuffer: false, storeMultisampledDepthBuffer: false });
     this.prevColorTarget = colorTarget(HalfFloatType);
     this.accumTarget = colorTarget(HalfFloatType);
     this.ldrTarget = colorTarget(UnsignedByteType);
@@ -579,7 +580,7 @@ class Pipeline {
       this.gi.render(renderer, {
         depthTexture: this.depthTexture,
         normalVelocity: this.prepassTarget.texture,
-        prevColor: this.hasPrevColor ? this.prevColorTarget.texture : null,
+        prevColor: this.hasPrevColor ? this._prevColor : null,
         camera,
       });
     } else {
@@ -600,9 +601,14 @@ class Pipeline {
     const debug = u.pipelineDebug.value;
     u.pipelineDebug.value = 0;
     this._renderMain(scene, camera);
-    this.copyMaterial.uniforms.tInput.value = this.mainTarget.texture;
-    this.copyMaterial.uniforms.weight.value = 1;
-    this._pass(this.copyMaterial, this.prevColorTarget);
+    // Nothing draws into mainTarget again before the next frame's GI reads it, except a debug view.
+    this._prevColor = this.mainTarget.texture;
+    if (debug > 0) {
+      this.copyMaterial.uniforms.tInput.value = this.mainTarget.texture;
+      this.copyMaterial.uniforms.weight.value = 1;
+      this._pass(this.copyMaterial, this.prevColorTarget);
+      this._prevColor = this.prevColorTarget.texture;
+    }
     this.hasPrevColor = true;
     u.pipelineDebug.value = debug;
     if (debug > 0) this._renderMain(scene, camera);
