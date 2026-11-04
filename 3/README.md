@@ -35,7 +35,7 @@ Controls:
   underside keeps it dripping.
 - Drag on the object to turn it, drag elsewhere to orbit, pinch or scroll to zoom.
 - Shape: Suzanne, Heart, Blob, Sphube, Torus, Knot, Star, Icosahedron, Dodecahedron.
-- Finish: Lacquer, Blueberry, Candy, Mercury or Wax (matte, dimpled candle wax that turns glossy where fresh melt runs).
+- Finish: Lacquer, Blueberry, Candy, Mercury or Wax (candle wax with subsurface scattering: light wraps past the shadow line and glows through thin parts; dimpled where dry, glossy where fresh melt runs).
 - Amount, Viscosity, Size and Drip length shape the melt; Reset melt (M) dries
   the object and lets it seep again.
 - Motion: Rock, Tumble or Still, with Spin. Flip (F) turns the object over.
