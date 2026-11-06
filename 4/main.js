@@ -25,6 +25,7 @@ const PALETTES = {
   "pink-orange": { film: [95, 135], absorption: [0.2, 1.4, 1.0] },
 };
 const FINISHES = { holographic: 0, pearl: 1, glass: 2 };
+const MATERIAL_DEBUG_VIEWS = ["shadow", "ao", "gi", "albedo"];
 const FADE = 1.2;
 
 // Eases from wherever it is to the latest target over FADE seconds.
@@ -270,7 +271,9 @@ render(({ time, dt, frame }) => {
   const u = tangle.meshUniforms;
   u.finishWeights.value.set(v[0], v[1], v[2]);
   const solo = v.slice(0, 3).indexOf(1);
-  tangle.setFinish(solo >= 0 ? solo : 3);
+  // Chrome and glass skip the pipeline's lighting, so the shadow/AO/GI/albedo debug views draw the bands with the full program.
+  const materialDebug = MATERIAL_DEBUG_VIEWS.includes(pipeline.debug);
+  tangle.setFinish(materialDebug ? 1 : solo >= 0 ? solo : 3);
   u.filmRange.value.set(v[3], v[4]);
   u.absorption.value.set(v[5], v[6], v[7]);
   u.filmShape.value.set(v[8], v[9]);
