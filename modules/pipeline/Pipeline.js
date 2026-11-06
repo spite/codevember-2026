@@ -150,6 +150,9 @@ class Pipeline {
     this.debug = "none";
     // Tints displayed luminance above 0.97 yellow on the normal image (exposure check).
     this.clipWarning = options.clipWarning ?? false;
+    // Draws every pipeline mesh as wireframe; a mesh with userData.noWireframe is left to the day.
+    this._wireframe = options.wireframe ?? false;
+    this._wired = new Map();
     const shadowOptions = { mapSize: tier.shadowMapSize, autoFit: true, ...options.shadow };
     // Fits the shadow camera to the casters every frame; set false after calling shadow.fit() yourself.
     this.shadowAutoFit = shadowOptions.autoFit;
@@ -659,6 +662,7 @@ class Pipeline {
   // time (seconds) drives the `time` uniform; defaults to the page clock.
   render(scene, camera, time = performance.now() / 1000) {
     const renderer = this.renderer;
+    if (this.wireframe || this._wired.size) this._applyWireframe(scene);
     renderer.getDrawingBufferSize(_size);
     this._resize(_size.x, _size.y);
 
@@ -800,6 +804,30 @@ class Pipeline {
   }
 
   // Guspira section bound to the settings; none of it is randomizable.
+  get wireframe() {
+    return this._wireframe;
+  }
+
+  set wireframe(v) {
+    this._wireframe = v;
+    this._wireframeControl?.signal.set(v);
+  }
+
+  // Sets wireframe on the scene's pipeline materials and restores each one's own setting when turned off.
+  _applyWireframe(scene) {
+    if (!this.wireframe) {
+      for (const [m, was] of this._wired) m.wireframe = was;
+      this._wired.clear();
+      return;
+    }
+    scene.traverse((o) => {
+      const m = o.material;
+      if (!o.isMesh || !m?.isPipelineMaterial || o.userData.noWireframe || this._wired.has(m)) return;
+      this._wired.set(m, m.wireframe);
+      m.wireframe = true;
+    });
+  }
+
   addGUI(gui, { title = "Rendering", open = false } = {}) {
     const u = globalUniforms;
     const opts = (onChange) => ({
@@ -841,6 +869,7 @@ class Pipeline {
     }
     gui.addSelect("Debug", this.debug, DEBUG_VIEWS, opts((v) => (this.debug = v)));
     gui.addCheckbox("Clip warning", this.clipWarning, opts((v) => (this.clipWarning = v)));
+    this._wireframeControl = gui.addCheckbox("Wireframe", this.wireframe, opts((v) => (this.wireframe = v)));
     gui.endSection();
     return section;
   }

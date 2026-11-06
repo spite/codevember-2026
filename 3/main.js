@@ -136,8 +136,17 @@ placeholder.setAttribute("position", new BufferAttribute(new Float32Array(0), 3)
 placeholder.setAttribute("normal", new BufferAttribute(new Float32Array(0), 3));
 const body = new Mesh(placeholder, createBodyMaterial(field, pools, bake));
 body.userData.shutterManual = true;
+body.userData.noWireframe = true;
 body.userData.shutterMatrixWorld = body.matrixWorld.clone();
 scene.add(body);
+// Wireframe: the same displaced mesh drawn as translucent edges over the body.
+const wire = new Mesh(placeholder, createBodyMaterial(field, pools, bake, { wire: true }));
+wire.material.wireframe = true;
+wire.material.depthWrite = false;
+wire.visible = false;
+wire.renderOrder = 1;
+wire.userData.noWireframe = true;
+body.add(wire);
 
 // Falling drops and the puddle they land in, in world space.
 const puddle = createPuddle({ lite, floorY: FLOOR_Y });
@@ -209,6 +218,7 @@ pipeline.addGUI(gui);
 gui.addSeparator();
 addKey("KeyT", "turn the object over", () => rotation.flip());
 addKey("KeyM", "reset the melt", resetMelt);
+addKey("KeyW", "toggle wireframe", () => (pipeline.wireframe = !pipeline.wireframe));
 const help = "Hold on the object to grow a blob, tap to drop one, drag it to turn, drag elsewhere to orbit, pinch to zoom.";
 gui.addText(touch ? help : `${help}<br/>${keysHelp()}`);
 gui.show();
@@ -361,7 +371,7 @@ async function setShape(name) {
   lookUniforms.shapeSdfMin.value.fromArray(next.sdf.min);
   lookUniforms.shapeSdfSize.value = next.sdf.size;
   melt = createMelt(next);
-  body.geometry = next.geometry;
+  body.geometry = wire.geometry = next.geometry;
   body.scale.setScalar(SHAPES[name].scale);
 }
 
@@ -390,6 +400,11 @@ function fitShadow() {
   shadowKey = key;
   const y = bodyY();
   pipeline.shadow.fit(new Sphere(new Vector3(0, (FLOOR_Y + y) / 2, 0), 0.5 * (y - FLOOR_Y) + 2));
+}
+
+// The body draws its own wireframe as an overlay; the pipeline's toggle wireframes the drops and puddle.
+function updateWireframe() {
+  wire.visible = pipeline.wireframe;
 }
 
 let lookKey = "";
@@ -524,6 +539,7 @@ render(({ time, dt }) => {
     updateFraming();
     body.position.y = bodyY();
   }
+  updateWireframe();
   rotation.update(dt);
   if (melt) {
     // R with the same shape: rebuild from the new seed so the url reproduces the pattern.

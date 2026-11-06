@@ -348,11 +348,13 @@ vec3 bodySurface(vec3 p, inout vec3 n, int pose, float fade, float room, out flo
 
 // The body with its blobs, trails and hanging pools; pools = { defines, uniforms } from pendantLayout. The vertex
 // stages read the displaced surface from bake (createBodyBake), evaluated once per frame.
-export function createBodyMaterial(field, pools, bake) {
+// wire: the edge overlay drawn over the shaded body, in the main pass only.
+export function createBodyMaterial(field, pools, bake, { wire = false } = {}) {
   return new PipelineMaterial({
+    transparent: wire,
     // Half-res screen AO steps the glossy highlights through specular occlusion; the baked AO carries most of it.
     uniforms: { ...lookUniforms, ...field.uniforms, ...pools.uniforms, ...bake.uniforms, aoIntensity: { value: 0.2 } },
-    defines: { ...field.defines, ...pools.defines },
+    defines: { ...field.defines, ...pools.defines, ...(wire ? { WIRE_OVERLAY: "" } : {}) },
     varyings: { vAo: "float", vFade: "float", vRoom: "float", vH: "float", vRest: "vec3", vRestN: "vec3" },
     vertexPars: bake.glsl + "in float ao;\nin float fade;\nin float clearance;\nuniform float motionPass;\nfloat bodyH;\n",
     vertex: /* glsl */ `
@@ -362,13 +364,33 @@ vec3 displace(vec3 p, inout vec3 n) {
   vec4 o = texelFetch(bakePose0, t, 0);
   n = texelFetch(bakeNormal0, t, 0).xyz;
   bodyH = o.w;
+#ifdef WIRE_OVERLAY
+  // Lifted off the surface so the edges never z-fight with it.
+  return p + o.xyz + n * 0.002;
+#else
   return p + o.xyz;
+#endif
 }
 `,
     vertexMain: "vAo = ao; vFade = fade; vRoom = clearance; vH = bodyH; vRest = position; vRestN = normal;",
     fragmentPars: lacquerGLSL + fieldGLSL + "uniform mat3 bodyRotation;\nuniform float motionPass;\n",
     surface: /* glsl */ `
 void surface(inout Surface s) {
+#ifdef WIRE_OVERLAY
+#if defined(PIPELINE_SHADOW) || defined(PIPELINE_PREPASS)
+  s.alpha = 0.0;
+#else
+  // Light lines on dark finishes, dark lines on light ones.
+  float l = mix(dot(bodyColor, vec3(0.2126, 0.7152, 0.0722)), 0.6, bodyFinish.z);
+  s.albedo = vec3(0.0);
+  s.metalness = 0.0;
+  s.specular = 0.0;
+  s.roughness = 1.0;
+  s.emissive = l > 0.2 ? vec3(0.0) : vec3(0.6);
+  s.alpha = l > 0.2 ? 0.45 : 0.3;
+#endif
+  return;
+#endif
 #ifdef PIPELINE_PREPASS
   // Motion blur reads only the velocity.
   if (motionPass > 0.5) return;

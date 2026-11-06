@@ -44,7 +44,7 @@ const smoothstep = (e0, e1, x) => {
 };
 
 // A floor puddle under the object: film thickness H on an N² grid over a SIZE² square centred under it (world xz).
-// Drops splat Gaussian volume in; the film spreads with h³ mobility and slowly soaks away. Two R16F textures hold the
+// Drops splat Gaussian volume in; the film flows only above a pinning depth and slowly soaks away. Two R16F textures hold the
 // shown height now and last frame.
 export function createPuddle({ lite = false, floorY, size = 4.5 }) {
   const N = lite ? 112 : 144;

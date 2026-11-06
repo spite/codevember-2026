@@ -39,7 +39,7 @@ Controls:
 - Amount, Viscosity, Size and Drip length shape the melt; Reset melt (M) dries
   the object and lets it seep again.
 - Motion: Rock, Tumble or Still, with Spin. Flip (T) turns the object over.
-- Set: a light or dark studio. Space pauses, R randomises.
+- Set: a light or dark studio. Wireframe (W, also in Rendering) draws the displaced body mesh's edges over it. Space pauses, R randomises.
 
 Phones get a lighter tier: an 8k-vertex body (densified, so the pools have
 vertices to swell from), fewer blobs, trails, pools and drops, smaller drips, a
