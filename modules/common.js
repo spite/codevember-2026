@@ -356,7 +356,9 @@ function setDay(day = getDay()) {
     return "Template";
   }
   const entry = days.find((d) => d.day === day);
-  const title = entry?.title ? `${day}. ${entry.title}` : `${day}`;
+  // A day's own page shows its prompt before it is published, for previews; the nav and gallery still hide it.
+  const name = entry?.title || entry?.prompt;
+  const title = name ? `${day}. ${name}` : `${day}`;
   document.title = `${event} ${year} - ${title}`;
 
   const info = document.createElement("nav");
