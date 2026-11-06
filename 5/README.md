@@ -47,5 +47,6 @@ in `suzanne.bin`. It ignores Tumble and always faces the camera, level.
 
 Controls: drag to orbit, scroll or pinch to zoom. R randomizes (a new sculpture), G
 regrows the moss, Space pauses. The depth of field is shallow by default: Aperture sets it and Focus
-moves the focal plane from the sculpture's front (-1) through its middle (0) to its back (1). Auto
-change brings a new sculpture once the current one has been on show for Change every seconds.
+moves the focal plane from the sculpture's front (-1) through its middle (0) to its back (1). It spins
+slowly by default (Spin), and Auto change, on by default, brings a new sculpture once the current one has
+been on show for Change every seconds (15); the count stops while paused and starts over on resuming.

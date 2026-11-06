@@ -1,4 +1,4 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, randomize, keysHelp, setDay, getSeed, applyUrlState, addKey } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, onPause, randomize, keysHelp, setDay, getSeed, applyUrlState, addKey } from "common";
 import { GUI } from "guspira";
 import { EqualDepth, Scene, Mesh, Group, InstancedMesh, BufferGeometry, BufferAttribute, Vector3, Matrix3, Matrix4 } from "three";
 import { Pipeline } from "modules/pipeline/Pipeline.js";
@@ -33,12 +33,12 @@ const defaults = {
   stone: "bone",
   weathering: 0.5,
   growTime: 14,
-  spin: 0,
+  spin: 0.5,
   float: 0.6,
   aperture: 0.7,
   focus: -0.75,
-  auto: false,
-  autoTime: 20,
+  auto: true,
+  autoTime: 15,
 };
 const params = fromDefaults(defaults);
 const touch = matchMedia("(pointer: coarse)").matches;
@@ -170,11 +170,11 @@ onResize((w, h, dpr) => {
   setDistance(fitDistance(params.float()));
 });
 
-// Frames the object and, below it, the gap down to its shadow.
+// Frames the object close up (0.78 of a fit that leaves room for the shadow below).
 function fitDistance(lift) {
   const t = Math.tan((camera.fov * Math.PI) / 360);
   const a = camera.aspect;
-  return Math.max((R + 0.15 + lift * 0.8) / t, (R + 0.35) / (t * a));
+  return 0.78 * Math.max((R + 0.15 + lift * 0.8) / t, (R + 0.35) / (t * a));
 }
 
 function setDistance(d) {
@@ -495,8 +495,12 @@ let wantedKey = buildKey();
 let wantedAt = 0;
 // The first build may still be running.
 let pendingKey = wantedKey;
-// Auto change: a new sculpture once the current one has been on show for Change every seconds.
+// Auto change: a new sculpture once the current one has been on show for Change every seconds. The count
+// stops while paused and starts over on resuming.
 let shownFor = 0;
+onPause((running) => {
+  if (running) shownFor = 0;
+});
 render(({ dt }) => {
   clock += dt;
   shownFor = params.auto() && buildKey() === builtKey ? shownFor + dt : 0;
