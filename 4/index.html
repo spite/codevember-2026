@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Tangle · Codevember 2026</title>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <link rel="stylesheet" type="text/css" href="../css/styles.css" />
+    <link rel="stylesheet" type="text/css" href="../css/gui.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "maf": "../modules/maf.js",
+          "guspira": "../third_party/guspira.js",
+          "common": "../modules/common.js",
+          "easings": "../modules/easings.js",
+          "three": "../third_party/three.module.js",
+          "three/": "../third_party/",
+          "third_party/": "../third_party/",
+          "shaders/": "../shaders/",
+          "modules/": "../modules/"
+        }
+      }
+    </script>
+    <script type="module" src="main.js"></script>
+  </head>
+  <body>
+    <div id="loading" style="--loading-background: #dcdad6"><span>Loading…</span></div>
+    <div id="main-gui">
+      <div id="randomize-button" class="button" title="Randomize">
+        <img src="../assets/randomize.svg" alt="Randomize" />
+      </div>
+      <div id="pause-button" class="button action" title="Pause">
+        <img src="../assets/pause.svg" alt="Pause" />
+      </div>
+      <div id="gui-container"></div>
+    </div>
+  </body>
+</html>
