@@ -1,0 +1,657 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>The Photographic Pipeline</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column on a cool studio grey; the hero pairs the thesis with the frame graph; figures break out on lighter panels. */
+:root {
+  --bg: #e6e7ea; --panel: #f1f2f4; --ink: #15161a; --muted: #595b63; --line: #c1c3c9;
+  --accent: #3b48d1; --accent-soft: #7b86f0; --second: #c97a12; --ground: #d5d7dc;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #0f1013; --panel: #1a1b20; --ink: #e8e9ee; --muted: #9c9ea8; --line: #30323a; --accent: #8e98ff; --accent-soft: #b3b9ff; --second: #f0a845; --ground: #23252c; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #0f1013; --panel: #1a1b20; --ink: #e8e9ee; --muted: #9c9ea8; --line: #30323a; --accent: #8e98ff; --accent-soft: #b3b9ff; --second: #f0a845; --ground: #23252c; color-scheme: dark; }
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+section { display: flex; flex-direction: column; gap: 24px; }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .drip { color: var(--accent); }
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 2px; }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+
+/* Figures */
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig svg, .fig canvas { display: block; width: 100%; height: auto; max-width: 100%; }
+.scroll { overflow-x: auto; }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 28px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 4ch; font-variant-numeric: tabular-nums; }
+input[type="range"] { accent-color: var(--accent); width: 160px; }
+button {
+  font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px;
+  padding: 9px 14px; cursor: pointer;
+}
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 12.5px/1.2 var(--mono); color: var(--muted); }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid currentColor; vertical-align: middle; margin-right: 6px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+.stage { color: var(--accent); font-weight: 600; }
+
+/* SVG text and strokes, from tokens */
+.t { font: 400 12px var(--mono); fill: var(--muted); }
+.t-ink { font: 600 12.5px var(--mono); fill: var(--ink); }
+.ink { stroke: var(--ink); }
+.muted-s { stroke: var(--muted); }
+.line-s { stroke: var(--line); }
+
+/* Bake diagram */
+.bake { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+.bake-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.bake-col h3 { font-size: 15px; }
+.pass { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 3px; background: var(--bg); font: 400 13px/1.2 var(--mono); }
+.chips { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.chip { font: 600 10.5px/1 var(--mono); padding: 4px 6px; border-radius: 2px; background: var(--accent); color: var(--bg); letter-spacing: 0.04em; }
+.chip.read { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
+.bake-src { padding: 12px; border-radius: 3px; box-shadow: inset 0 0 0 1.5px var(--accent); font: 400 13px/1.45 var(--mono); }
+.bake-src b { color: var(--accent); }
+
+/* Table */
+table { border-collapse: collapse; width: 100%; font: 400 13.5px/1.35 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+td b { color: var(--accent); }
+
+/* Finishes */
+.swatches { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.sw { display: flex; flex-direction: column; gap: 8px; font: 400 12px/1.35 var(--mono); color: var(--muted); }
+.sw .ball { aspect-ratio: 1; border-radius: 50%; max-width: 100%; }
+.sw b { color: var(--ink); font: 700 14px/1 var(--display); }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: nowrap; }
+.formula .c { color: var(--muted); }
+footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .two, .bake { grid-template-columns: minmax(0, 1fr); }
+  .swatches { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+.hero { align-items: start; }
+.graph { display: flex; flex-direction: column; gap: 6px; }
+.node { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding: 8px 12px; border-radius: 3px; background: var(--bg); font: 400 12.5px/1.35 var(--mono); }
+.node b { font: 700 14px/1.2 var(--display); white-space: nowrap; }
+.node span { color: var(--muted); text-align: right; }
+.node.opt { background: transparent; box-shadow: inset 0 0 0 1px var(--line); border: 0; }
+.hero h1 { font-size: clamp(40px, 6vw, 78px); overflow-wrap: anywhere; }
+td:last-child { white-space: normal; text-align: left; min-width: 220px; }
+th:last-child { text-align: left; }
+select { font: 400 13px var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 5px 8px; }
+</style>
+
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow">Codevember 2026 · <b>shared</b> · modules/pipeline</div>
+      <h1>The photographic <span class="drip">pipeline</span></h1>
+      <p class="lede">Every day of Codevember 2026 renders through one custom forward pipeline built on three.js. It is made to look like a product photograph: soft shadows, ambient occlusion and a bounce of indirect light, physical shading, a filmic tonemapper, grain. This page walks through one frame, pass by pass.</p>
+      <div class="meta"><span><b>three.js</b> r187</span><span>WebGL2</span><span>forward + MSAA</span><span>four quality tiers</span></div>
+    </div>
+    <div class="fig" style="align-self:stretch">
+      <div class="fig-head"><h3>One frame</h3>
+        <div class="controls"><label for="tier">Tier <select id="tier"><option>low</option><option>medium</option><option selected>high</option><option>capture</option></select></label></div>
+      </div>
+      <div id="frameGraph" class="graph"></div>
+    </div>
+  </header>
+
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The frame · <b>Pipeline.js</b></div>
+      <h2>Passes in order</h2>
+      <p>A day calls <code>pipeline.render(scene, camera, time)</code> instead of <code>renderer.render</code>. Each frame the pipeline collects the meshes and their previous poses, then runs: the shadow map, a prepass of normals, velocity and depth, ambient occlusion and indirect light at half resolution, an optional shadow mask, the lit main pass into a multisampled float target, then the optional motion blur, a day's own composite pass and depth of field, then bloom and the final pass that tonemaps to the screen. On the low tier, FXAA replaces MSAA.</p>
+      <p>Two paths replace the single frame. The <strong>capture</strong> tier renders 16 sub-frames, each jittered by half a pixel along a Halton (2, 3) sequence, and averages them, which antialiases and smooths every noisy effect. And when depth of field is on and the view holds still, the <strong>lens</strong> path averages frames rendered from across the aperture (below). There is no TAA on the live path.</p>
+      <p>The tier is picked from <code>?quality=</code>, then <code>?capture</code>, then the day's option; otherwise phones and coarse pointers get medium and everything else high. Every full-screen program compiles in parallel at construction, and <code>compileAsync(scene, camera)</code> compiles the scene's three material variants before the first frame, so nothing stalls on first use.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Materials · <b>PipelineMaterial.js</b></div>
+      <h2>One material, three variants</h2>
+      <p>Every mesh uses <code>PipelineMaterial</code>. A day customises it with two hooks. <code>vec3 displace(vec3 p, inout vec3 n)</code> moves vertices, and because it runs in every variant, the displacement reaches shadows, AO and velocity too. <code>void surface(inout Surface s)</code> edits the shading inputs per pixel: albedo, alpha, roughness, metalness, normal, emissive, sheen colour and roughness, occlusion, thin-sheet transmission, and a specular scale on the dielectric F0 (1 = 0.04).</p>
+      <p>The material has a colour variant and two hidden ones, <em>prepass</em> and <em>shadow</em>, that share its uniforms and swap a define. In the prepass, displace runs twice: once for now, and once for the previous pose, with <code>pipelinePrevPose</code> set and the time rolled back, so velocity covers deformation as well as object and camera motion. Instanced meshes can opt into per-instance velocity.</p>
+    </div>
+    <div class="col prose">
+      <h3>Shading</h3>
+      <p>Direct light is one analytic key: GGX distribution, height-correlated Smith visibility and Schlick Fresnel for specular, Lambert for diffuse, and a Charlie distribution with Neubelt visibility for sheen. The key's colour is irradiance, so diffuse is <code>lightColor · n·l · albedo / π</code>. Thin-sheet transmission lights the back face with a noise-free shadow lookup, so paper and fruit skin glow.</p>
+      <p>Indirect light is spherical-harmonics irradiance for diffuse plus a prefiltered environment for specular, using Karis' split-sum approximation with a multiple-scattering term so rough metals don't lose energy. Specular occlusion follows Lagarde. A day can add up to 16 analytic sphere occluders for soft contact darkening, <code>exp(−strength · r²/d² · cos)</code>, faded out beyond a few radii.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The GGX specular lobe</h3>
+        <div class="controls"><label for="rough">Roughness <input id="rough" type="range" min="0.05" max="1" step="0.01" value="0.3"><output id="roughOut">0.30</output></label>
+          <label for="incid">Light angle <input id="incid" type="range" min="0" max="80" step="1" value="35"><output id="incidOut">35°</output></label></div>
+      </div>
+      <div class="scroll"><svg id="ggxSvg" viewBox="0 0 760 300" role="img" aria-label="Polar plot of the GGX specular lobe for a light coming in at an angle; rougher surfaces spread it wider and lower."></svg></div>
+      <p class="fig-cap"><code>D = α² / (π((n·h)²(α² − 1) + 1)²)</code> with α = roughness², times the Smith visibility, plotted as reflected intensity over outgoing direction. Roughness is clamped to 0.03 so highlights never become a single pixel.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Shadows · <b>ShadowPass.js</b> · <b>shaders/pipeline/shadow.js</b></div>
+      <h2>Soft shadows that harden at contact</h2>
+      <p>The shadow map is orthographic, 1024² on low, 2048² on medium and high, 4096² for capture, and stores depth in a float target plus a compare texture for hardware filtering. It is fitted to the shadow casters every frame (or to a sphere the day gives it). Its radius is quantised to eighth-octave steps and its centre snapped to the texel grid, so shadows don't shimmer as things move.</p>
+      <p>Lookups use PCSS. A blocker search of 24 taps finds the average depth of what is between the point and the light, and the penumbra grows with that gap: <code>penumbra = gap · tan(light angle)</code>. Then 20 filtered taps soften the edge to that width. So a shadow is sharp where an object touches the floor and soft where it floats above it. Each pixel rotates its taps by white noise (rather than a pattern, which would show as hatching). A receiver-plane depth gradient, a slope-scaled normal offset and a fade at the terminator keep acne away.</p>
+      <p>With shadow denoise on, shadows are traced at half resolution instead and then accumulated over frames and blurred with the same filters as the indirect light below, edge-aware so contact shadows stay crisp; pixels too thin for the half-resolution buffer trace their own.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Penumbra from blocker distance</h3>
+        <div class="controls">
+          <label for="pGap">Gap <input id="pGap" type="range" min="0" max="2" step="0.01" value="0.8"><output id="pGapOut">0.80</output></label>
+          <label for="pSize">Light size <input id="pSize" type="range" min="0.02" max="0.6" step="0.01" value="0.3"><output id="pSizeOut">0.30</output></label>
+        </div>
+      </div>
+      <div class="scroll"><svg id="pcssSvg" viewBox="0 0 760 320" role="img" aria-label="Side view of an area light, a blocker and a floor; the shadow's soft edge widens as the gap between blocker and floor grows."></svg></div>
+      <p class="fig-cap">Light size is tan of the light's angular radius. The two discs on the right are the 24 blocker-search taps (radius linear in the index) and the 20 filtering taps (Vogel spiral).</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The prepass · <b>shaders/pipeline/octahedral.js</b></div>
+      <h2>Normals, velocity and depth</h2>
+      <p>Before shading, every opaque mesh is drawn once into a full-resolution RGBA16F target with float depth. Red and green hold the view-space normal, packed with the octahedral mapping. Blue and alpha hold the screen-space velocity between this frame and the last, with the frame's sub-pixel jitter removed. Everything after reads depth from here. The half-resolution buffers pack the world normal even tighter, as two 12-bit integers combined into one float32 (at most 2²⁴ − 1, which a float holds exactly), next to linear depth.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Octahedral normal mapping</h3></div>
+      <canvas id="octCanvas" width="900" height="360" aria-label="A sphere of normals folded onto an octahedron and unfolded into a square, coloured by normal direction."></canvas>
+      <p class="fig-cap">Divide the normal by |x| + |y| + |z| so it lands on an octahedron; if it points away (z &lt; 0), fold the lower half out to the square's corners: <code>xy = (1 − |yx|)·sign(xy)</code>. Every direction gets a unique point in the square with nearly even precision.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Light bouncing · <b>GIPass.js</b> · <b>shaders/pipeline/gi.js</b></div>
+      <h2>Ambient occlusion and one bounce, from a bitmask</h2>
+      <p>Ambient occlusion and indirect light come from one half-resolution pass: GTAO with a visibility bitmask. For each pixel the pass picks 1–3 slices (2 on high) around the view direction, rotated by noise. Along each slice it marches 8 steps outward on both sides (12 for capture), spaced quadratically so close detail gets more samples, out to one world unit or 64 half-res pixels.</p>
+      <p>Each sample is treated as a slab of a certain thickness, not an infinite wall. Its front and back edges map to angles, and the angles to a range of the hemisphere's 32 sectors, weighted by the cosine so the sectors carry equal irradiance. The sectors are bits in a 32-bit integer. Visibility is the share of bits left clear. And each sample lights the sectors it newly covers with last frame's lit colour at that spot, which is the bounce: colour bleeds from a red wall onto a white floor, a frame late.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>One slice and its 32-sector mask</h3>
+        <div class="controls"><label for="gThick">Thickness <input id="gThick" type="range" min="0.05" max="1.5" step="0.01" value="0.5"><output id="gThickOut">0.50</output></label></div>
+      </div>
+      <div class="scroll"><svg id="gtaoSvg" viewBox="0 0 760 340" role="img" aria-label="A height profile around a pixel with sample points; each sample's front and back horizon covers sectors, shown as a strip of 32 bits below."></svg></div>
+      <p class="fig-cap">Thick slabs hide everything behind them; thin ones let the sky through behind, which is what stops thin railings from darkening whole walls. A sector's bit is set by the first sample that covers it; later samples behind it add no light.</p>
+    </div>
+    <div class="col prose">
+      <h3>Accumulating over time</h3>
+      <p>One noisy frame of this is not usable, so each result is blended into a history buffer. The history is reprojected with the prepass velocity, and history samples are rejected where depth or normal disagree (a depth tolerance that loosens at grazing angles, and normals within about 37°). What survives is clamped to the mean ± 2.5 standard deviations of the current frame's 3 × 3 neighbourhood, so stale light can't linger. The blend is a running mean, <code>1 / min(frames + 1, 32)</code>, capped at 1/32 (1/48 on low).</p>
+      <p>Then 2 or 3 à-trous passes blur it: a 5 × 5 B3 kernel with doubling gaps, weighted by plane distance and normal agreement, so it smooths flat areas without bleeding over edges. In the main pass, each full-resolution pixel takes the four nearest half-resolution samples weighted by depth and normal match, falling back to the best of the 3 × 3 when none fit.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Clamping the history</h3>
+        <div class="controls"><label for="vcK">Clamp <input id="vcK" type="range" min="0.5" max="5" step="0.1" value="2.5"><output id="vcKOut">2.5σ</output></label></div>
+      </div>
+      <div class="scroll"><svg id="vclipSvg" viewBox="0 0 760 240" role="img" aria-label="The current frame's nine neighbourhood values, their mean and a clamp box; a stale history value outside the box is pulled onto its edge."></svg></div>
+      <p class="fig-cap">Then <code>out = mix(history, current, 1/n)</code>: after a clamp, the next frames pull the result toward the truth instead of keeping a ghost.</p>
+    </div>
+    <div class="col prose">
+      <p>A day tunes how AO and GI land: <code>ao = max(mix(1, visibility^aoPower, aoIntensity) · occlusion · spheres, aoMin)</code>. AO darkens the SH ambient (optionally tinted by aoColor), the GI adds <code>gi · giIntensity</code> to indirect diffuse, and aoDirect lets AO darken direct light too. Transparent materials get no AO or GI.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Motion blur · <b>shaders/pipeline/motionBlur.js</b></div>
+      <h2>A real shutter, even while paused</h2>
+      <p>Motion blur is opt-in. It follows McGuire's 2012 reconstruction filter, measured over a shutter window in scene time, so a paused frame keeps its blur. A second prepass renders every mesh at its pose half a shutter ago: the day's own <code>userData.shutterMatrixWorld</code> if it sets one, otherwise one extrapolated from its last measured linear and angular velocity. The camera is not blurred.</p>
+      <p>Velocities are capped (3 % of the image height by default), reduced to the longest per 8 × 8 tile, then to the longest within reach of each tile. Each pixel then takes 24 samples (32 on capture) along the tile's dominant velocity and its own, alternating, with a Bayer jitter. Each sample is weighted by whether it is in front or behind (with a soft depth range) and whether its motion reaches the pixel: the classic cone and cylinder terms, so a moving edge smears over the background but the background never smears over it.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Tile max and neighbour max</h3>
+        <div class="controls"><label for="mbR">Max blur <input id="mbR" type="range" min="8" max="40" step="1" value="24"><output id="mbROut">24 px</output></label></div>
+      </div>
+      <canvas id="mbCanvas" width="900" height="360" aria-label="A grid of pixels with velocity arrows; each 8 by 8 tile shows its longest velocity, and each tile's neighbour maximum spreads that to tiles within reach."></canvas>
+      <p class="fig-cap">Left: per-pixel velocity of a moving disc. Middle: the longest per 8 × 8 tile. Right: the longest within <code>ceil(max blur / 8)</code> tiles, which tells each pixel how far it must look for something that could blur over it.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Depth of field · <b>DepthOfFieldPass.js</b></div>
+      <h2>A fast gather, then the real lens</h2>
+      <p>Depth of field is opt-in. Each pixel's circle of confusion is <code>aperture · height · (1 − focus / z)</code>, signed so the near field is negative, and capped at 4 % of the height. A day sets the focus distance and the aperture, the blur of something infinitely far, every frame.</p>
+      <p>While the view moves, the pass gathers at half resolution. It averages each 2 × 2 block, records the maximum blur and the strongest foreground blur per 16-pixel tile, spreads those to neighbouring tiles so a blurred foreground can bleed over a sharp background, and takes 8 to 64 spiral samples, each counted if its own blur reaches the pixel.</p>
+      <p>When the camera, the scene, the time, the focus and the aperture all hold still, the pipeline switches to the real thing. It renders the scene again and again from points spread across the lens: the camera moves in its own plane by up to the aperture radius, and the projection shifts back so the focal plane stays put. A running mean of those frames gives exact blur, exact occlusion at every edge and antialiasing for free. The view crossfades from the gather to the mean over frames 8 to 32, and after 256 frames (Lens samples, up to 1024) it stops rendering and shows the stored average. Any change restarts it; a day calls <code>restartAccumulation()</code> after changing uniforms the pipeline can't see.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Blur circle and lens samples</h3>
+        <div class="controls">
+          <label for="cocF">Focus <input id="cocF" type="range" min="1" max="12" step="0.1" value="5"><output id="cocFOut">5.0</output></label>
+          <label for="lensN">Frames <input id="lensN" type="range" min="1" max="256" step="1" value="64"><output id="lensNOut">64</output></label>
+        </div>
+      </div>
+      <div class="two">
+        <svg id="cocSvg" viewBox="0 0 420 300" role="img" aria-label="Signed circle of confusion against distance: negative in front of the focus, positive behind, capped at 4 percent."></svg>
+        <svg id="lensSvg" viewBox="0 0 300 300" role="img" aria-label="Lens positions of the first frames, from Halton sequences, spread evenly over the aperture disc."></svg>
+      </div>
+      <p class="fig-cap">Lens offsets are <code>(√h₂(n)·cos 2πh₃(n), √h₂(n)·sin 2πh₃(n))</code> with Halton sequences in bases 2 and 3, so any prefix covers the disc evenly. Subpixel jitter uses bases 5 and 7. Aperture here is 0.02 of the height.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The finish · <b>shaders/pipeline/final.js</b> · <b>bloom.js</b></div>
+      <h2>Bloom, AgX and grain</h2>
+      <p>A day can run its own full-screen pass over the lit HDR image through the <code>composite</code> hook, after motion blur and before depth of field and bloom; an earlier version of Day 2 ray-traced glass there.</p>
+      <p>Bloom builds a pyramid of up to 7 half-size levels with Jimenez's 13-tap downsample (with Karis averaging on the first level, so single hot pixels don't sparkle) and a tent upsample. It is mixed in as an energy-preserving lerp, <code>mix(color, bloom, strength)</code>, not added, so it never brightens the image overall.</p>
+      <p>The final pass applies, in order: chromatic aberration (off by default), exposure, a vignette before tonemapping, the tonemapper (AgX by default; ACES, Khronos PBR Neutral or a plain clamp), sRGB encoding, saturation and contrast in display space, an optional clip warning, film grain that fades toward black and white, and a ±0.5/255 dither against banding. AgX converts to Rec.2020, applies an inset matrix, maps log₂ exposure over about 16.5 stops through a polynomial S-curve and back out, so highlights desaturate toward white smoothly instead of clipping to a hue.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Tonemappers on grey</h3>
+        <div class="controls"><label for="expo">Exposure <input id="expo" type="range" min="-3" max="3" step="0.1" value="0"><output id="expoOut">0 EV</output></label></div>
+      </div>
+      <div class="scroll"><svg id="tmSvg" viewBox="0 0 760 300" role="img" aria-label="Display value against scene luminance in stops for AgX, ACES, PBR Neutral and clamp."></svg></div>
+      <p class="fig-cap">Display value (sRGB-encoded) against scene value in stops around 0.18 grey. AgX keeps the longest highlight roll-off; the clip warning paints anything above 0.97.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The studio · <b>studio.js</b></div>
+      <h2>A studio baked into light</h2>
+      <p>Most days light their scene with a procedural photo studio: a seamless curved cyc, a key softbox about 7 units away, a larger fill panel, an optional ceiling disc and a dim surround. It is baked once into a prefiltered environment map for reflections. The diffuse light comes from 9 spherical-harmonic coefficients projected from a second bake with the key hidden, because the key is also the analytic light that casts the shadows: its colour is the panel's power over 7², and the PCSS light size is 0.8 × tan of its angular size. So the key's reflection, its diffuse light and its soft shadow all come from the same panel without counting it twice. An HDR photo can be used instead, with the light direction taken from its SH.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Controls · <b>addGUI()</b></div>
+      <h2>The Rendering panel</h2>
+      <p>Every day has a collapsed Rendering section with the same controls. None are randomised, and every change restarts the lens average.</p>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Control</th><th>Range</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>Exposure</td><td>0.1–4</td><td>scene multiplier before the tonemapper</td></tr>
+          <tr><td>Tonemapper</td><td>agx / aces / neutral / none</td><td>the curve above</td></tr>
+          <tr><td>Environment</td><td>0–3</td><td>scales SH ambient and reflections</td></tr>
+          <tr><td>Bloom, Bloom radius</td><td>0–0.3, 0–1</td><td>bloom mix and how far it spreads</td></tr>
+          <tr><td>Vignette, Grain, Aberration</td><td>0–1, 0–0.15, 0–1</td><td>lens and film effects</td></tr>
+          <tr><td>Saturation, Contrast</td><td>0–2, 0.5–1.5</td><td>display-space grading</td></tr>
+          <tr><td>Shadows, Shadow denoise</td><td>on / off</td><td>shadow map, half-res accumulated mask</td></tr>
+          <tr><td>Shadow softness, Light size</td><td>0–4, 0–0.6</td><td>PCSS penumbra scale and light angle</td></tr>
+          <tr><td>AO + GI, AO, AO power, GI, GI radius</td><td>on / off, 0–2, 0.5–4, 0–4, 0.05–4</td><td>the bitmask pass and how it lands</td></tr>
+          <tr><td>Motion blur, Shutter, Blur samples</td><td>on / off, 0–0.2, 2–64</td><td>only when the day enables motion blur</td></tr>
+          <tr><td>Depth of field, Lens samples</td><td>on / off, 0–1024</td><td>only when the day enables it</td></tr>
+          <tr><td>Debug</td><td>normals, depth, velocity, shadow, ao, gi, albedo, clipping</td><td>shows one buffer instead of the image</td></tr>
+          <tr><td>Clip warning, Wireframe</td><td>on / off</td><td>flags clipped highlights; draws pipeline meshes as wireframe</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="col">
+    Part of Codevember 2026 by Jaume Sanchez Elias. Source in <span class="mono">modules/pipeline/</span> and <span class="mono">shaders/pipeline/</span> of the codevember-2026 repository. Explainers for the days: <a href="../../1/explainer.html">Fold</a>, <a href="../../2/explainer.html">Shatter</a>, <a href="../../3/explainer.html">Melt</a>.
+  </footer>
+</main>
+
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs = {}, parent) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  };
+  const redrawers = [];
+  const onTheme = () => redrawers.forEach((f) => f());
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", onTheme);
+  new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // Canvas sized to its box at device pixel ratio; draw(ctx, w, h) in CSS pixels.
+  function fitCanvas(c, aspect, draw) {
+    const go = () => {
+      const w = c.clientWidth || 600, h = Math.round(w * aspect), d = Math.min(2, devicePixelRatio || 1);
+      c.width = Math.round(w * d); c.height = Math.round(h * d); c.style.height = h + "px";
+      const ctx = c.getContext("2d"); ctx.setTransform(d, 0, 0, d, 0, 0); draw(ctx, w, h);
+    };
+    new ResizeObserver(go).observe(c);
+    redrawers.push(go);
+    return go;
+  }
+
+  const clamp01 = (x) => Math.max(0, Math.min(1, x));
+  const sstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+  const halton = (i, b) => { let f = 1, r = 0; while (i > 0) { f /= b; r += f * (i % b); i = Math.floor(i / b); } return r; };
+
+  /* ---------- Frame graph ---------- */
+  {
+    const box = document.getElementById("frameGraph"), sel = document.getElementById("tier");
+    const T = {
+      low: { msaa: "FXAA", shadow: "1024²", gi: "1 slice × 8 steps, 3 blurs", sub: 1 },
+      medium: { msaa: "MSAA 2×", shadow: "2048²", gi: "1 slice × 8 steps", sub: 1 },
+      high: { msaa: "MSAA 4×", shadow: "2048²", gi: "2 slices × 8 steps", sub: 1 },
+      capture: { msaa: "MSAA 4×", shadow: "4096²", gi: "3 slices × 12 steps", sub: 16 },
+    };
+    const draw = () => {
+      const t = T[sel.value];
+      const rows = [
+        ["Shadow map", `R32F depth + compare, ${t.shadow}`, false],
+        ["Prepass", "normal · velocity · depth, RGBA16F", false],
+        ["AO + GI", `half res, ${t.gi}, history, à-trous`, false],
+        ["Shadow mask", "half res, accumulated (opt-in)", true],
+        ["Main pass", `lit HDR, RGBA16F, ${t.msaa === "FXAA" ? "no MSAA" : t.msaa}`, false],
+        ["Motion blur", "shutter prepass, 8×8 tiles, 24–32 taps (opt-in)", true],
+        ["Composite", "the day's own pass (opt-in)", true],
+        ["Depth of field", "gather, or lens average when still (opt-in)", true],
+        ["Bloom", "≤ 7 levels, mixed in", false],
+        ["Final", `exposure · AgX · grain · dither${t.msaa === "FXAA" ? " → FXAA" : ""}`, false],
+      ];
+      box.innerHTML = rows.map(([n, d, opt]) => `<div class="node${opt ? " opt" : ""}"><b>${n}</b><span>${d}</span></div>`).join("") + `<p class="fig-cap">${t.sub > 1 ? "Capture renders 16 jittered sub-frames of all of this and averages them." : "One pass of each per frame. Dashed: opt-in per day."}</p>`;
+    };
+    sel.addEventListener("change", draw); draw();
+  }
+
+  /* ---------- GGX lobe ---------- */
+  {
+    const svg = document.getElementById("ggxSvg"), rIn = document.getElementById("rough"), aIn = document.getElementById("incid");
+    const draw = () => {
+      svg.textContent = "";
+      const r = +rIn.value, ia = (+aIn.value * Math.PI) / 180; document.getElementById("roughOut").value = r.toFixed(2); document.getElementById("incidOut").value = `${aIn.value}°`;
+      const ink = css("--ink"), acc = css("--accent"), muted = css("--muted"), line = css("--line"), sec = css("--second");
+      const a = Math.max(0.03, r) ** 2, a2 = a * a, cx = 380, cy = 262;
+      const L = [-Math.sin(ia), Math.cos(ia)];
+      const D = (nh) => a2 / (Math.PI * (nh * nh * (a2 - 1) + 1) ** 2);
+      const Vis = (nl, nv) => 0.5 / (nl * Math.sqrt(nv * nv * (1 - a2) + a2) + nv * Math.sqrt(nl * nl * (1 - a2) + a2));
+      const vals = [];
+      for (let i = 0; i <= 180; i++) {
+        const th = -Math.PI / 2 + (Math.PI * i) / 180, V = [Math.sin(th), Math.cos(th)];
+        const H = [L[0] + V[0], L[1] + V[1]], hl = Math.hypot(...H), nh = H[1] / hl, nv = Math.max(V[1], 1e-4), nl = Math.max(L[1], 1e-4);
+        vals.push([th, D(nh) * Vis(nl, nv) * nl]);
+      }
+      const mx = Math.max(...vals.map((v) => v[1]));
+      el("line", { x1: 40, x2: 720, y1: cy, y2: cy, stroke: ink, "stroke-width": 2 }, svg);
+      for (const k of [0.33, 0.66, 1]) el("path", { d: `M${cx - 220 * k},${cy} A${220 * k},${220 * k} 0 0 1 ${cx + 220 * k},${cy}`, fill: "none", stroke: line }, svg);
+      const d = vals.map(([th, v], i) => { const rr = 220 * (v / mx); return (i ? "L" : "M") + (cx + Math.sin(th) * rr).toFixed(1) + "," + (cy - Math.cos(th) * rr).toFixed(1); }).join("");
+      el("path", { d: d + "Z", fill: acc, "fill-opacity": 0.2, stroke: acc, "stroke-width": 2.5 }, svg);
+      el("line", { x1: cx + L[0] * 240, y1: cy - L[1] * 240, x2: cx, y2: cy, stroke: sec, "stroke-width": 2 }, svg);
+      const rx = -L[0], ry = L[1];
+      el("line", { x1: cx, y1: cy, x2: cx + rx * 240, y2: cy - ry * 240, stroke: muted, "stroke-dasharray": "4 4" }, svg);
+      const lab = (x, y, s, an = "start") => { const e = el("text", { x, y, class: "t", "text-anchor": an }, svg); e.textContent = s; };
+      lab(cx + L[0] * 250 - 4, cy - L[1] * 250, "light", "end"); lab(cx + rx * 250 + 4, cy - ry * 250, "mirror direction");
+      lab(40, cy + 24, `peak scaled to fit: actual peak ${mx < 100 ? mx.toFixed(2) : mx.toFixed(0)}`);
+    };
+    rIn.addEventListener("input", draw); aIn.addEventListener("input", draw); redrawers.push(draw); draw();
+  }
+
+  /* ---------- PCSS ---------- */
+  {
+    const svg = document.getElementById("pcssSvg"), gIn = document.getElementById("pGap"), sIn = document.getElementById("pSize");
+    const draw = () => {
+      svg.textContent = "";
+      const gap = +gIn.value, ls = +sIn.value; document.getElementById("pGapOut").value = gap.toFixed(2); document.getElementById("pSizeOut").value = ls.toFixed(2);
+      const ink = css("--ink"), acc = css("--accent"), muted = css("--muted"), line = css("--line"), sec = css("--second");
+      const S = 110, floorY = 280, bx0 = 170, bx1 = 300;
+      const by = floorY - gap * S - 6;
+      // light at distance 2 above the blocker, size = 2·tan
+      const ly = Math.max(20, by - 2 * S), lw = Math.min(330, 2 * S * ls * 2);
+      el("line", { x1: 235 - lw / 2, x2: 235 + lw / 2, y1: ly, y2: ly, stroke: sec, "stroke-width": 6, "stroke-linecap": "round" }, svg);
+      el("rect", { x: bx0, y: by, width: bx1 - bx0, height: 6, fill: ink }, svg);
+      el("line", { x1: 20, x2: 470, y1: floorY, y2: floorY, stroke: ink, "stroke-width": 2 }, svg);
+      const pen = gap * ls * 2 * S;
+      const grad = `g${Math.random().toString(36).slice(2, 7)}`;
+      const defs = el("defs", {}, svg), lg = el("linearGradient", { id: grad, x1: 0, x2: 1, y1: 0, y2: 0 }, defs);
+      el("stop", { offset: 0, "stop-color": ink, "stop-opacity": 0 }, lg); el("stop", { offset: 1, "stop-color": ink, "stop-opacity": 0.55 }, lg);
+      el("rect", { x: bx1 - pen / 2, y: floorY + 2, width: Math.max(pen, 0.5), height: 14, fill: `url(#${grad})`, transform: `rotate(180 ${bx1} ${floorY + 9})` }, svg);
+      el("rect", { x: bx0 + pen / 2, y: floorY + 2, width: Math.max(0, bx1 - bx0 - pen), height: 14, fill: ink, "fill-opacity": 0.55 }, svg);
+      el("rect", { x: bx0 - pen / 2, y: floorY + 2, width: Math.max(pen, 0.5), height: 14, fill: `url(#${grad})` }, svg);
+      for (const sx of [-1, 1]) { const ex = sx < 0 ? bx0 : bx1; el("line", { x1: 235 + (sx * lw) / 2, y1: ly, x2: ex, y2: by, stroke: muted, "stroke-dasharray": "3 4" }, svg); el("line", { x1: 235 - (sx * lw) / 2, y1: ly, x2: ex, y2: by, stroke: muted, "stroke-dasharray": "3 4" }, svg); }
+      const lab = (x, y, s, an = "start") => { const e = el("text", { x, y, class: "t", "text-anchor": an }, svg); e.textContent = s; };
+      lab(235, ly - 10, "area light", "middle"); lab(bx1 + 10, by + 6, "blocker"); lab(30, floorY + 34, `penumbra = gap · light size = ${(gap * ls).toFixed(2)}`);
+      // tap patterns
+      const tap = (cx, cy, n, R, kind) => { el("circle", { cx, cy, r: R, fill: "none", stroke: line }, svg); for (let i = 0; i < n; i++) { const t = (i + 0.5) / n, rr = kind === "lin" ? t * R : Math.sqrt(t) * R, a = i * 2.39996; el("circle", { cx: cx + Math.cos(a) * rr, cy: cy + Math.sin(a) * rr, r: 3, fill: kind === "lin" ? sec : acc }, svg); } };
+      tap(580, 100, 24, 60, "lin"); tap(580, 230, 20, 60, "sqrt");
+      lab(660, 104, "24 blocker taps"); lab(660, 234, "20 filter taps");
+    };
+    gIn.addEventListener("input", draw); sIn.addEventListener("input", draw); redrawers.push(draw); draw();
+  }
+
+  /* ---------- Octahedral ---------- */
+  {
+    const c = document.getElementById("octCanvas");
+    const draw = (ctx, w, h) => {
+      ctx.clearRect(0, 0, w, h);
+      const size = Math.min(h - 40, w * 0.38), d = Math.min(2, devicePixelRatio || 1);
+      const N = Math.round(size * d), img = ctx.createImageData(N, N);
+      const col = (n) => [n[0] * 0.5 + 0.5, n[1] * 0.5 + 0.5, n[2] * 0.5 + 0.5].map((v) => Math.round(255 * Math.pow(v, 0.8)));
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        const ex = (i / (N - 1)) * 2 - 1, ey = 1 - (j / (N - 1)) * 2;
+        let x = ex, y = ey, z = 1 - Math.abs(ex) - Math.abs(ey);
+        const t = Math.max(-z, 0); x += x >= 0 ? -t : t; y += y >= 0 ? -t : t;
+        const l = Math.hypot(x, y, z), cc = col([x / l, y / l, z / l]), o = (j * N + i) * 4;
+        img.data[o] = cc[0]; img.data[o + 1] = cc[1]; img.data[o + 2] = cc[2]; img.data[o + 3] = 255;
+      }
+      const tmp = document.createElement("canvas"); tmp.width = N; tmp.height = N; tmp.getContext("2d").putImageData(img, 0, 0);
+      const sx = w * 0.62 - size / 2, sy = 16;
+      ctx.drawImage(tmp, sx, sy, size, size);
+      ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(sx + size / 2, sy); ctx.lineTo(sx + size, sy + size / 2); ctx.lineTo(sx + size / 2, sy + size); ctx.lineTo(sx, sy + size / 2); ctx.closePath(); ctx.stroke(); ctx.strokeRect(sx, sy, size, size);
+      // the sphere, front hemisphere
+      const R = size * 0.42, cx = w * 0.2, cy = sy + size / 2, M = Math.round(2 * R * d), sp = ctx.createImageData(M, M);
+      for (let j = 0; j < M; j++) for (let i = 0; i < M; i++) {
+        const x = (i / (M - 1)) * 2 - 1, y = 1 - (j / (M - 1)) * 2, r2 = x * x + y * y; if (r2 > 1) continue;
+        const cc = col([x, y, Math.sqrt(1 - r2)]), o = (j * M + i) * 4; sp.data[o] = cc[0]; sp.data[o + 1] = cc[1]; sp.data[o + 2] = cc[2]; sp.data[o + 3] = 255;
+      }
+      const t2 = document.createElement("canvas"); t2.width = M; t2.height = M; t2.getContext("2d").putImageData(sp, 0, 0); ctx.drawImage(t2, cx - R, cy - R, 2 * R, 2 * R);
+      ctx.fillStyle = css("--muted"); ctx.font = `400 12px ${css("--mono")}`; ctx.textAlign = "center";
+      ctx.fillText("normals facing the viewer", cx, sy + size + 18); ctx.fillText("inner diamond: z > 0 · corners: z < 0, folded out", sx + size / 2, sy + size + 18);
+    };
+    fitCanvas(c, 0.4, draw);
+  }
+
+  /* ---------- GTAO slice ---------- */
+  {
+    const svg = document.getElementById("gtaoSvg"), tIn = document.getElementById("gThick");
+    const draw = () => {
+      svg.textContent = "";
+      const thick = +tIn.value; document.getElementById("gThickOut").value = thick.toFixed(2);
+      const ink = css("--ink"), acc = css("--accent"), muted = css("--muted"), line = css("--line"), sec = css("--second"), bg = css("--bg");
+      const S = 120, cx = 380, gy = 230;
+      const H = (x) => 0.55 * Math.exp(-(((x + 1.25) / 0.28) ** 2)) + 1.1 * Math.exp(-(((x - 1.35) / 0.18) ** 2)) + 0.2 * Math.exp(-(((x - 0.6) / 0.25) ** 2));
+      let d = ""; for (let i = 0; i <= 300; i++) { const x = -2.9 + (5.8 * i) / 300; d += (i ? "L" : "M") + (cx + x * S).toFixed(1) + "," + (gy - H(x) * S).toFixed(1); }
+      el("path", { d: d + `L${cx + 2.9 * S},${gy + 10} L${cx - 2.9 * S},${gy + 10} Z`, fill: css("--ground"), stroke: ink, "stroke-width": 1.5 }, svg);
+      const P = [0, H(0)];
+      // sectors over the hemisphere around the up normal; view straight down
+      const sectors = new Array(32).fill(0);
+      const ang = (dx, dy) => Math.atan2(dx, dy); // angle from vertical, -pi/2..pi/2
+      const toSec = (a) => Math.max(0, Math.min(32, ((a + Math.PI / 2) / Math.PI) * 32));
+      const steps = 8, R = 2.6;
+      for (const side of [-1, 1]) for (let s = 0; s < steps; s++) {
+        const t = (s + 0.5) / steps, off = side * (0.05 + t * t * R), x = off, y = H(x);
+        const dx = x - P[0], dy = y - P[1];
+        const front = ang(dx, dy), back = ang(dx, dy - thick);
+        let lo = Math.min(front, back), hi = Math.max(front, back);
+        if (side < 0) { lo = Math.max(lo, -Math.PI / 2); } else { hi = Math.min(hi, Math.PI / 2); }
+        const a0 = Math.floor(toSec(lo)), a1 = Math.ceil(toSec(hi));
+        let fresh = 0; for (let k = a0; k < a1; k++) if (!sectors[k]) { sectors[k] = side; fresh++; }
+        el("circle", { cx: cx + x * S, cy: gy - y * S, r: 3.5, fill: fresh ? acc : muted }, svg);
+        el("line", { x1: cx + x * S, y1: gy - y * S, x2: cx + x * S, y2: gy - (y - thick) * S, stroke: muted, "stroke-width": 1, "stroke-opacity": 0.4 }, svg);
+      }
+      // hemisphere fan
+      for (let k = 0; k < 32; k++) {
+        const a0 = -Math.PI / 2 + (k * Math.PI) / 32, a1 = a0 + Math.PI / 32, r = 0.75 * S;
+        const p0 = [cx + Math.sin(a0) * r, gy - P[1] * S - Math.cos(a0) * r], p1 = [cx + Math.sin(a1) * r, gy - P[1] * S - Math.cos(a1) * r];
+        el("path", { d: `M${cx},${gy - P[1] * S} L${p0} L${p1} Z`, fill: sectors[k] ? ink : sec, "fill-opacity": sectors[k] ? 0.25 : 0.35, stroke: bg, "stroke-width": 0.5 }, svg);
+      }
+      el("circle", { cx, cy: gy - P[1] * S, r: 5, fill: ink }, svg);
+      // bit strip
+      const bx = 140, bw = 480 / 32, by = 296;
+      for (let k = 0; k < 32; k++) el("rect", { x: bx + k * bw, y: by, width: bw - 2, height: 16, fill: sectors[k] ? ink : sec, "fill-opacity": sectors[k] ? 0.85 : 0.35 }, svg);
+      const vis = sectors.filter((v) => !v).length / 32;
+      const lab = (x, y, s, an = "start") => { const e = el("text", { x, y, class: "t", "text-anchor": an }, svg); e.textContent = s; };
+      lab(bx, by - 8, `32-bit sector mask · visibility ${Math.round(vis * 100)} %`); lab(cx + 14, gy - P[1] * S + 18, "pixel");
+      lab(30, 24, "grey ticks: each sample's assumed thickness");
+    };
+    tIn.addEventListener("input", draw); redrawers.push(draw); draw();
+  }
+
+  /* ---------- Variance clipping ---------- */
+  {
+    const svg = document.getElementById("vclipSvg"), kIn = document.getElementById("vcK");
+    const vals = [0.42, 0.47, 0.5, 0.45, 0.52, 0.49, 0.44, 0.55, 0.48], hist = 0.82;
+    const draw = () => {
+      svg.textContent = "";
+      const k = +kIn.value; document.getElementById("vcKOut").value = `${k.toFixed(1)}σ`;
+      const ink = css("--ink"), acc = css("--accent"), muted = css("--muted"), line = css("--line"), sec = css("--second");
+      const mu = vals.reduce((a, b) => a + b) / vals.length, sd = Math.sqrt(vals.reduce((a, b) => a + (b - mu) ** 2, 0) / vals.length);
+      const X = (v) => 60 + v * 640, y = 120;
+      el("line", { x1: X(0), x2: X(1), y1: y, y2: y, stroke: line, "stroke-width": 2 }, svg);
+      const lo = Math.max(0, mu - k * sd), hi = Math.min(1, mu + k * sd);
+      el("rect", { x: X(lo), y: y - 26, width: X(hi) - X(lo), height: 52, fill: sec, "fill-opacity": 0.18, stroke: sec }, svg);
+      vals.forEach((v, i) => el("circle", { cx: X(v), cy: y + (i % 3 - 1) * 12, r: 4.5, fill: ink }, svg));
+      el("circle", { cx: X(hist), cy: y, r: 7, fill: "none", stroke: muted, "stroke-width": 2, "stroke-dasharray": "3 3" }, svg);
+      const cl = Math.min(hi, Math.max(lo, hist));
+      el("line", { x1: X(hist), x2: X(cl), y1: y, y2: y, stroke: acc, "stroke-width": 2 }, svg);
+      el("circle", { cx: X(cl), cy: y, r: 7, fill: acc }, svg);
+      const lab = (x, yy, s, an = "middle") => { const e = el("text", { x, y: yy, class: "t", "text-anchor": an }, svg); e.textContent = s; };
+      lab(X(mu), y + 48, "this frame's 3 × 3 neighbourhood"); lab(X(hist), y - 36, "stale history"); lab(X(cl), y + 70, "clamped");
+      for (const v of [0, 0.5, 1]) lab(X(v), 214, v.toFixed(1));
+    };
+    kIn.addEventListener("input", draw); redrawers.push(draw); draw();
+  }
+
+  /* ---------- Motion blur tiles ---------- */
+  {
+    const c = document.getElementById("mbCanvas"), rIn = document.getElementById("mbR");
+    const draw = (ctx, w, h) => {
+      const maxR = +rIn.value; document.getElementById("mbROut").value = `${maxR} px`;
+      ctx.clearRect(0, 0, w, h);
+      const G = 48, cell = Math.min((w - 40) / (3 * G + 8), (h - 40) / G), T = 8, nt = G / T;
+      const vel = new Float32Array(G * G);
+      for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) { const dx = i - 18, dy = j - 24; vel[j * G + i] = dx * dx + dy * dy < 64 ? 20 : 0; }
+      const tile = new Float32Array(nt * nt); for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) { const k = Math.floor(j / T) * nt + Math.floor(i / T); tile[k] = Math.max(tile[k], Math.min(maxR, vel[j * G + i])); }
+      const reach = Math.ceil(maxR / T), nb = new Float32Array(nt * nt);
+      for (let j = 0; j < nt; j++) for (let i = 0; i < nt; i++) { let m = 0; for (let b = -reach; b <= reach; b++) for (let a = -reach; a <= reach; a++) { const x = i + a, y = j + b; if (x >= 0 && y >= 0 && x < nt && y < nt) m = Math.max(m, tile[y * nt + x]); } nb[j * nt + i] = m; }
+      const acc = css("--accent"), ink = css("--ink"), line = css("--line");
+      const panel = (ox, f, label) => {
+        for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) { const v = f(i, j); if (v > 0) { ctx.fillStyle = acc; ctx.globalAlpha = 0.2 + 0.8 * (v / 20); ctx.fillRect(ox + i * cell, 20 + j * cell, cell, cell); } }
+        ctx.globalAlpha = 1; ctx.strokeStyle = line; ctx.lineWidth = 1;
+        for (let k = 0; k <= nt; k++) { ctx.beginPath(); ctx.moveTo(ox + k * T * cell, 20); ctx.lineTo(ox + k * T * cell, 20 + G * cell); ctx.stroke(); ctx.beginPath(); ctx.moveTo(ox, 20 + k * T * cell); ctx.lineTo(ox + G * cell, 20 + k * T * cell); ctx.stroke(); }
+        ctx.fillStyle = css("--muted"); ctx.font = `400 12px ${css("--mono")}`; ctx.textAlign = "left"; ctx.fillText(label, ox, 14);
+      };
+      const gap = 4 * cell;
+      panel(20, (i, j) => vel[j * G + i], "velocity");
+      panel(20 + G * cell + gap, (i, j) => tile[Math.floor(j / T) * nt + Math.floor(i / T)], "tile max");
+      panel(20 + 2 * (G * cell + gap), (i, j) => nb[Math.floor(j / T) * nt + Math.floor(i / T)], `neighbour max (±${reach} tiles)`);
+      ctx.strokeStyle = ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(20 + 18 * cell - 10, 20 + 24 * cell); ctx.lineTo(20 + 18 * cell + 14, 20 + 24 * cell); ctx.stroke();
+    };
+    const go = fitCanvas(c, 0.4, draw); rIn.addEventListener("input", go);
+  }
+
+  /* ---------- CoC and lens ---------- */
+  {
+    const coc = document.getElementById("cocSvg"), lens = document.getElementById("lensSvg"), fIn = document.getElementById("cocF"), nIn = document.getElementById("lensN");
+    const draw = () => {
+      coc.textContent = ""; lens.textContent = "";
+      const F = +fIn.value, n = +nIn.value; document.getElementById("cocFOut").value = F.toFixed(1); document.getElementById("lensNOut").value = n;
+      const acc = css("--accent"), line = css("--line"), muted = css("--muted"), ink = css("--ink");
+      const ap = 0.02, cap = 0.04, X = (z) => 40 + ((z - 0.5) / 15.5) * 360, Y = (v) => 150 - (v / 0.045) * 120;
+      for (const v of [-0.04, 0, 0.04]) { el("line", { x1: 40, x2: 400, y1: Y(v), y2: Y(v), stroke: line }, coc); const e = el("text", { x: 34, y: Y(v) + 4, class: "t", "text-anchor": "end" }, coc); e.textContent = `${(v * 100).toFixed(0)}%`; }
+      let d = ""; for (let i = 0; i <= 300; i++) { const z = 0.5 + (15.5 * i) / 300, c = Math.max(-cap, Math.min(cap, ap * (1 - F / z))); d += (i ? "L" : "M") + X(z).toFixed(1) + "," + Y(c).toFixed(1); }
+      el("path", { d, fill: "none", stroke: acc, "stroke-width": 2.5 }, coc);
+      el("line", { x1: X(F), x2: X(F), y1: Y(0.045), y2: Y(-0.045), stroke: muted, "stroke-dasharray": "3 3" }, coc);
+      const lb = (s, x, y, a = "start") => { const e = el("text", { x, y, class: "t", "text-anchor": a }, coc); e.textContent = s; };
+      lb("near: negative", 44, Y(-0.04) + 16); lb("far: positive", 396, Y(0.02) - 8, "end"); lb("distance", 400, 292, "end"); lb(`focus ${F.toFixed(1)}`, X(F) + 4, Y(0.045) + 12);
+      el("circle", { cx: 150, cy: 150, r: 130, fill: "none", stroke: line, "stroke-width": 1.5 }, lens);
+      for (let i = 1; i <= n; i++) { const r = Math.sqrt(halton(i, 2)), a = 2 * Math.PI * halton(i, 3); el("circle", { cx: 150 + 130 * r * Math.cos(a), cy: 150 + 130 * r * Math.sin(a), r: i === n ? 5 : 3, fill: i === n ? ink : acc }, lens); }
+      const fade = clamp01((n - 8) / 24); const e = el("text", { x: 150, y: 296, class: "t", "text-anchor": "middle" }, lens); e.textContent = `average share ${Math.round(fade * 100)} %`;
+    };
+    fIn.addEventListener("input", draw); nIn.addEventListener("input", draw); redrawers.push(draw); draw();
+  }
+
+  /* ---------- Tonemappers ---------- */
+  {
+    const svg = document.getElementById("tmSvg"), eIn = document.getElementById("expo");
+    const enc = (x) => (x <= 0.0031308 ? 12.92 * x : 1.055 * Math.pow(x, 1 / 2.4) - 0.055);
+    const mv = (m, v) => [m[0] * v[0] + m[3] * v[1] + m[6] * v[2], m[1] * v[0] + m[4] * v[1] + m[7] * v[2], m[2] * v[0] + m[5] * v[1] + m[8] * v[2]];
+    const INSET = [0.856627153315983, 0.137318972929847, 0.11189821299995, 0.0951212405381588, 0.761241990602591, 0.0767994186031903, 0.0482516061458583, 0.101439036467562, 0.811302368396859];
+    const OUTSET = [1.1271005818144368, -0.1413297634984383, -0.14132976349843826, -0.11060664309660323, 1.157823702216272, -0.11060664309660294, -0.016493938717834573, -0.016493938717834257, 1.2519364065950405];
+    const agx = (x) => {
+      let c = mv(INSET, [x, x, x]);
+      c = c.map((v) => { const l = Math.min(Math.max(Math.log2(Math.max(v, 1e-10)), -12.47393), 4.026069); const t = (l + 12.47393) / 16.499; const t2 = t * t, t4 = t2 * t2; return 15.5 * t4 * t2 - 40.14 * t4 * t + 31.96 * t4 - 6.868 * t2 * t + 0.4298 * t2 + 0.1191 * t - 0.00232; });
+      c = mv(OUTSET, c).map((v) => Math.pow(Math.max(0, v), 2.2));
+      return enc(Math.min(1, c[1]));
+    };
+    const aces = (x) => { const v = x / 0.6; const r = (v * (v + 0.0245786) - 0.000090537) / (v * (0.983729 * v + 0.432951) + 0.238081); return enc(Math.min(1, Math.max(0, r))); };
+    const neutral = (x) => { const start = 0.76, desat = 0.15; const off = x < 0.08 ? x - 6.25 * x * x : 0.04; let c = x - off; if (c < start) return enc(c); const d = 1 - start, np = 1 - (d * d) / (c + d - start); const g = 1 - 1 / (desat * (c - np) + 1); return enc(np * (1 - g) + np * g); };
+    const clampT = (x) => enc(Math.min(1, x));
+    const draw = () => {
+      svg.textContent = "";
+      const ev = +eIn.value; document.getElementById("expoOut").value = `${ev > 0 ? "+" : ""}${ev.toFixed(1)} EV`;
+      const acc = css("--accent"), sec = css("--second"), muted = css("--muted"), ink = css("--ink"), line = css("--line");
+      const X = (s) => 60 + ((s + 8) / 16) * 680, Y = (v) => 260 - v * 230;
+      for (const v of [0, 0.25, 0.5, 0.75, 1]) { el("line", { x1: 60, x2: 740, y1: Y(v), y2: Y(v), stroke: line }, svg); const e = el("text", { x: 52, y: Y(v) + 4, class: "t", "text-anchor": "end" }, svg); e.textContent = v; }
+      for (const s of [-8, -4, 0, 4, 8]) { const e = el("text", { x: X(s), y: 280, class: "t", "text-anchor": "middle" }, svg); e.textContent = `${s > 0 ? "+" : ""}${s}`; }
+      el("rect", { x: 60, y: Y(1), width: 680, height: Y(0.97) - Y(1), fill: acc, "fill-opacity": 0.15 }, svg);
+      const curve = (fn, attrs, name, at) => { let d = ""; for (let i = 0; i <= 320; i++) { const s = -8 + (16 * i) / 320, x = 0.18 * Math.pow(2, s + ev); d += (i ? "L" : "M") + X(s).toFixed(1) + "," + Y(fn(x)).toFixed(1); } el("path", { d, fill: "none", ...attrs }, svg); const s = at, v = fn(0.18 * Math.pow(2, s + ev)); const e = el("text", { x: X(s) + 6, y: Y(v) + 14, class: "t" }, svg); e.textContent = name; };
+      curve(clampT, { stroke: muted, "stroke-width": 1.5, "stroke-dasharray": "2 4" }, "clamp", 3.2);
+      curve(neutral, { stroke: sec, "stroke-width": 2 }, "neutral", -4.5);
+      curve(aces, { stroke: ink, "stroke-width": 1.5, "stroke-dasharray": "6 4" }, "aces", 5.5);
+      curve(agx, { stroke: acc, "stroke-width": 3 }, "agx", 1.2);
+      const t = el("text", { x: 740, y: 296, class: "t", "text-anchor": "end" }, svg); t.textContent = "stops from 0.18 grey";
+    };
+    eIn.addEventListener("input", draw); redrawers.push(draw); draw();
+  }
+})();
+</script>
+
+</body></html>
