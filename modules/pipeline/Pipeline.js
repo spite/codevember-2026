@@ -768,7 +768,7 @@ class Pipeline {
     const materials = [this.copyMaterial, this.accumMaterial, this.downMaterial, this.upMaterial, this.finalMaterial, this.fxaaMaterial];
     if (this.motionBlurAvailable) materials.push(this.tileMaxMaterial, this.neighborMaxMaterial, this.reconstructMaterial);
     if (this.dof) materials.push(...this.dof.materials);
-    materials.push(gi.geometryMaterial, gi.traceMaterial, gi.temporalMaterial, gi.blurMaterial);
+    materials.push(gi.geometryMaterial, gi.traceMaterial, gi.temporalMaterial, gi.blurMaterial, gi.tileMaterial, gi.skipMaterial);
     const mask = this.shadowMask;
     if (mask) materials.push(mask.traceMaterial, mask.temporalMaterial, mask.blurMaterial);
     const scene = new Scene();

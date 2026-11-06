@@ -169,7 +169,7 @@ export class ShadowMaskPass {
 
     let source = write.textures[0];
     const bl = this.blurMaterial.uniforms;
-    bl.tGeo.value = write.textures[1];
+    bl.tGeo.value = geometryTexture;
     const passes = Math.max(0, Math.round(this.blurPasses));
     for (let i = 0; i < Math.max(passes, 1); i++) {
       const dst = this.blurTargets[(Math.max(passes, 1) - 1 - i) % 2 === 0 ? 1 : 0];

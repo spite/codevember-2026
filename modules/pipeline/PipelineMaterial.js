@@ -273,11 +273,17 @@ void main() {
   float NdotH = clamp(dot(n, H), 0.0, 1.0);
   float VdotH = clamp(dot(V, H), 0.0, 1.0);
   #ifdef OPAQUE
+  // The shadow mask and GI share one set of upsampling weights.
   float zTol = giDepthTolerance();
+  GIUpsample giU = GIUpsample(ivec2(0), ivec2(0), ivec2(0), ivec2(0), vec4(0.0), 0.0);
+  if (shadowMaskEnabled > 0.5 || giEnabled > 0.5) giU = giUpsampleWeights(N, zTol);
   // Pixels the half-res mask has no match for (thin geometry) trace their own shadow.
   float maskMatch = 0.0;
   float shadow = 1.0;
-  if (shadowMaskEnabled > 0.5) shadow = giUpsample(shadowMask, N, zTol, maskMatch).a;
+  if (shadowMaskEnabled > 0.5) {
+    shadow = giUpsampleApply(shadowMask, giU).a;
+    maskMatch = giU.match;
+  }
   if (maskMatch < 0.05) shadow = getShadow(P, N);
   #else
   float shadow = getShadow(P, N);
@@ -295,7 +301,7 @@ void main() {
 
   // Indirect: SH env irradiance with AO, screen-space GI, prefiltered env specular.
   #ifdef OPAQUE
-  vec4 gi = sampleGI(N, zTol);
+  vec4 gi = sampleGI(giU);
   #else
   vec4 gi = vec4(0.0, 0.0, 0.0, 1.0);
   #endif

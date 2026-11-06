@@ -9,7 +9,9 @@ import {
   WebGLRenderTarget,
   DataTexture,
   RGBAFormat,
+  RGFormat,
   FloatType,
+  UnsignedByteType,
   HalfFloatType,
   NearestFilter,
   LinearFilter,
@@ -26,12 +28,14 @@ import {
   traceFragment,
   temporalFragment,
   blurFragment,
+  tileFragment,
+  skipFragment,
 } from "shaders/pipeline/gi.js";
 
-function target(type, filter = NearestFilter, count = 1) {
+function target(type, filter = NearestFilter, count = 1, format = RGBAFormat) {
   return new WebGLRenderTarget(1, 1, {
     type,
-    format: RGBAFormat,
+    format,
     minFilter: filter,
     magFilter: filter,
     wrapS: ClampToEdgeWrapping,
@@ -66,6 +70,7 @@ export class GIPass {
     historyClamp = 2.5,
     planeSigma = 0.01,
     normalPower = 16,
+    skipFlat = false,
   } = {}) {
     Object.assign(this, {
       slices, steps, radius, thickness, thicknessScale, fadeStart, fadeEnd, temporal, maxHistory, maxRadiusPixels,
@@ -87,11 +92,12 @@ export class GIPass {
     };
     this.shared = shared;
 
-    const make = (fragmentShader, own) =>
+    const make = (fragmentShader, own, def = {}) =>
       new RawShaderMaterial({
         glslVersion: GLSL3,
         vertexShader: fullscreenVertex,
         fragmentShader,
+        defines: def,
         uniforms: { ...shared, ...own },
         depthTest: false,
         depthWrite: false,
@@ -115,6 +121,13 @@ export class GIPass {
       noiseFrame: { value: 0 },
       slices: { value: slices },
       steps: { value: steps },
+      tSkip: { value: null },
+    });
+    this.tileMaterial = make(tileFragment, { tGeo: { value: null } });
+    this.skipMaterial = make(skipFragment, {
+      tTile: { value: null },
+      radius: { value: radius },
+      maxRadiusPixels: { value: maxRadiusPixels },
     });
     this.temporalMaterial = make(temporalFragment, {
       tCurrent: { value: null },
@@ -135,9 +148,15 @@ export class GIPass {
       stepSize: { value: 1 },
       planeSigma: { value: planeSigma },
       normalPower: { value: normalPower },
+      tSkip: { value: null },
+      skipReach: { value: 0 },
     });
+    // Opt-in: tiles where everything in reach is one plane skip the trace and blur. Flat floors come out
+    // slightly lighter than the trace makes them (it darkens them a little through texel snapping).
+    this.skipFlat = skipFlat;
 
-    this.geometryTarget = target(FloatType);
+    // x = linear depth, y = packed normal (see packNormal).
+    this.geometryTarget = target(FloatType, NearestFilter, 1, RGFormat);
     this.traceTarget = target(HalfFloatType);
     // textures[0] = accumulated GI/AO, textures[1] = geometry + history length.
     this.history = [0, 1].map(() => {
@@ -146,6 +165,8 @@ export class GIPass {
       return rt;
     });
     this.blurTargets = [target(HalfFloatType, LinearFilter), target(HalfFloatType, LinearFilter)];
+    this.tileTarget = target(FloatType);
+    this.skipTarget = target(UnsignedByteType);
     this.historyIndex = 0;
     this.historyValid = false;
     this.lastTemporal = temporal;
@@ -169,7 +190,23 @@ export class GIPass {
     for (const rt of [this.geometryTarget, this.traceTarget, ...this.history, ...this.blurTargets]) {
       rt.setSize(w, h);
     }
+    for (const rt of [this.tileTarget, this.skipTarget]) rt.setSize(Math.ceil(w / 8), Math.ceil(h / 8));
     this.historyValid = false;
+  }
+
+  get skipFlat() {
+    return this._skipFlat;
+  }
+
+  set skipFlat(v) {
+    v = !!v;
+    if (v === this._skipFlat) return;
+    this._skipFlat = v;
+    for (const m of [this.traceMaterial, this.blurMaterial]) {
+      if (v) m.defines.GI_SKIP = "";
+      else delete m.defines.GI_SKIP;
+      m.needsUpdate = true;
+    }
   }
 
   get texture() {
@@ -219,6 +256,18 @@ export class GIPass {
 
     this.renderGeometry(renderer, { depthTexture, normalVelocity, camera });
 
+    if (this.skipFlat) {
+      this.tileMaterial.uniforms.tGeo.value = this.geometryTarget.texture;
+      this._pass(renderer, this.tileMaterial, this.tileTarget);
+      const sk = this.skipMaterial.uniforms;
+      sk.tTile.value = this.tileTarget.texture;
+      sk.radius.value = this.radius;
+      sk.maxRadiusPixels.value = this.maxRadiusPixels / 2;
+      this._pass(renderer, this.skipMaterial, this.skipTarget);
+      this.traceMaterial.uniforms.tSkip.value = this.skipTarget.texture;
+      this.blurMaterial.uniforms.tSkip.value = this.skipTarget.texture;
+    }
+
     const frame = globalUniforms.frame.value;
     const tr = this.traceMaterial.uniforms;
     tr.tGeo.value = this.geometryTarget.texture;
@@ -238,7 +287,6 @@ export class GIPass {
     this._pass(renderer, this.traceMaterial, this.traceTarget);
 
     let source = this.traceTarget.texture;
-    let geometry = this.geometryTarget.texture;
 
     if (this.temporal) {
       const read = this.history[this.historyIndex];
@@ -258,12 +306,11 @@ export class GIPass {
       this._pass(renderer, this.temporalMaterial, write);
       this.historyIndex = 1 - this.historyIndex;
       source = write.textures[0];
-      geometry = write.textures[1];
     }
     this.historyValid = true;
 
     const bl = this.blurMaterial.uniforms;
-    bl.tGeo.value = geometry;
+    bl.tGeo.value = this.geometryTarget.texture;
     bl.planeSigma.value = this.planeSigma;
     bl.normalPower.value = this.normalPower;
     const passes = Math.max(0, Math.round(this.blurPasses));
@@ -272,6 +319,10 @@ export class GIPass {
       const dst = this.blurTargets[(Math.max(passes, 1) - 1 - i) % 2 === 0 ? 1 : 0];
       bl.tInput.value = source;
       bl.stepSize.value = passes === 0 ? 0 : 1 << i;
+      // Tiles reached by this pass and the earlier ones (2 * (2^(i+1) - 1) texels, plus the temporal 3x3);
+      // without variance clipping, history can carry ghosts into skipped tiles, so nothing is skipped.
+      const clamped = !this.temporal || this.historyClamp > 0;
+      bl.skipReach.value = clamped ? Math.ceil((2 * ((1 << (i + 1)) - 1) + 1) / 8) : 0;
       this._pass(renderer, this.blurMaterial, dst);
       source = dst.texture;
     }
@@ -286,10 +337,10 @@ export class GIPass {
   }
 
   dispose() {
-    for (const rt of [this.geometryTarget, this.traceTarget, ...this.history, ...this.blurTargets]) {
+    for (const rt of [this.geometryTarget, this.traceTarget, ...this.history, ...this.blurTargets, this.tileTarget, this.skipTarget]) {
       rt.dispose();
     }
-    for (const m of [this.geometryMaterial, this.traceMaterial, this.temporalMaterial, this.blurMaterial]) {
+    for (const m of [this.geometryMaterial, this.traceMaterial, this.temporalMaterial, this.blurMaterial, this.tileMaterial, this.skipMaterial]) {
       m.dispose();
     }
     this.quad.geometry.dispose();

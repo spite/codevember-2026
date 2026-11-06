@@ -49,7 +49,7 @@ export const globalUniforms = {
   aoDirect: { value: 0 }, // fraction of AO applied to direct diffuse
   aoMin: { value: 0 }, // floor on the combined occlusion, so deep pockets never go black
   depthTexture: { value: null },
-  giGeoMap: { value: null }, // half-res x = linear depth, yz = oct world normal
+  giGeoMap: { value: null }, // half-res x = linear depth, y = packed world normal
   // analytic sphere occluders (xyz centre, w radius), for soft contact darkening
   occluders: { value: Array.from({ length: 16 }, () => new Vector4()) },
   occluderCount: { value: 0 },

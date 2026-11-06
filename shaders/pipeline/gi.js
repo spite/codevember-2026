@@ -52,6 +52,17 @@ vec3 octDecode(vec2 e) {
   return normalize(n);
 }
 
+// The half-res geometry is x = linear depth, y = oct normal as two exact 12-bit integers.
+float packNormal(vec3 n) {
+  vec2 q = round(clamp(octEncode(n) * 0.5 + 0.5, 0.0, 1.0) * 4095.0);
+  return q.x * 4096.0 + q.y;
+}
+
+vec3 unpackNormal(float v) {
+  float a = floor(v / 4096.0);
+  return octDecode(vec2(a, v - a * 4096.0) / 4095.0 * 2.0 - 1.0);
+}
+
 float ign(vec2 p) {
   return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
 }
@@ -64,7 +75,7 @@ void main() {
 }
 `;
 
-// Packs the prepass into half res: x = linear depth (0 = background), yz = oct world normal.
+// Packs the prepass into half res: x = linear depth (0 = background), y = packed world normal.
 export const geometryFragment = /* glsl */ `${giCommon}
 uniform sampler2D tDepth;
 uniform sampler2D tNormalVelocity;
@@ -81,7 +92,7 @@ void main() {
   }
   vec3 nv = octDecode(texelFetch(tNormalVelocity, p, 0).xy);
   vec3 nw = normalize(mat3(uViewInverse) * nv);
-  outGeo = vec4(linearDepth(d), octEncode(nw), 0.0);
+  outGeo = vec4(linearDepth(d), packNormal(nw), 0.0, 0.0);
 }
 `;
 
@@ -101,6 +112,9 @@ uniform float prevColorValid;
 uniform float noiseFrame;
 uniform int slices;
 uniform int steps;
+#ifdef GI_SKIP
+uniform sampler2D tSkip;
+#endif
 
 layout(location = 0) out vec4 outGI;
 
@@ -123,8 +137,14 @@ void main() {
     return;
   }
 
+#ifdef GI_SKIP
+  if (texelFetch(tSkip, h / 8, 0).r > 0.5) {
+    outGI = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
+#endif
   vec3 P = viewPosition(halfToUv(h), g.x);
-  vec3 N = normalize(mat3(uView) * octDecode(g.yz));
+  vec3 N = normalize(mat3(uView) * unpackNormal(g.y));
   vec3 V = isOrtho > 0.5 ? vec3(0.0, 0.0, 1.0) : normalize(-P);
 
   float screenR = radius * projInfo.y * 0.5 * halfRes.y / (isOrtho > 0.5 ? 1.0 : g.x);
@@ -204,7 +224,7 @@ void main() {
             vec3 L = max(textureLod(tPrevColor, puv, 0.0).rgb, vec3(0.0));
             float peak = max(max(L.r, L.g), L.b);
             L *= min(1.0, radianceClamp / max(peak, 1e-4));
-            vec3 Ns = mat3(uView) * octDecode(sg.yz);
+            vec3 Ns = mat3(uView) * unpackNormal(sg.y);
             float facing = clamp(dot(Ns, -deltaDir), 0.0, 1.0);
             sliceGI += L * facing * float(fresh) / 32.0;
           }
@@ -221,6 +241,100 @@ void main() {
 
   vec4 r = wsum > 0.0 ? vec4(gi / wsum, vis / wsum) : vec4(0.0, 0.0, 0.0, 1.0);
   outGI = mix(vec4(0.0, 0.0, 0.0, 1.0), r, fade);
+}
+`;
+
+// 8x8 tiles of the half-res geometry: xyz = a reference view position, w = its packed normal when
+// every texel lies on that plane, -1 when not; all zero when the tile is background.
+export const tileFragment = /* glsl */ `${giCommon}
+uniform sampler2D tGeo;
+uniform mat4 uView;
+
+layout(location = 0) out vec4 outTile;
+
+void main() {
+  ivec2 base = ivec2(gl_FragCoord.xy) * 8;
+  ivec2 hs = ivec2(halfRes) - 1;
+  ivec2 rt = min(base + 4, hs);
+  vec4 ref = texelFetch(tGeo, rt, 0);
+  if (ref.x <= 0.0) {
+    for (int i = 0; i < 64; i++) {
+      ivec2 t = min(base + ivec2(i & 7, i >> 3), hs);
+      vec4 g = texelFetch(tGeo, t, 0);
+      if (g.x > 0.0) {
+        ref = g;
+        rt = t;
+        break;
+      }
+    }
+    if (ref.x <= 0.0) {
+      outTile = vec4(0.0);
+      return;
+    }
+  }
+  vec3 P0 = viewPosition(halfToUv(rt), ref.x);
+  vec3 N0 = mat3(uView) * unpackNormal(ref.y);
+  for (int i = 0; i < 64; i++) {
+    ivec2 t = min(base + ivec2(i & 7, i >> 3), hs);
+    vec4 g = texelFetch(tGeo, t, 0);
+    if (g.x <= 0.0) continue;
+    vec3 P = viewPosition(halfToUv(t), g.x);
+    vec3 N = mat3(uView) * unpackNormal(g.y);
+    if (dot(N, N0) < 0.998 || abs(dot(N0, P - P0)) > 0.02 * length(P - P0) + 1e-4 * g.x) {
+      outTile = vec4(0.0, 0.0, 0.0, -1.0);
+      return;
+    }
+  }
+  outTile = vec4(P0, ref.y);
+}
+`;
+
+// 1 where a tile and everything within the trace radius around it is one plane (or background), so
+// the trace can return vec4(0, 0, 0, 1) there. Not exact: texel snapping darkens flat planes slightly.
+export const skipFragment = /* glsl */ `${giCommon}
+uniform sampler2D tTile;
+uniform mat4 uView;
+uniform float radius;
+uniform float maxRadiusPixels;
+
+layout(location = 0) out vec4 outSkip;
+
+void main() {
+  ivec2 c = ivec2(gl_FragCoord.xy);
+  ivec2 ts = textureSize(tTile, 0) - 1;
+  vec4 own = texelFetch(tTile, c, 0);
+  if (own.w < 0.0) {
+    outSkip = vec4(0.0);
+    return;
+  }
+  if (own.z == 0.0) {
+    outSkip = vec4(1.0);
+    return;
+  }
+  vec3 P0 = own.xyz;
+  vec3 N0 = mat3(uView) * unpackNormal(own.w);
+  float z = isOrtho > 0.5 ? 1.0 : -P0.z;
+  // Trace radius in half-res texels, with margin for depth across the tile.
+  float screenR = min(radius * projInfo.y * 0.5 * halfRes.y / (z * 0.8), maxRadiusPixels);
+  int R = int(ceil(screenR / 8.0)) + 1;
+  for (int y = -R; y <= R; y++) {
+    for (int x = -R; x <= R; x++) {
+      vec4 t = texelFetch(tTile, clamp(c + ivec2(x, y), ivec2(0), ts), 0);
+      if (t.w < 0.0) {
+        outSkip = vec4(0.0);
+        return;
+      }
+      if (t.z == 0.0) continue;
+      vec3 d = t.xyz - P0;
+      vec3 N = mat3(uView) * unpackNormal(t.w);
+      // Neighbouring planes must match and rise no more than ~3 degrees above this one.
+      if (dot(N, N0) < 0.998 || dot(N0, d) > 0.05 * length(d) + 1e-4 * z) {
+        outSkip = vec4(0.0);
+        return;
+      }
+    }
+  }
+  outSkip = vec4(1.0);
 }
 `;
 
@@ -263,7 +377,7 @@ void main() {
     vec2 puv = uv - 0.5 * vel;
 
     vec3 P = viewPosition(uv, g.x);
-    vec3 nw = octDecode(g.yz);
+    vec3 nw = unpackNormal(g.y);
     vec3 V = isOrtho > 0.5 ? vec3(0.0, 0.0, 1.0) : normalize(-P);
     float expectZ = g.x;
     vec4 pc = uPrevViewProjection * (uViewInverse * vec4(P, 1.0));
@@ -286,7 +400,7 @@ void main() {
       vec2 bw2 = mix(1.0 - fr, fr, vec2(o));
       float dz = abs(hg.x - expectZ) / expectZ;
       float wd = clamp(1.0 - dz / tol, 0.0, 1.0);
-      float wn = step(normalThreshold, dot(octDecode(hg.yz), nw));
+      float wn = step(normalThreshold, dot(unpackNormal(hg.y), nw));
       float w = bw2.x * bw2.y * wd * wn;
       hist += texelFetch(tHistory, t, 0) * w;
       len += hg.w * w;
@@ -321,7 +435,7 @@ void main() {
 
   len = min(len + 1.0, maxHistory);
   outAccum = mix(hist, cur, 1.0 / len);
-  outGeo = vec4(g.xyz, len);
+  outGeo = vec4(g.xy, 0.0, len);
 }
 `;
 
@@ -333,6 +447,10 @@ uniform mat4 uView;
 uniform float stepSize;
 uniform float planeSigma;
 uniform float normalPower;
+#ifdef GI_SKIP
+uniform sampler2D tSkip;
+uniform int skipReach;
+#endif
 
 layout(location = 0) out vec4 outGI;
 
@@ -344,8 +462,20 @@ void main() {
     return;
   }
 
+#ifdef GI_SKIP
+  // Skipped tiles as far as this and the earlier passes reach: every tap is vec4(0, 0, 0, 1) already.
+  ivec2 tc = h / 8;
+  ivec2 ts = textureSize(tSkip, 0) - 1;
+  float skip = skipReach > 0 ? 1.0 : 0.0;
+  for (int y = -skipReach; y <= skipReach; y++)
+    for (int x = -skipReach; x <= skipReach; x++) skip = min(skip, texelFetch(tSkip, clamp(tc + ivec2(x, y), ivec2(0), ts), 0).r);
+  if (skip > 0.5) {
+    outGI = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
+#endif
   vec3 P = viewPosition(halfToUv(h), g.x);
-  vec3 nw = octDecode(g.yz);
+  vec3 nw = unpackNormal(g.y);
   vec3 nv = mat3(uView) * nw;
   float k[3] = float[3](0.375, 0.25, 0.0625);
   int st = int(stepSize);
@@ -369,7 +499,7 @@ void main() {
       vec3 Pt = viewPosition(halfToUv(t), tg.x);
       float plane = abs(dot(nv, Pt - P));
       float wd = exp(-plane / sigma);
-      float wn = pow(max(dot(nw, octDecode(tg.yz)), 0.0), normalPower);
+      float wn = pow(max(dot(nw, unpackNormal(tg.y)), 0.0), normalPower);
       float w = k[abs(x)] * k[abs(y)] * wd * wn;
       sum += texelFetch(tInput, t, 0) * w;
       wsum += w;
@@ -407,8 +537,11 @@ vec3 giOctDecode(vec2 e) {
   return normalize(n);
 }
 
-// Upsamples a half-res buffer laid out like giGeoMap: bilinear over the four texels around this
-// pixel, weighted by depth and normal similarity; when none match, the best texel of the 3x3.
+vec3 giUnpackNormal(float v) {
+  float a = floor(v / 4096.0);
+  return giOctDecode(vec2(a, v - a * 4096.0) / 4095.0 * 2.0 - 1.0);
+}
+
 // Depth tolerance for giUpsample; widens with the pixel's own depth slope (half-res texels are 2 px
 // apart). Call it in uniform control flow (it uses derivatives).
 float giDepthTolerance() {
@@ -416,11 +549,19 @@ float giDepthTolerance() {
   return 0.02 * z + 2.0 * fwidth(z);
 }
 
-// match is 1 when a texel matched this pixel, else the fallback's weight (thin geometry missing from
-// the half-res buffer gets a low match).
-vec4 giUpsample(sampler2D map, vec3 worldNormal, float zTol, out float match) {
-  match = 1.0;
-  ivec2 hs = textureSize(map, 0);
+// Upsampling weights for half-res buffers laid out like giGeoMap, so several maps can share them:
+// bilinear over the four texels around this pixel, weighted by depth and normal similarity; when
+// none match, the best texel of the 3x3. match is 1 when a texel matched this pixel, else the
+// fallback's weight (thin geometry missing from the half-res buffer gets a low match).
+struct GIUpsample {
+  ivec2 t0, t1, t2, t3;
+  vec4 w;
+  float match;
+};
+
+GIUpsample giUpsampleWeights(vec3 worldNormal, float zTol) {
+  GIUpsample u = GIUpsample(ivec2(0), ivec2(0), ivec2(0), ivec2(0), vec4(0.0), 1.0);
+  ivec2 hs = textureSize(giGeoMap, 0);
   float z = giLinearDepth(gl_FragCoord.z);
   // A zero normal (the no-argument overload) disables the normal weight.
   bool useN = dot(worldNormal, worldNormal) > 0.0;
@@ -428,40 +569,62 @@ vec4 giUpsample(sampler2D map, vec3 worldNormal, float zTol, out float match) {
   vec2 f = (gl_FragCoord.xy - 0.5) * 0.5;
   ivec2 b = ivec2(floor(f));
   vec2 fr = f - vec2(b);
-
-  vec4 sum = vec4(0.0);
-  float wsum = 0.0;
+  u.t0 = clamp(b, ivec2(0), hs - 1);
+  u.t1 = clamp(b + ivec2(1, 0), ivec2(0), hs - 1);
+  u.t2 = clamp(b + ivec2(0, 1), ivec2(0), hs - 1);
+  u.t3 = clamp(b + ivec2(1, 1), ivec2(0), hs - 1);
+  ivec2 ts[4] = ivec2[4](u.t0, u.t1, u.t2, u.t3);
+  float ws[4] = float[4](0.0, 0.0, 0.0, 0.0);
   for (int i = 0; i < 4; i++) {
     ivec2 o = ivec2(i & 1, i >> 1);
-    ivec2 t = clamp(b + o, ivec2(0), hs - 1);
-    vec4 g = texelFetch(giGeoMap, t, 0);
+    vec4 g = texelFetch(giGeoMap, ts[i], 0);
     float dz = abs(g.x - z) / zTol;
-    float wn = useN ? pow(max(dot(n, giOctDecode(g.yz)), 0.0), 8.0) : 1.0;
+    float wn = useN ? pow(max(dot(n, giUnpackNormal(g.y)), 0.0), 8.0) : 1.0;
     vec2 bw = mix(1.0 - fr, fr, vec2(o));
-    float w = bw.x * bw.y * exp(-dz) * wn;
-    sum += texelFetch(map, t, 0) * w;
-    wsum += w;
+    ws[i] = bw.x * bw.y * exp(-dz) * wn;
   }
-  if (wsum > 0.02) return sum / wsum;
-
-  vec4 best = vec4(0.0, 0.0, 0.0, 1.0);
-  float bestW = 0.0;
-  ivec2 c = ivec2(round(f));
-  for (int y = -1; y <= 1; y++) {
-    for (int x = -1; x <= 1; x++) {
-      ivec2 t = clamp(c + ivec2(x, y), ivec2(0), hs - 1);
-      vec4 g = texelFetch(giGeoMap, t, 0);
-      float dz = abs(g.x - z) / zTol;
-      float wn = useN ? pow(max(dot(n, giOctDecode(g.yz)), 0.0), 8.0) : 1.0;
-      float w = exp(-dz) * (0.05 + wn);
-      if (w > bestW) {
-        bestW = w;
-        best = texelFetch(map, t, 0);
+  u.w = vec4(ws[0], ws[1], ws[2], ws[3]);
+  float wsum = ws[0] + ws[1] + ws[2] + ws[3];
+  if (wsum > 0.02) {
+    u.w /= wsum;
+  } else {
+    float bestW = 0.0;
+    ivec2 best = u.t0;
+    ivec2 c = ivec2(round(f));
+    for (int y = -1; y <= 1; y++) {
+      for (int x = -1; x <= 1; x++) {
+        ivec2 t = clamp(c + ivec2(x, y), ivec2(0), hs - 1);
+        vec4 g = texelFetch(giGeoMap, t, 0);
+        float dz = abs(g.x - z) / zTol;
+        float wn = useN ? pow(max(dot(n, giUnpackNormal(g.y)), 0.0), 8.0) : 1.0;
+        float w = exp(-dz) * (0.05 + wn);
+        if (w > bestW) {
+          bestW = w;
+          best = t;
+        }
       }
     }
+    u.t0 = best;
+    u.t1 = best;
+    u.t2 = best;
+    u.t3 = best;
+    u.w = vec4(bestW > 0.0 ? 1.0 : 0.0, 0.0, 0.0, 0.0);
+    u.match = bestW;
   }
-  match = bestW;
-  return best;
+  return u;
+}
+
+vec4 giUpsampleApply(sampler2D map, GIUpsample u) {
+  vec4 r = vec4(0.0, 0.0, 0.0, 1.0);
+  if (u.w.y + u.w.z + u.w.w > 0.0) r = texelFetch(map, u.t0, 0) * u.w.x + texelFetch(map, u.t1, 0) * u.w.y + texelFetch(map, u.t2, 0) * u.w.z + texelFetch(map, u.t3, 0) * u.w.w;
+  else if (u.w.x > 0.0) r = texelFetch(map, u.t0, 0);
+  return r;
+}
+
+vec4 giUpsample(sampler2D map, vec3 worldNormal, float zTol, out float match) {
+  GIUpsample u = giUpsampleWeights(worldNormal, zTol);
+  match = u.match;
+  return giUpsampleApply(map, u);
 }
 
 vec4 giUpsample(sampler2D map, vec3 worldNormal, float zTol) {
@@ -476,6 +639,11 @@ vec4 giUpsample(sampler2D map, vec3 worldNormal) {
 vec4 sampleGI(vec3 worldNormal, float zTol) {
   if (giEnabled < 0.5) return vec4(0.0, 0.0, 0.0, 1.0);
   return giUpsample(giMap, worldNormal, zTol);
+}
+
+vec4 sampleGI(GIUpsample u) {
+  if (giEnabled < 0.5) return vec4(0.0, 0.0, 0.0, 1.0);
+  return giUpsampleApply(giMap, u);
 }
 
 vec4 sampleGI(vec3 worldNormal) {

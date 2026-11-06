@@ -23,7 +23,7 @@ void main() {
     return;
   }
   vec3 P = (uViewInverse * vec4(viewPosition(halfToUv(h), g.x), 1.0)).xyz;
-  float s = getShadow(P, octDecode(g.yz));
+  float s = getShadow(P, unpackNormal(g.y));
   // Kernel radius in world, then in half-res texels at this depth.
   vec3 row0 = vec3(shadowMatrix[0][0], shadowMatrix[1][0], shadowMatrix[2][0]);
   float radiusWorld = shadowKernelRadius * 2.0 / length(row0);
