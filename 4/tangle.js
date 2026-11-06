@@ -130,7 +130,7 @@ vec2 bezier(vec3 pos, vec3 A, vec3 B, vec3 C) {
   vec3 b = A - 2.0 * B + C + vec3(1e-5);
   vec3 c = a * 2.0;
   vec3 d = A - pos;
-  float kk = 1.0 / dot(b, b);
+  float kk = 1.0 / max(dot(b, b), 1e-12);
   float kx = kk * dot(a, b);
   float ky = kk * (2.0 * dot(a, a) + dot(d, b)) / 3.0;
   float kz = kk * dot(d, a);
@@ -146,7 +146,7 @@ vec2 bezier(vec3 pos, vec3 A, vec3 B, vec3 C) {
     res = vec2(dot2(d + (c + b * t) * t), t);
   } else {
     float z = sqrt(-p);
-    float v = acos(q / (p * z * 2.0)) / 3.0;
+    float v = acos(clamp(q / min(p * z * 2.0, -1e-30), -1.0, 1.0)) / 3.0;
     float m = cos(v);
     float n = sin(v) * 1.732050808;
     vec3 t = clamp(vec3(m + m, -n - m, n - m) * z - kx, 0.0, 1.0);
@@ -266,7 +266,7 @@ vec4 swell(vec4 d, vec4 b) {
     s = (blend + x) * (blend + x) / (4.0 * blend);
     ds = (blend + x) / (2.0 * blend);
   } else {
-    float th = tanh(x / blend);
+    float th = tanh(min(x / blend, 15.0));
     s = blend * (0.25 + 0.5 * th);
     ds = 0.5 * (1.0 - th * th);
   }
@@ -277,6 +277,7 @@ vec4 swell(vec4 d, vec4 b) {
 const PROJECT = /* glsl */ `
 precision highp float;
 precision highp int;
+precision highp sampler2D;
 uniform sampler2D tCurve;
 uniform sampler2D tRings;
 uniform vec4 chunks[${MAX_TUBES * CHUNKS}];
@@ -360,12 +361,18 @@ void main() {
 const BAKE = /* glsl */ `
 precision highp float;
 precision highp int;
+precision highp sampler2D;
 uniform sampler2D tCurve;
 uniform vec4 chunks[${MAX_TUBES * CHUNKS}];
 uniform int tubeCount;
 uniform float blend;
 uniform vec4 volumeBox;
 out vec4 outColor;
+
+vec3 safeNormalize(vec3 v, vec3 fallback) {
+  float l2 = dot(v, v);
+  return l2 > 1e-20 ? v * inversesqrt(l2) : fallback;
+}
 
 float smin(float a, float b, float k) {
   float h = max(k - abs(a - b), 0.0) / max(k, 1e-5);
@@ -393,8 +400,8 @@ float swept(vec3 p, vec4 pv, vec4 a, vec4 b, vec4 nx, vec4 fpv, vec4 fa, vec4 fb
   float u = first ? h + 0.5 : h - 0.5;
   vec4 q = mix(mix(A, c1, u), mix(c1, C, u), u);
   vec4 f = mix(mix(FA, f1, u), mix(f1, FC, u), u);
-  vec3 T = normalize(mix(c1.xyz - A.xyz, C.xyz - c1.xyz, u));
-  vec3 w = normalize(f.xyz - dot(f.xyz, T) * T);
+  vec3 T = safeNormalize(mix(c1.xyz - A.xyz, C.xyz - c1.xyz, u), vec3(0.0, 0.0, 1.0));
+  vec3 w = safeNormalize(f.xyz - dot(f.xyz, T) * T, abs(T.x) < 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0));
   vec3 o = p - q.xyz;
   float d = section(vec2(dot(o, w), dot(o, cross(T, w))), vec2(q.w, f.w)).z;
   // Beyond the segment's ends the overshoot along it counts too, so its tangent line isn't a surface.
@@ -456,7 +463,7 @@ void main() {
   bound -= 0.25 * blend;
   float cap = 8.0 * voxel;
   if (bound > cap) {
-    outColor = vec4(bound, bound - voxel, -1.0, -1.0);
+    outColor = vec4(min(bound, 6e4), min(bound, 6e4) - voxel, -1.0, -1.0);
     return;
   }
   vec2 d = vec2(cap);
@@ -511,6 +518,19 @@ uniform int tubeCount;
 uniform float blend;
 uniform vec3 finishWeights; // holographic, pearl, glass
 
+// Non-finite test on the bits, which fast-math can't assume away like isnan.
+bool finite4(vec4 c) { return all(lessThan(floatBitsToUint(c) & 0x7f800000u, uvec4(0x7f800000u))); }
+
+// smoothstep's formula, defined for inverted or equal edges as D3D evaluates it.
+float sstep(float a, float b, float x) {
+  float dd = b - a;
+  float t = clamp((x - a) / (abs(dd) < 1e-12 ? 1e-12 : dd), 0.0, 1.0);
+  return t * t * (3.0 - 2.0 * t);
+}
+
+// 1 / r with exact zeros nudged, so the slab test never multiplies 0 by Inf.
+vec3 safeInverse(vec3 r) { return 1.0 / vec3(r.x == 0.0 ? 1e-12 : r.x, r.y == 0.0 ? 1e-12 : r.y, r.z == 0.0 ? 1e-12 : r.z); }
+
 #if FINISH == 3
 // Cross-fading: the lean finishes add up here, and the lit colour is scaled by pearl's weight.
 vec3 leanColor = vec3(0.0);
@@ -528,7 +548,7 @@ ${FIELD}
 float stepToward(int t, float s, vec3 p) {
   float i = floor(s + 0.5);
   float u = s - i + 0.5;
-  int k = int(i);
+  int k = int(clamp(i, -float(${SAMPLES}), 2.0 * float(${SAMPLES})));
   vec3 c1 = curveAt(t, k).xyz;
   vec3 A = 0.5 * (curveAt(t, k - 1).xyz + c1), C = 0.5 * (c1 + curveAt(t, k + 1).xyz);
   vec3 c = mix(mix(A, c1, u), mix(c1, C, u), u);
@@ -615,7 +635,7 @@ vec3 thinFilm(float d, float ndv) {
   float sinT2 = (1.0 - ndv * ndv) / (filmIor * filmIor);
   float cosT = sqrt(max(1.0 - sinT2, 0.0));
   vec3 phase = 6.2831853 * 2.0 * filmIor * d * cosT / filmWavelengths + 3.14159265;
-  return 0.5 + 0.5 * cos(phase);
+  return clamp(0.5 + 0.5 * cos(phase), 0.0, 1.0);
 }
 
 // Film thickness drifts slowly over the surface, so the colours swim like oil on water, and follows
@@ -641,7 +661,7 @@ float volumeAt(vec3 p) {
 float frameAlong(int t, float s, out vec4 c, out vec4 f, out vec3 T) {
   float i = floor(s + 0.5);
   float u = s - i + 0.5;
-  int k = int(i);
+  int k = int(clamp(i, -float(${SAMPLES}), 2.0 * float(${SAMPLES})));
   vec4 c1 = curveAt(t, k), f1 = frameAt(t, k);
   vec4 A = 0.5 * (curveAt(t, k - 1) + c1), C = 0.5 * (c1 + curveAt(t, k + 1));
   vec4 FA = 0.5 * (frameAt(t, k - 1) + f1), FC = 0.5 * (f1 + frameAt(t, k + 1));
@@ -650,7 +670,9 @@ float frameAlong(int t, float s, out vec4 c, out vec4 f, out vec3 T) {
   vec3 dc = 2.0 * mix(c1.xyz - A.xyz, C.xyz - c1.xyz, u);
   float speed = max(length(dc), 1e-6);
   T = dc / speed;
-  f.xyz = normalize(f.xyz - dot(f.xyz, T) * T);
+  vec3 wv = f.xyz - dot(f.xyz, T) * T;
+  float wl = dot(wv, wv);
+  f.xyz = wl > 1e-20 ? wv * inversesqrt(wl) : (abs(T.x) < 0.9 ? normalize(cross(T, vec3(1.0, 0.0, 0.0))) : normalize(cross(T, vec3(0.0, 1.0, 0.0))));
   return speed;
 }
 
@@ -706,7 +728,9 @@ vec4 exactHit(vec3 o, vec3 r, float tc, int id, float cone, float voxel, out vec
         float bk = dot(kk, d), ck = dot(kk, kk) - rc * rc;
         te = (-bk - sqrt(max(bk * bk - d2 * ck, 0.0))) / d2;
         pe = p0 + d * te;
-        g = normalize(pe - sign(pe) * e);
+        vec2 gc = pe - sign(pe) * e;
+        float gl = dot(gc, gc);
+        g = gl > 1e-20 ? gc * inversesqrt(gl) : g;
         into = rc * min(abs(g.x), abs(g.y));
       }
       at = pe;
@@ -727,7 +751,7 @@ vec4 exactHit(vec3 o, vec3 r, float tc, int id, float cone, float voxel, out vec
     }
     // Rounded corners turn the normal fast: their curvature over the ray's footprint, eased in at their ends.
     float foot = th * cone + 1e-4;
-    spread = foot / max(rc - sectionShape.z * LENS * h.y, 0.1 * rc) * smoothstep(-foot, foot, into);
+    spread = foot / max(rc - sectionShape.z * LENS * h.y, max(0.1 * rc, 1e-6)) * sstep(-foot, foot, into);
     // The relief's own curvature, roughly at its most.
     spread += foot * h.y * (sectionShape.y * FLUTE * 2.0 * pow(1.5707963 * FLUTES, 2.0) + 4.0 * (sectionShape.x * PINCH + sectionShape.z * LENS)) / max(e.x * e.x, 1e-8);
     th = clamp(dot(at - p0, d) / d2, tc - 0.5 * tc - 8.0 * voxel, tc + 0.5 * tc + 8.0 * voxel);
@@ -739,7 +763,7 @@ vec4 exactHit(vec3 o, vec3 r, float tc, int id, float cone, float voxel, out vec
   float w = th * (cone + 0.25 * chromeRoughness) + 1e-4;
   // Faded by where the ray leaves the band, so the stretch it starts from never counts as a hit.
   float away = smoothstep(1.5 * voxel, 5.0 * voxel, exit);
-  return vec4((1.0 - smoothstep(-w, w, m)) * away, th, m + 1.0 - away, spread);
+  return vec4((1.0 - sstep(-w, w, m)) * away, th, m + 1.0 - away, max(spread, 0.0));
 }
 
 // Keeps band k (band * SAMPLES + sample) as one of the first three bands the ray passes, at the
@@ -760,7 +784,7 @@ void candidate(int k, float d, float t, bool away, inout ivec3 id, inout vec3 cd
 // A band seen in a reflection, from its exact hit h and normal n2.
 vec3 hitShade(vec4 h, vec3 n2, vec3 r, vec3 env, float voxel) {
   // The band's normal turns over the ray's footprint at its rounded edges; blur by as much.
-  float lod = max(0.5 + 0.3 * smoothstep(2.0 * voxel, 16.0 * voxel, h.y) + chromeRoughness, (log2(2.0 * h.w + 1e-6) + envMapMaxLod - 0.65) / envMapMaxLod);
+  float lod = max(0.5 + 0.3 * smoothstep(2.0 * voxel, 16.0 * voxel, h.y) + chromeRoughness, min((log2(max(2.0 * h.w, 0.0) + 1e-6) + envMapMaxLod - 0.65) / envMapMaxLod, 4.0));
   return reflectedBand(n2, r, env, lod);
 }
 
@@ -772,7 +796,7 @@ vec3 hitShade(vec4 h, vec3 n2, vec3 r, vec3 env, float voxel) {
 float tracedCover = 0.0;
 
 vec3 traced(vec3 p, vec3 n, vec3 r, vec3 env, float cone) {
-  vec3 inv = 1.0 / r;
+  vec3 inv = safeInverse(r);
   vec3 t0 = (volumeBox.xyz - p) * inv, t1 = (volumeBox.xyz + volumeBox.w - p) * inv;
   vec3 tf = max(t0, t1);
   float end = min(min(tf.x, tf.y), tf.z);
@@ -819,7 +843,7 @@ vec3 traced(vec3 p, vec3 n, vec3 r, vec3 env, float cone) {
   float g = max(k - abs(h0.z - h1.z), 0.0) / k;
   float mu = min(h0.z, h1.z) - g * g * k * 0.25;
   float w = h0.y * (cone + 0.25 * chromeRoughness) + 1e-4;
-  float joined = (1.0 - smoothstep(-w, w, mu)) * (1.0 - smoothstep(k, 3.0 * k, abs(h0.y - h1.y))) * fade;
+  float joined = (1.0 - sstep(-w, w, mu)) * (1.0 - smoothstep(k, 3.0 * k, abs(h0.y - h1.y))) * fade;
   float covered = 1.0 - (1.0 - a.x) * (1.0 - a.y);
   float extra = max(joined - covered, 0.0) / max(1.0 - covered, 1e-3);
   tracedCover = 1.0 - (1.0 - a.x) * (1.0 - a.y) * (1.0 - a.z) * (1.0 - extra);
@@ -840,6 +864,7 @@ vec4 reflectionBands(vec3 p, vec3 n, vec3 r, float cone) {
 // The reflection with the bands from the accumulated reflection pass, over this pixel's own env.
 vec3 accumulated(vec3 r) {
   vec4 b = texelFetch(tReflection, ivec2(gl_FragCoord.xy), 0);
+  if (!finite4(b)) b = vec4(0.0);
   return envAt(r) * (1.0 - b.a) + b.rgb;
 }
 
@@ -847,7 +872,7 @@ vec3 accumulated(vec3 r) {
 // travels through the bands behind, with a soft occupancy so it doesn't step with the voxels (x), and
 // how much of what it passes is a band's surface seen edge-on (y), which reads as a dark outline.
 vec2 pathBehind(vec3 p, vec3 r) {
-  vec3 inv = 1.0 / r;
+  vec3 inv = safeInverse(r);
   vec3 t0 = (volumeBox.xyz - p) * inv, t1 = (volumeBox.xyz + volumeBox.w - p) * inv;
   vec3 tf = max(t0, t1);
   float end = min(min(tf.x, tf.y), tf.z);
@@ -891,7 +916,7 @@ void surface(inout Surface s) {
 #if FINISH != 2
   vec3 reflected = front ? accumulated(r) : envAt(r);
 #endif
-  vec3 film = mix(vec3(1.0), pow(thinFilm(filmThickness(vWorldPosition, n), ndv), vec3(filmShape.x)) * filmShape.y, filmStrength);
+  vec3 film = mix(vec3(1.0), pow(max(thinFilm(filmThickness(vWorldPosition, n), ndv), vec3(1e-7)), vec3(filmShape.x)) * filmShape.y, filmStrength);
   float fresnel = 0.04 + 0.96 * pow(1.0 - ndv, 5.0);
   vec3 lean = vec3(0.0);
 #if FINISH == 0 || FINISH == 3
@@ -1082,7 +1107,7 @@ void main() {
   vec3 r = reflect(-v, n);
   float cone = length(fwidth(r));
   if (!front) discard;
-  outInfo = vec4(vPrevClip.xy / vPrevClip.w * 0.5 + 0.5, vPrevClip.w, 1.0 / gl_FragCoord.w);
+  outInfo = vec4(vPrevClip.w > 1e-4 ? vPrevClip.xy / vPrevClip.w * 0.5 + 0.5 : vec2(-1.0), vPrevClip.w, 1.0 / gl_FragCoord.w);
   outBands = vec4(0.0);
   if (dot(n, v) >= glassCut) return;
   // Interleaved gradient noise per pixel, stepped along the R2 sequence per frame.
@@ -1097,6 +1122,7 @@ void main() {
   float below = dot(rj, n);
   if (below < 0.0) rj -= 2.0 * below * n;
   outBands = reflectionBands(vWorldPosition, n, rj, cone);
+  outBands = finite4(outBands) ? clamp(outBands, -6e4, 6e4) : vec4(0.0);
 }
 `;
 
@@ -1115,6 +1141,8 @@ uniform float maxCount;
 layout(location = 0) out vec4 outBands;
 layout(location = 1) out vec4 outInfo;
 
+bool finite4(vec4 c) { return all(lessThan(floatBitsToUint(c) & 0x7f800000u, uvec4(0x7f800000u))); }
+
 void main() {
   ivec2 px = ivec2(gl_FragCoord.xy);
   vec4 info = texelFetch(tInfo, px, 0);
@@ -1124,6 +1152,7 @@ void main() {
     return;
   }
   vec4 cur = texelFetch(tBands, px, 0);
+  if (!finite4(cur)) cur = vec4(0.0);
   ivec2 size = textureSize(tBands, 0);
   vec4 m1 = vec4(0.0), m2 = vec4(0.0);
   float k = 0.0;
@@ -1132,10 +1161,12 @@ void main() {
       ivec2 q = clamp(px + ivec2(x, y), ivec2(0), size - 1);
       if (texelFetch(tInfo, q, 0).w <= 0.0) continue;
       vec4 c = texelFetch(tBands, q, 0);
+      if (!finite4(c)) continue;
       m1 += c;
       m2 += c * c;
       k += 1.0;
     }
+  k = max(k, 1.0);
   m1 /= k;
   vec4 sigma = sqrt(max(m2 / k - m1 * m1, 0.0));
   // Bilinear history over the taps on the same surface.
@@ -1151,7 +1182,9 @@ void main() {
     vec4 hi = texelFetch(tHistoryInfo, q, 0);
     if (hi.x <= 0.0 || abs(hi.x - info.z) > 0.02 * info.z + 0.01) continue;
     float w = (o.x == 1 ? f.x : 1.0 - f.x) * (o.y == 1 ? f.y : 1.0 - f.y);
-    history += w * texelFetch(tHistory, q, 0);
+    vec4 hv = texelFetch(tHistory, q, 0);
+    if (w <= 0.0 || !finite4(hv) || !finite4(vec4(hi.y))) continue;
+    history += w * hv;
     count += w * hi.y;
     hw += w;
   }
@@ -1164,6 +1197,7 @@ void main() {
     n = min(count + 1.0, maxCount);
     outBands = mix(history, cur, 1.0 / n);
   }
+  outBands = finite4(outBands) ? clamp(outBands, -6e4, 6e4) : cur;
   outInfo = vec4(info.w, n, 0.0, 0.0);
 }
 `;
@@ -1470,7 +1504,7 @@ vec3 displace(vec3 p, inout vec3 n) {
       material.customProgramCacheKey = () => `tangle-lean-${finish}`;
     } else if (finish === 3) {
       material.onBeforeCompile = (shader) => {
-        shader.fragmentShader = shader.fragmentShader.replace("outColor = vec4(color, 1.0);", "vec3 mixed = blendSpace(max(color, vec3(0.0))) * finishWeights.y + leanColor;\n  outColor = vec4(mixed / max(1.0 - mixed, 1e-3), 1.0);");
+        shader.fragmentShader = shader.fragmentShader.replace("outColor = vec4(color, 1.0);", "vec3 mixed = blendSpace(clamp(color, vec3(0.0), vec3(6e4))) * finishWeights.y + leanColor;\n  outColor = vec4(mixed / max(1.0 - mixed, 1e-3), 1.0);");
       };
       material.customProgramCacheKey = () => "tangle-mix";
     }

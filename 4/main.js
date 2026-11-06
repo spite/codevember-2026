@@ -78,7 +78,7 @@ const SECTIONS = { squircle: [0, 0, 0], pinched: [1, 0, 0], fluted: [0, 1, 0], l
 const SECTION_MORPH = 1;
 
 const defaults = {
-  dof: 0.006,
+  dof: 0.03,
   auto: 10,
   finish: "holographic",
   palette: "purple-cyan",
