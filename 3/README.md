@@ -38,7 +38,7 @@ Controls:
 - Finish: Lacquer, Blueberry, Candy, Mercury or Wax (candle wax with subsurface scattering: light wraps past the shadow line and glows through thin parts; dimpled where dry, glossy where fresh melt runs).
 - Amount, Viscosity, Size and Drip length shape the melt; Reset melt (M) dries
   the object and lets it seep again.
-- Motion: Rock, Tumble or Still, with Spin. Flip (F) turns the object over.
+- Motion: Rock, Tumble or Still, with Spin. Flip (T) turns the object over.
 - Set: a light or dark studio. Space pauses, R randomises.
 
 Phones get a lighter tier: an 8k-vertex body (densified, so the pools have

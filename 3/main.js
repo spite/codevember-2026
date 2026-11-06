@@ -207,7 +207,7 @@ gui.addSelect("Set", params.set, Object.keys(SETS));
 gui.addSelect("Reflections", params.reflections, ["auto", "softbox", "hdr", "studio"], { randomizable: false });
 pipeline.addGUI(gui);
 gui.addSeparator();
-addKey("KeyF", "flip the object", () => rotation.flip());
+addKey("KeyT", "turn the object over", () => rotation.flip());
 addKey("KeyM", "reset the melt", resetMelt);
 const help = "Hold on the object to grow a blob, tap to drop one, drag it to turn, drag elsewhere to orbit, pinch to zoom.";
 gui.addText(touch ? help : `${help}<br/>${keysHelp()}`);

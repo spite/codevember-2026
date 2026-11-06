@@ -278,6 +278,13 @@ function loadSeed(seed) {
   writeUrl();
 }
 
+// Fullscreen; browsers without it (iPhone Safari) just ignore the key.
+function toggleFullscreen() {
+  const el = document.documentElement;
+  if (document.fullscreenElement || document.webkitFullscreenElement) (document.exitFullscreen ?? document.webkitExitFullscreen)?.call(document);
+  else (el.requestFullscreen ?? el.webkitRequestFullscreen)?.call(el)?.catch?.(() => {});
+}
+
 // Keyboard
 
 const keys = [];
@@ -301,6 +308,7 @@ function keysHelp() {
 
 addKey("Space", "toggle animation", pause);
 addKey("KeyR", "randomize", randomize);
+addKey("KeyF", "toggle fullscreen", toggleFullscreen);
 addKey("Tab", "toggle this GUI", () =>
   document.body.classList.toggle("hide-ui"),
 );
