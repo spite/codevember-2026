@@ -1,17 +1,19 @@
-// Copies the git-tracked site into <outDir>, minifying JS (per file, no bundling), GLSL in JS
-// template literals, and CSS. Usage: node tools/minify.mjs <outDir> [--verbose]
+// Copies the git-tracked site into <outDir>, minifying JS (per file), GLSL in JS template literals
+// and CSS, then bundles each day page (see bundle.mjs). Usage: node tools/minify.mjs <outDir> [--verbose] [--no-bundle]
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync, copyFileSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { bundleDays } from "./bundle.mjs";
 
 const esbuild = await import(process.env.ESBUILD_MODULE ? pathToFileURL(process.env.ESBUILD_MODULE).href : "esbuild");
 
 const args = process.argv.slice(2);
 const verbose = args.includes("--verbose");
+const bundle = !args.includes("--no-bundle");
 const outArg = args.find((a) => !a.startsWith("--"));
 if (!outArg) {
-  console.error("usage: node tools/minify.mjs <outDir> [--verbose]");
+  console.error("usage: node tools/minify.mjs <outDir> [--verbose] [--no-bundle]");
   process.exit(1);
 }
 const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: dirname(fileURLToPath(import.meta.url)), encoding: "utf8" }).trim();
@@ -223,6 +225,7 @@ const stats = { glsl: 0, glslUntagged: 0, glslSkipped: 0, js: 0, css: 0, copied:
 const glslBefore = [];
 const glslAfter = [];
 const literals = new Set();
+const sources = new Map(); // GLSL-stripped source of every tracked .js, for the bundler
 
 function minifyGLSLInJS(src, file) {
   const { templates, strings } = lex(src);
@@ -274,10 +277,12 @@ for (const file of files) {
     const src = readFileSync(from, "utf8");
     if (isMinified(src)) {
       copyFileSync(from, to);
+      sources.set(file, src);
       stats.asIs.push(file);
       continue;
     }
     const glsl = minifyGLSLInJS(src, file);
+    sources.set(file, glsl);
     const { code } = await esbuild.transform(glsl, {
       loader: "js",
       format: "esm",
@@ -312,3 +317,5 @@ console.log(
   `minified ${stats.js} js (${stats.glsl} GLSL literals, ${stats.glslUntagged} untagged, ${stats.glslSkipped} skipped), ${stats.css} css; ` +
     `copied ${stats.copied} files and ${stats.asIs.length} already-minified (${stats.asIs.join(", ")}) to ${outDir}`,
 );
+
+if (bundle) await bundleDays({ esbuild, root, outDir, files, sources });

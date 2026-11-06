@@ -1,4 +1,4 @@
-# Publishes a minified copy of the site to GitHub Pages (Settings > Pages > Source: GitHub Actions).
+# Publishes a minified copy of the site, each day bundled, to GitHub Pages (Settings > Pages > Source: GitHub Actions).
 name: Deploy
 
 on:
