@@ -21,7 +21,8 @@ gears lock with a ka-ching.
 - The GUI picks the layout (a seeded symmetric one, one of the presets, or random great circles, whose
   number the Circles slider sets; randomising only picks symmetric layouts and presets), how
   many beads there are and in how many colours, the finish, the bead set, the engraving motifs and how
-  varied they are, how often parts pop out on their own, and supersampling for the sharpest engraving.
+  varied they are, how often parts pop out on their own, how often a new layout comes on its own (Auto
+  change, every 30 seconds by default; 0 turns it off), and supersampling for the sharpest engraving.
 - Quality: Auto (desktops high, phones medium, phones with 4 GB of memory or 4 cores or fewer low), High,
   Medium or Low; changing it reloads the page with the same seed. Low cuts the heaviest costs first: a
   1-megapixel drawing buffer, cheaper GI, no MSAA, motion blur or bloom, no guilloche and lighter geometry.

@@ -179,8 +179,9 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <h2>Circles on a sphere, and the plates between them</h2>
       <p>Every layout starts as a list of circles on the unit sphere. A circle is a plane, given by a normal <code>n</code> and an offset <code>h</code>: it is every point p on the sphere with <code>p · n = h</code>. With h = 0 the plane passes through the centre and cuts a great circle. Any other h cuts a smaller ring of radius <code>√(1 − h²)</code>. Each circle becomes a channel 0.078 radians wide, a turntable sits wherever two channels cross, and each region left between the channels becomes a plate.</p>
       <p>Two circles meet in at most two points, and <code>crossings()</code> solves for them in closed form. <code>buildLayout</code> compares each new crossing with the nodes it already has, and one within 10⁻⁴ radians of an existing node is merged into it. Where three or more circles meet (up to five in the icosahedral layouts), one turntable serves all of them. Each circle sorts its nodes by angle and links every node to the next one, which gives the edges. At each node the outgoing half-edges are sorted by angle. A plate is traced by walking one half-edge, turning at the far node to the half-edge just before the way back, and repeating until the walk is back where it started. Euler's formula for a sphere then has to hold, plates = edges − nodes + 2. When it fails, usually because the circles have split into groups that never touch, the layout is rejected.</p>
-      <p>The mechanism also needs room. In strict mode, two nodes closer than 0.3 radians reject the layout. So does a crossing where two channels meet at less than 0.62 radians (about 36°), a circle with fewer than three turntables to pass beads between, or a plate whose inradius is under 0.085 radians. The inradius is measured at the plate's centre with the same smoothed distance field that later builds the plate, before the dial hole is added. The random layout, the default, draws normals until one passes. Whatever layout is chosen, the final build runs with <code>strict: false</code>, and every preset passes the checks anyway.</p>
+      <p>The mechanism also needs room. In strict mode, two nodes closer than 0.3 radians reject the layout. So does a crossing where two channels meet at less than 0.62 radians (about 36°), a circle with fewer than three turntables to pass beads between, or a plate whose inradius is under 0.085 radians. The inradius is measured at the plate's centre with the same smoothed distance field that later builds the plate, before the dial hole is added. The random layout draws normals until one passes. Whatever layout is chosen, the final build runs with <code>strict: false</code>, and every preset passes the checks anyway.</p>
       <p>There are 25 presets. Some are the great circles that a polyhedron's edges lie on: three for the octahedron, four for the cuboctahedron, six for the icosidodecahedron. “Octahedral mirrors” is the octahedron's nine mirror planes. The rest add more great circles, rings of a fixed angular radius around the vertex or edge axes of the regular solids, mixtures of the two, or globe-like parallels and meridians. The eleven dense ones set a mechanism scale between 0.75 and 0.55. It shrinks channel width, turntable radius and every spacing limit together, so “great icosahedral rings” fits 120 turntables and 122 plates within the limit of 128 of each. “Symmetric” picks one of 19 layouts from <b>symmetric.js</b>, generated offline as orbits of one or two rings under the tetrahedral, octahedral or icosahedral rotations. Every preset and symmetric layout is turned to a random orientation by <code>rotateNormals</code>, so it doesn't always face the camera the same way.</p>
+      <p>The default is “dodecahedral rings”: 20 rings of 28° around the dodecahedron's vertices, at mechanism scale 0.75, which gives 60 turntables and 62 plates. The Layout menu lists “symmetric” first, then every preset, and “random” last. Randomising with R picks “symmetric” or a preset, never “random”. The Circles slider, from 4 to 6 great circles, only shapes the random layout, so it is shown only while Layout is “random”.</p>
     </div>
     <div class="fig">
       <div class="fig-head"><h3>Presets, built the way buildLayout builds them</h3>
@@ -188,11 +189,12 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
           <label for="s1Preset">Layout <select id="s1Preset">
             <option value="octahedral">octahedral</option>
             <option value="cuboctahedral">cuboctahedral</option>
-            <option value="icosidodecahedral" selected>icosidodecahedral</option>
+            <option value="icosidodecahedral">icosidodecahedral</option>
             <option value="octahedral mirrors">octahedral mirrors</option>
             <option value="ringed octahedron">ringed octahedron</option>
             <option value="cubic rings">cubic rings</option>
             <option value="icosahedral rings">icosahedral rings</option>
+            <option value="dodecahedral rings" selected>dodecahedral rings (default)</option>
             <option value="great icosahedral rings">great icosahedral rings</option>
             <option value="symmetric: I, 15 great circles">symmetric: I, 15 great circles</option>
           </select></label>
@@ -202,16 +204,16 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <canvas id="s1Canvas" aria-label="A slowly turning metal sphere divided by dark channels along circles, with a gold turntable at every crossing. One plate is highlighted; hovering or tapping highlights another."></canvas>
       <div class="legend"><span style="color:var(--gold)"><i></i>great circle</span><span style="color:var(--bead-ivory)"><i></i>small circle (ring)</span><span style="color:var(--gold)"><span class="dot"></span>turntable</span><span style="color:var(--bead-red)"><span class="dot"></span>merged node, 3 or more circles</span><span style="color:var(--accent)"><span class="sw"></span>traced plate</span></div>
       <div class="readout">
-        <span>circles <b id="s1Circles">6</b></span>
-        <span>turntables V <b id="s1Nodes">30</b></span>
-        <span>edges E <b id="s1Edges">60</b></span>
-        <span>plates <b id="s1Plates">60 − 30 + 2 = 32</b></span>
-        <span>traced <b id="s1Traced">32</b></span>
+        <span>circles <b id="s1Circles">20 rings</b></span>
+        <span>turntables V <b id="s1Nodes">60</b></span>
+        <span>edges E <b id="s1Edges">120</b></span>
+        <span>plates <b id="s1Plates">120 − 60 + 2 = 62</b></span>
+        <span>traced <b id="s1Traced">62</b></span>
         <span>merged <b id="s1Merged">0</b></span>
-        <span>scale <b id="s1Scale">1.00</b></span>
+        <span>scale <b id="s1Scale">0.75</b></span>
         <span>this plate <b id="s1Plate">–</b></span>
       </div>
-      <p class="fig-cap">Orthographic view of the presets' circles, with crossings, node merging, edges and the half-edge plate walk ported from <code>buildLayout</code>. Channels, turntables and their clearance cuts are drawn at the real angular sizes for the preset's scale. Each plate is a flat polygon shaded by the normal at its centre. The real plates are distance-field meshes with bevels and dials, and the dials are left out here. Point at a plate, or tap it, to see its sides and its inradius from <code>plateField</code>. The last entry is the 15 mirror planes of the icosahedron, one of the symmetric layouts.</p>
+      <p class="fig-cap">Orthographic view of the presets' circles, with crossings, node merging, edges and the half-edge plate walk ported from <code>buildLayout</code>. Channels, turntables and their clearance cuts are drawn at the real angular sizes for the preset's scale. Each plate is a flat polygon shaded by the normal at its centre. The real plates are distance-field meshes with bevels and dials, and the dials are left out here. Point at a plate, or tap it, to see its sides and its inradius from <code>plateField</code>. “Dodecahedral rings” is the sketch's default layout. The last entry is the 15 mirror planes of the icosahedron, one of the symmetric layouts.</p>
     </div>
     <div class="fig">
       <div class="fig-head"><h3>The random search</h3>
@@ -245,8 +247,8 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="eyebrow">Plates · <b>layout.js</b></div>
       <h2>Every plate is a distance field</h2>
       <p>A plate is whatever is left of the sphere between its channels. <code>plateField</code> describes it as one signed distance in radians, positive inside. Each channel wall contributes <code>s·(asin(p·n) − asin(h)) − W/2</code>, which is the exact angular distance to a great or small circle, pushed back by half the channel width W = 0.078. Each corner contributes <code>angle(p, q) − RC</code>, a round cut of 0.097 that leaves 0.009 of clearance round the 0.088 turntable. A dial adds a hole of its radius plus a 0.008 gap.</p>
-      <p>The terms are joined with a polynomial smooth minimum. Where two distances are within k = 0.022 of each other it subtracts <code>h²·k / 4</code>, with <code>h = 1 − |a − b| / k</code>, so every corner of the plate comes out rounded. All of these sizes shrink with the preset's scale, down to 0.55 for the densest layouts.</p>
-      <p>The mesh is grown from the plate's centre. Along each direction the field is sampled 21 times out to the plate's reach, and the first sign change after the peak is bisected 14 times to find the rim. 384 such rays trace the outline, and the rim samples are then spread by arc length plus 0.06 times the turning angle, so the rounded corners get more of them than the straight runs. A plate gets <code>reach × 420</code> samples, clamped to 72 to 150.</p>
+      <p>The terms are joined with a polynomial smooth minimum. Where two distances are within k = 0.022 of each other it subtracts <code>h²·k / 4</code>, with <code>h = 1 − |a − b| / k</code>, so every corner of the plate comes out rounded. All of these sizes shrink with the preset's scale, down to 0.55 for the densest layouts. The default layout, dodecahedral rings, runs at 0.75.</p>
+      <p>The mesh is grown from the plate's centre. Along each direction the field is sampled 21 times out to the plate's reach, and the first sign change after the peak is bisected 14 times to find the rim. 384 such rays trace the outline, and the rim samples are then spread by arc length plus 0.06 times the turning angle, so the rounded corners get more of them than the straight runs. A plate gets <code>reach × 420</code> samples, clamped to 72 to 150, then scaled by 0.72 on the medium quality tier and 0.55 on low.</p>
       <p>Every sample keeps its direction for the whole piece: a wall down to 0.02 below the channel floor, a quarter-circle bevel in four steps, each row found with a few secant steps, six top rings (evenly spaced when the plate has a dial, closing up toward the centre when it has none), and a closed underside of two strips. A plate gets a dial when it has room. The dial starts at its inradius minus 0.085, capped at 0.15, and shrinks by 0.006 until each of 48 rays round it reaches a field peak of at least 2.4 bevel widths.</p>
     </div>
     <div class="fig">
@@ -262,7 +264,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="scroll"><canvas id="s2Canvas" aria-label="A four-sided plate's signed distance field seen from above, with contour lines, its rounded outline, turntable cuts at the corners, an optional dial hole, and the rim vertices and mesh rows placed on it."></canvas></div>
       <div class="legend"><span style="color:var(--ink)"><i></i>zero line (the rim)</span><span style="color:var(--accent)"><span class="dot"></span>rim samples</span><span style="color:var(--accent)"><i style="opacity:0.55"></i>bevel rows and top rings</span><span style="color:var(--muted)"><i style="border-top-style:dashed"></i>channel centrelines</span><span style="color:var(--steel)"><span class="ring"></span>turntables</span><span style="color:var(--gold)"><span class="ring"></span>dial</span></div>
       <div class="readout"><span>inradius <b id="s2Inr">0</b></span><span>dial <b id="s2DialR">0</b></span><span>samples near corners <b id="s2Corner">0</b></span><span>vertices <b id="s2Verts">0</b></span></div>
-      <p class="fig-cap">A hand-built face, not one from a preset: two great circles and two small circles of 48° and 28° radius, at mechanism scale 1. It is drawn in an azimuthal equidistant projection about the plate's centre, so distances from the centre are true. Contours are 0.02 rad apart. The field, the dial search, the rim rays and the turn-weighted sample placement are ports of <code>plateField</code>, <code>roomRoundDial</code> and <code>buildPieceSteps</code>, with the plate's settings from <code>main.js</code>; this plate's reach of 0.56 asks for 234 samples, so it gets the cap of 150. The bevel rows are only a few pixels inside the rim at this size, and the underside rows are left out.</p>
+      <p class="fig-cap">A hand-built face, not one from a preset: two great circles and two small circles of 48° and 28° radius, at mechanism scale 1. It is drawn in an azimuthal equidistant projection about the plate's centre, so distances from the centre are true. Contours are 0.02 rad apart. The field, the dial search, the rim rays and the turn-weighted sample placement are ports of <code>plateField</code>, <code>roomRoundDial</code> and <code>buildPieceSteps</code>, with the plate's settings from <code>main.js</code>; this plate's reach of 0.56 asks for 234 samples, so on the high tier it gets the cap of 150. The bevel rows are only a few pixels inside the rim at this size, and the underside rows are left out.</p>
     </div>
     <div class="fig">
       <div class="fig-head"><h3>The bevel across a channel</h3>
@@ -276,7 +278,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="facts">
       <div class="fact"><b>Exact distances</b><span>For a small circle <code>p·n = h</code>, <code>asin(p·n) − asin(h)</code> is the difference in latitude about its axis, which is the true angular distance. Great circles are the case h = 0.</span></div>
       <div class="fact"><b>Edge distance per vertex</b><span>Every bevel and top vertex stores the field value it was placed at; walls and underside store 0. The plate shader uses it to tell bevel from top, for the highlight and where the engraving starts.</span></div>
-      <div class="fact"><b>Turntables use the same builder</b><span>Each half is <code>smin(RT − angle(p, pole), s·asin(z) − W/2)</code>, a disc cut by the channel's slot, built with 64 samples and three top rings. <code>buildCap</code> adds a disc at RF + 0.006 that floors the slot.</span></div>
+      <div class="fact"><b>Turntables use the same builder</b><span>Each half is <code>smin(RT − angle(p, pole), s·asin(z) − W/2)</code>, a disc cut by the channel's slot, built with 64 samples (48 on medium, 40 on low) and three top rings. <code>buildCap</code> adds a disc at RF + 0.006 that floors the slot.</span></div>
       <div class="fact"><b>Spread over frames</b><span><code>buildPieceSteps</code> is a generator that yields every 48 rays and once per bevel row, so a rebuild after R can spread the work over several frames.</span></div>
     </div>
   </section>
@@ -290,7 +292,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <p>The mechanism runs in ticks of 1.4 seconds of machine time. Each tick has two phases. From 2% to 40% of the tick, the turntables turn: every turntable with a bead on it lines its slot up with the circle that bead wants next, and an empty one lines up with the circle a bead is about to arrive on. The slot is symmetric, so the shortest turn is never more than 90°. From 44% to 96%, every bead that has room moves one edge along its circle. The gaps either side are the pauses you hear between the clicks.</p>
       <p>Both phases use <code>clockEase</code>, an in-out "back" ease with s = 0.9. It winds back 1.5% before it starts and overshoots by 1.5% before it settles, like an escapement letting go of a tooth. Every bead that moves also turns the dials on the plates either side of its channel by one notch of 15°, so the dials creep round as if they were geared to the beads.</p>
       <p>Each bead has a colour, and each circle belongs to one colour. In <strong>sort</strong> mode, a bead on a circle of another colour switches at the first crossing with one of its own, then rides it in that circle's direction. When every bead is home the machine goes into <strong>orbit</strong> for 10 ticks, then <strong>scramble</strong> for 7, where each bead switches circle with a chance of 45% and reverses with a chance of 30%. Then it sorts again. A sort that has made no move for 6 ticks, or has lasted 60, skips to the last 3 ticks of a scramble.</p>
-      <p>Clicking a turntable pops it out on its rod: up with a 5% overshoot, a full turn while it is up, and back down, over 1.25 seconds. A full turn is the least it can do, because half a turn of a symmetric slot looks like no turn at all. A bead on it leaves on the other circle, and ignores sorting for 3 ticks. Dials pop the same way over 1.8 seconds and plates over 2.4. At a rate of 0.3 per second of machine time (the Pop-outs slider) the machine also pops parts out on its own.</p>
+      <p>Clicking a turntable pops it out on its rod: up with a 5% overshoot, a full turn while it is up, and back down, over 1.25 seconds. A full turn is the least it can do, because half a turn of a symmetric slot looks like no turn at all. A bead on it leaves on the other circle, and ignores sorting for 3 ticks. Dials pop the same way over 1.8 seconds and plates over 2.4. A plate with a symmetric outline may turn only part of the way, as the next section explains. At a rate of 0.3 per second of machine time (the Pop-outs slider) the machine also pops parts out on its own.</p>
     </div>
     <div class="fig">
       <div class="fig-head"><h3>The machine on a cuboctahedral map</h3>
@@ -305,7 +307,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <canvas id="s3Canvas" aria-label="A flat map of four great circles crossing at twelve turntables. Coloured beads on carriages move one edge per tick after the turntables turn; a strip shows where the current tick is in its turn and move phases."></canvas>
       <div class="readout" aria-live="off"><span>tick <b id="s3Tick">0</b></span><span>phase <b id="s3Phase">wait</b></span><span>mode <b id="s3Mode">sort</b></span><span>sorted <b id="s3Sorted">0 of 5</b></span><span>moved <b id="s3Moved">0</b></span></div>
       <div class="legend"><span style="color:var(--gold)"><span class="dot"></span>turntable, with its slot</span><span style="color:var(--gold)"><span class="ring"></span>plate dial</span><span style="color:var(--muted)"><i></i>the colour that owns a circle</span></div>
-      <p class="fig-cap">The four great circles of the cuboctahedral layout (normals (±1, ±1, ±1)): 12 turntables, 24 edges, 14 plates and 5 beads in 3 colours, the sketch's density of 0.45. It is drawn as an azimuthal map around the top square plate, so distance from the centre is the angle on the sphere; past the dashed ring is the far side, stretched. The tick logic, rules, eases and pop timings are <code>machine.js</code> ported as is. Plates don't pop here, and the dial of the bottom plate, which the map spreads round its rim, is not drawn. Turntables and beads are drawn about 2.5 times their size; dials are drawn at their size. The sphere doesn't mark which colour owns a circle; the thin line inside each channel does that here. Click a turntable or a dial to pop it.</p>
+      <p class="fig-cap">The four great circles of the cuboctahedral layout (normals (±1, ±1, ±1)): 12 turntables, 24 edges, 14 plates and 5 beads in 3 colours, the sketch's density of 0.45. It is drawn as an azimuthal map around the top square plate, so distance from the centre is the angle on the sphere; past the dashed ring is the far side, stretched. The tick logic, rules, eases and pop timings are <code>machine.js</code> ported as is. Plates don't pop here, and the dial of the bottom plate, which the map spreads round its rim, is not drawn. Turntables and beads are drawn about 2.5 times their size; dials are drawn at their size. The sphere doesn't mark which colour owns a circle; the thin line inside each channel does that here. Click a turntable or a dial to pop it. The Scramble button starts a scramble at once; the sketch has no such control and scrambles only in its own cycle.</p>
     </div>
     <div class="formula">
       <span class="c">// both phases, and every turn that isn't a pop</span><br>
@@ -330,7 +332,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <h2>Parts that rise on rods</h2>
       <p>Click a turntable, a dial or a plate and it rises out of the sphere, turns in the air and settles back. Turntables and dials turn a full revolution. A plate whose outline has k-fold symmetry may turn any m/k of a turn, m from 1 to k, because it still fits its hole: when the machine starts it rotates each plate's distance field about its centre by a turn over k, for k from 12 down to 2, and keeps the largest k that maps the outline onto itself. Triangles get 3, squares 4, pentagons 5, the lens-shaped plates of the ring layouts 2; plates of random layouts have none and always turn the full way. All three follow the same lift curve in <code>liftOf()</code>. For the first 24% of the pop the part rises with an out-back ease that overshoots by about 5%. It holds at full height until 74%, then comes down with a cubic in-out. The spin, also a cubic in-out, runs over about the same stretch: exactly the hold, 24 to 74% of the pop, for a turntable, but 20 to 78% for a dial and 22 to 76% for a plate, so those two start turning before they have finished rising and are still turning as they start down. A pop takes 1.25 s for a turntable (<code>POP_TIME</code>), 1.8 s for a dial and 2.4 s for a plate. Turntables and dials rise 0.15 on a sphere of radius 1 (<code>POP</code> in main.js, and the dial shader's <code>popHeight</code> uniform). Plates go higher, 0.21 (<code>PLATE_POP</code>), to clear the beads.</p>
       <p>A turntable that carries a bead turns the shortest way to line its slot up with the other circle, plus a full revolution. Its slot is symmetric, so a half turn on its own would look like no turn at all. Lifting it shows what was under it: a 32-tooth crown wheel inside its skirt and a shaft of radius 0.019 down to <code>ROD_BOTTOM</code>, which is 0.4 below the core. Lower on the shaft, an 18-tooth wheel turns at −1.7 times the turntable's angle. Nothing meshes with it; it sits on the same shaft and just turns the other way, faster. Dials have the same pair, a rim gear plus a lower wheel at 0.62 of its radius spinning at −1.7. Each plate has a ring gear on one central rod, or on three pins when a dial sits in its middle.</p>
-      <p>While a part is up, the core opens under it. Each frame <code>updateInstances()</code> collects the openings: a cap of 0.097 rad (<code>RC</code>, at mechanism scale 1) for a turntable, the dial's radius plus its gap for a dial, and <code>plateHole()</code> for a plate. They go into <code>shared.holes</code>, up to 8, and the core's fragment shader discards every pixel with <code>dot(p, c) &gt; cos(r)</code>. A well 0.12 deep goes into each opening, with a sun gear and three planets on its floor, all scaled to the opening's radius.</p>
+      <p>While a part is up, the core opens under it. Each frame <code>updateInstances()</code> collects the openings: a cap of 0.097 rad (<code>RC</code>, at mechanism scale 1) for a turntable, the dial's radius plus its gap for a dial, and <code>plateHole()</code> for a plate. They go into <code>shared.holes</code>, up to 8, and the core's fragment shader discards every pixel with <code>dot(p, c) &gt; cos(r)</code>. A well 0.12 deep goes into each opening, with a sun gear and three planets on its floor, all scaled to the opening's radius. The well's instance matrix takes its columns as e1, c and −e2 of the opening, which is right-handed. Built from e1, c and e2 it was mirrored, and three.js then flipped the winding and culled the walls seen from inside, so the sphere looked see-through where a part was up.</p>
       <p>Seated, these gears are covered, so they cost almost nothing. In <code>displace()</code> they collapse to a single point and rasterise no pixels. Plate gears collapse while their plate and dial both have zero lift and no flight. Turntable gears collapse while their instance has no offset and unit scale. A sun gear never meets that test, because its matrix is scaled down to its opening. When no wells are out, their meshes are hidden altogether.</p>
     </div>
     <div class="fig">
@@ -351,10 +353,10 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
           <button id="s4LiftPlay" type="button">Pause</button>
         </div>
       </div>
-      <div class="scroll"><canvas id="s4LiftCanvas" aria-label="A plot of height against time for one pop of a turntable, a dial and a plate. Each curve rises quickly with a small overshoot, holds flat, and eases back down; the plate rises highest and lasts longest. A lower strip shows each part's turn going from 0 to 360 degrees during the flat stretch. A moving playhead marks the current time."></canvas></div>
+      <div class="scroll"><canvas id="s4LiftCanvas" aria-label="A plot of height against time for one pop of a turntable, a dial and a plate. Each curve rises quickly with a small overshoot, holds flat, and eases back down; the plate rises highest and lasts longest. A lower strip shows each part's turn going from 0 to 360 degrees around the flat stretch. A moving playhead marks the current time."></canvas></div>
       <div class="readout"><span>t <b><output id="s4LiftT">0.00</output> s</b></span><span>turntable <b><output id="s4LiftA">0.000</output></b></span><span>dial <b><output id="s4LiftB">0.000</output></b></span><span>plate <b><output id="s4LiftC">0.000</output></b></span></div>
       <div class="legend"><span style="color:var(--gold)"><i></i>turntable, 1.25 s, up 0.15</span><span style="color:var(--cyan)"><i></i>dial, 1.8 s, up 0.15</span><span style="color:var(--magenta)"><i></i>plate, 2.4 s, up 0.21</span></div>
-      <p class="fig-cap">Height above the seated position, in units of the sphere's radius, against wall-clock seconds. It is <code>liftOf()</code> times <code>POP</code> or <code>PLATE_POP</code>. The lower strip is the full-revolution spin each part makes while it is up, from <code>pop()</code>, <code>popDial()</code> and <code>popPlate()</code>. Durations are multiplied by the Speed setting and the machine clock runs at Speed too, so a pop takes the same time at any speed. The turntable's extra alignment turn, when it carries a bead, is left out.</p>
+      <p class="fig-cap">Height above the seated position, in units of the sphere's radius, against wall-clock seconds. It is <code>liftOf()</code> times <code>POP</code> or <code>PLATE_POP</code>. The lower strip is the spin each part makes while it is up, from <code>pop()</code>, <code>popDial()</code> and <code>popPlate()</code>, drawn as a full revolution. A plate with k-fold symmetry may stop at m/k of it. Durations are multiplied by the Speed setting and the machine clock runs at Speed too, so a pop takes the same time at any speed. The turntable's extra alignment turn, when it carries a bead, is left out.</p>
     </div>
     <div class="formula"><span class="c">// machine.js, u = (time − start) / duration</span><br>u &lt; 0.24 : outBack(u / 0.24) &nbsp;&nbsp;<span class="c">// 1 + 2.2 (t − 1)³ + 1.2 (t − 1)², peaks at 1.053</span><br>u &lt; 0.74 : 1<br>else &nbsp;&nbsp;&nbsp;&nbsp;: 1 − inOutCubic((u − 0.74) / 0.26)</div>
     <div class="facts">
@@ -374,6 +376,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <p>Nothing engraved on the orrery is a texture, apart from one atlas of motifs. Each part's fragment shader works out a single distance <code>d</code> from the pixel to the nearest engraved centreline, measured as an angle on the unit sphere. On a plate that means a rule 0.027 inside the rim, graduations along every channel at each 2° of its orbit with a long one every 10°, a ring and 24 ticks round the dial, a belt of small motifs between two rules where the plate has room, and spokes from the dial towards each turntable that end in a motif where there is room, or in a small ring where there isn't. All of these sizes are multiplied by <code>mechScale</code>, which shrinks the whole mechanism on the dense layouts.</p>
       <p>One call to <code>machineGroove(s, d, hw, depth)</code> then cuts the lot, with a half width of 0.0022 and a depth of 0.0012 on a plate. It tilts the normal on the groove's walls. The slope comes from the gradient of d², because d has a kink on the centreline that screen derivatives can't follow, while d² is smooth there. Where two lines meet, the minimum jumps from one to the other, so any gradient steeper than a true distance allows (<code>3d + fw</code>) is clipped. The tilt is scaled by vis², with <code>vis = smoothstep(1, 3, hw / fw)</code>, so a groove narrower than a couple of pixels loses its walls before they can sparkle.</p>
       <p>The function also returns how much of the pixel lies inside the groove, and that fraction blends albedo, metalness and roughness towards the inlay and darkens occlusion by up to 35%. A line thinner than a pixel, sampled once at each pixel centre, is hit in some pixels and missed in the ones next to them, so it breaks into a row of dots. The fix is to give it a half width of at least half a pixel, <code>w = max(hw, fw / 2)</code>, so it is never narrower than a pixel, and dim it by <code>hw / w</code> so it carries about the same amount of ink. Last, <code>machineSpecularAA</code> (Tokuyoshi and Kaplanyan) raises the roughness where the normal changes within a pixel, so the walls of a fine groove read as a duller line instead of flickering highlights.</p>
+      <p>Every one of these pixel-size estimates (the groove's <code>fwidth</code>, the specular kernel, the motifs' <code>motifPixel</code> and the milled walls' fade) is multiplied by a shared uniform, <code>detailScale</code>. It is 1 while anything moves. Once the view has held still for 0.4 s it drops to 0.25, so the engraving is drawn as if its pixels were a quarter of the size, and the pipeline averages jittered frames of it (64 on high, 16 on medium, 8 on low) to filter that finer detail. That is supersampling spread over frames, at the same resolution.</p>
     </div>
     <div class="fig">
       <div class="fig-head"><h3>Thin lines, three ways</h3>
@@ -396,7 +399,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       n = normalize(n − depth · 3 (1 − clamp(d / hw, 0, 1)) / hw² · vis² · g)
     </div>
     <div class="col prose">
-      <p>The open metal between the dial and the spokes gets one of four engine-turned guilloche patterns, chosen per plate from its index and the seed: waves (rings 0.0055 apart, rippled by <code>sin 24θ</code>), a sunburst of 240 rays, a basket weave of two diagonal line sets 0.007 apart, or a rosette of crossed spirals. <code>machineTurned</code> folds two continuous phases into a distance to the nearest line and cuts it 0.0004 deep with a half width of 0.15 of the spacing. It fades out as the density goes from 1/16 to 1/8 lines per pixel, so the pattern is gone before its lines come within 8 pixels of each other and beat against the grid. The density comes from <code>fwidth</code> of the continuous phase, because the folded distance's derivatives jump at every fold. Angles from <code>atan</code> use <code>machineAngleWidth</code>, the smaller of fwidth(θ) and fwidth(θ wrapped by 2π): the two readings jump at opposite sides, so one of them is always clean.</p>
+      <p>The open metal between the dial and the spokes gets one of four engine-turned guilloche patterns, chosen per plate from its index and the seed: waves (rings 0.0055 apart, rippled by <code>sin 24θ</code>), a sunburst of 240 rays, a basket weave of two diagonal line sets 0.007 apart, or a rosette of crossed spirals. <code>machineTurned</code> folds two continuous phases into a distance to the nearest line and cuts it 0.0004 deep with a half width of 0.15 of the spacing. For its coverage, <code>machineLines</code> takes the running integral of evenly spaced lines, 0.3 of the spacing wide, and differences it across the pixel's footprint, which gives the exact box filter of the lines over the pixel. Where the lines are a few pixels apart they read as lines; as they close in on the pixel size they soften into their average, 30% coverage, a plain sheen that can't beat against the grid. The grooves only tilt the normal while the lines resolve, scaled by <code>1 − smoothstep(0.15, 0.4, density)</code>. The footprint is always the whole pixel, also on a settled still, where <code>detailScale</code> leaves the guilloche alone and the average of jittered frames softens it a little more. The density comes from <code>fwidth</code> of the continuous phase, because the folded distance's derivatives jump at every fold. Angles from <code>atan</code> use <code>machineAngleWidth</code>, the smaller of fwidth(θ) and fwidth(θ wrapped by 2π): the two readings jump at opposite sides, so one of them is always clean.</p>
       <p>The motifs are distance fields to their stroke centrelines in a unit disc, built from five primitives: segments, rings, dots, arcs and star polygons. There are 40 of them in five sets of eight: geometric, arcane, medieval, sidereal, and alien crop-circle pictograms whose counts, sizes and turn come from the seed. Compiling all 40 into every engraving shader and branching to the right one per pixel would be slow, so they are drawn once per seed into a 1024 × 640 R16F atlas, a 128-pixel cell each over [−1.15, 1.15]. The atlas stores squared distance, because bilinear filtering of the V shape of |d| raises its minimum on the centreline and d² filters smoothly. <code>motifPick</code> gives each part its motif from an integer hash of the part and the seed (a sine hash would amplify tiny differences from pixel to pixel), choosing among <code>1 + floor(variety · 7.999)</code> of the eight. <code>motifAt</code> fades a motif out as its radius drops from 7 to 3.5 pixels, pushing its distance out by up to 0.6 of the radius so its strokes recede instead of breaking into speckles.</p>
     </div>
     <div class="fig">
@@ -415,7 +418,8 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="facts">
       <div class="fact"><b>Champlevé</b><span>The dials and turntables fill their engraving with <code>partInlay</code>. On black enamel, lapis, white enamel and ruthenium that is the plate's own colour, so the gold (or blued steel, or rose gold) parts are cut through to the plate's colour. Finishes without one fall back to the plate's inlay.</span></div>
       <div class="fact"><b>Graduations</b><span>A tick every <code>2π / 180</code> of the channel's orbit. Every fifth is long, from 0.009 to 0.021 off the channel wall; the others start at 0.014.</span></div>
-      <div class="fact"><b>Guilloche on the finish</b><span>The pattern raises roughness by 0.08 and darkens albedo by 12% where it is cut, a shallow sheen next to the inlaid lines.</span></div>
+      <div class="fact"><b>Guilloche on the finish</b><span>The pattern raises roughness by 0.08 and darkens albedo by 12% where it is cut, a shallow sheen next to the inlaid lines. On the low quality tier the <code>lowDetail</code> uniform skips it entirely.</span></div>
+      <div class="fact"><b>Settled still</b><span><code>detailScale</code> only drops when nothing moves (paused, or Speed and Spin both 0), the camera is unchanged and no drag or zoom is under way. Any change sets it back to 1 and restarts the average.</span></div>
       <div class="fact"><b>Lit pass only</b><span>The engraving sits under <code>#ifdef PIPELINE_COLOR</code>, so the shadow map and the prepass skip it entirely.</span></div>
     </div>
   </section>
@@ -425,7 +429,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">The transformation · <b>main.js</b></div>
       <h2>Seven seconds to take it apart and put it back</h2>
-      <p>A new shape doesn't swap in. <code>startRebuild</code> runs three states. In <em>sink</em>, 2.55 s, every part flies straight out along its own direction from the centre and dissolves. In <em>swap</em>, two rail fades of 0.8 s each, the bare black core's old channels thin to nothing and the new ones thicken in. In <em>rise</em>, 3.05 s, the new layout's parts fly back from 2.6 units out and seat themselves. Anything still popped out when it starts sinks back home over the first half second.</p>
+      <p>A new shape doesn't swap in. <code>startRebuild</code> runs three states. In <em>sink</em>, 2.55 s, every part flies straight out along its own direction from the centre and dissolves. In <em>swap</em>, two rail fades of 0.8 s each, the bare black core's old channels thin to nothing and the new ones thicken in. Each layout's rails keep the width of its own mechanism while they fade, so when the dense default (dodecahedral rings, mechanism scale 0.75) replaces a full-size layout, the old channels thin from their full width and the new ones grow only to three quarters of it. In <em>rise</em>, 3.05 s, the new layout's parts fly back from 2.6 units out and seat themselves. Anything still popped out when it starts sinks back home over the first half second.</p>
       <p>The order is a loose wave. The rebuild picks a random origin direction, and a part's delay is 0.4 s times its angle from that origin over π, plus its own random delay of up to 0.85 s. That one is squared, so most parts go close to their turn and a few straggle. Each part also flies for its own time, within 20% of 0.9 s going out and 1.05 s coming back. Plates leave 0.25 s after the turntables and beads, and come back 0.5 s before them. The rise draws a new salt and turns the origin, so the parts come back in a different order from the one they left in.</p>
       <p>The random numbers come from <code>partRandom(id, k)</code>, a sine hash of the part's id, the rebuild's salt and a channel k. It is stable for the whole phase, so the timing is a pure function of time and can be evaluated for any part on any frame, with no per-part state. The same functions place the sounds: up to 40 of the plates and turntables are voiced, spread evenly through the wave, each at its own launch or arrival time.</p>
       <p>The sink also hides the work. The new layout's search and its geometry are one generator, <code>layoutAndGeometry</code>, stepped for at most 6 ms a frame while the old parts fly off. If it isn't finished at 2.55 s, the sink holds until it is. A new finish, bead set or motif set that comes with a new shape switches only during the swap, while nothing but the core is showing, so the old parts leave in their own finish and the new ones come up in the new one.</p>
@@ -443,7 +447,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="legend"><span style="color:var(--steel)"><span class="sw"></span>plate</span><span style="color:var(--gold)"><span class="sw"></span>turntable</span><span style="color:var(--magenta)"><span class="sw"></span>bead</span><span style="color:var(--muted)"><i></i>old rails</span><span style="color:var(--accent)"><i></i>new rails</span></div>
       <div class="readout"><span>phase <b id="s6Phase">sink</b></span><span>in phase <b id="s6PhaseT">1.20 s</b></span><span>total <b id="s6Total">7.20 s</b></span><span>part <b id="s6Info">-</b></span></div>
       <canvas id="s6Plot" aria-label="Left: the sphere's core with every part drawn at its current distance and opacity. Right: the selected part's distance out and opacity over the whole rebuild."></canvas>
-      <p class="fig-cap">A sample layout of 14 plates, 12 turntables and 14 beads at random directions, timed with the sketch's <code>lag</code>, <code>flightTime</code>, <code>launchAt</code>, <code>arriveAt</code> and <code>flightOf</code>, and its rule for the rise's salt and origin. A bar's opacity is the part's opacity; click a row to pick it. The rails are <code>setCoreCircles</code>'s staggered weights for 8 old and 8 new circles. The real rise brings back the new layout's parts, not the old ones, and the sink can run longer than 2.55 s while the new layout is still building. The plot's distance is out / 2.6, so the 0.03 kick and the 0.012 dip at the end barely show.</p>
+      <p class="fig-cap">A sample layout of 14 plates, 12 turntables and 14 beads at random directions, timed with the sketch's <code>lag</code>, <code>flightTime</code>, <code>launchAt</code>, <code>arriveAt</code> and <code>flightOf</code>, and its rule for the rise's salt and origin. A bar's opacity is the part's opacity; click a row to pick it. The rails are <code>setCoreCircles</code>'s staggered widths for 8 old circles at mechanism scale 1 and 8 new ones at 0.75, each layout at its own scale. The real rise brings back the new layout's parts, not the old ones, and the sink can run longer than 2.55 s while the new layout is still building. The plot's distance is out / 2.6, so the 0.03 kick and the 0.012 dip at the end barely show.</p>
     </div>
     <div class="formula">
       lag = 0.4 · angle(p, origin) / π + 0.85 · r₁²<br>
@@ -454,9 +458,9 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       out = 2.6 · (1 − k)³ − 0.012 · sin(π · clamp((k − 0.8) / 0.2)) &nbsp; fade = smooth(k / 0.5)
     </div>
     <div class="facts">
-      <div class="fact"><b>Only a shape rebuilds</b><span>R (a new seed), the layout or the circle count start a rebuild. A new finish, bead set, motifs or engraving depth changes in place, and a new bead count or number of bead colours restarts the machine on the same layout. A rebuild or a restart first waits for anything popped out to come home.</span></div>
+      <div class="fact"><b>Only a shape rebuilds</b><span>R (a new seed and a new layout, never "random"), the Layout setting, or Circles while Layout is "random" start a rebuild. A new Finish, Beads, Motifs, Motif variety or Engraving changes in place, and a new Bead count or Bead colours restarts the machine on the same layout. A rebuild or a restart first waits for anything popped out to come home.</span></div>
       <div class="fact"><b>Dither, not alpha</b><span><code>machineDissolve</code> discards a fragment where a screen-space hash is above the part's opacity, so a fading part is still opaque. It casts thinning shadows and writes depth and velocity like any solid.</span></div>
-      <div class="fact"><b>Rails one after another</b><span>Circle k of n gets <code>smooth(1.6·w − 0.6·k / (n − 1))</code> of the fade weight w. The shader scales the channel's width by it, so each circle narrows to a line and vanishes a little after the one before it.</span></div>
+      <div class="fact"><b>Rails one after another</b><span>Circle k of n gets <code>smooth(1.6·w − 0.6·k / (n − 1))</code> of the fade weight w. The shader scales the channel's width by it, so each circle narrows to a line and vanishes a little after the one before it. The old circles' weights are also multiplied by <code>previousScale</code>, the old mechanism scale over the new one, so they keep their own width.</span></div>
       <div class="fact"><b>Mid-sink changes</b><span>Press R again while the parts are leaving and only the layout being built changes. During the swap or the rise, the request waits for the new layout to finish seating.</span></div>
     </div>
   </section>
@@ -468,8 +472,8 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <h2>Foley timed to the parts</h2>
       <p>Every sound is a one-shot cut from a CC0 recording on freesound.org: 68 short files in 15 sets, from a watch's tick and a crown being wound to tower-clock cogs, a press, levers, bolts and a ka-ching. <code>play()</code> picks a random variant of the set, never the same one twice in a row, multiplies the playback rate by 0.92 to 1.08 so repeats differ in pitch by up to 8%, and pans it to where the part sits on screen. At most 28 voices sound at once, and each set has a minimum gap between two starts, from 8 ms for a ratchet's click to half a second for the ka-ching, so a busy tick turns into a patter instead of a pile of copies.</p>
       <p>Browsers only allow audio after the visitor does something, so the <code>AudioContext</code> is created on the first pointerdown, touchend, click or key, and only then are the files fetched and decoded. They run through a compressor at −16 dB and 3:1. While paused the context is suspended, so sounds already scheduled freeze with the animation.</p>
-      <p>While the machine runs, <code>machineSound</code> in main.js turns its events into sounds, with every delay divided by Speed because the machine's clock runs at Speed. A carriage's move is a slide with a click at 90% of the way; a turntable's turn is a ratchet with one click per 15° plus one; a part popping out pops, whirrs, ratchets through its turn and latches at 97% of its time. Outside <code>machineSound</code>, the frame loop plays a short wind every tick and a long one every fourth, and under it all an escapement ticks and tacks at 5·√Speed beats a second, the tac at 0.8 of the tic's gain and a lower pitch.</p>
-      <p>A transformation is scored all at once, at the start of each phase. <code>rebuildSound</code> lays down a crank every 1.1 to 1.5 seconds, a whirr for the whole phase and a slow 14-tooth ratchet. Then it sorts the plates and turntables by when each one leaves (or seats), with the same functions that fly them, and voices about 40 of them, stepping n / 40 through the sorted list; past ten parts the loudness is shared, as 0.38 / √(n / 10).</p>
+      <p>While the machine runs, <code>machineSound</code> in main.js turns its events into sounds, with every delay divided by Speed because the machine's clock runs at Speed. A carriage's move is a slide with a click at 90% of the way; a turntable's turn is a ratchet with one click per 15° plus one; a part popping out pops, whirrs, ratchets through its turn and latches at 97% of its time. A plate's ratchet is 18 clicks whether it makes a whole turn or, for a symmetric plate, only m / k of one, since its pop takes the same time either way. Outside <code>machineSound</code>, the frame loop plays a short wind every tick and a long one every fourth, and under it all an escapement ticks and tacks at 5·√Speed beats a second, the tac at 0.8 of the tic's gain and a lower pitch.</p>
+      <p>A transformation is scored all at once, at the start of each phase. <code>rebuildSound</code> lays down a crank every 1.1 to 1.5 seconds, a whirr for the whole phase and a slow 14-tooth ratchet. Then it sorts the plates and turntables by when each one leaves (or seats), with the same functions that fly them, and voices about 40 of them, stepping n / 40 through the sorted list; past ten parts the loudness is shared, as 0.38 / √(n / 10) with n capped at 40.</p>
     </div>
     <div class="formula" aria-label="Per-part timing of the transformation, from main.js">
       lag(p) = 0.4 · angle(p, origin) / π + 0.85 · r₁²   <span class="c">// r₁, r₂: stable random numbers per part</span><br>
@@ -487,7 +491,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="scroll"><canvas id="s7Canvas" style="min-width:760px" aria-label="A timeline of every sound scheduled for one transformation, one row per sound set, over the sink, swap and rise phases, with a top row marking when each plate and turntable launches or seats."></canvas></div>
       <div class="legend"><span style="color:var(--accent)"><span class="dot"></span>plates</span><span style="color:var(--cyan)"><span class="dot"></span>turntables</span><span style="color:var(--steel)"><span class="dot"></span>crank, whirr and gear train</span><span style="color:var(--magenta)"><span class="dot"></span>finale</span></div>
       <div class="readout"><span>plates <b id="s7Plates">32</b></span><span>turntables <b id="s7Nodes">30</b></span><span>voiced per phase <b id="s7Voiced">41</b></span><span>sounds <b id="s7Count">0</b></span><span>dropped by spacing <b id="s7Dropped">0</b></span></div>
-      <p class="fig-cap">Six great circles, the default count, with uniformly random normals here (the sketch also spreads them apart or starts from a jittered symmetric set, which moves the parts but not their number): 30 crossings and 32 plates, each centred on the mean of its corners. The schedule is <code>rebuildSound</code> run with <code>play()</code>'s spacing rule, which is what <code>setLogger</code> would receive: launch times for the sink, then 1.6 s of rails fading during the swap, then arrival times for the new layout, with the wave's origin and salt advanced as the sketch does. Dot size is gain. With 62 parts the step is 1.55, and rounding in the running sum lets a 41st part through. The top row marks every part's launch or seat time; tall ticks are the voiced ones. The facing gain assumes a distant camera on the +z axis and pan is not drawn, and the swap is assumed to start on time (the sketch waits there if the new layout has not finished building).</p>
+      <p class="fig-cap">Six great circles, the Circles slider's default for the random layout, with uniformly random normals here (the sketch also spreads them apart or starts from a jittered symmetric set, which moves the parts but not their number): 30 crossings and 32 plates, each centred on the mean of its corners. The schedule is <code>rebuildSound</code> run with <code>play()</code>'s spacing rule, which is what <code>setLogger</code> would receive: launch times for the sink, then 1.6 s of rails fading during the swap, then arrival times for the new layout, with the wave's origin and salt advanced as the sketch does. Dot size is gain. With 62 parts the step is 1.55, and rounding in the running sum lets a 41st part through. The default layout, dodecahedral rings, has 62 plates and 60 turntables: the step is 3.05 and exactly 40 parts are voiced. The top row marks every part's launch or seat time; tall ticks are the voiced ones. The facing gain assumes a distant camera on the +z axis and pan is not drawn, and the swap is assumed to start on time (the sketch waits there if the new layout has not finished building).</p>
     </div>
     <div class="fig">
       <div class="fig-head"><h3>A ratchet's clicks</h3>
@@ -517,7 +521,9 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <h2>Finishes, studio and performance</h2>
       <p>A finish is one entry in <code>FINISHES</code>, and there are 22 of them. Each sets the plate colour and roughness, the inlay that fills the engraving (colour, metalness, roughness), the turntable colour and roughness, and the carriage colour. Optional keys cover the rest: <code>gear</code> for the gears inside the core (the plate colour otherwise), <code>plateMetal: 0</code> for the three enamels (black, white and lapis), and <code>partInlay</code> for the engraving on dials and turntables. On black enamel, lapis, white enamel and ruthenium that fill is the plate's own colour, so the dials and turntables carry the plate's colour in their engraving, champlevé style. The beads come in four sets of four colours: enamel (roughness 0.18), jewel (0.05), metal (0.14, fully metallic) and stone (0.5). A new finish is applied to the materials in place, with no rebuild; if a new shape is already on its way, it waits and arrives with the new parts.</p>
       <p>The studio is the shared pipeline's: a key light from (−0.55, 0.8, 0.45) at intensity 16 and size 0.55, a cool fill at 0.32, floor 0.22, wall 0.3, ceiling 0.2, all tinted warm. Shadows are PCSS, fitted to the scene and denoised. AO runs at intensity 1 with a minimum of 0.04, GI at 1.2, and one analytic sphere occluder of radius 1 at the centre darkens the floor under the machine. The frame ends at exposure 1.1 with bloom 0.04, vignette 0.3 and grain 0.025. AO and GI start to fade at the camera's distance to the target plus 2.4 (plus 4.5 while parts are flying) and are gone 1.6 further on, so the far floor and the wall skip the trace.</p>
-      <p>Motion blur uses a 1/60 s shutter, 24 samples and a maximum of 0.03 of the screen, and it is switched off on the low and medium tiers, so it runs on high and capture. The prepass already holds every part's motion over the last frame, so the blur reuses that velocity instead of rendering the scene again, as long as the camera is still and the spin moves the front of the sphere less than 0.4 px a frame. Phones, picked by user agent or a coarse pointer, get the medium tier and no blur, a 96 × 48 core instead of 128 × 64, 48 rim samples per turntable instead of 64, plates and dials with about 0.7 of the samples, no supersampling, and a drawing buffer of at most 2.6 megapixels.</p>
+      <p>Motion blur uses a 1/60 s shutter, 24 samples and a maximum of 0.03 of the screen, and it is switched off on the low and medium tiers, so it runs on high and capture. The prepass already holds every part's motion over the last frame, so the blur reuses that velocity instead of rendering the scene again, as long as the camera is still and the spin moves the front of the sphere less than 0.4 px a frame.</p>
+      <p>The <b>Quality</b> setting picks the budget: auto, high, medium or low. The tier is fixed when the pipeline is built, so a new choice reloads the page with <code>?quality=</code>, keeping the seed and settings in the url. On auto, a desktop gets high and a phone, picked by user agent or a coarse pointer, gets medium; a phone that reports 4 GB of memory or less, or 4 cores or fewer, starts on low. Medium has no blur, a 96 × 48 core instead of 128 × 64, 48 rim samples per turntable instead of 64, plates with 0.72 and dials with 0.7 of the samples, no supersampling, and a drawing buffer of at most 2.6 megapixels. Low goes further: the pipeline's low tier (no MSAA, FXAA instead, a 1024 shadow map), 4 GI steps instead of 8, no bloom, no guilloche, a 64 × 32 core, 40 turntable rim samples, plates and dials at 0.55, and at most 1 megapixel.</p>
+      <p>Once nothing moves, the frame settles into a supersampled still. That needs the machine paused (or Speed and Spin both at 0), the camera where it was last frame, and no drag or zoom under way, for 0.4 s. The shared <code>detailScale</code> uniform then drops to 0.25, so the engraving's pixel-size estimates (the groove's <code>fwidth</code>, the milled-edge fade, the specular antialiasing kernel and the motif's pixel size) act as if the pixels were a quarter of the size. The guilloche's line coverage still filters over the whole pixel. The pipeline averages jittered frames into one, 64 on high, 16 on medium and 8 on low, reusing the depth-of-field lens accumulator with zero aperture, and then stops rendering the scene: only bloom and the final pass run. If something restarts it while settled, it cross-fades from the image on screen over the first 24 samples. For this the day passes the pipeline a clock that only runs while something moves, and uploads instance matrices only when they change, because the pipeline reads an upload as motion. Temporal antialiasing was tried for the same job and dropped.</p>
       <p>Most of the speed comes from not drawing what can't be seen. While a plate or turntable is seated, <code>displace()</code> returns the origin for its gears, so their triangles have no area and the rasteriser drops them in every pass. The gear builder shares vertices round each ring. Plate rims get <code>reach · 420</code> samples, clamped to 72–150, with a turn weight of 0.06 that keeps the rounded corners dense. The core draws after the parts, so the depth test rejects most of it. The shaders compile while the first layout builds, and a rebuild finds and builds the next layout in steps of about 6 ms a frame (it stops at the first step that ends past the deadline) while the old one flies apart.</p>
     </div>
 
@@ -539,7 +545,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
         <div class="order-col">
           <h3>Orrery's own work, each frame</h3>
           <div class="pass own"><span>Machine tick<small>machine.js: turntables turn, then beads with room move one edge</small></span><span class="chips"><span class="chip">CPU</span></span></div>
-          <div class="pass own"><span>Instances<small>turntables, counter gears, wells and their gear trains, carriages, beads; fades only while fading</small></span><span class="chips"><span class="chip">128 + 80</span></span></div>
+          <div class="pass own"><span>Instances<small>turntables, counter gears, wells and their gear trains, carriages, beads; matrices upload only when they change, fades only while fading</small></span><span class="chips"><span class="chip">128 + 80</span></span></div>
           <div class="pass own"><span>Plate state<small>lift, turn, dial angle, dial lift and fade per plate; last frame kept for velocity</small></span><span class="chips"><span class="chip read">128 × 3 texels</span></span></div>
           <div class="pass own"><span>Rebuild step<small>layout search, plate fields, merge</small></span><span class="chips"><span class="chip">~6 ms, if rebuilding</span></span></div>
           <div class="pass own"><span>Motif atlas<small>distance-field motifs for the engraving</small></span><span class="chips"><span class="chip">per layout</span></span></div>
@@ -551,31 +557,38 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
           <div class="pass"><span>GTAO + SSIL<small>half resolution, faded past the machine</small></span><span class="chips"><span class="chip read">pipeline</span></span></div>
           <div class="pass"><span>Colour pass<small>engraving and motifs drawn in the plate shader</small></span><span class="chips"><span class="chip read">MSAA</span></span></div>
           <div class="pass"><span>Motion blur<small>reuses the prepass velocity when it can</small></span><span class="chips"><span class="chip read">24, high and capture</span></span></div>
-          <div class="pass"><span>Bloom, AgX, vignette, grain<small>exposure 1.1</small></span><span class="chips"><span class="chip read">final</span></span></div>
+          <div class="pass"><span>Settled still<small>jittered frames averaged in the lens accumulator, then the passes above stop</small></span><span class="chips"><span class="chip read">64 / 16 / 8</span></span></div>
+          <div class="pass"><span>Bloom, AgX, vignette, grain<small>exposure 1.1; bloom off on low</small></span><span class="chips"><span class="chip read">final</span></span></div>
         </div>
       </div>
     </div>
 
     <div class="scroll">
       <table>
-        <thead><tr><th>Budget</th><th>Desktop</th><th>Phone</th></tr></thead>
+        <thead><tr><th>Budget</th><th>High (desktop)</th><th>Medium (phone)</th><th>Low (weak phone)</th></tr></thead>
         <tbody>
-          <tr><td>Pipeline tier</td><td>high: 4× MSAA</td><td>medium: 2× MSAA</td></tr>
-          <tr><td>Motion blur</td><td>24 samples, 1/60 s</td><td>off</td></tr>
-          <tr><td>Core sphere</td><td>128 × 64</td><td>96 × 48</td></tr>
-          <tr><td>Turntable rim samples</td><td>64</td><td>48</td></tr>
-          <tr><td>Plate rim samples</td><td>reach · 420, 72–150</td><td>× 0.72</td></tr>
-          <tr><td>Dial rim samples</td><td>dial · 800, 64–112</td><td>× 0.7</td></tr>
-          <tr><td>Supersample</td><td>1×, up to 2× from the GUI</td><td>never</td></tr>
-          <tr><td>Drawing buffer</td><td>dpr × supersample</td><td>≤ 2.6 MP</td></tr>
+          <tr><td>Pipeline tier</td><td>4× MSAA, 2048 shadow map</td><td>2× MSAA, 2048 shadow map</td><td>no MSAA, FXAA, 1024 shadow map</td></tr>
+          <tr><td>GI</td><td>2 slices, 8 steps</td><td>1 slice, 8 steps</td><td>1 slice, 4 steps</td></tr>
+          <tr><td>Motion blur</td><td>24 samples, 1/60 s</td><td>off</td><td>off</td></tr>
+          <tr><td>Bloom</td><td>0.04</td><td>0.04</td><td>off</td></tr>
+          <tr><td>Guilloche</td><td>on</td><td>on</td><td>off</td></tr>
+          <tr><td>Core sphere</td><td>128 × 64</td><td>96 × 48</td><td>64 × 32</td></tr>
+          <tr><td>Turntable rim samples</td><td>64</td><td>48</td><td>40</td></tr>
+          <tr><td>Plate rim samples</td><td>reach · 420, 72–150</td><td>× 0.72</td><td>× 0.55</td></tr>
+          <tr><td>Dial rim samples</td><td>dial · 800, 64–112</td><td>× 0.7</td><td>× 0.55</td></tr>
+          <tr><td>Supersample</td><td>1×, up to 2× from the GUI</td><td>never</td><td>never</td></tr>
+          <tr><td>Drawing buffer</td><td>dpr × supersample</td><td>≤ 2.6 MP</td><td>≤ 1 MP</td></tr>
+          <tr><td>Settled still</td><td>64 frames</td><td>16 frames</td><td>8 frames</td></tr>
         </tbody>
       </table>
     </div>
 
     <div class="facts">
       <div class="fact"><b>~2.5 ms a frame</b><span>GPU time at 1200 × 900 on an RTX 4060 laptop with motion blur on, against 3.1 ms before the work above, without blur.</span></div>
-      <div class="fact"><b>~2.8–2.9 ms on the phone profile</b><span>The lite tier measured the same way, down from 3.3 ms.</span></div>
-      <div class="fact"><b>~2.0M → ~1.4M triangles</b><span>Submitted per frame, after the gears were collapsed and the rims trimmed.</span></div>
+      <div class="fact"><b>~2.8–2.9 ms on the phone profile</b><span>The medium tier measured the same way, down from 3.3 ms.</span></div>
+      <div class="fact"><b>Low: well under half</b><span>The low tier's GPU time against medium's on the same phone profile. Other GPU load disturbed the absolute numbers, so only the ratio holds.</span></div>
+      <div class="fact"><b>~2.0M → ~1.4M triangles</b><span>Submitted per frame on the layout measured at the time, after the gears were collapsed and the rims trimmed. The count follows the number of plates, so a dense layout such as the default dodecahedral rings can differ.</span></div>
+      <div class="fact"><b>Nothing drawn when settled</b><span>Once the still has its 64 frames (16 on medium, 8 on low), the scene is not rendered again until something moves; only bloom and the final pass run.</span></div>
       <div class="fact"><b>No first-frame stall</b><span>The programs don't depend on the plates' vertex data, so they compile against placeholder geometry while the first layout is still being built.</span></div>
     </div>
 
@@ -585,16 +598,17 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <ul class="keys">
       <li><b>Click</b> or tap a turntable to pop it out and send its bead onto another circle; a dial or plate pops out and spins.</li>
       <li><b>Drag</b> orbits; scroll or pinch zooms.</li>
-      <li><b>Layout</b>: random, symmetric, or one of the presets. <b>Circles</b>: 4 to 6.</li>
+      <li><b>Layout</b>: symmetric, one of the presets (dodecahedral rings by default), or random. <b>Circles</b>, 4 to 6, shows only for the random layout, the only one it shapes.</li>
       <li><b>Bead count</b>: 0.2 to 0.6. <b>Bead colours</b>: 2 to 4.</li>
-      <li><b>Finish</b>: one of the 22 above. <b>Beads</b>: enamel, jewel, metal or stone.</li>
-      <li><b>Motifs</b>: the engraving set, with <b>Motif variety</b> from 0 to 1.</li>
+      <li><b>Finish</b>: one of the 22 above, black enamel by default. <b>Beads</b>: enamel, jewel (the default), metal or stone.</li>
+      <li><b>Motifs</b>: the engraving set, arcane by default, with <b>Motif variety</b> from 0 to 1.</li>
       <li><b>Engraving</b>: depth, 0 to 1.5.</li>
       <li><b>Speed</b>: 0 to 3. <b>Spin</b>: 0 to 0.4.</li>
       <li><b>Pop-outs</b>: how often parts pop out on their own.</li>
       <li><b>Supersample</b>: 1 to 2, for the sharpest engraving at up to four times the cost.</li>
-      <li><b>Auto change</b>: seconds between new layouts; 0 turns it off.</li>
-      <li><b>R</b> flies apart into a new layout.</li>
+      <li><b>Auto change</b>: seconds between new layouts, 30 by default; 0 turns it off.</li>
+      <li><b>Quality</b>: auto, high, medium or low; a change reloads the page.</li>
+      <li><b>R</b> flies apart into a new layout: symmetric or a preset, never random.</li>
       <li><b>M</b> or the speaker button toggles sound.</li>
       <li><b>Space</b> pauses, <b>Tab</b> hides the panel, <b>F</b> goes fullscreen, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
     </ul>
@@ -737,6 +751,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     const DIAGONALS = [[1, 1, 0], [1, -1, 0], [0, 1, 1], [0, 1, -1], [1, 0, 1], [1, 0, -1]];
     const OCTA = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
     const CUBE = [[1, 1, 1], [1, 1, -1], [1, -1, 1], [1, -1, -1], [-1, 1, 1], [-1, 1, -1], [-1, -1, 1], [-1, -1, -1]];
+    const DODECA = [...CUBE, [0, 1 / PHI, PHI], [0, -1 / PHI, PHI], [0, 1 / PHI, -PHI], [0, -1 / PHI, -PHI], [1 / PHI, PHI, 0], [-1 / PHI, PHI, 0], [1 / PHI, -PHI, 0], [-1 / PHI, -PHI, 0], [PHI, 0, 1 / PHI], [-PHI, 0, 1 / PHI], [PHI, 0, -1 / PHI], [-PHI, 0, -1 / PHI]];
     const ICOSA = [[0, 1, PHI], [0, -1, PHI], [0, 1, -PHI], [0, -1, -PHI], [1, PHI, 0], [-1, PHI, 0], [1, -PHI, 0], [-1, -PHI, 0], [PHI, 0, 1], [-PHI, 0, 1], [PHI, 0, -1], [-PHI, 0, -1]];
     const CUBOCTA = [[1, 1, 1], [1, 1, -1], [1, -1, 1], [-1, 1, 1]];
     const ICOSIDODECA = [[0, 1, PHI], [0, -1, PHI], [1, PHI, 0], [-1, PHI, 0], [PHI, 0, 1], [PHI, 0, -1]];
@@ -749,6 +764,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       "ringed octahedron": { circles: [...COORDINATES, ...rings(OCTA, 30)] },
       "cubic rings": { circles: rings(CUBE, 44.5) },
       "icosahedral rings": { circles: rings(ICOSA, 47) },
+      "dodecahedral rings": { circles: rings(DODECA, 28), scale: 0.75 },
       "great icosahedral rings": { circles: rings(ICOSA, 74), scale: 0.55 },
       "symmetric: I, 15 great circles": {
         scale: 0.85,
@@ -2834,6 +2850,8 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     const SINK_TIME = 2.55, RAIL_FADE = 0.8, RISE_TIME = 3.05;
     const LAUNCH = 0.9, ARRIVE = 1.05, FLY = 2.6;
     const NODE_ID = 1000, TOKEN_ID = 2000;
+    // Mechanism scales of the sample's old and new layouts; each layout's rails keep their own width.
+    const OLD_SCALE = 1, NEW_SCALE = 0.75;
     const SWAP_TIME = RAIL_FADE * 2, TOTAL = SINK_TIME + SWAP_TIME + RISE_TIME;
     const clamp01 = (x) => Math.min(Math.max(x, 0), 1);
     const smooth = (x) => { x = clamp01(x); return x * x * x * (x * (x * 6 - 15) + 10); };
@@ -2905,6 +2923,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       if (s > SWAP_TIME) return [0, 1];
       return [stagger(1 - clamp01(s / RAIL_FADE), k, n), stagger(clamp01((s - RAIL_FADE) / RAIL_FADE), k, n)];
     };
+    const railWidth = (t, k, n, which) => rails(t, k, n)[which] * (which ? NEW_SCALE : OLD_SCALE);
     const phaseAt = (t) =>
       t < SINK_TIME ? ["sink", t] : t < SINK_TIME + SWAP_TIME ? ["swap", t - SINK_TIME] : t <= TOTAL ? ["rise", t - SINK_TIME - SWAP_TIME] : ["idle", 0];
 
@@ -2974,7 +2993,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
         for (let k = 0; k < 8; k++) {
           ctx.beginPath();
           for (let s = 0; s <= 240; s++) {
-            const tt = (s / 240) * TOTAL, v = rails(tt, k, 8)[which];
+            const tt = (s / 240) * TOTAL, v = railWidth(tt, k, 8, which);
             const px = X(tt), py = LANE_Y + LANE - v * LANE;
             if (s) ctx.lineTo(px, py); else ctx.moveTo(px, py);
           }
@@ -3032,7 +3051,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
           if (wgt <= 0.001) return;
           const u = normalize(cross(n, Math.abs(n[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])), v = cross(n, u);
           ctx.strokeStyle = rgba(which ? acc : muted, 0.25 + 0.6 * smooth(wgt / 0.12));
-          ctx.lineWidth = 0.3 + 3 * wgt;
+          ctx.lineWidth = 0.3 + 3 * railWidth(t, k, 8, which);
           ctx.beginPath();
           let on = false;
           for (let s = 0; s <= 72; s++) {
@@ -3706,7 +3725,8 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     if (c < g.cols && i < names.length) pick(i);
   });
   canvas.style.cursor = "pointer";
-  pick(0);
+  beadSel.value = "jewel";
+  pick(names.indexOf("black enamel"));
 }
 
 })();

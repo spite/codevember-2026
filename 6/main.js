@@ -52,7 +52,7 @@ const defaults = {
   spin: 0.05,
   pops: 0.3,
   supersample: 1,
-  auto: 0,
+  auto: 30,
 };
 const params = fromDefaults(defaults);
 const capture = new URLSearchParams(location.search).has("capture");
@@ -1006,7 +1006,8 @@ render(({ time, dt, frame }) => {
   pipeline.gi.fadeStart = distance + (rebuild.state === "idle" ? 2.4 : 4.5);
   pipeline.gi.fadeEnd = pipeline.gi.fadeStart + 1.6;
 
-  sinceChange = dt > 0 ? sinceChange + dt : 0;
+  // Counts only while the layout stands: a rebuild (from R, the menu or an auto change) starts it again once it lands.
+  sinceChange = dt > 0 && rebuild.state === "idle" ? sinceChange + dt : 0;
   if (params.auto() > 0 && sinceChange >= params.auto() && !capture && rebuild.state === "idle") randomize();
 
   updateLook(1);
