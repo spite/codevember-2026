@@ -1,5 +1,6 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, randomize, keysHelp, setDay, addKey, getSeed, applyUrlState, addActionButton, onPause } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, randomize, keysHelp, setDay, addKey, getSeed, applyUrlState, addActionButton, onPause, showHint } from "common";
 import { GUI, signal, effect } from "guspira";
+import { createAutoChange } from "modules/autoChange.js";
 import { Scene, Mesh, Group, InstancedMesh, InstancedBufferAttribute, BufferGeometry, BufferAttribute, SphereGeometry, Matrix4, Vector2, Vector3, Color, Raycaster, Sphere, DynamicDrawUsage } from "three";
 import { RoundedBoxGeometry } from "third_party/three-rounded-box.js";
 import { Pipeline } from "modules/pipeline/Pipeline.js";
@@ -7,7 +8,7 @@ import { createStudioEnvironmentAsync } from "modules/pipeline/studio.js";
 import { globalUniforms } from "modules/pipeline/uniforms.js";
 import { seededRandom, nativeRandom } from "modules/random.js";
 import { R, RF, RT, RC, DIAL_GAP, SCALE, setMechanismScale, PRESETS, buildLayout, randomNormals, randomNormalsSteps, rotateNormals, plateField, turntableFields, dialField, buildPiece, buildPieceSteps, buildCap, buildGear, dot, cross, normalize, angle, perpendicular } from "./layout.js";
-import { Machine } from "./machine.js";
+import { Machine, clockEase, BEATS } from "./machine.js";
 import { FINISHES, BEADS, MAX_PLATES, MAX_CIRCLES, MAX_HOLES, createShared, writePlateData, createPlateMaterial, createDialMaterial, createTurntableMaterial, createCoreMaterial, createCarriageMaterial, createBeadMaterial } from "./materials.js";
 import { createBackdrop } from "./backdrop.js";
 import { MOTIF_SETS, createMotifAtlas } from "./motifs.js";
@@ -52,7 +53,8 @@ const defaults = {
   spin: 0.05,
   pops: 0.3,
   supersample: 1,
-  auto: 30,
+  auto: true,
+  autoTime: 30,
 };
 const params = fromDefaults(defaults);
 const capture = new URLSearchParams(location.search).has("capture");
@@ -119,7 +121,8 @@ gui.addSlider("Spin", params.spin, 0, 0.4, 0.01, { randomizable: false });
 gui.addSlider("Pop-outs", params.pops, 0, 1, 0.01, { randomizable: false });
 // Renders at up to twice the resolution and averages down: the sharpest engraving, at up to four times the cost.
 gui.addSlider("Supersample", params.supersample, 1, 2, 0.5, { randomizable: false });
-gui.addSlider("Auto change", params.auto, 0, 120, 1, { randomizable: false });
+// Counts only while the layout stands: a change (from R, the menu or an auto change) starts it again once it lands.
+const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTime, gui, max: 120, ready: () => rebuild.state === "idle" && !waiting });
 // The pipeline's tier is fixed when it is built, so a new one reloads the page (seed and settings stay in the url).
 const qualityChoice = signal(new URLSearchParams(location.search).get("quality") ?? "auto");
 gui.addSelect("Quality", qualityChoice, ["auto", "high", "medium", "low"], { randomizable: false });
@@ -148,6 +151,7 @@ gui.addText(
     ? "Tap turntables, dials and plates to set them moving. Drag to orbit, pinch to zoom."
     : `Click turntables, dials and plates to set them moving. Drag to orbit, scroll to zoom.<br/>${keysHelp()}`,
 );
+showHint("Click turntables, dials and plates · drag to orbit · R for a new orrery", "Tap parts to pop them · tap {randomize} for a new one");
 gui.show();
 
 const scene = new Scene();
@@ -242,7 +246,8 @@ function plateHole(face) {
 
 // Moves a piece built around +y onto the axis c.
 function aroundAxis(piece, c) {
-  const e1 = perpendicular(c), e2 = cross(c, e1);
+  // e1, c, e2 must be right-handed, or the piece is mirrored and its faces wind the wrong way and get culled.
+  const e1 = perpendicular(c), e2 = cross(e1, c);
   for (const key of ["position", "normal"]) {
     const a = piece[key];
     for (let k = 0; k < a.length; k += 3) {
@@ -264,6 +269,11 @@ function* buildGeometry(layout) {
     const samples = Math.round(Math.min(Math.max(face.reach * 420, 72), 150) * (low ? 0.55 : lite ? 0.72 : 1));
     const piece = yield* buildPieceSteps({ seed: face.center, field: plateField(face), reach: face.reach, samples, turnWeight: 0.06, undersideStrips: 2 });
     plateParts.push({ id: i, piece });
+    // How far the plate's outline reaches from its centre: the disc it sweeps when it turns.
+    let sweep = 0;
+    const P = piece.position;
+    for (let v = 0; v < P.length; v += 3) sweep = Math.max(sweep, angle(normalize([P[v], P[v + 1], P[v + 2]]), face.center));
+    face.sweep = sweep;
     const c = face.center;
     const hole = plateHole(face);
     if (face.dial) {
@@ -420,10 +430,13 @@ function* layoutAndGeometry(key) {
   return yield* buildGeometry(next);
 }
 
+// Pop-outs per second of machine time: the slider's value up to 0.5, then rising to 25 at 1.
+const popRate = (v) => (v <= 0.5 ? v : 0.5 + 24.5 * ((v - 0.5) / 0.5) ** 2);
+
 function startMachine() {
   machineBuiltKey = machineKey();
   machine = new Machine(layout, { density: params.density(), colours: params.colours(), random: seededRandom(machineBuiltKey) });
-  machine.autoRate = params.pops();
+  machine.autoRate = popRate(params.pops());
   machine.onEvent = machineSound;
   carriages.count = beads.count = Math.min(machine.tokens.length, MAX_TOKENS);
 }
@@ -811,26 +824,135 @@ function soundAt(dir) {
   const ndc = _sv.clone().project(camera);
   return { pan: Math.max(-1, Math.min(1, ndc.x)) * 0.8, gain: 0.3 + 0.7 * Math.min(Math.max((facing + 0.2) / 0.8, 0), 1) };
 }
-// Busy ticks share their loudness, so a dense layout is a patter rather than a wall.
-let tickEvents = { at: -1, count: 0 };
+// A Swiss watch far in the background and, now and then, a ratchet somewhere in the works, both on the machine's beat
+// while it runs (a free-running watch while it rebuilds).
+let watchUntil = -Infinity;
+function beatSounds(dt) {
+  const speed = params.speed();
+  ratchetClock -= dt;
+  if (rebuild.state !== "idle" || speed <= 0 || dt <= 0) {
+    watchUntil = -Infinity;
+    sound.escapement(dt > 0 ? (BEATS / machine.tickLength) * Math.max(speed, 0.5) : 0, 0.3);
+    return;
+  }
+  sound.escapement(0, 0);
+  // Every beat, or every other one when they come faster than ten a second.
+  const every = (BEATS / machine.tickLength) * speed > 10 ? 2 : 1;
+  for (let t = machine.nextBeat(Math.max(machine.time, watchUntil + machine.beat / 2)); t <= machine.time + 0.15 * speed; t = machine.nextBeat(t + machine.beat / 2)) {
+    watchUntil = t;
+    const k = machine.beatIndex(t);
+    if (k % every) continue;
+    // Accented on the turntables locking and the beads arriving.
+    sound.play("beat", { gain: k % 4 === 0 ? 0.32 : 0.22, delay: (t - machine.time) / speed, rate: k % 2 ? 0.92 : 1.05 });
+  }
+  if (ratchetClock <= 0) {
+    ratchetClock = 1.5 + 4 * nativeRandom();
+    const start = (machine.nextBeat() - machine.time) / speed, step = machine.beat / speed / (nativeRandom() < 0.5 ? 1 : 2);
+    const n = 3 + Math.floor(nativeRandom() * 8), gain = 0.18 + 0.15 * nativeRandom(), pan = (nativeRandom() - 0.5) * 1.4, rate = 0.7 + 0.6 * nativeRandom();
+    for (let k = 0; k < n; k++) sound.play("ratchet", { gain: gain * (0.8 + 0.2 * Math.sin((k / n) * Math.PI)), pan, delay: start + k * step, rate, quiet: true });
+  }
+}
+
+// Sounds of one kind in the same tick share their loudness, so a dense layout is a patter rather than a wall.
+let tickEvents = { at: -1, count: {} };
+// Beads all set off together on a tick. The ones most in view are heard, up to three, each panned to its path,
+// louder the more beads move.
+let slideBatch = null;
+let ratchetClock = 2;
+// How fast a bead goes through its move (the clock easing's speed), 0 to 1: the roll's loudness over the move.
+const SLIDE_SHAPE = (() => {
+  const n = 48, h = 0.5 / n, v = [];
+  for (let i = 0; i <= n; i++) {
+    const a = Math.max(0, i / n - h), b = Math.min(1, i / n + h);
+    v.push(Math.abs(clockEase(b) - clockEase(a)) / (b - a));
+  }
+  const top = Math.max(...v);
+  return v.map((x, i) => (x / top) * Math.min(1, i / 3, (n - i) / 3));
+})();
+function queueSlide(info, delay, speed) {
+  if (!slideBatch) {
+    slideBatch = [];
+    queueMicrotask(flushSlides);
+  }
+  const from = layout.nodes[info.from].p, to = layout.nodes[info.to].p;
+  slideBatch.push({ delay, duration: info.duration / speed, at: soundAt(normalize([from[0] + to[0], from[1] + to[1], from[2] + to[2]])) });
+}
+function flushSlides() {
+  const batch = slideBatch.sort((a, b) => b.at.gain - a.at.gain);
+  slideBatch = null;
+  const crowd = Math.min(1, 0.55 + 0.06 * batch.length);
+  const small = 0.7 + 0.3 * SCALE;
+  batch.slice(0, 3).forEach(({ delay, duration, at }, i) => {
+    const lag = i * 0.02;
+    sound.play("slide", { gain: (i ? 0.3 : 0.45) * at.gain * crowd, pan: at.pan, delay: delay + lag, rate: 1 / small, duration: Math.max(duration - lag, 0.1), envelope: SLIDE_SHAPE });
+  });
+  // ...and the "wah" as they all arrive, on the beat.
+  const { delay, duration, at } = batch[0];
+  sound.play("latch", { gain: 0.42 * at.gain * crowd, pan: at.pan * 0.5, delay: delay + duration, rate: 0.68 / small });
+}
+
+// The turntables turning in a tick are one figure, "tiki-tiki" on sixteenths up to the clack of them locking, which
+// falls on the beat.
+let turnBatch = null;
+function queueTurn(delay, duration, at) {
+  if (!turnBatch) {
+    turnBatch = [];
+    queueMicrotask(flushTurns);
+  }
+  turnBatch.push({ delay, duration, at });
+}
+function flushTurns() {
+  const batch = turnBatch;
+  turnBatch = null;
+  const loud = batch.reduce((m, b) => Math.max(m, b.at.gain), 0);
+  const pan = batch.reduce((s, b) => s + b.at.pan * b.at.gain, 0) / batch.reduce((s, b) => s + b.at.gain, 0);
+  const crowd = Math.min(1, 0.5 + 0.08 * batch.length);
+  const small = 0.7 + 0.3 * SCALE;
+  const lock = batch[0].delay + batch[0].duration;
+  const step = machine.tickLength / 16 / params.speed();
+  for (let k = 4; k >= 1; k--) sound.play("ratchet", { gain: (k % 2 ? 0.3 : 0.38) * loud * crowd, pan, delay: lock - k * step, rate: (k % 2 ? 0.95 : 1.25) / small });
+  sound.play("clack", { gain: 0.6 * loud * crowd, pan, delay: lock, rate: 1 / small });
+}
+
+// A plate's turn sounds different each time: a freewheel or a socket ratchet, a heavy pawl, big detents or a winding
+// spring.
+function plateTurnSound(gain, pan, delay, duration) {
+  const r = nativeRandom();
+  const rate = 0.85 + 0.3 * nativeRandom();
+  if (r < 0.3) sound.play("spin", { gain: 1 * gain, pan, delay, rate, duration });
+  else if (r < 0.55) sound.ratchet({ teeth: 14 + Math.floor(nativeRandom() * 10), duration, gain: 0.4 * gain, pan, delay, rate: 0.6 + 0.25 * nativeRandom() });
+  else if (r < 0.8) {
+    // Big detents: a few heavy clicks spread over the turn.
+    const teeth = 6 + Math.floor(nativeRandom() * 4);
+    for (let k = 0; k < teeth; k++) sound.play("click", { gain: 0.5 * gain, pan, delay: delay + ((k + 0.5) / teeth) * duration, rate: rate * 0.6 });
+  } else {
+    sound.play("wind", { gain: 0.6 * gain, pan, delay, rate, duration });
+    sound.play("spin", { gain: 0.7 * gain, pan, delay: delay + 0.1 * duration, rate: rate * 1.1, duration: 0.8 * duration });
+  }
+}
+
 function machineSound(type, start, info) {
   if (rebuild.state !== "idle" || params.speed() <= 0) return;
   const speed = params.speed();
   const delay = Math.max(0, (start - machine.time) / speed);
-  if (tickEvents.at !== machine.tickStart) tickEvents = { at: machine.tickStart, count: 0 };
-  const busy = 1 / Math.sqrt(1 + 0.15 * tickEvents.count++);
+  if (tickEvents.at !== machine.tickStart) tickEvents = { at: machine.tickStart, count: {} };
+  const seen = (tickEvents.count[type] = (tickEvents.count[type] ?? 0) + 1);
+  const busy = 1 / Math.sqrt(1 + 0.1 * (seen - 1));
   const node = info.node !== undefined ? layout.nodes[info.node].p : null;
   const face = info.face !== undefined ? layout.faces[info.face].center : null;
   const { pan, gain } = soundAt(node ?? face ?? layout.nodes[info.from ?? 0].p);
   const small = 0.7 + 0.3 * SCALE;
   if (type === "move") {
-    sound.play("slide", { gain: 0.22 * gain * busy, pan, delay, rate: 1.1 / small, duration: info.duration / speed });
+    queueSlide(info, delay, speed);
     const { pan: arrivePan, gain: arriveGain } = soundAt(layout.nodes[info.to].p);
-    sound.play("click", { gain: 0.28 * arriveGain * busy, pan: arrivePan, delay: delay + (info.duration * 0.9) / speed, rate: 1 / small });
+    sound.play("click", { gain: 0.2 * arriveGain * busy, pan: arrivePan, delay: delay + info.duration / speed, rate: 1 / small });
   } else if (type === "turn") {
-    sound.ratchet({ teeth: Math.round(Math.abs(info.angle) / (Math.PI / 12)) + 1, duration: info.duration / speed, gain: 0.3 * gain * busy, pan, delay, rate: 1 / small });
+    queueTurn(delay, info.duration / speed, { pan, gain });
   } else if (type === "notch") {
-    sound.play("tick", { gain: 0.3 * gain * busy, pan, delay });
+    // A dial stepping one position: a crisp detent tick, a little apart from the dials stepping with it.
+    const at = delay + nativeRandom() * 0.02;
+    sound.play("tick", { gain: 1 * gain * busy, pan, delay: at, rate: 1.2 / small });
+    sound.play("click", { gain: 0.4 * gain * busy, pan, delay: at, rate: 1.5 / small });
   } else if (type === "pop") {
     const plate = info.kind === "plate";
     const D = info.duration / speed;
@@ -838,9 +960,16 @@ function machineSound(type, start, info) {
     sound.play("whirr", { gain: (plate ? 0.4 : 0.3) * gain, pan, delay: delay + 0.22 * D, rate: plate ? 0.8 : 1.1, duration: 0.54 * D });
     // Everything that pops out turns, and turning is heard: a ratchet over the whole turn (heavy for plates, a notch a tooth for dials).
     if (info.kind === "turntable") sound.ratchet({ teeth: 12, duration: 0.5 * D, gain: 0.25 * gain, pan, delay: delay + 0.24 * D });
-    else if (info.kind === "dial") sound.ratchet({ teeth: 24, duration: 0.56 * D, gain: 0.22 * gain, pan, delay: delay + 0.2 * D, rate: 1.2 });
-    else sound.ratchet({ teeth: 18, duration: 0.54 * D, gain: 0.34 * gain, pan, delay: delay + 0.22 * D, rate: 0.7 });
-    sound.play("latch", { gain: (plate ? 0.6 : 0.42) * gain, pan, delay: delay + 0.97 * D, rate: plate ? 0.85 : 1.1 });
+    else if (info.kind === "dial") {
+      // A dial's full turn is wound round: a ratchet a notch at a time over a winding crown.
+      sound.ratchet({ teeth: 24, duration: 0.56 * D, gain: 0.3 * gain, pan, delay: delay + 0.2 * D, rate: 1.2 });
+      sound.play("wind", { gain: 0.5 * gain, pan, delay: delay + 0.2 * D, rate: 1.15, duration: 0.58 * D });
+    }
+    else plateTurnSound(gain, pan, delay + 0.22 * D, 0.54 * D);
+    // Seated on the beat: pops last whole beats.
+    sound.play("latch", { gain: (plate ? 0.45 : 0.42) * gain, pan, delay: delay + D, rate: plate ? 0.85 : 1.1 });
+    // A plate clinks back into its hole as it seats.
+    if (plate) sound.play("clink", { gain: 1 * gain, pan, delay: delay + D, rate: 0.8 + 0.35 * nativeRandom() });
   } else if (type === "sorted") {
     // Like winding a watch's crown, then the click of it setting.
     sound.ratchet({ teeth: 10, duration: 0.45, gain: 0.3, delay, rate: 1.25 });
@@ -925,14 +1054,10 @@ onResize((w, h, dpr) => {
   applySize();
 });
 
-let sinceChange = 0;
 // True while a change waits for the pop-outs to come home.
 let waiting = false;
 // The frame loop rebuilds when the seed or layout params change.
-onRandomize(() => {
-  sinceChange = 0;
-  gui.randomizeAll();
-});
+onRandomize(() => gui.randomizeAll());
 
 // Programs don't depend on the plates' vertex data, so they compile in parallel with the first build.
 let atlasReady = false;
@@ -987,16 +1112,16 @@ render(({ time, dt, frame }) => {
   else if (reshape) startRebuild(frame > 0);
   else if (restart) startMachine();
   stepRebuild(wall);
-  machine.autoRate = capture || waiting ? 0 : params.pops();
+  machine.autoRate = capture || waiting ? 0 : popRate(params.pops());
   machine.popScale = Math.max(params.speed(), 0.05);
   const tickBefore = machine.tickStart;
   if (rebuild.state === "idle") machine.update(dt * params.speed());
   // The mechanism keeps itself wound: a short wind every tick, a long one every fourth.
   if (rebuild.state === "idle" && machine.tickStart !== tickBefore) {
     const long = Math.round(machine.tickStart / machine.tickLength) % 4 === 0;
-    sound.play("wind", { gain: long ? 0.2 : 0.1, rate: long ? 0.95 : 1.15, duration: long ? 1.1 : 0.35, pan: (nativeRandom() - 0.5) * 0.3 });
+    sound.play("wind", { gain: long ? 0.2 : 0.1, rate: long ? 0.95 : 1.15, duration: long ? 1.1 : 0.35, pan: (nativeRandom() - 0.5) * 0.3, delay: (machine.nextBeat() - machine.time) / params.speed() });
   }
-  sound.escapement(dt > 0 ? 5 * Math.sqrt(Math.max(params.speed(), 0.05)) : 0, 0.12);
+  beatSounds(dt);
   machineGroup.rotation.y += dt * params.spin();
   // Every part's prepass velocity is already last frame's motion, which the blur can reuse; only the spin is
   // measured over the shutter instead, so reuse holds while the spin moves the sphere's front under 0.4 px a frame.
@@ -1006,9 +1131,7 @@ render(({ time, dt, frame }) => {
   pipeline.gi.fadeStart = distance + (rebuild.state === "idle" ? 2.4 : 4.5);
   pipeline.gi.fadeEnd = pipeline.gi.fadeStart + 1.6;
 
-  // Counts only while the layout stands: a rebuild (from R, the menu or an auto change) starts it again once it lands.
-  sinceChange = dt > 0 && rebuild.state === "idle" ? sinceChange + dt : 0;
-  if (params.auto() > 0 && sinceChange >= params.auto() && !capture && rebuild.state === "idle") randomize();
+  autoChange.update(dt);
 
   updateLook(1);
   updateInstances();

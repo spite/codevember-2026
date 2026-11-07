@@ -6,7 +6,10 @@ import { dot, cross, normalize, scale, circlePoint, angle, plateField, perpendic
 const TAU = Math.PI * 2;
 export const DIAL_STEP = TAU / 24;
 const ROTATE = [0.02, 0.4]; // phase A, fraction of a tick
-const MOVE = [0.44, 0.96]; // phase B
+const MOVE = [0.44, 0.9]; // phase B, ending half a tick after the turntables lock
+// The beat: eight to a tick, on the moment the turntables lock and, half a tick later, the beads arrive.
+export const BEATS = 8;
+const BEAT_PHASE = ROTATE[1];
 const ORBIT_TICKS = 10;
 const SCRAMBLE_TICKS = 7;
 const SORT_TICKS = 60;
@@ -140,6 +143,7 @@ export class Machine {
     // Pop-outs keep their own pace in real time: machine time runs at Speed, so their length is scaled by it.
     this.popScale = 1;
     this.autoClock = 2;
+    this.pendingPops = 0;
 
     const count = Math.max(m, Math.min(Math.round(density * nodes.length), Math.floor(nodes.length * 0.62)));
     const free = shuffle(nodes.map((_, i) => i), random);
@@ -187,12 +191,35 @@ export class Machine {
   update(dt) {
     this.time += dt;
     for (const f of [...this.plateQueue]) this.popPlate(f);
+    // Pop-outs that come due wait for the next beat, so they start (and, lasting whole beats, end) on it.
     this.autoClock -= dt * this.autoRate;
-    if (this.autoClock <= 0) {
-      this.autoClock = 0.6 + this.random() * 0.8;
-      this.autoPop();
+    while (this.autoClock <= 0) {
+      this.autoClock += 0.6 + this.random() * 0.8;
+      this.pendingPops++;
+    }
+    const b = this.beat, o = BEAT_PHASE * this.tickLength;
+    if (this.pendingPops && Math.floor((this.time - o) / b) !== Math.floor((this.time - dt - o) / b)) {
+      const n = Math.min(this.pendingPops, 6);
+      this.pendingPops -= n;
+      for (let k = 0; k < n; k++) this.autoPop();
     }
     while (this.time >= this.tickStart + this.tickLength) this.tick(this.tickStart + this.tickLength);
+  }
+
+  get beat() {
+    return this.tickLength / BEATS;
+  }
+  // The first beat at or after machine time t.
+  nextBeat(t = this.time) {
+    const b = this.beat, o = BEAT_PHASE * this.tickLength;
+    return o + Math.ceil((t - o - 1e-9) / b) * b;
+  }
+  // Which beat of the tick a beat time is, 0 at the turntables locking.
+  beatIndex(t) {
+    return ((Math.round((t - BEAT_PHASE * this.tickLength) / this.beat) % BEATS) + BEATS) % BEATS;
+  }
+  snapToBeats(d) {
+    return Math.max(2, Math.round(d / this.beat)) * this.beat;
   }
 
   finishMoves() {
@@ -333,10 +360,12 @@ export class Machine {
         // A popped-out dial is clear of the rack, so passing beads don't turn it.
         if (this.dialPops[f]) continue;
         const dial = this.dials[f];
-        // A dial still spinning from a click just takes the notch on board.
+        // A dial still spinning from a click just takes the notch on board, under the sound of its spin.
         if (dial.busy(this.time)) dial.to += side * dir * DIAL_STEP;
-        else dial.set(this.time, dial.to + side * dir * DIAL_STEP, m0, md);
-        this.emit("notch", m0 + md * 0.85, { face: f });
+        else {
+          dial.set(this.time, dial.to + side * dir * DIAL_STEP, m0, md);
+          if (face.dial) this.emit("notch", m0 + md, { face: f });
+        }
       }
     }
   }
@@ -382,14 +411,14 @@ export class Machine {
     return this.layout.faces.some((face, f) => this.platePops[f] && face.verts.includes(n));
   }
 
-  // Lifts a plate clear of the beads, turns it a full revolution and lets it down. One at a time.
+  // Lifts a plate clear of the beads, turns it a full revolution and lets it down.
   // Several plates may be up at once as long as their sweeps can't meet.
   popPlate(f) {
     const face = this.layout.faces[f];
     if (this.platePops[f] || this.platePops.some((pop, g) => pop && !this.clear(face, this.layout.faces[g]))) return false;
     if (this.dialPops[f] || face.verts.some((n) => this.pops[n] || this.forced.has(n))) return false;
     this.plateQueue.delete(f);
-    const D = PLATE_POP_TIME * this.popScale;
+    const D = this.snapToBeats(PLATE_POP_TIME * this.popScale);
     this.platePops[f] = { start: this.time, duration: D };
     this.emit("pop", this.time, { face: f, kind: "plate", duration: D });
     const turn = this.plateTurn[f];
@@ -400,10 +429,10 @@ export class Machine {
     return true;
   }
 
-  // Two plates turning in the air clear each other when their swept discs don't overlap and they share no corner.
+  // Two plates turning in the air clear each other when the discs their outlines sweep don't overlap.
   clear(a, b) {
     if (a === b) return false;
-    return angle(a.center, b.center) > a.reach + b.reach && !a.verts.some((n) => b.verts.includes(n));
+    return angle(a.center, b.center) > (a.sweep ?? a.reach) + (b.sweep ?? b.reach) + 0.01;
   }
 
   // A plate clicked while it can't pop yet goes up as soon as it can.
@@ -426,7 +455,8 @@ export class Machine {
       const nodes = this.layout.nodes.map((_, n) => n).filter((n) => !this.pops[n] && !this.forced.has(n));
       if (nodes.length) this.poke(nodes[Math.floor(this.random() * nodes.length)]);
     } else {
-      this.popPlate(Math.floor(this.random() * faces.length));
+      // A few tries, since a busy machine blocks many plates.
+      for (let k = 0; k < 6 && !this.popPlate(Math.floor(this.random() * faces.length)); k++);
     }
   }
 
@@ -443,7 +473,7 @@ export class Machine {
   // Pops a turntable out, turns it while it is up (its token onto the other circle), and lets it back in.
   pop(n, start) {
     if (this.pops[n]) return;
-    const D = POP_TIME * this.popScale;
+    const D = this.snapToBeats(POP_TIME * this.popScale);
     this.pops[n] = { start, duration: D };
     this.emit("pop", start, { node: n, kind: "turntable", duration: D });
     const node = this.layout.nodes[n];
@@ -468,7 +498,7 @@ export class Machine {
   popDial(f) {
     // A dial rides on its plate, so it stays put while the plate is out (and the other way round).
     if (this.dialPops[f] || this.platePops[f]) return;
-    const D = DIAL_POP_TIME * this.popScale;
+    const D = this.snapToBeats(DIAL_POP_TIME * this.popScale);
     this.dialPops[f] = { start: this.time, duration: D };
     this.emit("pop", this.time, { face: f, kind: "dial", duration: D });
     const dial = this.dials[f];

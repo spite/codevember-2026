@@ -22,7 +22,8 @@ gears lock with a ka-ching.
   number the Circles slider sets; randomising only picks symmetric layouts and presets), how
   many beads there are and in how many colours, the finish, the bead set, the engraving motifs and how
   varied they are, how often parts pop out on their own, how often a new layout comes on its own (Auto
-  change, every 30 seconds by default; 0 turns it off), and supersampling for the sharpest engraving.
+  change, every 30 seconds by default, counted from when a layout lands; randomizing, pausing, clicking
+  parts, orbiting or using the panel starts it over, and Next change shows how long is left), and supersampling for the sharpest engraving.
 - Quality: Auto (desktops high, phones medium, phones with 4 GB of memory or 4 cores or fewer low), High,
   Medium or Low; changing it reloads the page with the same seed. Low cuts the heaviest costs first: a
   1-megapixel drawing buffer, cheaper GI, no MSAA, motion blur or bloom, no guilloche and lighter geometry.
@@ -70,13 +71,12 @@ engraving on the gold dials and turntables is filled with the plate's colour, ch
 
 ## Sound
 
-Sound starts on the first click or key: an escapement's tic-tac, winding, ratchets, gear trains and
-latches, and for the transformations a crank, tower-clock cogs, a press, levers and bolts, ending in a
+Sound starts on the first click or key: an escapement's tic-tac, beads rolling in their channels,
+winding, ratchets, gear trains, latches and plates clinking back into place, and for the transformations a crank, tower-clock cogs, a press, levers and bolts, ending in a
 ka-ching. One-shots were cut from CC0 recordings on freesound.org: "watch-ticking-contact-mic.wav" by
 Astounded (478738), "Metal_Mechanism_Click_Small.wav" by LamaMakesMusic (403587), "MECHRtch_Ratchet01" by
 InMotionAudio (689528), "INSTAX CAMERA - Mechanical wheel, ratchet" by Headphaze (696760),
-"slide_small_3" by blaukreuz (459647), "Metal Slide 2" by WasabiWielder (323369), "Spring loaded release"
-by KieranKeegan (418229), "12 Volt Solenoid Clicks" by shdwtek (679204), "Clockwork motor" by
+"Glass Marbles Rolling on Wood.wav" by Solar01 (661650), "Stone Sliding" by qubodup (743262), "Bycicle grears in reverse.wav" by MichelleGrobler (410557), "ratchet socket wrench tool" by AlaskaRobotics (551497), "Wind-up2.aif" and "Wind-up3.aif" by timgormly (162806, 162807), "metal clink" by waheegle (738634), "metal hammer clink.wav" by Pagey1969 (566041), "Metal clinks in a shallow dish" by haulaway (434194), "Clockwork motor" by
 robindouglasjohnson (698991), "gears Mitchel animation table mechanism turn metal rattle6" by kyles
 (452239), "Door Lock" by nebulasnails (405534), "Box Latch" by Motion_S (177851), "Metallic latch
 release.wav" by Crinkem (481789), "Antique Pocket Watch Ticking and Winding" by apintofmild (847217),
