@@ -483,7 +483,12 @@ class Pipeline {
   }
 
   // Restarts the lens average, for changes the pipeline cannot see (uniforms, materials).
-  restartAccumulation() {
+  // fade: false for motion it cannot see (an object the day draws itself), which would ghost if faded.
+  restartAccumulation(fade = true) {
+    if (!fade) {
+      this._settleShown = null;
+      this._settleFade = false;
+    }
     // A settled still that starts over fades from what is on screen instead of jumping to one raw frame.
     if (this.stillSamples > 0 && this._settleShown) {
       this._settleFrom ??= colorTarget(HalfFloatType);
