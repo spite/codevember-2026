@@ -4,6 +4,17 @@
   padding: 0;
 }
 
+/* One height for every header control: the nav links, the action buttons and the collapsed panel. */
+:root {
+  --header-size: 40px;
+}
+
+@media (max-width: 950px) {
+  :root {
+    --header-size: 44px;
+  }
+}
+
 html,
 body {
   height: 100%;
@@ -34,6 +45,27 @@ body {
 #gui-container {
   flex: 1;
   min-width: 0;
+
+  > .gui {
+    padding: 0 16px;
+
+    &:not(.collapsed) {
+      padding-bottom: 16px;
+    }
+
+    > .gui-title {
+      height: var(--header-size);
+    }
+
+    .gui-rows {
+      border-top-width: 0;
+    }
+
+    .gui-rows.visible {
+      margin-top: 0;
+      border-top-width: 1px;
+    }
+  }
 }
 
 .hide-ui #main-gui {
@@ -42,7 +74,19 @@ body {
 
 .action,
 #randomize-button {
-  padding: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--header-size);
+  height: var(--header-size);
+  padding: 0;
+
+  img {
+    display: block;
+    width: 22px;
+    height: 22px;
+  }
 }
 
 canvas {
@@ -86,12 +130,6 @@ canvas {
       pointer-events: auto;
     }
 
-    .action,
-    #randomize-button {
-      padding: 11px;
-      flex-shrink: 0;
-    }
-
     .gui-scroller {
       max-height: 50vh;
     }
@@ -120,7 +158,17 @@ canvas {
   a {
     background-color: #2c2c2c;
     color: #e0e0e0;
-    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: var(--header-size);
+    padding: 0 14px;
+    font-variant-numeric: tabular-nums;
+
+    svg {
+      display: block;
+      flex-shrink: 0;
+    }
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     text-decoration: none;
@@ -154,7 +202,9 @@ canvas {
   font-size: 13px;
   letter-spacing: 0.06em;
   pointer-events: none;
-  transition: opacity 0.6s ease;
+  transition:
+    opacity 0.6s ease,
+    background-color 0.6s ease;
 
   /* A solid pill, so the message reads on any backdrop. */
   span {
@@ -168,6 +218,42 @@ canvas {
 
   &.done {
     opacity: 0;
+  }
+
+  /* The pill turns into the hint (ready() in common.js): the backdrop clears, the text swaps as it resizes. */
+  &.hint {
+    background-color: transparent;
+
+    span {
+      display: inline-block;
+      overflow: hidden;
+      white-space: nowrap;
+      max-width: calc(100vw - 32px);
+      text-overflow: ellipsis;
+      text-align: center;
+      animation: none;
+      color: transparent;
+      transition:
+        width 0.35s ease,
+        color 0.25s ease;
+
+      img {
+        width: 16px;
+        height: 16px;
+        margin: 0 2px;
+        vertical-align: -3px;
+        opacity: 0;
+        transition: opacity 0.25s ease;
+      }
+    }
+  }
+
+  &.hint.shown span {
+    color: var(--loading-pill-color, rgb(240, 240, 240));
+
+    img {
+      opacity: 1;
+    }
   }
 }
 

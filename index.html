@@ -82,17 +82,37 @@
         color: #333;
         background: none;
       }
+      h2 {
+        font-size: 1.1em;
+        margin-bottom: 0.6em;
+      }
+      .explainers {
+        margin-bottom: 2em;
+        list-style-type: none;
+
+        li {
+          padding: 0.2em 0;
+        }
+        .number {
+          display: inline-block;
+          min-width: 2em;
+          color: #999;
+        }
+      }
     </style>
   </head>
 
   <body>
     <h1>Codevember 2026</h1>
     <ul class="gallery"></ul>
+    <h2>How they work</h2>
+    <ul class="explainers"></ul>
     <p>
       Jaume Sanchez Elias
       <a href="https://twitter.com/thespite">twitter</a>
       <a href="https://github.com/spite">github</a>
     </p>
+    <p><a href="https://github.com/spite/codevember-2026">Source code on GitHub</a></p>
     <script type="module">
       import { days } from "./modules/days.js";
 
@@ -114,6 +134,30 @@
         a.append(number, label);
         li.append(a);
         gallery.append(li);
+      }
+
+      // Explainers of published days, then the shared ones.
+      const explainers = [
+        [1, "How Fold Folds"],
+        [2, "How Shatter Bursts"],
+        [3, "How Melt Drips"],
+        [4, "How Tangle Ties"],
+        [6, "How the Orrery Turns"],
+      ]
+        .filter(([day]) => days[day - 1].title)
+        .map(([day, title]) => ({ number: day, title, href: `./${day}/explainer.html` }));
+      explainers.push({ number: "", title: "The Photographic Pipeline", href: "./modules/pipeline/explainer.html" });
+      const list = document.querySelector(".explainers");
+      for (const { number, title, href } of explainers) {
+        const li = document.createElement("li");
+        const n = document.createElement("span");
+        n.className = "number";
+        n.textContent = number;
+        const a = document.createElement("a");
+        a.href = href;
+        a.textContent = title;
+        li.append(n, a);
+        list.append(li);
       }
     </script>
   </body>

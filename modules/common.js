@@ -324,11 +324,52 @@ if (query.has("capture")) {
 const loading = document.querySelector("#loading");
 if (query.has("capture")) loading?.remove();
 
-// Fades the placeholder out; render() calls it after the first frame.
-function ready() {
-  if (!loading?.isConnected || loading.classList.contains("done")) return;
+// How to interact: showHint(desktop, touch) before the first frame; touch screens get the second text.
+// {name} in a text shows the button icon assets/name.svg, e.g. "tap {randomize} for a new one".
+let hintText = null;
+function showHint(desktop, touch = desktop) {
+  hintText = matchMedia("(pointer: coarse)").matches ? touch : desktop;
+}
+
+function hideLoading() {
+  if (!loading.isConnected || loading.classList.contains("done")) return;
   loading.classList.add("done");
   setTimeout(() => loading.remove(), 700);
+}
+
+// Fades the placeholder out; render() calls it after the first frame. With a hint, the backdrop fades
+// while the pill resizes to the hint, which stays a few seconds or until the first interaction.
+function ready() {
+  if (!loading?.isConnected || loading.classList.contains("done")) return;
+  const span = loading.querySelector("span");
+  if (!hintText || !span) return hideLoading();
+  const from = span.getBoundingClientRect().width;
+  span.style.width = `${from}px`;
+  loading.classList.add("hint");
+  const events = ["pointerdown", "wheel", "keydown", "touchstart"];
+  const dismiss = () => {
+    events.forEach((e) => removeEventListener(e, dismiss, true));
+    hideLoading();
+  };
+  events.forEach((e) => addEventListener(e, dismiss, { capture: true, passive: true }));
+  setTimeout(() => {
+    span.replaceChildren(
+      ...hintText.split(/\{(\w+)\}/).map((part, i) => {
+        if (i % 2 === 0) return part;
+        const img = document.createElement("img");
+        img.src = `../assets/${part}.svg`;
+        img.alt = part;
+        return img;
+      }),
+    );
+    span.style.width = "";
+    const to = span.getBoundingClientRect().width;
+    span.style.width = `${from}px`;
+    span.getBoundingClientRect();
+    span.style.width = `${to}px`;
+    setTimeout(() => loading.classList.add("shown"), 350);
+  }, 250);
+  setTimeout(dismiss, 6000);
 }
 
 // Buttons next to the GUI
@@ -371,12 +412,14 @@ function setDay(day = getDay()) {
   info.id = "info";
   const link = (href, text, label) =>
     `<a href="${href}"${label ? ` title="${label}" aria-label="${label}"` : ""}>${text}</a>`;
+  const arrow = (d) =>
+    `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const prev = days.find((d) => d.day === day - 1);
   const next = days.find((d) => d.day === day + 1);
   info.innerHTML = [
-    prev?.title ? link(`../${prev.day}/`, `&larr; ${prev.day}`, `Previous: ${prev.day}. ${prev.title}`) : "",
+    prev?.title ? link(`../${prev.day}/`, `${arrow("M13 8H3M7.5 3.5 3 8l4.5 4.5")}${prev.day}`, `Previous: ${prev.day}. ${prev.title}`) : "",
     link("../", `${event} ${year}`),
-    next?.title ? link(`../${next.day}/`, `${next.day} &rarr;`, `Next: ${next.day}. ${next.title}`) : "",
+    next?.title ? link(`../${next.day}/`, `${next.day}${arrow("M3 8h10M8.5 3.5 13 8l-4.5 4.5")}`, `Next: ${next.day}. ${next.title}`) : "",
   ].join("");
   document.body.append(info);
 
@@ -468,4 +511,5 @@ export {
   screenshot,
   setDay,
   ready,
+  showHint,
 };
