@@ -171,6 +171,9 @@ class Pipeline {
     this.motionSamples = motionOptions?.samples ?? (this.quality === "capture" ? 32 : 24);
     this.motionMaxBlur = motionOptions?.maxBlur ?? 0.03; // half-length cap, as a fraction of the height
     this.motionSoftZ = motionOptions?.softZ ?? 0.1;
+    // Opt-in: with the camera still, blur from the prepass velocity (last frame's motion) instead of rendering
+    // the scene again for the shutter's. Only for scenes whose motion is already measured per frame.
+    this.motionReusePrepass = motionOptions?.reusePrepass ?? false;
 
     // (hdrTexture, { depthTexture, camera, width, height }) => texture, run before bloom; see render().
     this.composite = options.composite ?? null;
@@ -180,8 +183,13 @@ class Pipeline {
     // frames from across the lens are averaged up to lensSamples for the exact result.
     const dofOptions = options.depthOfField;
     this.dof = dofOptions ? new DepthOfFieldPass(dofOptions) : null;
+    this.dofRequested = !!dofOptions;
     this.dofEnabled = !!dofOptions && (dofOptions.enabled ?? true);
     this.lensSamples = dofOptions?.lensSamples ?? 256;
+    // Opt-in: while the view holds still, average this many jittered frames, then stop rendering the scene.
+    // Without depth of field it borrows the lens average with no aperture, so it only antialiases.
+    this.stillSamples = options.stillSamples ?? 0;
+    if (this.stillSamples > 0 && !this.dof) this.dof = new DepthOfFieldPass({ aperture: 0 });
     this.lensCount = 0;
     this._stillKey = [];
 
@@ -386,6 +394,14 @@ class Pipeline {
     d.shutterMatrixWorld.compose(_p1, _q1, _s1);
   }
 
+  // True when the camera's view-projection matches the one stored last frame.
+  _cameraUnmoved(camera) {
+    _viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    const a = _viewProjection.elements, b = globalUniforms.prevViewProjection.value.elements;
+    for (let i = 0; i < 16; i++) if (Math.abs(a[i] - b[i]) > 1e-6 * (1 + Math.abs(b[i]))) return false;
+    return true;
+  }
+
   _renderMotion(scene, camera) {
     const u = globalUniforms;
     _viewProjection.copy(u.prevViewProjection.value);
@@ -468,14 +484,25 @@ class Pipeline {
 
   // Restarts the lens average, for changes the pipeline cannot see (uniforms, materials).
   restartAccumulation() {
+    // A settled still that starts over fades from what is on screen instead of jumping to one raw frame.
+    if (this.stillSamples > 0 && this._settleShown) {
+      this._settleFrom ??= colorTarget(HalfFloatType);
+      if (this._settleFrom.width !== this.width || this._settleFrom.height !== this.height) this._settleFrom.setSize(this.width, this.height);
+      const prev = this.renderer.getRenderTarget();
+      this.copyMaterial.uniforms.tInput.value = this._settleShown;
+      this.copyMaterial.uniforms.weight.value = 1;
+      this._pass(this.copyMaterial, this._settleFrom);
+      this.renderer.setRenderTarget(prev);
+      this._settleFade = true;
+    }
     this.lensCount = 0;
   }
 
   // One more frame from across the lens, folded into the mean; the gathered frame stands in until
   // there are enough of them.
-  _renderLens(scene, camera) {
+  _renderLens(scene, camera, limit = this.lensSamples, gather = true) {
     const dof = this.dof;
-    if (this.lensCount >= this.lensSamples) return dof.lensResult;
+    if (this.lensCount >= limit) return gather ? dof.lensResult : (this._settleShown = dof.lensResult);
     const n = ++this.lensCount;
     dof.lensSample(n, camera, _lens);
     _p0.copy(camera.position);
@@ -503,6 +530,11 @@ class Pipeline {
       this._updateCameraUniforms(camera);
     }
     const mean = dof.accumulate(this.renderer, hdr, n);
+    if (!gather) {
+      const t = this._settleFade ? Math.min(1, n / 24) : 1;
+      if (t >= 1) this._settleFade = false;
+      return (this._settleShown = t < 1 ? dof.blend(this.renderer, this._settleFrom.texture, mean, t * t * (3 - 2 * t)) : mean);
+    }
     const fade = Math.min(1, Math.max(0, (n - 8) / 24));
     if (fade >= 1) return mean;
     return dof.blend(this.renderer, dof.gather(this.renderer, hdr, this.depthTexture, camera), mean, fade);
@@ -691,10 +723,13 @@ class Pipeline {
       let hdr;
       const samples = Math.max(1, Math.round(this.samples));
       const dof = this.dof && this.dofEnabled && this.dof.active && camera.isPerspectiveCamera && debug === "none" ? this.dof : null;
-      const still = dof ? this._isStill(camera, time) : false;
+      const settle = !dof && this.stillSamples > 0 && this.dof && camera.isPerspectiveCamera && debug === "none" && samples === 1;
+      const still = dof || settle ? this._isStill(camera, time) : false;
       if (!still) this.lensCount = 0;
-      if (dof && still && this.lensSamples > 0) {
-        hdr = this._renderLens(scene, camera);
+      if (!still) (this._settleShown = null), (this._settleFade = false);
+      const lensPath = still && ((dof && this.lensSamples > 0) || settle);
+      if (lensPath) {
+        hdr = this._renderLens(scene, camera, settle ? this.stillSamples : this.lensSamples, !settle);
       } else if (samples > 1) {
         _projection.copy(camera.projectionMatrix);
         const accum = this.accumMaterial.uniforms;
@@ -721,9 +756,11 @@ class Pipeline {
         this._renderFrame(scene, camera);
         hdr = this.mainTarget.texture;
       }
-      if (!(dof && still && this.lensSamples > 0)) {
+      if (!lensPath) {
         const motionOn = this.motionBlur && this.motionBlurAvailable && debug === "none";
-        if (motionOn) this._renderMotion(scene, camera);
+        const reuse = motionOn && this.motionReusePrepass && samples === 1 && this._cameraUnmoved(camera);
+        if (motionOn) this.tileMaxMaterial.uniforms.tVelocity.value = reuse ? this.prepassTarget.texture : this.motionTarget.texture;
+        if (motionOn && !reuse) this._renderMotion(scene, camera);
         this._storePrevious(camera);
         if (motionOn) hdr = this._renderMotionBlur(hdr);
         // Opt-in hook for a day's own full-screen pass over the lit HDR image (e.g. ray-traced glass).
@@ -863,7 +900,7 @@ class Pipeline {
       add("Shutter", () => this.shutter, (v) => (this.shutter = v), 0, 0.2, 0.001);
       add("Blur samples", () => this.motionSamples, (v) => (this.motionSamples = v), 2, 64, 1);
     }
-    if (this.dof) {
+    if (this.dof && this.dofRequested) {
       gui.addCheckbox("Depth of field", this.dofEnabled, opts((v) => (this.dofEnabled = v)));
       add("Lens samples", () => this.lensSamples, (v) => (this.lensSamples = v), 0, 1024, 1);
     }
@@ -894,6 +931,7 @@ class Pipeline {
     this.shadow.dispose();
     this.shadowMask?.dispose();
     this.dof?.dispose();
+    this._settleFrom?.dispose();
     this.gi.dispose();
   }
 }

@@ -1,12 +1,12 @@
 import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, randomize, keysHelp, setDay, addKey, getSeed, applyUrlState, addActionButton, onPause } from "common";
-import { GUI } from "guspira";
+import { GUI, signal, effect } from "guspira";
 import { Scene, Mesh, Group, InstancedMesh, InstancedBufferAttribute, BufferGeometry, BufferAttribute, SphereGeometry, Matrix4, Vector2, Vector3, Color, Raycaster, Sphere, DynamicDrawUsage } from "three";
 import { RoundedBoxGeometry } from "third_party/three-rounded-box.js";
 import { Pipeline } from "modules/pipeline/Pipeline.js";
 import { createStudioEnvironmentAsync } from "modules/pipeline/studio.js";
 import { globalUniforms } from "modules/pipeline/uniforms.js";
 import { seededRandom, nativeRandom } from "modules/random.js";
-import { R, RF, RT, RC, DIAL_GAP, SCALE, setMechanismScale, PRESETS, buildLayout, randomNormals, rotateNormals, plateField, turntableFields, dialField, buildPiece, buildPieceSteps, buildCap, buildGear, dot, cross, normalize, angle, perpendicular } from "./layout.js";
+import { R, RF, RT, RC, DIAL_GAP, SCALE, setMechanismScale, PRESETS, buildLayout, randomNormals, randomNormalsSteps, rotateNormals, plateField, turntableFields, dialField, buildPiece, buildPieceSteps, buildCap, buildGear, dot, cross, normalize, angle, perpendicular } from "./layout.js";
 import { Machine } from "./machine.js";
 import { FINISHES, BEADS, MAX_PLATES, MAX_CIRCLES, MAX_HOLES, createShared, writePlateData, createPlateMaterial, createDialMaterial, createTurntableMaterial, createCoreMaterial, createCarriageMaterial, createBeadMaterial } from "./materials.js";
 import { createBackdrop } from "./backdrop.js";
@@ -33,17 +33,19 @@ const CORE_COLOR = "#050505";
 const CARRIAGE = { length: 0.105, height: 0.07, width: 0.056, base: RF + 0.004 };
 const BEAD_RADIUS = 0.037;
 const BEAD_HEIGHT = R + 0.004;
-const lite = /Mobi|Android|iPhone|iPad/.test(navigator.userAgent) || matchMedia("(pointer: coarse)").matches;
+const mobile = /Mobi|Android|iPhone|iPad/.test(navigator.userAgent) || matchMedia("(pointer: coarse)").matches;
+// Phones that report little memory or few cores start on the low tier; ?quality= (the Quality setting) overrides.
+const lowEnd = mobile && ((navigator.deviceMemory ?? 8) <= 4 || (navigator.hardwareConcurrency ?? 8) <= 4);
 const touch = matchMedia("(pointer: coarse)").matches;
 
 const defaults = {
-  layout: "random",
+  layout: "dodecahedral rings",
   circles: 6,
   density: 0.45,
   colours: 3,
-  finish: "brass",
-  beads: "enamel",
-  motifs: "sidereal",
+  finish: "black enamel",
+  beads: "jewel",
+  motifs: "arcane",
   variety: 0.7,
   engrave: 1,
   speed: 1,
@@ -56,13 +58,28 @@ const params = fromDefaults(defaults);
 const capture = new URLSearchParams(location.search).has("capture");
 
 const pipeline = new Pipeline(renderer, {
+  quality: lowEnd ? "low" : "auto",
   background: BACKDROP,
   exposure: 1.1,
   bloomStrength: 0.04,
   vignette: 0.3,
   grain: 0.025,
   shadow: { autoFit: true, denoise: true },
+  // Mostly seen while parts fly off and back; it also softens their dithered dissolve.
+  motionBlur: { shutter: 1 / 60, maxBlur: 0.03, samples: 24, reusePrepass: true },
+  // Once nothing moves, jittered frames are averaged into a supersampled still, then rendering stops.
+  stillSamples: 64,
 });
+// Medium (phones) and low (weaker phones) budgets, heaviest costs first: fewer pixels, cheaper GI, no MSAA (the
+// pipeline's low tier), no motion blur or bloom, no guilloche, lighter geometry and a shorter settle.
+const lite = pipeline.quality === "medium" || pipeline.quality === "low";
+const low = pipeline.quality === "low";
+if (lite) pipeline.motionBlur = false;
+pipeline.stillSamples = low ? 8 : lite ? 16 : 64;
+if (low) {
+  pipeline.bloom = false;
+  pipeline.gi.steps = 4;
+}
 globalUniforms.aoIntensity.value = 1;
 globalUniforms.aoMin.value = 0.04;
 globalUniforms.giIntensity.value = 1.2;
@@ -84,10 +101,13 @@ const studio = createStudioEnvironmentAsync(renderer, {
 });
 
 const gui = new GUI(setDay(), document.querySelector("#gui-container"));
-gui.addSelect("Layout", params.layout, ["random", "symmetric", ...Object.keys(PRESETS)]);
-gui.addSlider("Circles", params.circles, 4, 6, 1);
-gui.addSlider("Tokens", params.density, 0.2, 0.6, 0.01);
-gui.addSlider("Colours", params.colours, 2, 4, 1);
+// Randomising picks a symmetric layout or a preset, never the free random one.
+const shaped = ["symmetric", ...Object.keys(PRESETS)];
+gui.addSelect("Layout", params.layout, [...shaped, "random"]).randomize = () => params.layout.set(shaped[Math.floor(Math.random() * shaped.length)]);
+// The number of great circles only shapes the random layout.
+gui.addSlider("Circles", params.circles, 4, 6, 1, { visibleWhen: () => params.layout() === "random" });
+gui.addSlider("Bead count", params.density, 0.2, 0.6, 0.01);
+gui.addSlider("Bead colours", params.colours, 2, 4, 1);
 gui.addSelect("Finish", params.finish, Object.keys(FINISHES));
 gui.addSelect("Beads", params.beads, Object.keys(BEADS));
 gui.addSelect("Motifs", params.motifs, MOTIF_SETS);
@@ -100,10 +120,20 @@ gui.addSlider("Pop-outs", params.pops, 0, 1, 0.01, { randomizable: false });
 // Renders at up to twice the resolution and averages down: the sharpest engraving, at up to four times the cost.
 gui.addSlider("Supersample", params.supersample, 1, 2, 0.5, { randomizable: false });
 gui.addSlider("Auto change", params.auto, 0, 120, 1, { randomizable: false });
-gui.addButton("Scramble", () => machine?.scramble());
+// The pipeline's tier is fixed when it is built, so a new one reloads the page (seed and settings stay in the url).
+const qualityChoice = signal(new URLSearchParams(location.search).get("quality") ?? "auto");
+gui.addSelect("Quality", qualityChoice, ["auto", "high", "medium", "low"], { randomizable: false });
+const startQuality = qualityChoice.peek();
+effect(() => {
+  const q = qualityChoice();
+  if (q === startQuality) return;
+  const url = new URL(location.href);
+  if (q === "auto") url.searchParams.delete("quality");
+  else url.searchParams.set("quality", q);
+  location.replace(url);
+});
 pipeline.addGUI(gui);
 gui.addSeparator();
-addKey("KeyS", "scramble", () => machine?.scramble());
 const sound = createMachineSound();
 const soundButton = addActionButton("../assets/sound.svg", "Sound", () => toggleSound());
 function toggleSound() {
@@ -128,6 +158,7 @@ backdrop.mesh.renderOrder = 1;
 scene.add(backdrop.mesh);
 
 const shared = createShared();
+shared.lowDetail.value = low ? 1 : 0;
 const motifAtlas = createMotifAtlas(renderer);
 shared.motifAtlas.value = motifAtlas.texture;
 const plateMaterial = createPlateMaterial(shared);
@@ -145,22 +176,39 @@ rig.add(machineGroup);
 
 coreMaterial.color.set(CORE_COLOR);
 coreMaterial.metalness = 0;
-const core = new Mesh(new SphereGeometry(RF, lite ? 160 : 256, lite ? 80 : 128), coreMaterial);
+const core = new Mesh(new SphereGeometry(RF, low ? 64 : lite ? 96 : 128, low ? 32 : lite ? 48 : 64), coreMaterial);
+// After the parts that cover most of it, so depth testing rejects the hidden part of the core in every pass.
+core.renderOrder = 0.5;
 machineGroup.add(core);
 
-const plates = new Mesh(new BufferGeometry(), plateMaterial);
-const dials = new Mesh(new BufferGeometry(), dialMaterial);
+// Placeholders with the attributes the real geometry has, so the programs compiled at startup match it.
+function placeholder() {
+  const g = new BufferGeometry();
+  g.setAttribute("position", new BufferAttribute(new Float32Array(9), 3));
+  g.setAttribute("normal", new BufferAttribute(new Float32Array(9), 3));
+  return g;
+}
+const plates = new Mesh(placeholder(), plateMaterial);
+const dials = new Mesh(placeholder(), dialMaterial);
 plates.frustumCulled = dials.frustumCulled = false;
 machineGroup.add(plates, dials);
 
 function mergePieces(parts) {
+  const steps = mergePiecesSteps(parts);
+  for (;;) {
+    const r = steps.next();
+    if (r.done) return r.value;
+  }
+}
+// Yields every few parts, so a rebuild can merge over several frames.
+function* mergePiecesSteps(parts) {
   let vertices = 0, indices = 0;
   for (const { piece } of parts) (vertices += piece.vertexCount), (indices += piece.index.length);
   const position = new Float32Array(vertices * 3), normal = new Float32Array(vertices * 3);
   const edge = new Float32Array(vertices), plate = new Float32Array(vertices);
   const spin = new Float32Array(vertices), rider = new Float32Array(vertices);
   const index = new Uint32Array(indices);
-  let v = 0, i = 0;
+  let v = 0, i = 0, lastYield = 0;
   for (const part of parts) {
     const { piece, id, edgeOverride } = part;
     position.set(piece.position, v * 3);
@@ -173,6 +221,7 @@ function mergePieces(parts) {
     for (let k = 0; k < piece.index.length; k++) index[i + k] = piece.index[k] + v;
     v += piece.vertexCount;
     i += piece.index.length;
+    if (i - lastYield > 60000) (lastYield = i), yield;
   }
   const geometry = new BufferGeometry();
   geometry.setAttribute("position", new BufferAttribute(position, 3));
@@ -211,14 +260,14 @@ function* buildGeometry(layout) {
   const plateParts = [], dialParts = [];
   for (let i = 0; i < layout.faces.length; i++) {
     const face = layout.faces[i];
-    // Smaller plates need fewer samples round their rim.
-    const samples = Math.round(Math.min(Math.max(face.reach * 560, 96), 200) * (lite ? 0.72 : 1));
-    const piece = yield* buildPieceSteps({ seed: face.center, field: plateField(face), reach: face.reach, samples });
+    // Smaller plates need fewer samples round their rim; the turn weight keeps them dense at the rounded corners.
+    const samples = Math.round(Math.min(Math.max(face.reach * 420, 72), 150) * (low ? 0.55 : lite ? 0.72 : 1));
+    const piece = yield* buildPieceSteps({ seed: face.center, field: plateField(face), reach: face.reach, samples, turnWeight: 0.06, undersideStrips: 2 });
     plateParts.push({ id: i, piece });
     const c = face.center;
     const hole = plateHole(face);
     if (face.dial) {
-      const dial = yield* buildPieceSteps({ seed: c, field: dialField(c, face.dial), reach: face.dial + 0.03, samples: Math.round(Math.min(Math.max(face.dial * 800, 64), 112) * (lite ? 0.7 : 1)), topRings: 5, bottom: RF - 0.01 });
+      const dial = yield* buildPieceSteps({ seed: c, field: dialField(c, face.dial), reach: face.dial + 0.03, samples: Math.round(Math.min(Math.max(face.dial * 800, 64), 112) * (low ? 0.55 : lite ? 0.7 : 1)), topRings: 5, bottom: RF - 0.01 });
       const r = RF * Math.sin(face.dial);
       dialParts.push(
         { id: i, piece: dial },
@@ -245,12 +294,14 @@ function* buildGeometry(layout) {
       }
     }
   }
-  return { plates: mergePieces(plateParts), dials: mergePieces(dialParts) };
+  const platesGeometry = yield* mergePiecesSteps(plateParts);
+  yield;
+  return { plates: platesGeometry, dials: yield* mergePiecesSteps(dialParts) };
 }
 
 function turntableGeometry() {
-  const parts = turntableFields().map((f) => ({ piece: buildPiece({ seed: f.seed, field: f.field, reach: f.reach, samples: lite ? 72 : 96, topRings: 3, bottom: RF + 0.006 }) }));
-  parts.push({ piece: buildCap({ radius: RT, r: RF + 0.006, skirt: RF - 0.012 }), edgeOverride: -1 });
+  const parts = turntableFields().map((f) => ({ piece: buildPiece({ seed: f.seed, field: f.field, reach: f.reach, samples: low ? 40 : lite ? 48 : 64, turnWeight: 0.03, topRings: 3, bottom: RF + 0.006 }) }));
+  parts.push({ piece: buildCap({ radius: RT, r: RF + 0.006, skirt: RF - 0.012, rings: 4, samples: 64 }), edgeOverride: -1 });
   // Hidden in the core until the turntable pops out: a crown wheel under the disc on a shaft.
   // The crown sits inside the cap's skirt, which narrows towards its foot.
   parts.push({ piece: buildGear({ radius: (RF - 0.012) * Math.sin(RT) - 0.003, teeth: 32, depth: 0.007, y0: RF - 0.034, y1: RF - 0.01 }), edgeOverride: -2 });
@@ -321,7 +372,8 @@ for (const m of [turntables, counterGears, wells, suns, planets, carriages, bead
   m.frustumCulled = false;
   machineGroup.add(m);
 }
-for (let i = 0; i < MAX_TOKENS; i++) beads.setColorAt(i, new Color(1, 1, 1));
+// Carriages get a white instance colour too, so they share the beads' shader programs.
+for (let i = 0; i < MAX_TOKENS; i++) beads.setColorAt(i, new Color(1, 1, 1)), carriages.setColorAt(i, new Color(1, 1, 1));
 
 let layout = null;
 let machine = null;
@@ -337,17 +389,35 @@ function machineKey() {
 }
 
 function makeLayout(key) {
+  const steps = makeLayoutSteps(key);
+  for (;;) {
+    const r = steps.next();
+    if (r.done) return r.value;
+  }
+}
+// The random search can take a while, so a rebuild runs it in steps; the settings are read up front.
+function makeLayoutSteps(key) {
   const random = seededRandom(key);
   // A preset is a list of circles, or { circles, scale } for the dense ones that need a smaller mechanism.
   let preset = params.layout() === "random" ? null : PRESETS[params.layout()];
   // "symmetric" draws one of the verified symmetric layouts from the seed.
   if (params.layout() === "symmetric") preset = SYMMETRIC[Math.floor(random() * SYMMETRIC.length)];
   setMechanismScale(preset?.scale ?? 1);
-  let normals;
-  if (!preset) normals = randomNormals(params.circles(), random);
-  else normals = rotateNormals(preset.circles ?? preset, random);
-  normals ??= rotateNormals(PRESETS.icosidodecahedral, random);
-  return buildLayout(normals, { strict: false });
+  const circles = params.circles();
+  return (function* () {
+    let normals;
+    if (!preset) normals = yield* randomNormalsSteps(circles, random);
+    else normals = rotateNormals(preset.circles ?? preset, random);
+    normals ??= rotateNormals(PRESETS.icosidodecahedral, random);
+    yield;
+    return buildLayout(normals, { strict: false });
+  })();
+}
+// Finds the layout, then builds its geometry; the layout is kept on rebuild.next for install().
+function* layoutAndGeometry(key) {
+  const next = yield* makeLayoutSteps(key);
+  rebuild.next = next;
+  return yield* buildGeometry(next);
 }
 
 function startMachine() {
@@ -358,19 +428,23 @@ function startMachine() {
   carriages.count = beads.count = Math.min(machine.tokens.length, MAX_TOKENS);
 }
 
-function setCoreCircles(next, previous, mix, previousMix = 1 - mix) {
+// previousScale is the old layout's mechanism scale over the new one: its rails keep their own width while they thin.
+function setCoreCircles(next, previous, mix, previousMix = 1 - mix, previousScale = 1) {
   const N = shared.coreN.value, U = shared.coreU.value;
   for (let k = 0; k < MAX_CIRCLES * 2; k++) N[k].w = 0;
-  const put = (L, offset, weight) => {
+  // Circles go one after another: each one's share of the transition starts a little later than the last's.
+  const put = (L, offset, weight, widthScale = 1) => {
     if (!L || weight <= 0) return;
+    const n = Math.min(L.circles.length, MAX_CIRCLES), stagger = 0.6;
     L.circles.forEach((C, k) => {
       if (k >= MAX_CIRCLES) return;
-      N[offset + k].set(...C.n, weight);
+      const w = weight >= 1 ? 1 : smooth(weight * (1 + stagger) - (stagger * k) / Math.max(n - 1, 1));
+      N[offset + k].set(...C.n, w * widthScale);
       U[offset + k].set(...C.u, C.h);
     });
   };
   put(next, 0, mix);
-  put(previous, MAX_CIRCLES, previousMix);
+  put(previous, MAX_CIRCLES, previousMix, previousScale);
 }
 
 function install(next, geometry) {
@@ -382,7 +456,7 @@ function install(next, geometry) {
   setMechanism();
   writePlateData(shared.plateData.value, layout);
   shared.motifSeed.value = seededRandom(`${builtKey}|motifs`)();
-  motifAtlas.draw(shared.motifSeed.value);
+  if (atlasReady) motifAtlas.draw(shared.motifSeed.value);
   startMachine();
   turntables.count = counterGears.count = layout.nodes.length;
   shared.plateState.value.image.data.fill(0);
@@ -393,19 +467,12 @@ function install(next, geometry) {
 // then the new layout rises out of it. The new layout is built while the old one sinks.
 const rebuild = { state: "idle", t: 0, origin: [0, 1, 0], salt: 0, next: null, builder: null, result: null, previous: null };
 // A change that comes while the new layout is already in place waits for it to finish rising.
-// With `restyle`, the same layout goes down and comes back up, so a new look can be swapped in while it's hidden.
-function startRebuild(animate, restyle = false) {
+function startRebuild(animate) {
   if (animate && (rebuild.state === "swap" || rebuild.state === "rise")) return;
   const key = layoutKey();
-  if (restyle && key === builtKey && layout && rebuild.state === "idle") {
-    const wave = seededRandom(`${key}|wave|${lookKey()}`);
-    const result = { plates: plates.geometry, dials: dials.geometry };
-    Object.assign(rebuild, { state: "sink", t: 0, salt: wave(), origin: normalize([wave() - 0.5, wave() - 0.5, wave() - 0.5]), next: layout, builder: null, result, previous: layout });
-    return rebuildSound("sink");
-  }
   builtKey = key;
-  const next = makeLayout(key);
   if (!animate || !layout) {
+    const next = makeLayout(key);
     const gen = buildGeometry(next);
     let r;
     while (!(r = gen.next()).done);
@@ -415,9 +482,9 @@ function startRebuild(animate, restyle = false) {
     return;
   }
   // Mid-sink, only the layout being built changes.
-  if (rebuild.state === "sink") return Object.assign(rebuild, { next, builder: buildGeometry(next), result: null });
+  if (rebuild.state === "sink") return Object.assign(rebuild, { next: null, builder: layoutAndGeometry(key), result: null });
   const wave = seededRandom(`${key}|wave`);
-  Object.assign(rebuild, { state: "sink", t: 0, salt: wave(), origin: normalize([wave() - 0.5, wave() - 0.5, wave() - 0.5]), next, builder: buildGeometry(next), result: null, previous: layout });
+  Object.assign(rebuild, { state: "sink", t: 0, salt: wave(), origin: normalize([wave() - 0.5, wave() - 0.5, wave() - 0.5]), next: null, builder: layoutAndGeometry(key), result: null, previous: layout, previousScale: shared.mechScale.value });
   rebuildSound("sink");
 }
 
@@ -473,7 +540,7 @@ const smooth = (x) => {
   x = clamp01(x);
   return x * x * x * (x * (x * 6 - 15) + 10);
 };
-const SINK_TIME = 2.55, RAIL_FADE = 0.55, RISE_TIME = 3.05;
+const SINK_TIME = 2.55, RAIL_FADE = 0.8, RISE_TIME = 3.05;
 const LAUNCH = 0.9, ARRIVE = 1.05;
 // Part ids for the per-part timing: plates are their face index, then turntables, then beads.
 const NODE_ID = 1000, TOKEN_ID = 2000;
@@ -534,7 +601,7 @@ function stepRebuild(dt) {
       Object.assign(rebuild, { state: "swap", t: 0 });
     }
   } else if (rebuild.state === "swap") {
-    setCoreCircles(layout, rebuild.previous, smooth((rebuild.t - RAIL_FADE) / RAIL_FADE), 1 - smooth(rebuild.t / RAIL_FADE));
+    setCoreCircles(layout, rebuild.previous, clamp01((rebuild.t - RAIL_FADE) / RAIL_FADE), 1 - clamp01(rebuild.t / RAIL_FADE), rebuild.previousScale / SCALE);
     if (rebuild.t > RAIL_FADE * 2) {
       setCoreCircles(layout, null, 1);
       Object.assign(rebuild, { state: "rise", t: 0, salt: (rebuild.salt * 7.13 + 0.37) % 1, origin: normalize(cross(rebuild.origin, [0.3, 1, 0.2])) });
@@ -555,8 +622,25 @@ function gearMatrix(e1, e2, c, s, b, u, v) {
   _m.set(X[0] * s, c[0], Z[0] * s, t[0], X[1] * s, c[1], Z[1] * s, t[1], X[2] * s, c[2], Z[2] * s, t[2], 0, 0, 0, 1);
 }
 const _basis = new Matrix4();
+// Uploads an instanced mesh's matrices only when they changed: the pipeline reads an upload as motion,
+// and a still scene is what lets it settle into a supersampled frame.
+function uploadIfChanged(mesh) {
+  const a = mesh.instanceMatrix.array, n = mesh.count * 16;
+  const last = (mesh.userData.lastMatrices ??= new Float32Array(a.length).fill(NaN));
+  for (let i = 0; i < n; i++) {
+    if (a[i] !== last[i]) {
+      last.set(a);
+      mesh.instanceMatrix.needsUpdate = true;
+      return;
+    }
+  }
+}
+// Fades only change during a transformation, so they upload then and once after it.
+let fadedLastFrame = false;
 function updateInstances() {
   const swap = rebuild.state === "swap";
+  const fading = rebuild.state !== "idle" || fadedLastFrame;
+  fadedLastFrame = rebuild.state !== "idle";
   const ttFade = fadeOf(turntables), cgFade = fadeOf(counterGears), carFade = fadeOf(carriages), beadFade = fadeOf(beads);
   // Anything popped out when a rebuild starts comes back in before it flies off.
   const held = rebuild.state === "sink" ? 1 - smooth(rebuild.t / 0.5) : swap ? 0 : 1;
@@ -581,8 +665,9 @@ function updateInstances() {
     _m.set(G[0], y[0], GZ[0], -y[0] * depth, G[1], y[1], GZ[1], -y[1] * depth, G[2], y[2], GZ[2], -y[2] * depth, 0, 0, 0, 1);
     counterGears.setMatrixAt(n, _m);
   });
-  turntables.instanceMatrix.needsUpdate = counterGears.instanceMatrix.needsUpdate = true;
-  ttFade.needsUpdate = cgFade.needsUpdate = true;
+  uploadIfChanged(turntables);
+  uploadIfChanged(counterGears);
+  ttFade.needsUpdate = cgFade.needsUpdate = fading;
   machine.tokens.forEach((t, i) => {
     if (i >= MAX_TOKENS) return;
     const { p, x, lift: rawLift } = machine.tokenPose(t);
@@ -595,8 +680,9 @@ function updateInstances() {
     carriages.setMatrixAt(i, _basis);
     beads.setMatrixAt(i, _basis);
   });
-  carriages.instanceMatrix.needsUpdate = beads.instanceMatrix.needsUpdate = true;
-  carFade.needsUpdate = beadFade.needsUpdate = true;
+  uploadIfChanged(carriages);
+  uploadIfChanged(beads);
+  carFade.needsUpdate = beadFade.needsUpdate = fading;
 
   // Row 1 keeps last frame's state for the motion vectors.
   const state = shared.plateState.value.image.data;
@@ -624,7 +710,8 @@ function updateInstances() {
     const [c, r] = openings[k];
     holes[k].set(c[0], c[1], c[2], r);
     const e1 = perpendicular(c), e2 = cross(c, e1), s = RF * Math.sin(r);
-    _m.set(e1[0] * s, c[0], e2[0] * s, 0, e1[1] * s, c[1], e2[1] * s, 0, e1[2] * s, c[2], e2[2] * s, 0, 0, 0, 0, 1);
+    // e1, c, -e2 is right-handed: a mirrored instance would cull the well's walls from the inside.
+    _m.set(e1[0] * s, c[0], -e2[0] * s, 0, e1[1] * s, c[1], -e2[1] * s, 0, e1[2] * s, c[2], -e2[2] * s, 0, 0, 0, 0, 1);
     wells.setMatrixAt(k, _m);
     const sun = machine.time * 0.9;
     gearMatrix(e1, e2, c, s, sun, 0, 0);
@@ -639,7 +726,18 @@ function updateInstances() {
   }
   wells.count = suns.count = count;
   planets.count = count * 3;
-  wells.instanceMatrix.needsUpdate = suns.instanceMatrix.needsUpdate = planets.instanceMatrix.needsUpdate = true;
+  // Hidden while there are none: an empty instanced draw still costs a program and uniform setup per pass.
+  for (const m of [wells, suns, planets]) {
+    const show = m.count > 0;
+    if (show && !m.visible) {
+      // Their motion history is stale from the last time they were out (the machine has spun since).
+      m.userData.prevMatrixWorld?.copy(m.matrixWorld);
+      const prev = m.geometry.getAttribute("prevInstanceMatrix");
+      if (prev) (prev.array.set(m.instanceMatrix.array), (prev.needsUpdate = true));
+    }
+    m.visible = show;
+    if (show) uploadIfChanged(m);
+  }
 }
 
 // Finishes and bead colours ease towards the chosen set in wall time.
@@ -651,18 +749,26 @@ const look = {
 const _c = new Color();
 // The old parts sink in their own finish; the new ones come up in the new one.
 let shownFinish = null, shownBeads = null, shownLook = null;
+let lookApplied = null, lookMachine = null;
 function lookKey() {
   return [params.finish(), params.beads(), params.motifs(), params.variety()].join("|");
 }
-// The look only changes while every piece is down in the core.
 function updateLook(k) {
-  if (!shownLook || rebuild.state === "swap") {
+  // A new look shows straight away, unless a new shape is on its way: then it comes with the new parts.
+  const settled = rebuild.state === "idle" && layoutKey() === builtKey;
+  if (!shownLook || rebuild.state === "swap" || (settled && lookKey() !== shownLook)) {
     shownLook = lookKey();
     shownFinish = params.finish();
     shownBeads = params.beads();
     shared.motifSet.value = MOTIF_SETS.indexOf(params.motifs());
     shared.motifVariety.value = params.variety();
   }
+  // Nothing to do unless the look, the engraving depth or the machine (its bead colours) changed.
+  const applied = `${shownLook}|${params.engrave()}|${k}`;
+  if (k === 1 && applied === lookApplied && machine === lookMachine) return;
+  lookApplied = applied;
+  lookMachine = machine;
+  pipeline.restartAccumulation();
   const f = FINISHES[shownFinish];
   const b = BEADS[shownBeads];
   look.plate.lerp(_c.set(f.plate), k);
@@ -794,9 +900,29 @@ controls.minDistance = 1.8;
 controls.maxDistance = 8;
 
 let viewport = null;
+// Supersampling raises the drawing buffer's pixel ratio, so the pipeline and the canvas agree on its size.
+// Phones never supersample and stay under about 2.6 megapixels.
+function sizeRatio() {
+  const [w, h, dpr] = viewport;
+  return lite ? Math.min(dpr, Math.sqrt((low ? 1e6 : 2.6e6) / (w * h))) : dpr * params.supersample();
+}
+let stillView = false, lastView = [], movedAt = 0, interacting = false;
+// Not while a drag or zoom is under way: a pause of the cursor mid-drag shouldn't switch resolution.
+controls.addEventListener("start", () => (interacting = true));
+controls.addEventListener("end", () => ((interacting = false), (movedAt = performance.now())));
+function applySize() {
+  if (!viewport) return;
+  const [w, h] = viewport;
+  const ratio = sizeRatio();
+  if (renderer.getPixelRatio() !== ratio) {
+    renderer.setPixelRatio(ratio);
+    renderer.setSize(w, h);
+  }
+  pipeline.setSize(w, h, ratio);
+}
 onResize((w, h, dpr) => {
   viewport = [w, h, dpr];
-  pipeline.setSize(w, h, dpr * params.supersample());
+  applySize();
 });
 
 let sinceChange = 0;
@@ -808,6 +934,9 @@ onRandomize(() => {
   gui.randomizeAll();
 });
 
+// Programs don't depend on the plates' vertex data, so they compile in parallel with the first build.
+let atlasReady = false;
+const compiled = Promise.all([pipeline.compileAsync(scene, camera), motifAtlas.compile()]);
 applyUrlState();
 // Unknown names from the url fall back to the defaults.
 if (!(params.finish() in FINISHES)) params.finish.set(defaults.finish);
@@ -818,11 +947,14 @@ startRebuild(false);
 updateLook(1);
 updateInstances();
 await studio;
-await Promise.all([pipeline.compileAsync(scene, camera), motifAtlas.compile()]);
+await compiled;
+atlasReady = true;
+motifAtlas.draw(shared.motifSeed.value);
 
 window.app = { canvas: renderer.domElement, params, pipeline, camera, controls, randomize, sound, get machine() { return machine; }, get layout() { return layout; }, get rebuild() { return rebuild.state; }, poke };
 
 let last = performance.now();
+let stillTime = 0;
 render(({ time, dt, frame }) => {
   const now = performance.now();
   const wall = Math.min((now - last) / 1000, 0.1);
@@ -832,16 +964,28 @@ render(({ time, dt, frame }) => {
   controls.maxPolarAngle = Math.min(Math.PI * 0.62, Math.acos(Math.max(-1, Math.min(1, (FLOOR_Y + 0.3 - controls.target.y) / distance))));
   controls.update();
   backdrop.keepInsideCyc(camera, controls.target);
-  if (viewport) pipeline.setSize(viewport[0], viewport[1], viewport[2] * params.supersample());
+  const view = [...camera.position.toArray(), ...camera.quaternion.toArray(), camera.fov];
+  const moving = (dt > 0 && (params.speed() > 0 || params.spin() > 0)) || rebuild.state !== "idle" || view.some((v, i) => v !== lastView[i]);
+  lastView = view;
+  if (moving || interacting) movedAt = now;
+  // Settles only after the view has held still for a moment, so orbiting never flips back and forth.
+  stillView = now - movedAt > 400;
+  // A settled still draws the engraving as if its pixels were a quarter of the size, and the pipeline's average
+  // of jittered frames filters that detail: supersampling spread over frames, at the same resolution.
+  const detail = stillView && !capture ? 0.25 : 1;
+  if (shared.detailScale.value !== detail) (shared.detailScale.value = detail), pipeline.restartAccumulation();
+  if (viewport && renderer.getPixelRatio() !== sizeRatio()) applySize();
 
-  // A change waits for anything popped out to finish its turn and come home; no new pop-outs start meanwhile.
-  const restyle = rebuild.state === "idle" && ((shownLook && lookKey() !== shownLook) || machineKey() !== machineBuiltKey);
-  const wanted = layoutKey() !== builtKey || restyle;
+  // Only a new shape (seed, layout, circles) comes apart and rebuilds. New tokens or colours restart the machine
+  // in place, and the finish and engraving change in place (see updateLook).
+  // Either waits for anything popped out to finish its turn and come home; no new pop-outs start meanwhile.
+  const reshape = layoutKey() !== builtKey;
+  const restart = rebuild.state === "idle" && !reshape && machineKey() !== machineBuiltKey;
   // Paused (or at Speed 0) nothing would finish, so the change goes ahead.
-  waiting = wanted && frame > 0 && dt > 0 && params.speed() > 0 && rebuild.state === "idle" && machine.popping;
+  waiting = (reshape || restart) && frame > 0 && dt > 0 && params.speed() > 0 && rebuild.state === "idle" && machine.popping;
   if (waiting) machine.plateQueue.clear();
-  else if (layoutKey() !== builtKey) startRebuild(frame > 0);
-  else if (restyle) startRebuild(true, true);
+  else if (reshape) startRebuild(frame > 0);
+  else if (restart) startMachine();
   stepRebuild(wall);
   machine.autoRate = capture || waiting ? 0 : params.pops();
   machine.popScale = Math.max(params.speed(), 0.05);
@@ -854,11 +998,22 @@ render(({ time, dt, frame }) => {
   }
   sound.escapement(dt > 0 ? 5 * Math.sqrt(Math.max(params.speed(), 0.05)) : 0, 0.12);
   machineGroup.rotation.y += dt * params.spin();
+  // Every part's prepass velocity is already last frame's motion, which the blur can reuse; only the spin is
+  // measured over the shutter instead, so reuse holds while the spin moves the sphere's front under 0.4 px a frame.
+  const pxPerUnit = (0.5 * renderer.domElement.height) / Math.tan((camera.fov * Math.PI) / 360) / Math.max(distance - 1.3, 0.1);
+  pipeline.motionReusePrepass = params.spin() * dt * pxPerUnit < 0.4;
+  // AO and GI only matter on and around the machine; the far floor and the wall skip the trace.
+  pipeline.gi.fadeStart = distance + (rebuild.state === "idle" ? 2.4 : 4.5);
+  pipeline.gi.fadeEnd = pipeline.gi.fadeStart + 1.6;
 
   sinceChange = dt > 0 ? sinceChange + dt : 0;
   if (params.auto() > 0 && sinceChange >= params.auto() && !capture && rebuild.state === "idle") randomize();
 
   updateLook(1);
   updateInstances();
-  pipeline.render(scene, camera, time);
+  // The pipeline's clock only runs while something moves, so a still view settles into a supersampled frame.
+  // A transformation runs on wall time, even paused, so it keeps the frame fresh.
+  if (dt > 0 && (params.speed() > 0 || params.spin() > 0)) stillTime += dt;
+  if (rebuild.state !== "idle") pipeline.restartAccumulation();
+  pipeline.render(scene, camera, stillTime);
 });

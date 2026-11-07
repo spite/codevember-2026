@@ -4,7 +4,7 @@ import { R, RF, RC, DIAL_GAP, SCALE, plateField, angle } from "./layout.js";
 import { MOTIFS } from "./motifs.js";
 
 export const MAX_PLATES = 128;
-export const MAX_CIRCLES = 20;
+export const MAX_CIRCLES = 24;
 export const MAX_HOLES = 8;
 // Per plate: centre, counts, up to 12 corners, then 12 walls as (normal, h) and (u, side).
 const MAX_SIDES = 12;
@@ -18,6 +18,35 @@ export const FINISHES = {
   gunmetal: { plate: "#4b4d52", plateRough: 0.34, inlay: "#e0b866", inlayMetal: 1, inlayRough: 0.3, turntable: "#c49a52", turntableRough: 0.26, carriage: "#7a7c82" },
   // Gold lines in the black plates; on the gold dials and turntables the engraving is filled with black, champleve style.
   "black enamel": { plate: "#0b0b0d", plateRough: 0.1, plateMetal: 0, inlay: "#e8bb5e", inlayMetal: 1, inlayRough: 0.22, turntable: "#dcb062", turntableRough: 0.2, carriage: "#2b2b2f", gear: "#c99c4c", partInlay: "#0b0b0d", partInlayMetal: 0, partInlayRough: 0.1 },
+  // Fire-gilt movement plates, frosted matte, with heat-blued steel turntables.
+  "frosted gilt": { plate: "#e0b46a", plateRough: 0.5, inlay: "#2a1a0a", inlayMetal: 0.4, inlayRough: 0.75, turntable: "#2d4c9e", turntableRough: 0.22, carriage: "#8a8c92", gear: "#c9a35e" },
+  // Heat-blued steel plates engraved in gold, with gold dials and turntables.
+  "blued steel": { plate: "#2b4796", plateRough: 0.2, inlay: "#e0b866", inlayMetal: 1, inlayRough: 0.3, turntable: "#d6ae66", turntableRough: 0.22, carriage: "#7a7c82", gear: "#c99c4c" },
+  // Rhodium-plated plates like a Swiss movement, engraved in gold, with gold dials.
+  rhodium: { plate: "#dadde1", plateRough: 0.2, inlay: "#d6ad5f", inlayMetal: 1, inlayRough: 0.3, turntable: "#d9b066", turntableRough: 0.22, carriage: "#9a9ca2", gear: "#c9a35e" },
+  // Weathered bronze with verdigris settled in the engraving.
+  verdigris: { plate: "#5a4024", plateRough: 0.55, inlay: "#6cc0a0", inlayMetal: 0, inlayRough: 0.9, turntable: "#8e6c3e", turntableRough: 0.38, carriage: "#5f5a52", gear: "#7a5c34", partInlay: "#6cc0a0", partInlayMetal: 0, partInlayRough: 0.9 },
+  "rose gold": { plate: "#e3aa8e", plateRough: 0.28, inlay: "#2a1410", inlayMetal: 0.4, inlayRough: 0.7, turntable: "#c9ccd0", turntableRough: 0.24, carriage: "#8a8c92" },
+  // Soft, dull pewter with brass fittings.
+  pewter: { plate: "#6c6e71", plateRough: 0.68, inlay: "#161718", inlayMetal: 0.2, inlayRough: 0.85, turntable: "#c9a35e", turntableRough: 0.3, carriage: "#5f6165", gear: "#8a8c8f" },
+  // Swiss movement: rhodium plates, engraving and turntables in blued steel.
+  "rhodium and blued": { plate: "#dadde1", plateRough: 0.2, inlay: "#2d4c9e", inlayMetal: 1, inlayRough: 0.25, turntable: "#2d4c9e", turntableRough: 0.22, carriage: "#9a9ca2", gear: "#b8bbc0" },
+  // An antique clock movement: brass plates and blued steel.
+  "brass and blued": { plate: "#d1aa62", plateRough: 0.32, inlay: "#2a1c0c", inlayMetal: 0.4, inlayRough: 0.75, turntable: "#2d4c9e", turntableRough: 0.22, carriage: "#8a8c92", gear: "#c9a35e" },
+  "steel and rose gold": { plate: "#b9bcc1", plateRough: 0.27, inlay: "#16171a", inlayMetal: 0.5, inlayRough: 0.6, turntable: "#e3aa8e", turntableRough: 0.24, carriage: "#8a8c92", gear: "#c9ccd0" },
+  "gilt and rhodium": { plate: "#e0b46a", plateRough: 0.5, inlay: "#2a1a0a", inlayMetal: 0.4, inlayRough: 0.75, turntable: "#dadde1", turntableRough: 0.2, carriage: "#8a8c92", gear: "#c9a35e" },
+  // Black-plated movement: dark glossy ruthenium engraved in white gold, rose gold turntables.
+  ruthenium: { plate: "#3e3d3c", plateRough: 0.18, inlay: "#e4e6e9", inlayMetal: 1, inlayRough: 0.25, turntable: "#e3aa8e", turntableRough: 0.24, carriage: "#5f6165", gear: "#8a8c8f", partInlay: "#3e3d3c", partInlayMetal: 1, partInlayRough: 0.2 },
+  // Silver with its engraving filled jet black.
+  niello: { plate: "#d8d6d0", plateRough: 0.24, inlay: "#0a0a0b", inlayMetal: 0, inlayRough: 0.3, turntable: "#d8d6d0", turntableRough: 0.22, carriage: "#8a8c92", gear: "#b8b6b0", partInlay: "#0a0a0b", partInlayMetal: 0, partInlayRough: 0.3 },
+  // Oil-blackened steel, matte, with brass turntables and brass-filled engraving.
+  "blackened steel": { plate: "#2a2a2c", plateRough: 0.6, inlay: "#c9a35e", inlayMetal: 1, inlayRough: 0.4, turntable: "#d1aa62", turntableRough: 0.3, carriage: "#4a4b4e", gear: "#c9a35e" },
+  // Fire-gilt bronze, deeper and redder than brass, as on French mantel clocks.
+  ormolu: { plate: "#c8913f", plateRough: 0.38, inlay: "#2a1408", inlayMetal: 0.4, inlayRough: 0.75, turntable: "#d8a050", turntableRough: 0.25, carriage: "#7a6a58", gear: "#b88a40" },
+  // An astronomical clock's blue dial: lapis plates engraved in gold.
+  lapis: { plate: "#121c4e", plateRough: 0.32, plateMetal: 0, inlay: "#e3b862", inlayMetal: 1, inlayRough: 0.28, turntable: "#d9b066", turntableRough: 0.2, carriage: "#2b2b2f", gear: "#c99c4c", partInlay: "#121c4e", partInlayMetal: 0, partInlayRough: 0.32 },
+  // Grand-feu enamel, white, engraved in black, with blued steel turntables.
+  "white enamel": { plate: "#ece8df", plateRough: 0.12, plateMetal: 0, inlay: "#121214", inlayMetal: 0, inlayRough: 0.3, turntable: "#2d4c9e", turntableRough: 0.22, carriage: "#8a8c92", gear: "#c9a35e", partInlay: "#ece8df", partInlayMetal: 0, partInlayRough: 0.15 },
   bronze: { plate: "#6a4a2a", plateRough: 0.42, inlay: "#1a1008", inlayMetal: 0.3, inlayRough: 0.8, turntable: "#dcbb72", turntableRough: 0.22, carriage: "#8a8680" },
 };
 
@@ -33,6 +62,11 @@ const COMMON = /* glsl */ `
 #define TAU 6.28318530718
 uniform float mechScale;
 #define MS mechScale
+// How big a pixel the engraving assumes, relative to the real one: below 1 on a settled still, whose jittered
+// frames are averaged, so detail finer than a pixel is drawn and then filtered by the average.
+uniform float detailScale;
+// 1 on the low tier, which leaves out the guilloche.
+uniform float lowDetail;
 #define W_CH (0.078 * MS)
 #define BEVEL (0.011 * MS)
 float machineHash(vec3 p) {
@@ -62,7 +96,7 @@ vec3 machineSurfGrad(vec3 N, float f) {
 // returns how much of the pixel is inside it, faded out once it gets thinner than a pixel.
 float machineGroove(inout Surface s, float d, float hw, float depth) {
   hw = max(hw, 1e-6);
-  float fw = max(fwidth(d), 1e-6);
+  float fw = max(fwidth(d) * detailScale, 1e-6);
   float vis = smoothstep(1.0, 3.0, hw / fw);
   float x = clamp(d / hw, 0.0, 1.0);
   // The slope comes from d squared, which is smooth through the centreline where d itself has a kink
@@ -75,18 +109,30 @@ float machineGroove(inout Surface s, float d, float hw, float depth) {
   float w = max(hw, fw * 0.5);
   return (1.0 - smoothstep(w * 0.55 - fw * 0.5, w + fw * 0.5, d)) * (hw / w);
 }
-// A shallow engine-turned pattern of line spacing spacing: fades out well before its lines get close
-// enough on screen to beat against the pixels.
 // How fast an angle from atan() changes per pixel, ignoring the jump where it wraps: the two readings
 // wrap on opposite sides, so one of them is always clean.
 float machineAngleWidth(float theta) {
   return min(fwidth(theta), fwidth(mod(theta + TAU, TAU)));
 }
 // density: lines per pixel, from the continuous phases (derivatives of the folded distance can't be trusted).
+// Exact coverage of evenly spaced lines (one per unit of x, a fraction w wide, centred on the half units) over a
+// footprint dp: the lines' running integral differenced, so they soften into their average instead of beating.
+float machineLines(float x, float dp, float w) {
+  float a = x - dp * 0.5 - 0.5 + w * 0.5, b = a + dp;
+  float fa = floor(a) * w + min(fract(a), w), fb = floor(b) * w + min(fract(b), w);
+  return (fb - fa) / dp;
+}
+// A shallow engine-turned pattern of line spacing spacing, in two families fa and fb. Its coverage is filtered over
+// the whole pixel (density: lines per pixel, from the continuous phases), also on a settled still, where the
+// average of jittered frames then softens it a little more, and its grooves only tilt the normal where the lines
+// are far enough apart to resolve.
 float machineTurned(inout Surface s, float fa, float fb, float spacing, float depth, float density) {
-  float fade = 1.0 - smoothstep(1.0 / 16.0, 1.0 / 8.0, density);
+  if (lowDetail > 0.5) return 0.0;
+  float dp = max(density, 1e-4);
+  float resolved = 1.0 - smoothstep(0.15, 0.4, dp);
   float d = min(abs(fract(fa) - 0.5), abs(fract(fb) - 0.5)) * spacing;
-  return machineGroove(s, d, spacing * 0.15, depth * fade) * fade;
+  machineGroove(s, d, spacing * 0.15, depth * resolved);
+  return max(machineLines(fa, dp, 0.3), machineLines(fb, dp, 0.3));
 }
 // How much a piece faces sideways (its walls), and their milled finish: fine lines around the piece
 // at constant height, faded out before they get too fine for the pixels.
@@ -96,13 +142,13 @@ float machineWall() {
 void machineMilled(inout Surface s, vec3 rest, float wall) {
   float h = length(rest);
   float period = TAU / 2600.0;
-  float fade = smoothstep(4.0, 8.0, period / max(fwidth(h), 1e-7)) * wall;
+  float fade = smoothstep(4.0, 8.0, period / max(fwidth(h) * detailScale, 1e-7)) * wall;
   s.roughness = clamp(s.roughness * mix(1.0, mix(0.8, 1.2, 0.5 + 0.5 * sin(h * 2600.0)), fade), 0.05, 1.0);
 }
 // Specular antialiasing (Tokuyoshi and Kaplanyan): widens the lobe where the normal varies within a pixel.
 void machineSpecularAA(inout Surface s) {
   vec3 dx = dFdx(s.normal), dy = dFdy(s.normal);
-  float kernel = min(0.5 * (dot(dx, dx) + dot(dy, dy)), 0.18);
+  float kernel = min(0.5 * (dot(dx, dx) + dot(dy, dy)) * detailScale * detailScale, 0.18);
   float a = s.roughness * s.roughness;
   s.roughness = sqrt(sqrt(clamp(a * a + kernel, 0.0, 1.0)));
 }
@@ -211,6 +257,8 @@ export function createShared() {
     inlayMetal: { value: 0.4 },
     inlayRough: { value: 0.7 },
     engrave: { value: 1 },
+    detailScale: { value: 1 },
+    lowDetail: { value: 0 },
     mechScale: { value: 1 },
     popHeight: { value: 0.15 },
     motifSet: { value: 0 },
@@ -297,7 +345,10 @@ void surface(inout Surface s) {
     vec4 nh = texelFetch(plateData, ivec2(${2 + 12} + k, i), 0);
     vec4 us = texelFetch(plateData, ivec2(${2 + 24} + k, i), 0);
     vec3 n = nh.xyz, u = us.xyz;
-    float wd = us.w * (asin(clamp(dot(p, n), -1.0, 1.0)) - asin(nh.w)) - W_CH * 0.5;
+    float x = dot(p, n);
+    // asin's slope is at least 1, so x - h bounds the wall distance from below: far walls skip the asins.
+    if (us.w * (x - nh.w) - W_CH * 0.5 - e > (0.004 * MS)) continue;
+    float wd = us.w * (asin(clamp(x, -1.0, 1.0)) - asin(nh.w)) - W_CH * 0.5;
     if (wd - e > (0.004 * MS)) continue;
     vec3 v = cross(n, u);
     float a = atan(dot(p, v), dot(p, u));
@@ -381,11 +432,14 @@ void surface(inout Surface s) {
     float end = tE - max(mr, (0.006 * MS)) - (0.003 * MS);
     if (end - start < (0.02 * MS)) continue;
     vec3 nrm = normalize(cross(c, V));
-    float off = asin(clamp(dot(p, nrm), -1.0, 1.0));
-    float along = atan(dot(p, Vt), dot(p, c));
-    float seg = length(vec2(off, along - clamp(along, start, end)));
     vec3 E = c * cos(tE) + Vt * sin(tE);
-    d = min(d, seg);
+    // The spoke is at least |asin x| >= |x| away, so it only needs measuring when that could beat d.
+    float x = dot(p, nrm);
+    if (abs(x) * 0.9999 < d) {
+      float off = asin(clamp(x, -1.0, 1.0));
+      float along = atan(dot(p, Vt), dot(p, c));
+      d = min(d, length(vec2(off, along - clamp(along, start, end))));
+    }
     float pe = machineAngle(p, E);
     if (mr > 0.0 && pe < mr * 1.2) (mC = E), (mUp = Vt), (mR = mr), (mPart = float(i) * 16.0 + 1.0 + float(k));
     else if (mr == 0.0) d = min(d, abs(pe - (0.006 * MS)));
@@ -420,6 +474,9 @@ uniform float popHeight;`,
     vertex: /* glsl */ `
 vec3 displace(vec3 p, inout vec3 n) {
   int i = int(plate + 0.5);
+  // The gears inside the core are collapsed to nothing while their plate and dial are seated (and covered).
+  vec4 now = texelFetch(plateState, ivec2(i, 0), 0);
+  if (edge < -1.5 && now.x == 0.0 && now.w == 0.0) return vec3(0.0);
   vec3 c = texelFetch(plateData, ivec2(0, i), 0).xyz;
   vec4 st = texelFetch(plateState, ivec2(i, pipelinePrevPose ? 1 : 0), 0);
   float a = st.y + st.z * spin;
@@ -491,6 +548,13 @@ export function createTurntableMaterial(shared) {
     uniforms: shared,
     varyings: { vEdge: "float", vRest: "vec3", vNode: "float", vFade: "float" },
     vertexPars: "in float edge;\nin float fade;",
+    // A seated turntable's crown, shaft and counter gear are collapsed to nothing; wells (edge -3) and the
+    // scaled sun gears are left alone.
+    vertex: /* glsl */ `
+vec3 displace(vec3 p, inout vec3 n) {
+  if (edge > -2.5 && edge < -1.5 && dot(instanceMatrix[3].xyz, instanceMatrix[3].xyz) == 0.0 && dot(instanceMatrix[0].xyz, instanceMatrix[0].xyz) > 0.99) return vec3(0.0);
+  return p;
+}`,
     vertexMain: "vEdge = edge; vRest = position; vNode = float(gl_InstanceID); vFade = fade;",
     fragmentPars: COMMON + FINISH_PARS + `uniform vec3 gearColor;\n#define RT (0.088 * MS)\n#define R_FLOOR ${RF.toFixed(4)}\n` + GEAR_SHADING + MOTIFS,
     surface: /* glsl */ `
@@ -568,19 +632,21 @@ void surface(inout Surface s) {
   float in_ = 0.0;
   float cut = 0.0;
   s.albedo *= mix(0.7, 1.0, machineNoise(p * 40.0));
-  // Each circle's rack and rails, scaled by its weight so a rebuild can fade them out and in.
+  // Each circle's rack and rails. In a rebuild its weight thins the channel down to nothing and back.
   for (int k = 0; k < ${MAX_CIRCLES * 2}; k++) {
     vec4 nw = coreN[k];
-    if (nw.w <= 0.001) continue;
+    float w = nw.w;
+    if (w <= 0.001) continue;
     float lat = asin(clamp(dot(p, nw.xyz), -1.0, 1.0)) - asin(coreU[k].w);
-    if (abs(lat) > W_CH * 0.5) continue;
+    if (abs(lat) > W_CH * 0.5 * w) continue;
     vec3 u = coreU[k].xyz, v = cross(nw.xyz, u);
     float a = atan(dot(p, v), dot(p, u));
+    float vis = smoothstep(0.0, 0.12, w);
     float pitch = 0.012 * MS;
-    float teeth = max(abs(fract(a / pitch) - 0.5) * pitch, (abs(lat) - W_CH * 0.17) * 4.0 + 0.003 * MS);
-    float rail = abs(abs(lat) - W_CH * 0.3);
-    cut = max(cut, nw.w * machineGroove(s, min(teeth, rail), 0.0028 * MS, 0.0018 * MS * nw.w));
-    in_ = max(in_, nw.w * (1.0 - smoothstep(W_CH * 0.4, W_CH * 0.5, abs(lat))));
+    float teeth = max(abs(fract(a / pitch) - 0.5) * pitch, (abs(lat) - W_CH * 0.17 * w) * 4.0 + 0.003 * MS);
+    float rail = abs(abs(lat) - W_CH * 0.3 * w);
+    cut = max(cut, vis * machineGroove(s, min(teeth, rail), 0.0028 * MS, 0.0018 * MS * vis));
+    in_ = max(in_, vis * (1.0 - smoothstep(W_CH * 0.4 * w, W_CH * 0.5 * w, abs(lat))));
   }
   s.albedo *= 1.0 - 0.6 * cut;
   // Matte black, with a faint sheen only along the worn rails.

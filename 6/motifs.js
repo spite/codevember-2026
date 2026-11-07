@@ -1,5 +1,5 @@
 // Engraved motifs as distance fields to their stroke centrelines, in a unit disc (strokes stay inside
-// radius ~0.95). Five sets of eight: geometric, arcane, medieval, sidereal and a generated alien script.
+// radius ~0.95). Five sets of eight: geometric, arcane, medieval, sidereal and seeded crop-circle pictograms (alien).
 export const MOTIF_SETS = ["geometric", "arcane", "medieval", "sidereal", "alien", "mixed"];
 
 import { WebGLRenderTarget, HalfFloatType, LinearFilter, ShaderMaterial, GLSL3, Mesh, PlaneGeometry, OrthographicCamera, Scene, RedFormat } from "three";
@@ -196,23 +196,93 @@ float motifSidereal(int id, vec2 p) {
   return min(arm, min(mDot(p, vec2(0), 0.14), mRing(p, vec2(0), 0.97) + 0.04));
 }
 
-// Alien script: a stroked path across a 3x3 grid, with a dot and sometimes a ring, all seeded.
+// Crop-circle pictograms: flattened discs and rings in a field, joined by straight paths, with counts,
+// sizes and turn seeded.
+float mHash(float seed, float k) { return fract(sin(seed * 12.9898 + k * 78.233) * 43758.5453); }
+mat2 mRot(float a) { float c = cos(a), s = sin(a); return mat2(c, s, -s, c); }
 float motifAlien(int id, vec2 p) {
   float seed = float(id) * 13.17 + motifSeed * 101.3;
+  p = mRot(floor(mHash(seed, 1.0) * 8.0) * MPI * 0.25) * p;
+  float h = mHash(seed, 2.0), h2 = mHash(seed, 3.0);
   float d = 1e3;
-  vec2 prev = vec2(0);
-  for (int i = 0; i < 5; i++) {
-    float h = fract(sin((seed + float(i)) * 53.71) * 43758.5);
-    float k = floor(h * 9.0);
-    vec2 g = vec2(mod(k, 3.0) - 1.0, floor(k / 3.0) - 1.0) * 0.72;
-    if (i > 0 && length(g - prev) > 0.01) d = min(d, mSeg(p, prev, g));
-    prev = g;
+  if (id == 0) {
+    // A ringed disc with a path running off it to a small ring, flanked by two dots.
+    d = min(mDot(p, vec2(0, 0.3), 0.2 + 0.06 * h), mRing(p, vec2(0, 0.3), 0.4));
+    d = min(d, mSeg(p, vec2(0, -0.1), vec2(0, -0.66)));
+    d = min(d, mRing(p, vec2(0, -0.78), 0.12));
+    float y = mix(-0.2, -0.5, h2);
+    return min(d, min(mDot(p, vec2(-0.22, y), 0.06), mDot(p, vec2(0.22, y), 0.06)));
   }
-  float hr = fract(sin(seed * 7.13) * 9341.7);
-  vec2 c = vec2(mod(floor(hr * 9.0), 3.0) - 1.0, floor(floor(hr * 9.0) / 3.0) - 1.0) * 0.72;
-  d = min(d, hr > 0.5 ? mRing(p, c, 0.22) : mDot(p, c, 0.1));
-  float hd = fract(sin(seed * 3.71) * 2717.3);
-  return min(d, mDot(p, vec2(hd * 1.2 - 0.6, hd > 0.5 ? 0.92 : -0.92), 0.08));
+  if (id == 1) {
+    // Three ringed discs on a triangle, joined edge to edge, inside a ring.
+    d = mRing(p, vec2(0), 0.92);
+    for (int i = 0; i < 3; i++) {
+      vec2 a = 0.52 * mDir(MPI * 0.5 + float(i) * 2.0 * MPI / 3.0), b = 0.52 * mDir(MPI * 0.5 + float(i + 1) * 2.0 * MPI / 3.0);
+      vec2 u = normalize(b - a);
+      d = min(d, min(mRing(p, a, 0.21), mDot(p, a, 0.06 + 0.03 * h)));
+      d = min(d, mSeg(p, a + u * 0.21, b - u * 0.21));
+    }
+    return d;
+  }
+  if (id == 2) {
+    // A disc in a ring, with satellites on spokes.
+    int n = 3 + int(h * 4.0);
+    d = min(mRing(p, vec2(0), 0.42), mDot(p, vec2(0), 0.2));
+    for (int i = 0; i < 6; i++) {
+      if (i >= n) break;
+      vec2 dir = mDir(MPI * 0.5 + float(i) * 2.0 * MPI / float(n));
+      d = min(d, mSeg(p, dir * 0.42, dir * 0.66));
+      d = min(d, i % 2 == 0 || h2 < 0.5 ? mDot(p, dir * 0.78, 0.11) : mRing(p, dir * 0.78, 0.11));
+    }
+    return d;
+  }
+  if (id == 3) {
+    // A comet: a path through circles shrinking from a big disc.
+    d = mSeg(p, vec2(-0.2, 0), vec2(0.9, 0));
+    d = min(d, mDot(p, vec2(-0.6, 0), 0.22));
+    d = min(d, mRing(p, vec2(-0.6, 0), 0.38));
+    d = min(d, mRing(p, vec2(0.02, 0), 0.15));
+    d = min(d, mDot(p, vec2(0.42, 0), 0.08));
+    return min(d, mDot(p, vec2(0.7, 0), 0.045));
+  }
+  if (id == 4) {
+    // Concentric rings around a disc, cut through by a straight path with bars across it.
+    d = min(min(mRing(p, vec2(0), 0.9), mRing(p, vec2(0), 0.64)), min(mRing(p, vec2(0), 0.4), mDot(p, vec2(0), 0.15)));
+    d = min(d, mSeg(p, vec2(0, 0.15), vec2(0, 0.9)));
+    for (int i = 0; i < 3; i++) {
+      float y = 0.4 + 0.25 * float(i);
+      if (i == 1 && h > 0.5) continue;
+      d = min(d, mSeg(p, vec2(-0.1, y), vec2(0.1, y)));
+    }
+    return d;
+  }
+  if (id == 5) {
+    // Two discs joined by a ladder.
+    int rungs = 3 + int(h * 3.0);
+    d = min(mDot(p, vec2(-0.66, 0), 0.2), mDot(p, vec2(0.66, 0), 0.2));
+    d = min(d, mRing(p, vec2(h2 < 0.5 ? -0.66 : 0.66, 0), 0.3));
+    d = min(d, mSeg(p, vec2(-0.46, 0), vec2(0.46, 0)));
+    for (int i = 0; i < 5; i++) {
+      if (i >= rungs) break;
+      float x = mix(-0.32, 0.32, (float(i) + 0.5) / float(rungs));
+      d = min(d, mSeg(p, vec2(x, -0.14), vec2(x, 0.14)));
+    }
+    return d;
+  }
+  if (id == 6) {
+    // A spiral arm of discs, shrinking outwards from a ring.
+    d = mRing(p, vec2(0), 0.14);
+    float turn = 0.55 + 0.1 * h;
+    for (int k = 0; k < 12; k++) {
+      float t = float(k);
+      d = min(d, mDot(p, (0.32 + 0.052 * t) * mDir(t * turn), 0.085 - 0.0052 * t));
+    }
+    return d;
+  }
+  // Three overlapping rings in a great ring, a disc where they meet.
+  d = mRing(p, vec2(0), 0.9);
+  for (int i = 0; i < 3; i++) d = min(d, mRing(p, 0.3 * mDir(MPI * 0.5 + float(i) * 2.0 * MPI / 3.0), 0.42));
+  return min(d, mDot(p, vec2(0), 0.06 + 0.05 * h2));
 }
 
 float motif(int set, int id, vec2 p) {
@@ -251,7 +321,7 @@ void main() {
   return {
     texture: target.texture,
     compile: () => renderer.compileAsync(scene, camera),
-    // The alien script and constellations depend on the seed, so the atlas is redrawn when it changes.
+    // The crop circles and constellations depend on the seed, so the atlas is redrawn when it changes.
     draw(seed) {
       if (seed === drawn) return;
       drawn = seed;
@@ -290,7 +360,7 @@ void motifPick(float part, out int set, out int id) {
 }
 // Size of a pixel on the unit sphere; taken outside any branch, where screen derivatives are reliable.
 float motifPixel(vec3 p) {
-  return max(max(length(dFdx(p)), length(dFdy(p))), 1e-7);
+  return max(max(length(dFdx(p)), length(dFdy(p))) * detailScale, 1e-7);
 }
 // Distance to a motif of the given radius centred on c, its up direction towards up. A motif only a few pixels
 // across can't show its strokes, so it fades out instead of breaking into speckles.

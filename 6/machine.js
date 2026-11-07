@@ -1,7 +1,7 @@
 // The clockwork: tokens ride the channels node to node in timed ticks. Each tick the turntables
 // turn first (carrying any token on them onto another circle), then every token that has room moves
 // one edge. Tokens sort onto the circles of their colour, orbit for a while, then get scrambled.
-import { dot, cross, normalize, scale, circlePoint, angle } from "./layout.js";
+import { dot, cross, normalize, scale, circlePoint, angle, plateField, perpendicular } from "./layout.js";
 
 const TAU = Math.PI * 2;
 export const DIAL_STEP = TAU / 24;
@@ -81,6 +81,23 @@ function liftOf(pops, i, time) {
   return 1 - inOutCubic((u - 0.74) / 0.26);
 }
 
+// The largest k (up to 12) for which turning the plate by TAU / k about its centre maps its outline onto itself.
+function symmetryOf(face) {
+  const field = plateField(face);
+  const c = face.center, e1 = perpendicular(c), e2 = cross(c, e1);
+  const at = (a, t) => {
+    const d = [e1[0] * Math.cos(a) + e2[0] * Math.sin(a), e1[1] * Math.cos(a) + e2[1] * Math.sin(a), e1[2] * Math.cos(a) + e2[2] * Math.sin(a)];
+    return normalize([c[0] * Math.cos(t) + d[0] * Math.sin(t), c[1] * Math.cos(t) + d[1] * Math.sin(t), c[2] * Math.cos(t) + d[2] * Math.sin(t)]);
+  };
+  const samples = [];
+  for (let i = 0; i < 48; i++) for (const t of [0.35, 0.7, 0.9, 1.0]) samples.push([(i / 48) * TAU, t * face.reach]);
+  const base = samples.map(([a, t]) => field(at(a, t)));
+  for (let k = 12; k >= 2; k--) {
+    if (samples.every(([a, t], i) => Math.abs(field(at(a + TAU / k, t)) - base[i]) < 2e-3)) return k;
+  }
+  return 1;
+}
+
 export class Machine {
   constructor(layout, { density = 0.45, colours = 3, random = Math.random } = {}) {
     this.layout = layout;
@@ -116,6 +133,8 @@ export class Machine {
     this.platePops = faces.map(() => null);
     this.plateQueue = new Set();
     this.plateTurn = faces.map(() => new Anim(0));
+    // How many ways each plate fits its own hole: a turn of a multiple of TAU / k seats it again.
+    this.plateFold = faces.map((face) => symmetryOf(face));
     // Pop-outs per second that happen on their own.
     this.autoRate = 0.3;
     // Pop-outs keep their own pace in real time: machine time runs at Speed, so their length is scaled by it.
@@ -374,7 +393,10 @@ export class Machine {
     this.platePops[f] = { start: this.time, duration: D };
     this.emit("pop", this.time, { face: f, kind: "plate", duration: D });
     const turn = this.plateTurn[f];
-    turn.set(this.time, turn.to + TAU * (this.random() < 0.5 ? 1 : -1), this.time + 0.22 * D, 0.54 * D, inOutCubic);
+    // A symmetric plate may turn just part of the way, as long as it seats again: m / k of a turn, m from 1 to k.
+    const k = this.plateFold[f];
+    const part = (1 + Math.floor(this.random() * k)) / k;
+    turn.set(this.time, turn.to + TAU * part * (this.random() < 0.5 ? 1 : -1), this.time + 0.22 * D, 0.54 * D, inOutCubic);
     return true;
   }
 
@@ -453,6 +475,7 @@ export class Machine {
     dial.set(this.time, dial.to + TAU * (this.random() < 0.5 ? 1 : -1), this.time + 0.2 * D, 0.58 * D, inOutCubic);
   }
 
+  // Starts a full scramble.
   scramble() {
     this.mode = "scramble";
     this.modeTicks = 0;

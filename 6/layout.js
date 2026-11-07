@@ -89,7 +89,16 @@ const toCircle = (c) => (Array.isArray(c) ? { n: normalize(c), h: 0 } : { n: nor
 
 // Random circle normals, spread apart and rejected until every node, crossing and face is roomy enough.
 export function randomNormals(count, random) {
+  const steps = randomNormalsSteps(count, random);
+  for (;;) {
+    const r = steps.next();
+    if (r.done) return r.value;
+  }
+}
+// The same search, yielding after every attempt so it can be spread over frames.
+export function* randomNormalsSteps(count, random) {
   for (let attempt = 0; attempt < 400; attempt++) {
+    if (attempt > 0) yield;
     // Six free circles rarely fit, so most of the time they start from a jittered symmetric set.
     if (attempt >= 40 || (count >= 6 && attempt >= 8)) {
       const base = count >= 5 ? PRESETS.icosidodecahedral.slice(0, count) : PRESETS.cuboctahedral.slice(0, count);
@@ -358,7 +367,7 @@ function bisect(f, lo, hi, iterations = 18) {
 // `bottom`. Rows run outer wall → bevel → top → inner bevel → inner wall (if the piece has a hole).
 // Returns flat arrays: position, normal, edge distance per vertex, and the index buffer.
 // Yields every few dozen rays, so a caller can spread the work over frames.
-export function* buildPieceSteps({ seed, field, reach, top = R, bottom = RF - 0.02, bevel = BEVEL, samples = 192, bevelRows = 4, topRings = 6, coarse = 20 }) {
+export function* buildPieceSteps({ seed, field, reach, top = R, bottom = RF - 0.02, bevel = BEVEL, samples = 192, bevelRows = 4, topRings = 6, coarse = 20, turnWeight = 0.012, undersideStrips = 3 }) {
   const c = seed;
   const e1 = perpendicular(c);
   const e2 = cross(c, e1);
@@ -430,7 +439,7 @@ export function* buildPieceSteps({ seed, field, reach, top = R, bottom = RF - 0.
     const dir = normalize(sub(q, p));
     const turn = prevDir ? angle(dir, prevDir) : 0;
     prevDir = dir;
-    weights.push(weights[i] + seg + turn * 0.012);
+    weights.push(weights[i] + seg + turn * turnWeight);
   }
   const total = weights[fine];
   const alphas = [];
@@ -454,7 +463,8 @@ export function* buildPieceSteps({ seed, field, reach, top = R, bottom = RF - 0.
     if (s % 48 === 47) yield;
   }
 
-  function bevelSide(side) {
+  // One row per step: each one bisects every sample.
+  function* bevelSide(side) {
     const out = [];
     const ts0 = profiles.map((pr) => (side > 0 ? pr.outer : pr.inner));
     const outwards = ts0.map((t, s) => normalize(scale(grad(geodesic(c, profiles[s].d, t)), -1)));
@@ -473,21 +483,22 @@ export function* buildPieceSteps({ seed, field, reach, top = R, bottom = RF - 0.
           return { p, r, n, e: j < 0 ? 0 : level, t };
         }),
       );
+      yield;
     }
     return out;
   }
-  const outer = bevelSide(1);
+  const outer = yield* bevelSide(1);
   rows.push(...outer);
   const outerTop = outer[outer.length - 1];
   let innerRows = null;
   let innerTop;
   if (hole) {
-    innerRows = bevelSide(-1);
+    innerRows = yield* bevelSide(-1);
     innerTop = innerRows[innerRows.length - 1];
   }
   for (let k = 1; k <= topRings; k++) {
     const f = k / (topRings + (hole ? 1 : 0));
-    // Denser near the rim, where the bevel highlight and engraving are.
+    // Without a dial hole the rings close up towards the centre.
     const ff = hole ? f : 1 - Math.pow(1 - f, 1.6);
     rows.push(
       profiles.map((pr, s) => {
@@ -503,8 +514,8 @@ export function* buildPieceSteps({ seed, field, reach, top = R, bottom = RF - 0.
   const topRows = rows.length;
   // The underside at the walls' foot, facing in, so the piece is closed and its rods have something to meet.
   const footOuter = outer[0], footInner = hole ? innerRows[0] : null;
-  for (let k = 0; k <= 3; k++) {
-    const f = k / 3;
+  for (let k = 0; k <= undersideStrips; k++) {
+    const f = k / undersideStrips;
     rows.push(
       profiles.map((pr, s) => {
         const t0 = footOuter[s].t, t1 = footInner ? footInner[s].t : 0;
@@ -514,6 +525,7 @@ export function* buildPieceSteps({ seed, field, reach, top = R, bottom = RF - 0.
     );
   }
 
+  yield;
   const S = samples;
   const position = new Float32Array(rows.length * S * 3);
   const normal = new Float32Array(rows.length * S * 3);
@@ -530,6 +542,7 @@ export function* buildPieceSteps({ seed, field, reach, top = R, bottom = RF - 0.
       edge[i * S + s] = v.e;
     }),
   );
+  yield;
   const index = [];
   // Winding from the first top strip: the face normal must point outwards.
   const flip = (() => {
@@ -594,7 +607,7 @@ export function buildGear({ radius, teeth = 0, depth = 0.008, y0, y1, hole = 0, 
     const root = radius - depth;
     for (let k = 0; k < teeth; k++) {
       const a = k * step;
-      for (const [f, r] of [[0, root], [0.22, root], [0.36, radius], [0.64, radius], [0.78, root]]) ring.push([r, a + f * step]);
+      for (const [f, r] of [[0.22, root], [0.36, radius], [0.64, radius], [0.78, root]]) ring.push([r, a + f * step]);
     }
   } else {
     for (let k = 0; k < segments; k++) ring.push([radius, (k / segments) * Math.PI * 2]);
@@ -603,33 +616,43 @@ export function buildGear({ radius, teeth = 0, depth = 0.008, y0, y1, hole = 0, 
   const vert = (p, n) => (position.push(...p), normal.push(...n), position.length / 3 - 1);
   const at = ([r, a], y) => [r * Math.cos(a), y, r * Math.sin(a)];
   const smooth = !teeth;
-  for (let i = 0; i < ring.length; i++) {
-    const A = ring[i], B = ring[(i + 1) % ring.length];
-    const pa = at(A, y1), pb = at(B, y1);
-    const side = smooth ? null : normalize(cross(sub(at(B, y0), pa), sub(pb, pa)));
-    const na = smooth ? [Math.cos(A[1]), 0, Math.sin(A[1])] : scale(side, -1);
-    const nb = smooth ? [Math.cos(B[1]), 0, Math.sin(B[1])] : na;
-    const a0 = vert(at(A, y0), na), b0 = vert(at(B, y0), nb), a1 = vert(pa, na), b1 = vert(pb, nb);
-    index.push(a0, a1, b0, b0, a1, b1);
-    // Top and bottom faces: fans, or rings around the hole, which also gets its own inner wall.
-    for (const [y, up] of caps ? [[y1, 1], [y0, -1]] : []) {
-      const n = [0, up, 0];
-      const ta = vert(at(A, y), n), tb = vert(at(B, y), n);
-      if (hole) {
-        const ha = vert([hole * Math.cos(A[1]), y, hole * Math.sin(A[1])], n), hb = vert([hole * Math.cos(B[1]), y, hole * Math.sin(B[1])], n);
-        if (up > 0) index.push(ha, tb, ta, ha, hb, tb);
-        else index.push(ha, ta, tb, ha, tb, hb);
-      } else {
-        const o = vert([0, y, 0], n);
-        if (up > 0) index.push(o, tb, ta);
-        else index.push(o, ta, tb);
-      }
+  const N = ring.length;
+  // Vertices shared round a ring: one per ring point, for the caps, the hole and smooth sides.
+  const shared = (fn) => ring.map((A) => fn(A));
+  const sideRing = smooth && [y0, y1].map((y) => shared((A) => vert(at(A, y), [Math.cos(A[1]), 0, Math.sin(A[1])])));
+  for (let i = 0; i < N; i++) {
+    const j = (i + 1) % N;
+    if (smooth) {
+      index.push(sideRing[0][i], sideRing[1][i], sideRing[0][j], sideRing[0][j], sideRing[1][i], sideRing[1][j]);
+      continue;
     }
-    if (hole) {
-      const inA = [-Math.cos(A[1]), 0, -Math.sin(A[1])], inB = [-Math.cos(B[1]), 0, -Math.sin(B[1])];
-      const h = (a, y, n) => vert([hole * Math.cos(a), y, hole * Math.sin(a)], n);
-      const i0 = h(A[1], y0, inA), j0 = h(B[1], y0, inB), i1 = h(A[1], y1, inA), j1 = h(B[1], y1, inB);
-      index.push(i0, j0, i1, j0, j1, i1);
+    // Teeth are flat shaded: each side quad has its own vertices.
+    const A = ring[i], B = ring[j];
+    const pa = at(A, y1), pb = at(B, y1);
+    const n = scale(normalize(cross(sub(at(B, y0), pa), sub(pb, pa))), -1);
+    const a0 = vert(at(A, y0), n), b0 = vert(at(B, y0), n), a1 = vert(pa, n), b1 = vert(pb, n);
+    index.push(a0, a1, b0, b0, a1, b1);
+  }
+  // Top and bottom faces: fans, or rings around the hole, which also gets its own inner wall.
+  for (const [y, up] of caps ? [[y1, 1], [y0, -1]] : []) {
+    const n = [0, up, 0];
+    const outer = shared((A) => vert(at(A, y), n));
+    const inner = hole ? shared((A) => vert([hole * Math.cos(A[1]), y, hole * Math.sin(A[1])], n)) : null;
+    const o = hole ? -1 : vert([0, y, 0], n);
+    for (let i = 0; i < N; i++) {
+      const j = (i + 1) % N;
+      if (hole) {
+        if (up > 0) index.push(inner[i], outer[j], outer[i], inner[i], inner[j], outer[j]);
+        else index.push(inner[i], outer[i], outer[j], inner[i], outer[j], inner[j]);
+      } else if (up > 0) index.push(o, outer[j], outer[i]);
+      else index.push(o, outer[i], outer[j]);
+    }
+  }
+  if (hole) {
+    const wall = [y0, y1].map((y) => shared((A) => vert([hole * Math.cos(A[1]), y, hole * Math.sin(A[1])], [-Math.cos(A[1]), 0, -Math.sin(A[1])])));
+    for (let i = 0; i < N; i++) {
+      const j = (i + 1) % N;
+      index.push(wall[0][i], wall[0][j], wall[1][i], wall[0][j], wall[1][j], wall[1][i]);
     }
   }
   return { position: new Float32Array(position), normal: new Float32Array(normal), index, vertexCount: position.length / 3 };
