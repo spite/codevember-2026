@@ -1,5 +1,5 @@
 import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, randomize, keysHelp, setDay, addKey, getSeed, applyUrlState, addActionButton, onPause, showHint, showSoundHint, loadingStep } from "common";
-import { GUI, signal, effect } from "guspira";
+import { GUI } from "guspira";
 import { createAutoChange } from "modules/autoChange.js";
 import { Scene, Mesh, Group, InstancedMesh, InstancedBufferAttribute, BufferGeometry, BufferAttribute, SphereGeometry, Matrix4, Vector2, Vector3, Color, Raycaster, Sphere, DynamicDrawUsage } from "three";
 import { RoundedBoxGeometry } from "third_party/three-rounded-box.js";
@@ -125,18 +125,6 @@ gui.addSlider("Pop-outs", params.pops, 0, 1, 0.01, { randomizable: false });
 gui.addSlider("Supersample", params.supersample, 1, 2, 0.5, { randomizable: false });
 // Counts only while the layout stands: a change (from R, the menu or an auto change) starts it again once it lands.
 const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTime, gui, max: 120, ready: () => rebuild.state === "idle" && !waiting });
-// The pipeline's tier is fixed when it is built, so a new one reloads the page (seed and settings stay in the url).
-const qualityChoice = signal(new URLSearchParams(location.search).get("quality") ?? "auto");
-gui.addSelect("Quality", qualityChoice, ["auto", "high", "medium", "low"], { randomizable: false });
-const startQuality = qualityChoice.peek();
-effect(() => {
-  const q = qualityChoice();
-  if (q === startQuality) return;
-  const url = new URL(location.href);
-  if (q === "auto") url.searchParams.delete("quality");
-  else url.searchParams.set("quality", q);
-  location.replace(url);
-});
 pipeline.addGUI(gui);
 gui.addSeparator();
 const sound = createMachineSound({ onProgress: load.sound.set });
@@ -148,6 +136,7 @@ function toggleSound() {
 addKey("KeyM", "toggle sound", toggleSound);
 // Sounds already scheduled freeze with the animation.
 onPause((running) => sound.setPaused(!running));
+gui.addText('<a href="gallery/">The Orrery Collection</a>: every layout, rendered.');
 gui.addText(
   touch
     ? "Tap turntables, dials and plates to set them moving. Drag to orbit, pinch to zoom."

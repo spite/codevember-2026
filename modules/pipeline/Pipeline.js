@@ -57,10 +57,11 @@ const DEBUG_VIEWS = ["none", "normals", "depth", "velocity", "shadow", "ao", "gi
 const MATERIAL_DEBUG = { shadow: 1, ao: 2, gi: 3, albedo: 4 };
 const FINAL_DEBUG = { normals: 1, depth: 2, velocity: 3, clipping: 5 };
 
-function resolveQuality(quality) {
+// useUrl false gives what "auto" picks on this device, ignoring ?quality and ?capture.
+function resolveQuality(quality, useUrl = true) {
   const query = new URLSearchParams(window.location.search);
-  if (TIERS[query.get("quality")]) return query.get("quality");
-  if (query.has("capture")) return "capture";
+  if (useUrl && TIERS[query.get("quality")]) return query.get("quality");
+  if (useUrl && query.has("capture")) return "capture";
   if (TIERS[quality]) return quality;
   const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || matchMedia("(pointer: coarse)").matches;
   return mobile ? "medium" : "high";
@@ -130,6 +131,7 @@ class Pipeline {
   constructor(renderer, options = {}) {
     this.renderer = renderer;
     this.quality = resolveQuality(options.quality ?? "auto");
+    this.autoQuality = resolveQuality(options.quality ?? "auto", false);
     const tier = TIERS[this.quality];
 
     this.msaa = Math.min(options.msaa ?? tier.msaa, renderer.capabilities.maxSamples);
@@ -880,6 +882,19 @@ class Pipeline {
       },
     });
     const section = gui.addSection(title, { open });
+    // The tier is fixed when the pipeline is built, so picking another reloads the page; the url keeps the
+    // seed and settings.
+    const asked = new URLSearchParams(location.search).get("quality");
+    const tiers = ["high", "medium", "low"];
+    gui.addSelect("Quality (reloads)", tiers.includes(asked) ? asked : "auto", [["auto", `auto (${this.autoQuality})`], ...tiers], {
+      randomizable: false,
+      onChange: (q) => {
+        const url = new URL(location.href);
+        if (q === "auto") url.searchParams.delete("quality");
+        else url.searchParams.set("quality", q);
+        location.replace(url);
+      },
+    });
     const add = (label, get, set, min, max, step) => gui.addSlider(label, get(), min, max, step, opts(set));
     add("Exposure", () => this.exposure, (v) => (this.exposure = v), 0.1, 4, 0.01);
     gui.addSelect("Tonemapper", this.tonemapper, TONEMAPPERS, opts((v) => (this.tonemapper = v)));

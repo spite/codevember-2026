@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Orrery Collection · Codevember 2026 #6</title>
+<meta name="description" content="Every layout the day 6 orrery can build, in black enamel and gold: presets, symmetric orbits and random circles.">
+<style>.eyebrow a { color: inherit; text-decoration: none; } .eyebrow a:hover { text-decoration: underline; }</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Spectral:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* A watchmaker's case catalogue: numbered entries on black velvet, gold for figures and rules only. */
+:root {
+  --velvet: #121114;
+  --case: #1b1a1e;
+  --rule: #2e2b30;
+  --gold: #d6ad5f;
+  --gold-dim: #8f7444;
+  --ivory: #ece5d8;
+  --muted: #9b9488;
+  --display: "Cinzel", "Trajan Pro", Georgia, serif;
+  --body: "Spectral", Georgia, "Times New Roman", serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--velvet); color: var(--ivory); font: 400 1rem/1.55 var(--body); }
+.wrap { max-width: 1320px; margin: 0 auto; padding-block: 56px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { display: grid; gap: 14px; margin-bottom: 36px; }
+.eyebrow { font: 500 0.72rem/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); }
+h1 { font: 600 clamp(2.1rem, 5vw, 3.6rem)/1.05 var(--display); letter-spacing: 0.04em; margin: 0; text-wrap: balance; }
+.lede { max-width: 62ch; margin: 0; color: var(--muted); font-size: 1.05rem; }
+.lede em { color: var(--ivory); }
+.bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; border-block: 1px solid var(--rule); padding-block: 12px; margin-bottom: 28px; }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.filters button { font: 500 0.78rem/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: none; border: 1px solid var(--rule); border-radius: 2px; padding: 9px 12px; cursor: pointer; }
+.filters button:hover { color: var(--ivory); border-color: var(--gold-dim); }
+.filters button[aria-pressed="true"] { color: var(--velvet); background: var(--gold); border-color: var(--gold); }
+.filters button:focus-visible, .card:focus-visible, dialog button:focus-visible, dialog a:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.count { font: 400 0.78rem/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 28px 22px; }
+.card { display: grid; gap: 10px; background: none; border: 0; padding: 0; color: inherit; text-align: left; cursor: zoom-in; font: inherit; }
+.card .plate { aspect-ratio: 1; max-width: 100%; overflow: hidden; background: var(--case); border: 1px solid var(--rule); }
+.card img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease; }
+.card:hover img { transform: scale(1.04); }
+.meta { display: grid; gap: 3px; min-width: 0; }
+.no { font: 500 0.7rem/1 var(--mono); letter-spacing: 0.14em; color: var(--gold); font-variant-numeric: tabular-nums; }
+.name { font: 600 1.02rem/1.25 var(--display); letter-spacing: 0.03em; }
+.figs { font: 400 0.76rem/1.45 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+dialog { width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 1px solid var(--rule); background: var(--case); color: var(--ivory); }
+dialog::backdrop { background: rgb(8 7 9 / 0.86); }
+.view { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+.view img { width: 100%; height: auto; display: block; }
+.detail { display: grid; align-content: start; gap: 18px; padding: 28px 26px; min-width: 0; }
+.detail h2 { margin: 0; font: 600 1.6rem/1.15 var(--display); letter-spacing: 0.03em; text-wrap: balance; }
+dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 18px; margin: 0; font: 400 0.84rem/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+dt { color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.72rem; padding-top: 2px; }
+dd { margin: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.actions a, .actions button { font: 500 0.78rem/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; padding: 11px 14px; border-radius: 2px; cursor: pointer; text-decoration: none; }
+.actions a { background: var(--gold); color: var(--velvet); border: 1px solid var(--gold); }
+.actions button { background: none; color: var(--ivory); border: 1px solid var(--rule); }
+.nav { display: flex; gap: 8px; }
+footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--rule); font: 400 0.76rem/1.6 var(--mono); color: var(--muted); }
+@media (max-width: 760px) { .view { grid-template-columns: 1fr; } .detail { padding: 20px 18px; } }
+@media (prefers-reduced-motion: reduce) { .card img { transition: none; } .card:hover img { transform: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow"><a href="../">Codevember 2026 · Day 6 · Orrery</a></div>
+    <h1>The Orrery Collection</h1>
+    <p class="lede">Every layout the machine can build, each in <em>black enamel and gold</em>. Channels run along great and small circles, a turntable sits at every crossing, and the faces between them become engraved plates. The engraving cycles through the five motif sets.</p>
+  </header>
+  <div class="bar">
+    <div class="filters" role="group" aria-label="Show">
+      <button type="button" id="f-all" data-kind="all" aria-pressed="true">All</button>
+      <button type="button" id="f-preset" data-kind="preset" aria-pressed="false">Presets</button>
+      <button type="button" id="f-symmetric" data-kind="symmetric" aria-pressed="false">Symmetric orbits</button>
+      <button type="button" id="f-random" data-kind="random" aria-pressed="false">Random</button>
+    </div>
+    <div class="count" id="count"></div>
+  </div>
+  <div class="grid" id="grid"></div>
+  <footer>Rendered with the sketch's capture quality: PBR, soft shadows, GTAO and screen-space GI, AgX. Figures are counted from each layout as built: circles, turntables at their crossings, and plates between them, of which the ones with room carry a dial.</footer>
+</div>
+<dialog id="view" aria-label="Orrery">
+  <div class="view">
+    <img id="v-img" alt="">
+    <div class="detail">
+      <div class="no" id="v-no"></div>
+      <h2 id="v-name"></h2>
+      <dl id="v-dl"></dl>
+      <div class="actions">
+        <a id="v-open" href="#">Open in the sketch</a>
+        <button type="button" id="v-close">Close</button>
+      </div>
+      <div class="nav actions">
+        <button type="button" id="v-prev">Previous</button>
+        <button type="button" id="v-next">Next</button>
+      </div>
+    </div>
+  </div>
+</dialog>
+<script>
+const ENTRIES = [{"n": 1, "img": "img/p00.jpg", "kind": "preset", "title": "Octahedral", "circles": "3 great", "total": 3, "turntables": 6, "plates": 8, "dials": 8, "scale": 1, "motifs": "sidereal", "href": "../?seed=gallery&layout=octahedral&circles=6&finish=black%20enamel&motifs=sidereal&variety=0.8"}, {"n": 2, "img": "img/p01.jpg", "kind": "preset", "title": "Cuboctahedral", "circles": "4 great", "total": 4, "turntables": 12, "plates": 14, "dials": 14, "scale": 1, "motifs": "arcane", "href": "../?seed=gallery&layout=cuboctahedral&circles=6&finish=black%20enamel&motifs=arcane&variety=0.8"}, {"n": 3, "img": "img/p02.jpg", "kind": "preset", "title": "Icosidodecahedral", "circles": "6 great", "total": 6, "turntables": 30, "plates": 32, "dials": 32, "scale": 1, "motifs": "medieval", "href": "../?seed=gallery&layout=icosidodecahedral&circles=6&finish=black%20enamel&motifs=medieval&variety=0.8"}, {"n": 4, "img": "img/p03.jpg", "kind": "preset", "title": "Armillary", "circles": "4 great, 2 small", "total": 6, "turntables": 20, "plates": 24, "dials": 24, "scale": 1, "motifs": "geometric", "href": "../?seed=gallery&layout=armillary&circles=6&finish=black%20enamel&motifs=geometric&variety=0.8"}, {"n": 5, "img": "img/p04.jpg", "kind": "preset", "title": "Globe", "circles": "5 great, 2 small", "total": 7, "turntables": 26, "plates": 32, "dials": 32, "scale": 1, "motifs": "alien", "href": "../?seed=gallery&layout=globe&circles=6&finish=black%20enamel&motifs=alien&variety=0.8"}, {"n": 6, "img": "img/p05.jpg", "kind": "preset", "title": "Tetrahedral rings", "circles": "4 small", "total": 4, "turntables": 12, "plates": 14, "dials": 10, "scale": 1, "motifs": "sidereal", "href": "../?seed=gallery&layout=tetrahedral%20rings&circles=6&finish=black%20enamel&motifs=sidereal&variety=0.8"}, {"n": 7, "img": "img/p06.jpg", "kind": "preset", "title": "Octahedral rings", "circles": "6 small", "total": 6, "turntables": 24, "plates": 26, "dials": 26, "scale": 1, "motifs": "arcane", "href": "../?seed=gallery&layout=octahedral%20rings&circles=6&finish=black%20enamel&motifs=arcane&variety=0.8"}, {"n": 8, "img": "img/p07.jpg", "kind": "preset", "title": "Cubic rings", "circles": "8 small", "total": 8, "turntables": 24, "plates": 26, "dials": 8, "scale": 1, "motifs": "medieval", "href": "../?seed=gallery&layout=cubic%20rings&circles=6&finish=black%20enamel&motifs=medieval&variety=0.8"}, {"n": 9, "img": "img/p08.jpg", "kind": "preset", "title": "Icosahedral rings", "circles": "12 small", "total": 12, "turntables": 60, "plates": 62, "dials": 42, "scale": 1, "motifs": "geometric", "href": "../?seed=gallery&layout=icosahedral%20rings&circles=6&finish=black%20enamel&motifs=geometric&variety=0.8"}, {"n": 10, "img": "img/p09.jpg", "kind": "preset", "title": "Rhombic dodecahedral", "circles": "6 great", "total": 6, "turntables": 14, "plates": 24, "dials": 24, "scale": 1, "motifs": "alien", "href": "../?seed=gallery&layout=rhombic%20dodecahedral&circles=6&finish=black%20enamel&motifs=alien&variety=0.8"}, {"n": 11, "img": "img/p10.jpg", "kind": "preset", "title": "Octahedral mirrors", "circles": "9 great", "total": 9, "turntables": 26, "plates": 48, "dials": 48, "scale": 1, "motifs": "sidereal", "href": "../?seed=gallery&layout=octahedral%20mirrors&circles=6&finish=black%20enamel&motifs=sidereal&variety=0.8"}, {"n": 12, "img": "img/p11.jpg", "kind": "preset", "title": "Seven circles", "circles": "7 great", "total": 7, "turntables": 18, "plates": 32, "dials": 32, "scale": 1, "motifs": "arcane", "href": "../?seed=gallery&layout=seven%20circles&circles=6&finish=black%20enamel&motifs=arcane&variety=0.8"}, {"n": 13, "img": "img/p12.jpg", "kind": "preset", "title": "Ringed octahedron", "circles": "3 great, 6 small", "total": 9, "turntables": 30, "plates": 32, "dials": 8, "scale": 1, "motifs": "medieval", "href": "../?seed=gallery&layout=ringed%20octahedron&circles=6&finish=black%20enamel&motifs=medieval&variety=0.8"}, {"n": 14, "img": "img/p13.jpg", "kind": "preset", "title": "Astrolabe", "circles": "4 great, 4 small", "total": 8, "turntables": 32, "plates": 36, "dials": 12, "scale": 1, "motifs": "geometric", "href": "../?seed=gallery&layout=astrolabe&circles=6&finish=black%20enamel&motifs=geometric&variety=0.8"}, {"n": 15, "img": "img/p14.jpg", "kind": "preset", "title": "Dodecahedral rings", "circles": "20 small", "total": 20, "turntables": 60, "plates": 62, "dials": 32, "scale": 0.75, "motifs": "alien", "href": "../?seed=gallery&layout=dodecahedral%20rings&circles=6&finish=black%20enamel&motifs=alien&variety=0.8"}, {"n": 16, "img": "img/p15.jpg", "kind": "preset", "title": "Cubic rings and diagonals", "circles": "6 great, 8 small", "total": 14, "turntables": 62, "plates": 72, "dials": 24, "scale": 0.75, "motifs": "sidereal", "href": "../?seed=gallery&layout=cubic%20rings%20and%20diagonals&circles=6&finish=black%20enamel&motifs=sidereal&variety=0.8"}, {"n": 17, "img": "img/p16.jpg", "kind": "preset", "title": "Edge rings and seams", "circles": "4 great, 12 small", "total": 16, "turntables": 60, "plates": 62, "dials": 14, "scale": 0.75, "motifs": "arcane", "href": "../?seed=gallery&layout=edge%20rings%20and%20seams&circles=6&finish=black%20enamel&motifs=arcane&variety=0.8"}, {"n": 18, "img": "img/p17.jpg", "kind": "preset", "title": "Cubic rings and mirrors", "circles": "3 great, 8 small", "total": 11, "turntables": 54, "plates": 80, "dials": 48, "scale": 0.75, "motifs": "medieval", "href": "../?seed=gallery&layout=cubic%20rings%20and%20mirrors&circles=6&finish=black%20enamel&motifs=medieval&variety=0.8"}, {"n": 19, "img": "img/p18.jpg", "kind": "preset", "title": "Octahedral and cubic rings", "circles": "14 small", "total": 14, "turntables": 72, "plates": 74, "dials": 44, "scale": 0.72, "motifs": "geometric", "href": "../?seed=gallery&layout=octahedral%20and%20cubic%20rings&circles=6&finish=black%20enamel&motifs=geometric&variety=0.8"}, {"n": 20, "img": "img/p19.jpg", "kind": "preset", "title": "Edge rings", "circles": "12 small", "total": 12, "turntables": 72, "plates": 74, "dials": 38, "scale": 0.65, "motifs": "alien", "href": "../?seed=gallery&layout=edge%20rings&circles=6&finish=black%20enamel&motifs=alien&variety=0.8"}, {"n": 21, "img": "img/p20.jpg", "kind": "preset", "title": "Cuboctahedral web", "circles": "4 great, 8 small", "total": 12, "turntables": 108, "plates": 110, "dials": 54, "scale": 0.65, "motifs": "sidereal", "href": "../?seed=gallery&layout=cuboctahedral%20web&circles=6&finish=black%20enamel&motifs=sidereal&variety=0.8"}, {"n": 22, "img": "img/p21.jpg", "kind": "preset", "title": "Great octahedral and cubic rings", "circles": "14 small", "total": 14, "turntables": 96, "plates": 98, "dials": 50, "scale": 0.62, "motifs": "arcane", "href": "../?seed=gallery&layout=great%20octahedral%20and%20cubic%20rings&circles=6&finish=black%20enamel&motifs=arcane&variety=0.8"}, {"n": 23, "img": "img/p22.jpg", "kind": "preset", "title": "Great icosahedral rings", "circles": "12 small", "total": 12, "turntables": 120, "plates": 122, "dials": 42, "scale": 0.55, "motifs": "medieval", "href": "../?seed=gallery&layout=great%20icosahedral%20rings&circles=6&finish=black%20enamel&motifs=medieval&variety=0.8"}, {"n": 24, "img": "img/p23.jpg", "kind": "preset", "title": "Icosahedral rings and seams", "circles": "4 great, 12 small", "total": 16, "turntables": 120, "plates": 122, "dials": 66, "scale": 0.55, "motifs": "geometric", "href": "../?seed=gallery&layout=icosahedral%20rings%20and%20seams&circles=6&finish=black%20enamel&motifs=geometric&variety=0.8"}, {"n": 25, "img": "img/p24.jpg", "kind": "preset", "title": "Cubic and icosahedral web", "circles": "20 small", "total": 20, "turntables": 108, "plates": 110, "dials": 62, "scale": 0.55, "motifs": "alien", "href": "../?seed=gallery&layout=cubic%20and%20icosahedral%20web&circles=6&finish=black%20enamel&motifs=alien&variety=0.8"}, {"n": 26, "img": "img/s00.jpg", "kind": "symmetric", "title": "Tetrahedral orbit of 4", "circles": "4 small", "total": 4, "turntables": 12, "plates": 14, "dials": 10, "scale": 0.85, "motifs": "sidereal", "href": "../?seed=sym1b&layout=symmetric&circles=6&finish=black%20enamel&motifs=sidereal&variety=0.8"}, {"n": 27, "img": "img/s01.jpg", "kind": "symmetric", "title": "Octahedral orbit of 6", "circles": "6 small", "total": 6, "turntables": 24, "plates": 26, "dials": 6, "scale": 0.55, "motifs": "arcane", "href": "../?seed=symb&layout=symmetric&circles=6&finish=black%20enamel&motifs=arcane&variety=0.8"}, {"n": 28, "img": "img/s02.jpg", "kind": "symmetric", "title": "Tetrahedral orbit of 12", "circles": "12 small", "total": 12, "turntables": 36, "plates": 38, "dials": 28, "scale": 0.85, "motifs": "medieval", "href": "../?seed=symi&layout=symmetric&circles=6&finish=black%20enamel&motifs=medieval&variety=0.8"}, {"n": 29, "img": "img/s03.jpg", "kind": "symmetric", "title": "Octahedral orbit of 8", "circles": "8 small", "total": 8, "turntables": 48, "plates": 50, "dials": 20, "scale": 0.65, "motifs": "geometric", "href": "../?seed=syme&layout=symmetric&circles=6&finish=black%20enamel&motifs=geometric&variety=0.8"}, {"n": 30, "img": "img/s04.jpg", "kind": "symmetric", "title": "Octahedral orbit of 12", "circles": "12 small", "total": 12, "turntables": 48, "plates": 50, "dials": 36, "scale": 0.55, "motifs": "alien", "href": "../?seed=sym5&layout=symmetric&circles=6&finish=black%20enamel&motifs=alien&variety=0.8"}, {"n": 31, "img": "img/s05.jpg", "kind": "symmetric", "title": "Tetrahedral orbit of 10", "circles": "10 small", "total": 10, "turntables": 48, "plates": 50, "dials": 32, "scale": 0.75, "motifs": "sidereal", "href": "../?seed=sym0&layout=symmetric&circles=6&finish=black%20enamel&motifs=sidereal&variety=0.8"}, {"n": 32, "img": "img/s06.jpg", "kind": "symmetric", "title": "Octahedral orbit of 8", "circles": "8 small", "total": 8, "turntables": 48, "plates": 50, "dials": 14, "scale": 1, "motifs": "arcane", "href": "../?seed=symu&layout=symmetric&circles=6&finish=black%20enamel&motifs=arcane&variety=0.8"}, {"n": 33, "img": "img/s07.jpg", "kind": "symmetric", "title": "Octahedral orbit of 9", "circles": "3 great, 6 small", "total": 9, "turntables": 54, "plates": 56, "dials": 48, "scale": 1, "motifs": "medieval", "href": "../?seed=sym22&layout=symmetric&circles=6&finish=black%20enamel&motifs=medieval&variety=0.8"}, {"n": 34, "img": "img/s08.jpg", "kind": "symmetric", "title": "Icosahedral orbit of 15", "circles": "15 great", "total": 15, "turntables": 62, "plates": 120, "dials": 0, "scale": 0.85, "motifs": "geometric", "href": "../?seed=sym3&layout=symmetric&circles=6&finish=black%20enamel&motifs=geometric&variety=0.8"}, {"n": 35, "img": "img/s09.jpg", "kind": "symmetric", "title": "Octahedral orbit of 12", "circles": "6 great, 6 small", "total": 12, "turntables": 62, "plates": 96, "dials": 72, "scale": 0.55, "motifs": "alien", "href": "../?seed=sym11&layout=symmetric&circles=6&finish=black%20enamel&motifs=alien&variety=0.8"}, {"n": 36, "img": "img/s10.jpg", "kind": "symmetric", "title": "Tetrahedral orbit of 12", "circles": "12 small", "total": 12, "turntables": 72, "plates": 74, "dials": 32, "scale": 0.65, "motifs": "sidereal", "href": "../?seed=sym6&layout=symmetric&circles=6&finish=black%20enamel&motifs=sidereal&variety=0.8"}, {"n": 37, "img": "img/s11.jpg", "kind": "symmetric", "title": "Octahedral orbit of 24", "circles": "24 small", "total": 24, "turntables": 72, "plates": 74, "dials": 30, "scale": 0.65, "motifs": "arcane", "href": "../?seed=symo&layout=symmetric&circles=6&finish=black%20enamel&motifs=arcane&variety=0.8"}, {"n": 38, "img": "img/s12.jpg", "kind": "symmetric", "title": "Tetrahedral orbit of 10", "circles": "4 great, 6 small", "total": 10, "turntables": 84, "plates": 86, "dials": 62, "scale": 0.55, "motifs": "medieval", "href": "../?seed=sym2&layout=symmetric&circles=6&finish=black%20enamel&motifs=medieval&variety=0.8"}, {"n": 39, "img": "img/s13.jpg", "kind": "symmetric", "title": "Tetrahedral orbit of 16", "circles": "4 great, 12 small", "total": 16, "turntables": 84, "plates": 86, "dials": 50, "scale": 0.55, "motifs": "geometric", "href": "../?seed=symv&layout=symmetric&circles=6&finish=black%20enamel&motifs=geometric&variety=0.8"}, {"n": 40, "img": "img/s14.jpg", "kind": "symmetric", "title": "Octahedral orbit of 14", "circles": "6 great, 8 small", "total": 14, "turntables": 86, "plates": 96, "dials": 48, "scale": 0.65, "motifs": "alien", "href": "../?seed=syma&layout=symmetric&circles=6&finish=black%20enamel&motifs=alien&variety=0.8"}, {"n": 41, "img": "img/s15.jpg", "kind": "symmetric", "title": "Icosahedral orbit of 10", "circles": "10 great", "total": 10, "turntables": 90, "plates": 92, "dials": 32, "scale": 0.65, "motifs": "sidereal", "href": "../?seed=symh&layout=symmetric&circles=6&finish=black%20enamel&motifs=sidereal&variety=0.8"}, {"n": 42, "img": "img/s16.jpg", "kind": "symmetric", "title": "Octahedral orbit of 12", "circles": "12 small", "total": 12, "turntables": 120, "plates": 122, "dials": 50, "scale": 0.55, "motifs": "arcane", "href": "../?seed=sym4&layout=symmetric&circles=6&finish=black%20enamel&motifs=arcane&variety=0.8"}, {"n": 43, "img": "img/s17.jpg", "kind": "symmetric", "title": "Icosahedral orbit of 12", "circles": "12 small", "total": 12, "turntables": 120, "plates": 122, "dials": 72, "scale": 0.55, "motifs": "medieval", "href": "../?seed=symg&layout=symmetric&circles=6&finish=black%20enamel&motifs=medieval&variety=0.8"}, {"n": 44, "img": "img/s18.jpg", "kind": "symmetric", "title": "Octahedral orbit of 24", "circles": "24 small", "total": 24, "turntables": 120, "plates": 122, "dials": 44, "scale": 0.65, "motifs": "geometric", "href": "../?seed=sym25&layout=symmetric&circles=6&finish=black%20enamel&motifs=geometric&variety=0.8"}, {"n": 45, "img": "img/r4.jpg", "kind": "random", "title": "4 random circles", "circles": "4 great", "total": 4, "turntables": 12, "plates": 14, "dials": 12, "scale": 1, "motifs": "alien", "href": "../?seed=rnd4a&layout=random&circles=4&finish=black%20enamel&motifs=alien&variety=0.8"}, {"n": 46, "img": "img/r5.jpg", "kind": "random", "title": "5 random circles", "circles": "5 great", "total": 5, "turntables": 20, "plates": 22, "dials": 16, "scale": 1, "motifs": "sidereal", "href": "../?seed=rnd5a&layout=random&circles=5&finish=black%20enamel&motifs=sidereal&variety=0.8"}, {"n": 47, "img": "img/r6.jpg", "kind": "random", "title": "6 random circles", "circles": "6 great", "total": 6, "turntables": 30, "plates": 32, "dials": 20, "scale": 1, "motifs": "arcane", "href": "../?seed=rnd6a&layout=random&circles=6&finish=black%20enamel&motifs=arcane&variety=0.8"}];
+const KIND = { preset: "Preset", symmetric: "Symmetric orbit", random: "Random" };
+const grid = document.getElementById("grid"), count = document.getElementById("count");
+const pad = (n) => "No. " + String(n).padStart(2, "0");
+let shown = ENTRIES;
+function figs(e) { return `${e.total} circles · ${e.turntables} turntables · ${e.plates} plates`; }
+function render(kind) {
+  shown = kind === "all" ? ENTRIES : ENTRIES.filter((e) => e.kind === kind);
+  grid.replaceChildren(...shown.map((e, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "card"; b.id = "card-" + e.n;
+    b.innerHTML = `<div class="plate"><img loading="lazy" width="720" height="720" src="${e.img}" alt="${e.title}, black enamel and gold"></div><div class="meta"><span class="no">${pad(e.n)} · ${KIND[e.kind]}</span><span class="name">${e.title}</span><span class="figs">${figs(e)}</span></div>`;
+    b.addEventListener("click", () => open(i));
+    return b;
+  }));
+  count.textContent = `${shown.length} of ${ENTRIES.length} orreries`;
+  for (const f of document.querySelectorAll(".filters button")) f.setAttribute("aria-pressed", String(f.dataset.kind === kind));
+}
+const dlg = document.getElementById("view");
+let current = 0;
+function open(i) {
+  current = (i + shown.length) % shown.length;
+  const e = shown[current];
+  document.getElementById("v-img").src = e.img;
+  document.getElementById("v-img").alt = `${e.title}, black enamel and gold`;
+  document.getElementById("v-no").textContent = `${pad(e.n)} · ${KIND[e.kind]}`;
+  document.getElementById("v-name").textContent = e.title;
+  const rows = [["Circles", e.circles], ["Turntables", e.turntables], ["Plates", `${e.plates}, ${e.dials} with dials`], ["Mechanism", e.scale === 1 ? "full size" : `scaled to ${e.scale}`], ["Engraving", e.motifs === "alien" ? "alien crop circles" : e.motifs], ["Finish", "black enamel, gold inlay"]];
+  document.getElementById("v-dl").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  document.getElementById("v-open").href = e.href;
+  if (!dlg.open) dlg.showModal();
+}
+document.getElementById("v-close").addEventListener("click", () => dlg.close());
+document.getElementById("v-prev").addEventListener("click", () => open(current - 1));
+document.getElementById("v-next").addEventListener("click", () => open(current + 1));
+dlg.addEventListener("click", (ev) => { if (ev.target === dlg) dlg.close(); });
+dlg.addEventListener("keydown", (ev) => { if (ev.key === "ArrowLeft") open(current - 1); if (ev.key === "ArrowRight") open(current + 1); });
+for (const f of document.querySelectorAll(".filters button")) f.addEventListener("click", () => render(f.dataset.kind));
+render("all");
+</script>
+
+</body>
+</html>

@@ -24,11 +24,17 @@ gears lock with a ka-ching.
   varied they are, how often parts pop out on their own, how often a new layout comes on its own (Auto
   change, every 30 seconds by default, counted from when a layout lands; randomizing, pausing, clicking
   parts, orbiting or using the panel starts it over, and Next change shows how long is left), and supersampling for the sharpest engraving.
-- Quality: Auto (desktops high, phones medium, phones with 4 GB of memory or 4 cores or fewer low), High,
+- Quality, in the Rendering section: Auto (desktops high, phones medium, phones with 4 GB of memory or 4 cores or fewer low), High,
   Medium or Low; changing it reloads the page with the same seed. Low cuts the heaviest costs first: a
   1-megapixel drawing buffer, cheaper GI, no MSAA, motion blur or bloom, no guilloche and lighter geometry.
 - Only a new shape comes apart and rebuilds: R, the layout or the number of circles. The finish and
   engraving change in place, and a new bead count or colours restarts the machine where it stands.
+
+## Gallery
+
+`gallery/` (linked from the panel) shows every layout the machine can build, each rendered in black enamel
+and gold at capture quality: the presets, the symmetric orbits and random circles. Each one opens in the
+sketch.
 
 ## Finishes
 
