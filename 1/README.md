@@ -10,6 +10,10 @@ them, morphs each flat net into the net of the next solid, and folds that up.
 Faces bow slightly and the peaks are softly rounded; the paper can be egg white,
 white with a coloured accent, or mixed origami colours.
 
+A new set folds up every 15 seconds. Randomizing, pausing, or throwing or orbiting starts the 15
+seconds over. Auto change in the panel turns it off or sets how often, and Next change shows how
+long is left.
+
 Rendered with the shared pipeline (`modules/pipeline/`): PBR paper with a
 baked fibre texture (`modules/materials/paper.js`), burnished creases and sheen,
 a procedural studio environment, soft denoised PCSS shadows, analytic sphere

@@ -1,6 +1,7 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, keysHelp, setDay, addKey } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, keysHelp, setDay, addKey, showHint } from "common";
 import { getSeed } from "modules/random.js";
 import { GUI } from "guspira";
+import { createAutoChange } from "modules/autoChange.js";
 import { Scene, Mesh, Vector3, Vector2, Sphere, Raycaster, Matrix4, Quaternion, IcosahedronGeometry, InstancedBufferGeometry, BufferGeometry, BufferAttribute } from "three";
 import { Pipeline } from "modules/pipeline/Pipeline.js";
 import { createStudioEnvironmentAsync } from "modules/pipeline/studio.js";
@@ -39,6 +40,8 @@ const defaults = {
   height: 1.8,
   set: "Light",
   reflections: "auto",
+  auto: true,
+  autoTime: 15,
 };
 
 const params = fromDefaults(defaults);
@@ -214,6 +217,8 @@ gui.addButton("Flip", () => rotation.flip());
 gui.addSlider("Height", params.height, 1.0, 2.6, 0.01, { randomizable: false });
 gui.addSelect("Set", params.set, Object.keys(SETS));
 gui.addSelect("Reflections", params.reflections, ["auto", "softbox", "hdr", "studio"], { randomizable: false });
+// Counts once a new shape has loaded.
+const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTime, gui, ready: () => shape?.name === shapeRequest });
 pipeline.addGUI(gui);
 gui.addSeparator();
 addKey("KeyT", "turn the object over", () => rotation.flip());
@@ -221,6 +226,7 @@ addKey("KeyM", "reset the melt", resetMelt);
 addKey("KeyW", "toggle wireframe", () => (pipeline.wireframe = !pipeline.wireframe));
 const help = "Hold on the object to grow a blob, tap to drop one, drag it to turn, drag elsewhere to orbit, pinch to zoom.";
 gui.addText(touch ? help : `${help}<br/>${keysHelp()}`);
+showHint("Hold on the object to grow a blob · drag it to turn · R for a new one", "Hold to grow a blob · tap {randomize} for a new one");
 gui.show();
 
 // ---------------------------------------------------------------- shape
@@ -531,6 +537,7 @@ render(({ time, dt }) => {
   // The first frame after a pause carries the paused time (up to 0.1 s); it steps as one substep.
   if (wasPaused && dt > 0) dt = Math.min(dt, SUBSTEP);
   wasPaused = dt === 0;
+  autoChange.update(dt);
   if (params.shape() !== shapeRequest) setShape(params.shape());
   // While a new shape loads, the rest of a randomize waits for it, so they change on the same frame.
   const settled = shape?.name === shapeRequest;

@@ -1,5 +1,6 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, onPause, randomize, keysHelp, setDay, getSeed, applyUrlState, addKey } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, keysHelp, setDay, getSeed, applyUrlState, addKey, showHint } from "common";
 import { GUI } from "guspira";
+import { createAutoChange } from "modules/autoChange.js";
 import { EqualDepth, Scene, Mesh, Group, InstancedMesh, BufferGeometry, BufferAttribute, Vector3, Matrix3, Matrix4 } from "three";
 import { Pipeline } from "modules/pipeline/Pipeline.js";
 import { createStudioEnvironmentAsync } from "modules/pipeline/studio.js";
@@ -119,11 +120,12 @@ gui.addSlider("Float", params.float, 0, 1.2, 0.01, { randomizable: false });
 gui.addSlider("Aperture", params.aperture, 0, 1, 0.01, { randomizable: false });
 // Focal distance through the sculpture: -1 its front, 0 its middle, 1 its back.
 gui.addSlider("Focus", params.focus, -1.5, 1.5, 0.01, { randomizable: false });
-gui.addCheckbox("Auto change", params.auto, { randomizable: false });
-gui.addSlider("Change every", params.autoTime, 5, 60, 1, { randomizable: false });
+// Counts while the sculpture on show is the one asked for.
+const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTime, gui, ready: () => buildKey() === builtKey });
 pipeline.addGUI(gui);
 gui.addSeparator();
 gui.addText(touch ? "Drag to orbit, pinch to zoom." : `Drag to orbit, scroll to zoom.<br/>${keysHelp()}`);
+showHint("Drag to orbit · scroll to zoom · R for a new one", "Drag to orbit · tap {randomize} for a new one");
 gui.show();
 
 const scene = new Scene();
@@ -495,19 +497,9 @@ let wantedKey = buildKey();
 let wantedAt = 0;
 // The first build may still be running.
 let pendingKey = wantedKey;
-// Auto change: a new sculpture once the current one has been on show for Change every seconds. The count
-// stops while paused and starts over on resuming.
-let shownFor = 0;
-onPause((running) => {
-  if (running) shownFor = 0;
-});
 render(({ dt }) => {
   clock += dt;
-  shownFor = params.auto() && buildKey() === builtKey ? shownFor + dt : 0;
-  if (shownFor > params.autoTime()) {
-    shownFor = 0;
-    randomize();
-  }
+  autoChange.update(dt);
   const now = performance.now() / 1000;
   const key = buildKey();
   // Back to the built object: drop any build in flight.

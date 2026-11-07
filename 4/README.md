@@ -36,8 +36,10 @@ Controls:
 - Bands (2 to 5) and Merge, how softly neighbouring bands blend together.
 - Section: squircle, pinched (corners pushed out past the sides), fluted (ridges
   along the band) or lens, with Section amount. Changing it morphs the bands.
-- Motion sets how fast the coil writhes. Auto change re-ties and restyles the coil
-  every few seconds while playing (0 turns it off; pausing restarts the countdown).
+- Motion sets how fast the coil writhes.
+- Auto change re-ties and restyles the coil every 10 seconds once the last re-tie has settled.
+  Randomizing, pausing, or orbiting or touching the panel starts the 10 seconds over. Change
+  every sets how often, and Next change shows how long is left.
 - Reflections: the baked studio or a photographed studio HDR. Depth of field sets
   the blur; while nothing moves, frames from across the lens are averaged.
 - Re-tie (T) ties a new knot. Space pauses, R randomises.

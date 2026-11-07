@@ -1,5 +1,6 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, randomize, keysHelp, setDay, addKey } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, keysHelp, setDay, addKey, showHint } from "common";
 import { GUI } from "guspira";
+import { createAutoChange } from "modules/autoChange.js";
 import { Scene, Mesh, Vector3 } from "three";
 import { Easings } from "easings";
 import { Pipeline } from "modules/pipeline/Pipeline.js";
@@ -80,7 +81,8 @@ const SECTION_MORPH = 1;
 
 const defaults = {
   dof: 0.03,
-  auto: 10,
+  auto: true,
+  autoTime: 10,
   finish: "holographic",
   palette: "purple-cyan",
   film: 1,
@@ -92,8 +94,6 @@ const defaults = {
   reflections: "studio",
 };
 const params = fromDefaults(defaults);
-// Recordings and captures drive their own looks.
-const capture = new URLSearchParams(location.search).has("capture");
 
 const knots = new Knots();
 const tangle = new Tangle(knots, lite ? { rings: 192, sides: 28, volume: 32, reflectionSteps: 12 } : {});
@@ -153,7 +153,8 @@ gui.addSlider("Merge", params.merge, 0, 0.3, 0.005);
 gui.addSelect("Section", params.section, Object.keys(SECTIONS), { randomizable: false });
 gui.addSlider("Section amount", params.sectionAmount, 0, 1, 0.01, { randomizable: false });
 gui.addSlider("Motion", params.motion, 0, 2, 0.01, { randomizable: false });
-gui.addSlider("Auto change", params.auto, 0, 30, 1, { randomizable: false });
+// Counts once a re-tie has finished morphing.
+const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTime, gui, ready: () => knots.blend === 1 && !knots.pending });
 gui.addSelect("Reflections", params.reflections, ["studio", "hdr"], { randomizable: false });
 gui.addSlider("Depth of field", params.dof, 0, 0.03, 0.001, { randomizable: false });
 gui.addButton("Re-tie", () => retie());
@@ -161,6 +162,7 @@ pipeline.addGUI(gui);
 gui.addSeparator();
 addKey("KeyT", "re-tie the knot", () => retie());
 gui.addText(keysHelp());
+showHint("Drag to orbit · T to re-tie the knot · R for a new coil", "Drag to orbit · tap {randomize} for a new coil");
 gui.show();
 
 const scene = new Scene();
@@ -195,8 +197,6 @@ function updateSection(snap) {
 }
 
 let tubesBuilt = 0;
-// Seconds of unpaused play since the last randomize; Auto change randomizes when it reaches the slider.
-let sinceChange = 0;
 let ties = 0;
 // Re-ties from a seed or the Bands slider stay reproducible; T and Re-tie may keep the old twist to avoid tearing.
 function retie(animate = true, matchTwist = true) {
@@ -209,7 +209,6 @@ onResize((w, h, dpr) => {
   pipeline.setSize(w, h, dpr);
 });
 onRandomize(() => {
-  sinceChange = 0;
   gui.randomizeAll();
   retie(tubesBuilt > 0, false);
   const shapes = Object.keys(SECTIONS);
@@ -249,8 +248,7 @@ render(({ time, dt, frame }) => {
   backdrop.keepInsideCyc(camera, controls.target);
   if (params.tubes() !== tubesBuilt) retie(true, false);
   updateReflections();
-  sinceChange = dt > 0 ? sinceChange + dt : 0;
-  if (params.auto() > 0 && sinceChange >= params.auto() && !capture) randomize();
+  autoChange.update(dt);
   t += dt * params.motion();
   knots.update(t, dt);
   // The first frame takes a seed's section as it is.

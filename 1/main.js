@@ -14,8 +14,10 @@ import {
   onPause,
   loadSeed,
   getSeed,
+  showHint,
 } from "common";
 import { GUI } from "guspira";
+import { createAutoChange } from "modules/autoChange.js";
 import {
   Scene,
   Group,
@@ -71,6 +73,8 @@ const defaults = {
   drift: 1.5,
   spin: 0.3,
   creaseAmount: 0.6,
+  auto: true,
+  autoTime: 15,
 };
 
 const params = fromDefaults(defaults);
@@ -158,6 +162,8 @@ gui.addSlider("Bounce", params.bounce, 0, 0.9, 0.01);
 gui.addSlider("Drift", params.drift, 0, 4, 0.01);
 gui.addSlider("Spin", params.spin, 0, 1, 0.01, { randomizable: false });
 gui.addSlider("Crease", params.creaseAmount, 0, 1, 0.01);
+// Counts once the new shapes have folded up.
+const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTime, gui, ready: () => !transition && key() === builtKey });
 pipeline.addGUI(gui);
 gui.addSeparator();
 gui.addText(
@@ -165,6 +171,7 @@ gui.addText(
     ? "Drag a shape to throw it, tap to scatter. Drag empty space to orbit, pinch to zoom."
     : `Drag a shape to throw it, tap to scatter.<br/>${keysHelp()}`,
 );
+showHint("Drag a shape to throw it · drag the backdrop to orbit · R for new shapes", "Drag a shape to throw it · tap {randomize} for new ones");
 gui.show();
 
 const scene = new Scene();
@@ -828,6 +835,7 @@ window.app = {
 };
 
 render(({ time, dt }) => {
+  autoChange.update(dt);
   if (key() !== builtKey) {
     if (!started) {
       builtKey = key();
