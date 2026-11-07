@@ -154,7 +154,7 @@ gui.addText(
     : `Click turntables, dials and plates to set them moving. Drag to orbit, scroll to zoom.<br/>${keysHelp()}`,
 );
 showHint("Click turntables, dials and plates · drag to orbit · R for a new orrery", "Tap parts to pop them · tap {randomize} for a new one");
-showSoundHint();
+showSoundHint(() => !sound.running);
 gui.show();
 
 const scene = new Scene();

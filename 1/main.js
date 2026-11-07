@@ -176,7 +176,7 @@ gui.addText(
     : `Drag a shape to throw it, tap to scatter.<br/>${keysHelp()}`,
 );
 showHint("Drag a shape to throw it · drag the backdrop to orbit · R for new shapes", "Drag a shape to throw it · tap {randomize} for new ones");
-showSoundHint();
+showSoundHint(() => !sound.running);
 gui.show();
 
 const scene = new Scene();

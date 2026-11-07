@@ -1,5 +1,6 @@
 // Mechanical foley: one-shots cut from CC0 recordings (freesound.org, see README), played with a random
-// variant, pitch and pan. The AudioContext starts on the first user gesture; nothing plays before that.
+// variant, pitch and pan. The AudioContext is created on load: it runs at once if the browser allows it (the
+// visitor has already interacted), otherwise it resumes on the first gesture.
 import { nativeRandom } from "modules/random.js";
 
 // Watch, gear, winding and latch sounds, stones sliding, freewheels and clinks for the plates, plus heavier clockwork (tower-clock cogs, a press, levers, a crank, bolts,
@@ -183,5 +184,7 @@ export function createMachineSound({ base = "./sounds/", enabled = true, onProgr
     logger = fn;
   }
 
-  return { play, ratchet, escapement, setEnabled, setPaused, setLogger, downloaded, get enabled() { return on; }, sets: SETS };
+  start();
+
+  return { play, ratchet, escapement, setEnabled, setPaused, setLogger, downloaded, get enabled() { return on; }, get running() { return ctx?.state === "running"; }, sets: SETS };
 }

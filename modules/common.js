@@ -331,11 +331,11 @@ function showHint(desktop, touch = desktop) {
   hintText = matchMedia("(pointer: coarse)").matches ? touch : desktop;
 }
 
-// A day with sound calls showSoundHint() before the first frame: a second pill under the hint says a click
-// or tap turns the sound on, unless the page has already had one.
-let soundHint = false;
-function showSoundHint() {
-  soundHint = true;
+// A day with sound calls showSoundHint(needed) before the first frame: a second pill under the hint says a click
+// or tap turns the sound on, when needed() is true then (e.g. () => !sound.running).
+let soundHint = null;
+function showSoundHint(needed = () => true) {
+  soundHint = needed;
 }
 
 // Load progress in the placeholder's pill. Declare every step up front, so the total is known from the start:
@@ -415,7 +415,7 @@ function ready() {
   if (!loading?.isConnected || loading.classList.contains("done")) return;
   const span = loading.querySelector("span");
   if (!hintText || !span) return hideLoading();
-  if (soundHint && !navigator.userActivation?.hasBeenActive) {
+  if (soundHint?.() && !navigator.userActivation?.hasBeenActive) {
     const note = document.createElement("span");
     note.className = "sound-hint";
     const img = document.createElement("img");

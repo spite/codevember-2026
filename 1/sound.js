@@ -1,5 +1,6 @@
 // Paper foley: one-shot samples (CC0, freesound.org) played with random variant, pitch and pan.
-// The AudioContext starts on the first user gesture; nothing plays before that.
+// The AudioContext is created on load: it runs at once if the browser allows it (the visitor has already
+// interacted), otherwise it resumes on the first gesture.
 
 import { nativeRandom } from "modules/random.js";
 
@@ -101,5 +102,7 @@ export function createPaperSound({ base = "./sounds/", enabled = true, onProgres
     logger = fn;
   }
 
-  return { play, setEnabled, setPaused, setLogger, downloaded, get enabled() { return on; } };
+  start();
+
+  return { play, setEnabled, setPaused, setLogger, downloaded, get enabled() { return on; }, get running() { return ctx?.state === "running"; } };
 }
