@@ -494,13 +494,13 @@ function setDay(day = getDay()) {
   const link = (href, text, label) =>
     `<a href="${href}"${label ? ` title="${label}" aria-label="${label}"` : ""}>${text}</a>`;
   const arrow = (d) =>
-    `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="${d}" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
   const prev = days.find((d) => d.day === day - 1);
   const next = days.find((d) => d.day === day + 1);
   info.innerHTML = [
-    prev?.title ? link(`../${prev.day}/`, `${arrow("M13 8H3M7.5 3.5 3 8l4.5 4.5")}${prev.day}`, `Previous: ${prev.day}. ${prev.title}`) : "",
-    link("../", `${event} ${year}`),
-    next?.title ? link(`../${next.day}/`, `${next.day}${arrow("M3 8h10M8.5 3.5 13 8l-4.5 4.5")}`, `Next: ${next.day}. ${next.title}`) : "",
+    prev?.title ? link(`../${prev.day}/`, `${arrow("M11 3.5v9L4.5 8z")}<span>${prev.day}</span>`, `Previous: ${prev.day}. ${prev.title}`) : "",
+    link("../", `<span>${event} ${year}</span>`),
+    next?.title ? link(`../${next.day}/`, `<span>${next.day}</span>${arrow("M5 3.5v9L11.5 8z")}`, `Next: ${next.day}. ${next.title}`) : "",
   ].join("");
   document.body.append(info);
 

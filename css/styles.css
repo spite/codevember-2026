@@ -169,6 +169,11 @@ canvas {
       display: block;
       flex-shrink: 0;
     }
+
+    /* Trimmed to the capitals, so the letters themselves sit in the middle. */
+    span {
+      text-box: trim-both cap alphabetic;
+    }
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     text-decoration: none;
