@@ -1,4 +1,4 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, randomize, isRunning, setRunning, applyUrlState, keysHelp, setDay } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, randomize, isRunning, setRunning, applyUrlState, keysHelp, setDay, showHint } from "common";
 import { GUI } from "guspira";
 import { Scene, Mesh, Group, InstancedMesh, Matrix4, Quaternion, Vector3, IcosahedronGeometry, BufferGeometry } from "three";
 import { mergeVertices } from "third_party/BufferGeometryUtils.js";
@@ -10,6 +10,7 @@ import { createShellMaterial, createFillMaterial, createPlainMaterial, applySubj
 import { SUBJECTS } from "./subjects.js";
 import { SHAPES, loadShape, offsetGeometry } from "./shapes.js";
 import { createTransport } from "./transport.js";
+import { createAutoChange } from "modules/autoChange.js";
 
 const defaults = {
   subject: "shell",
@@ -18,7 +19,9 @@ const defaults = {
   spray: 0.7,
   focus: 0.15,
   aperture: 0.2,
-  rotation: 0.4,
+  rotation: 0.8,
+  auto: true,
+  autoTime: 10,
 };
 
 const params = fromDefaults(defaults);
@@ -61,6 +64,7 @@ gui.addSelect("Shape", params.shape, Object.keys(SHAPES));
 gui.addSlider("Explosion", params.explosion, 0, 1, 0.01);
 gui.addSlider("Spray", params.spray, 0, 1, 0.01);
 gui.addSlider("Rotation", params.rotation, 0, 2, 0.01, { randomizable: false });
+const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTime, gui });
 gui.addSection("Depth of field", { open: true });
 // Focus runs from the nearest shell piece (0) to the farthest (1), and a little past either.
 gui.addSlider("Focus", params.focus, -0.5, 1.5, 0.01, { randomizable: false });
@@ -69,6 +73,7 @@ gui.endSection();
 pipeline.addGUI(gui);
 gui.addSeparator();
 gui.addText(keysHelp());
+showHint("Drag to orbit · scroll to zoom · R for a new burst", "Drag to orbit · tap {randomize} for a new burst");
 gui.show();
 
 const scene = new Scene();
@@ -452,9 +457,41 @@ shapes.set(params.shape(), await loadShape(params.shape()));
 update();
 await pipeline.compileAsync(scene, camera);
 
+// Auto change: each new object plays its whole burst in slow motion over the first BURST_SHARE of
+// Change every, then holds; a recording (?capture) drives its own changes.
+const BURST_SHARE = 0.6;
+const autoOn = () => params.auto() && !new URLSearchParams(location.search).has("capture");
+let shownKey = built;
+let burstPending = false;
+
+function burst() {
+  params.explosion.set(0);
+  transport.play(1, params.autoTime() * BURST_SHARE);
+}
+
+// A new object starts intact and bursts once it is built (a shape may still be loading).
+onRandomize(() => {
+  if (!autoOn()) return;
+  transport.setPlaying(false);
+  params.explosion.set(0);
+  burstPending = true;
+});
+
+// A link with an explosion holds that moment; otherwise the first object bursts.
+if (autoOn() && !new URLSearchParams(location.search).has("explosion")) burst();
+
 render(({ dt }) => {
+  autoChange.update(dt);
   transport.update(dt);
   update();
+  if (built !== shownKey) {
+    shownKey = built;
+    autoChange.restart();
+    if (burstPending) {
+      burstPending = false;
+      burst();
+    }
+  }
   controls.autoRotateSpeed = params.rotation();
   controls.update(dt);
   // Nothing animates with time, so whenever the view holds still the lens average refines it.

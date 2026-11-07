@@ -38,6 +38,9 @@ function createTransport({ value, duration = 4, onRandomize, onPlay }) {
   document.body.append(root);
 
   let playing = false;
+  // Where playback stops, and how fast it gets there (per second).
+  let until = 1;
+  let rate = 0;
   const setPlaying = (v) => {
     playing = v;
     play.innerHTML = icon(v ? "pause" : "play");
@@ -52,6 +55,8 @@ function createTransport({ value, duration = 4, onRandomize, onPlay }) {
   play.addEventListener("click", () => {
     if (playing) return setPlaying(false);
     if (value() >= 1) value.set(0);
+    until = 1;
+    rate = 1 / duration;
     setPlaying(true);
     onPlay?.();
   });
@@ -68,9 +73,9 @@ function createTransport({ value, duration = 4, onRandomize, onPlay }) {
   // Called every frame with the page's dt (0 while paused).
   function update(dt) {
     if (playing) {
-      const next = Math.min(1, value() + dt / duration);
+      const next = Math.min(until, value() + dt * rate);
       value.set(next);
-      if (next >= 1) setPlaying(false);
+      if (next >= until) setPlaying(false);
     }
     const v = value();
     if (document.activeElement !== scrub || playing) scrub.value = v;
@@ -81,7 +86,12 @@ function createTransport({ value, duration = 4, onRandomize, onPlay }) {
   return {
     update,
     setPlaying,
-    play: () => setPlaying(true),
+    // Plays from where it is to `to`, taking `seconds` (or at the usual speed).
+    play: (to = 1, seconds = 0) => {
+      until = to;
+      rate = seconds > 0 ? Math.max(to - value(), 1e-3) / seconds : 1 / duration;
+      setPlaying(true);
+    },
     get playing() {
       return playing;
     },
