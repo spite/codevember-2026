@@ -1,4 +1,4 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, keysHelp, setDay, getSeed, applyUrlState, addKey, showHint } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, keysHelp, setDay, getSeed, applyUrlState, addKey, showHint, loadingStep } from "common";
 import { GUI } from "guspira";
 import { createAutoChange } from "modules/autoChange.js";
 import { EqualDepth, Scene, Mesh, Group, InstancedMesh, BufferGeometry, BufferAttribute, Vector3, Matrix3, Matrix4 } from "three";
@@ -42,6 +42,8 @@ const defaults = {
   autoTime: 15,
 };
 const params = fromDefaults(defaults);
+// Load progress: the seed shape, the first sculpture, the studio and the shader programs.
+const load = { field: loadingStep(1), build: loadingStep(3), studio: loadingStep(1), compile: loadingStep(4) };
 const touch = matchMedia("(pointer: coarse)").matches;
 
 const FLOOR_Y = -1;
@@ -479,13 +481,13 @@ onRandomize(() => gui.randomizeAll());
 applyUrlState();
 updateLook();
 // Start on the first look at the growing form; the build carries on in the background.
-await rd.ready;
+await load.field.track(rd.ready);
 const firstBuild = build();
-await Promise.race([firstBuild, shown]);
-await studio;
+await load.build.track(Promise.race([firstBuild, shown]));
+await load.studio.track(studio);
 if (shells) shells.visible = true;
 syncShellDepth();
-await pipeline.compileAsync(scene, camera);
+await load.compile.track(pipeline.compileAsync(scene, camera), 4);
 started = true;
 
 window.app = { canvas: renderer.domElement, pipeline, controls, params, shared, rd, regrow };

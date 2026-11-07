@@ -15,6 +15,8 @@ import {
   loadSeed,
   getSeed,
   showHint,
+  showSoundHint,
+  loadingStep,
 } from "common";
 import { GUI } from "guspira";
 import { createAutoChange } from "modules/autoChange.js";
@@ -78,6 +80,8 @@ const defaults = {
 };
 
 const params = fromDefaults(defaults);
+// Load progress: the paper's textures, Ammo, the sounds, the studio and the shader programs.
+const load = { paper: loadingStep(1), physics: loadingStep(2), sound: loadingStep(1), studio: loadingStep(1), compile: loadingStep(4) };
 const touch = matchMedia("(pointer: coarse)").matches;
 
 const FLOOR_Y = -3.1;
@@ -141,7 +145,7 @@ const studio = createStudioEnvironmentAsync(renderer, {
   tint: 0xfdfdfd,
 });
 
-const sound = createPaperSound();
+const sound = createPaperSound({ onProgress: load.sound.set });
 const soundButton = addActionButton("../assets/sound.svg", "Sound", () => toggleSound());
 function toggleSound() {
   sound.setEnabled(!sound.enabled);
@@ -172,11 +176,12 @@ gui.addText(
     : `Drag a shape to throw it, tap to scatter.<br/>${keysHelp()}`,
 );
 showHint("Drag a shape to throw it · drag the backdrop to orbit · R for new shapes", "Drag a shape to throw it · tap {randomize} for new ones");
+showSoundHint();
 gui.show();
 
 const scene = new Scene();
 
-const paperTexture = await loadPaperTexture(renderer, { tile: 0.35 });
+const paperTexture = await load.paper.track(loadPaperTexture(renderer, { tile: 0.35 }));
 
 const paper = new PipelineMaterial({
   color: PAPER,
@@ -323,7 +328,7 @@ cyc.userData.noShadow = true;
 cyc.renderOrder = 1;
 scene.add(cyc);
 
-const physics = await Physics.create({ damping: 0.08, angularDamping: 0.12 });
+const physics = await load.physics.track(Physics.create({ damping: 0.08, angularDamping: 0.12 }));
 physics.addPlane({ x: 0, y: 1, z: 0 }, FLOOR_Y);
 const pointer = createPointer({
   physics,
@@ -810,8 +815,10 @@ function updateCrease(time) {
 const dq = new Quaternion();
 let started = false;
 
-await studio;
-await pipeline.compileAsync(scene, camera);
+await load.studio.track(studio);
+// The samples are in before the first frame, so the first click already sounds.
+await sound.downloaded;
+await load.compile.track(pipeline.compileAsync(scene, camera), 4);
 
 // Handle for scripted capture and the console: nextLook() transitions to a seed or a set of settings.
 window.app = {

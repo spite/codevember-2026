@@ -27,7 +27,8 @@ function report(name, delay, gain, status, all = false) {
   setTimeout(() => console.log(`sound: ${name} (${WHAT[name] ?? name}), gain ${gain.toFixed(2)}: ${status}`), Math.max(delay, 0) * 1000);
 }
 
-export function createMachineSound({ base = "./sounds/", enabled = true } = {}) {
+// The samples download right away (onProgress(fraction) follows them); they are decoded once the AudioContext starts.
+export function createMachineSound({ base = "./sounds/", enabled = true, onProgress } = {}) {
   let ctx = null;
   let master = null;
   let on = enabled;
@@ -38,6 +39,16 @@ export function createMachineSound({ base = "./sounds/", enabled = true } = {}) 
   const buffers = {};
   const last = {};
   const lastAt = {};
+
+  const files = Object.entries(SETS).flatMap(([name, n]) => Array.from({ length: n }, (_, i) => ({ name, i })));
+  let fetched = 0;
+  for (const file of files) {
+    file.data = fetch(`${base}${file.name}-${file.i}.mp3`)
+      .then((res) => res.arrayBuffer())
+      .finally(() => onProgress?.(++fetched / files.length));
+    file.data.catch(() => {});
+  }
+  const downloaded = Promise.allSettled(files.map((f) => f.data));
 
   async function start() {
     if (ctx) return;
@@ -50,16 +61,13 @@ export function createMachineSound({ base = "./sounds/", enabled = true } = {}) 
     master.gain.value = on ? 0.8 : 0;
     master.connect(comp).connect(ctx.destination);
     await Promise.all(
-      Object.entries(SETS).flatMap(([name, n]) =>
-        Array.from({ length: n }, async (_, i) => {
-          try {
-            const data = await (await fetch(`${base}${name}-${i}.mp3`)).arrayBuffer();
-            (buffers[name] ??= [])[i] = await ctx.decodeAudioData(data);
-          } catch (e) {
-            console.warn("machine sound", name, i, e);
-          }
-        }),
-      ),
+      files.map(async ({ name, i, data }) => {
+        try {
+          (buffers[name] ??= [])[i] = await ctx.decodeAudioData(await data);
+        } catch (e) {
+          console.warn("machine sound", name, i, e);
+        }
+      }),
     );
   }
 
@@ -175,5 +183,5 @@ export function createMachineSound({ base = "./sounds/", enabled = true } = {}) 
     logger = fn;
   }
 
-  return { play, ratchet, escapement, setEnabled, setPaused, setLogger, get enabled() { return on; }, sets: SETS };
+  return { play, ratchet, escapement, setEnabled, setPaused, setLogger, downloaded, get enabled() { return on; }, sets: SETS };
 }

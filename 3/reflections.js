@@ -7,9 +7,9 @@ const azimuth = (v) => Math.atan2(v.z, v.x);
 
 // An HDR for reflections only: turned so its brightest light sits at the key's azimuth,
 // and scaled to the brightness of the env it replaces. Resolves to { envMap, maxLod }.
-async function loadReflections(renderer, url, { keyDirection, match }) {
+async function loadReflections(renderer, url, { keyDirection, match, onProgress }) {
   const { HDRLoader } = await import("three/addons/loaders/HDRLoader.js");
-  const texture = await new HDRLoader().setDataType(FloatType).loadAsync(url);
+  const texture = await new HDRLoader().setDataType(FloatType).loadAsync(url, (e) => e.total && onProgress?.(e.loaded / e.total));
   const { width: W, height: H, data } = texture.image;
   const C = data.length / (W * H);
   const source = data.slice();

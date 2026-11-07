@@ -1,4 +1,4 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, randomize, isRunning, setRunning, applyUrlState, keysHelp, setDay, showHint } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, randomize, isRunning, setRunning, applyUrlState, keysHelp, setDay, showHint, loadingStep } from "common";
 import { GUI } from "guspira";
 import { Scene, Mesh, Group, InstancedMesh, Matrix4, Quaternion, Vector3, IcosahedronGeometry, BufferGeometry } from "three";
 import { mergeVertices } from "third_party/BufferGeometryUtils.js";
@@ -25,6 +25,8 @@ const defaults = {
 };
 
 const params = fromDefaults(defaults);
+// Load progress: the first shape and the shader programs.
+const load = { shape: loadingStep(1), compile: loadingStep(4) };
 
 const pipeline = new Pipeline(renderer, {
   background: 0xffffff,
@@ -453,9 +455,9 @@ window.app = {
 
 // The url's subject and shape, so the first build is the one asked for.
 applyUrlState();
-shapes.set(params.shape(), await loadShape(params.shape()));
+shapes.set(params.shape(), await load.shape.track(loadShape(params.shape())));
 update();
-await pipeline.compileAsync(scene, camera);
+await load.compile.track(pipeline.compileAsync(scene, camera), 4);
 
 // Auto change: each new object plays its whole burst in slow motion over the first BURST_SHARE of
 // Change every, then holds; a recording (?capture) drives its own changes.
@@ -497,4 +499,12 @@ render(({ dt }) => {
   // Nothing animates with time, so whenever the view holds still the lens average refines it.
   pipeline.render(scene, camera, 0);
   firstFrame();
+});
+
+// The other shapes build in the background, one at a time, so a change never waits for one.
+rendered.then(async () => {
+  for (const name of Object.keys(SHAPES)) {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    if (!shapes.has(name)) shapes.set(name, await loadShape(name));
+  }
 });

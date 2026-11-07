@@ -331,6 +331,78 @@ function showHint(desktop, touch = desktop) {
   hintText = matchMedia("(pointer: coarse)").matches ? touch : desktop;
 }
 
+// A day with sound calls showSoundHint() before the first frame: a second pill under the hint says a click
+// or tap turns the sound on, unless the page has already had one.
+let soundHint = false;
+function showSoundHint() {
+  soundHint = true;
+}
+
+// Load progress in the placeholder's pill. Declare every step up front, so the total is known from the start:
+// const step = loadingStep(weight); … step.set(0.5); … step.track(promise). The pill fills by weight.
+// track(promise, seconds) creeps toward the step's end over about that long, for work that can't report
+// its progress (shader compiles).
+const loadingSteps = [];
+let loadingShown = 0;
+function loadingStep(weight = 1) {
+  const step = {
+    weight,
+    value: 0,
+    set(f) {
+      step.value = Math.max(step.value, Math.min(1, f));
+      showLoadingProgress();
+    },
+    done() {
+      step.set(1);
+    },
+    track(promise, seconds = 0) {
+      const start = performance.now();
+      const creep = seconds > 0 && setInterval(() => step.set(0.9 * (1 - Math.exp((start - performance.now()) / 1000 / seconds))), 100);
+      const finish = () => {
+        clearInterval(creep);
+        step.done();
+      };
+      promise.then(finish, finish);
+      return promise;
+    },
+  };
+  loadingSteps.push(step);
+  showLoadingProgress();
+  return step;
+}
+
+function showLoadingProgress() {
+  const span = loading?.querySelector("span");
+  if (!span || loading.classList.contains("hint")) return;
+  const total = loadingSteps.reduce((a, s) => a + s.weight, 0);
+  const value = loadingSteps.reduce((a, s) => a + s.weight * s.value, 0);
+  loadingShown = Math.max(loadingShown, total > 0 ? value / total : 0);
+  loading.classList.add("progress");
+  span.style.setProperty("--progress", loadingShown);
+}
+
+// fetch(), with onProgress(fraction) as the body arrives. Resolves to a Response once it is all in.
+async function fetchWithProgress(url, onProgress) {
+  const res = await fetch(url);
+  const total = Number(res.headers.get("content-length"));
+  if (!res.ok || !res.body || !total) {
+    onProgress?.(1);
+    return res;
+  }
+  const reader = res.body.getReader();
+  const chunks = [];
+  let loaded = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.length;
+    onProgress?.(loaded / total);
+  }
+  onProgress?.(1);
+  return new Response(new Blob(chunks), { status: res.status, statusText: res.statusText, headers: res.headers });
+}
+
 function hideLoading() {
   if (!loading.isConnected || loading.classList.contains("done")) return;
   loading.classList.add("done");
@@ -343,6 +415,15 @@ function ready() {
   if (!loading?.isConnected || loading.classList.contains("done")) return;
   const span = loading.querySelector("span");
   if (!hintText || !span) return hideLoading();
+  if (soundHint && !navigator.userActivation?.hasBeenActive) {
+    const note = document.createElement("span");
+    note.className = "sound-hint";
+    const img = document.createElement("img");
+    img.src = "../assets/sound.svg";
+    img.alt = "";
+    note.append(img, matchMedia("(pointer: coarse)").matches ? "Tap anywhere for sound" : "Click anywhere for sound");
+    loading.append(note);
+  }
   const from = span.getBoundingClientRect().width;
   span.style.width = `${from}px`;
   loading.classList.add("hint");
@@ -501,6 +582,9 @@ export {
   pause,
   onPause,
   randomize,
+  loadingStep,
+  fetchWithProgress,
+  showSoundHint,
   applyUrlState,
   loadSeed,
   onRandomize,

@@ -1,4 +1,5 @@
 import { clearance } from "./clearance.js";
+import { fetchWithProgress } from "common";
 import {
   BufferGeometry,
   BufferAttribute,
@@ -33,29 +34,49 @@ const cache = new Map();
 // Resolves to { name, key, radius, center, geometry (render mesh, densified on request), walk (undensified mesh the
 // sim walks on), level (Loop subdivision level, Suzanne only), sdf: { texture, min, size, step, res, sample, grad,
 // raycast }, topology() (of walk) }.
-export function loadShape(name, { lite = false, densify = false } = {}) {
+// onProgress(fraction) follows the download.
+export function loadShape(name, { lite = false, densify = false, onProgress } = {}) {
   const id = `${name}|${lite}|${densify}`;
   if (!cache.has(id)) {
-    const promise = build(name, lite, densify);
+    const promise = build(name, lite, densify, onProgress);
     cache.set(id, promise);
     promise.catch(() => cache.delete(id));
   }
   return cache.get(id);
 }
 
-async function get(url, type) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`${url}: ${res.status}`);
-  return res[type]();
+// Downloads are kept, so prefetchShapes() can fetch every shape ahead of its first use.
+const files = new Map();
+function download(url, onProgress) {
+  const key = String(url);
+  if (!files.has(key)) {
+    const promise = fetchWithProgress(url, onProgress).then((res) => {
+      if (!res.ok) throw new Error(`${url}: ${res.status}`);
+      return res.arrayBuffer();
+    });
+    files.set(key, promise);
+    promise.catch(() => files.delete(key));
+  }
+  return files.get(key);
 }
 
-async function build(name, lite, densify) {
+async function get(url, type, onProgress) {
+  const buffer = await download(url, onProgress);
+  return type === "text" ? new TextDecoder().decode(buffer) : buffer;
+}
+
+export function prefetchShapes() {
+  for (const { key } of Object.values(SHAPES)) download(new URL(`${key}.bin`, base)).catch(() => {});
+  download(new URL("suzanne.obj", base)).catch(() => {});
+}
+
+async function build(name, lite, densify, onProgress) {
   const { key } = SHAPES[name];
   // Suzanne's cage comes from its .obj, fetched alongside the .bin.
   const objUrl = key === "suzanne" ? new URL("suzanne.obj", base).href : null;
   const objFetch = objUrl && get(objUrl, "text");
   objFetch?.catch(() => {});
-  const buffer = await get(new URL(`${key}.bin`, base), "arrayBuffer");
+  const buffer = await get(new URL(`${key}.bin`, base), "arrayBuffer", onProgress);
   const { header, arrays } = decodeAsset(buffer);
 
   let geometry;

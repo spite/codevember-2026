@@ -1,4 +1,4 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, keysHelp, setDay, addKey, showHint } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, keysHelp, setDay, addKey, showHint, loadingStep } from "common";
 import { GUI } from "guspira";
 import { createAutoChange } from "modules/autoChange.js";
 import { Scene, Mesh, Vector3 } from "three";
@@ -112,6 +112,9 @@ globalUniforms.aoMin.value = 0.06;
 globalUniforms.lightSpecular.value = 0;
 globalUniforms.specularShadow.value = 1;
 
+// Load progress: the studio, the studio HDR when the url asks for it, and the shader programs.
+const hdrFirst = new URLSearchParams(location.search).get("reflections") === "hdr";
+const load = { studio: loadingStep(1), hdr: hdrFirst ? loadingStep(6) : null, compile: loadingStep(4) };
 const studio = createStudioEnvironmentAsync(renderer, {
   keyDirection: KEY_DIRECTION,
   keyIntensity: 30,
@@ -128,9 +131,9 @@ const studio = createStudioEnvironmentAsync(renderer, {
 const envs = {};
 studio.then((env) => (envs.studio = { envMap: env.envMap, maxLod: Math.max(env.envMap.mipmaps.length - 1, 0) }));
 let hdrLoad = null;
-function loadHdr() {
+function loadHdr(onProgress) {
   return (hdrLoad ??= studio
-    .then((env) => loadReflections(renderer, "../assets/studio_small_03_2k.hdr", { keyDirection: KEY_DIRECTION, match: env.envMap }))
+    .then((env) => loadReflections(renderer, "../assets/studio_small_03_2k.hdr", { keyDirection: KEY_DIRECTION, match: env.envMap, onProgress }))
     .then((env) => (envs.hdr = env)));
 }
 function updateReflections() {
@@ -220,9 +223,10 @@ retie(false);
 updateSection(true);
 knots.update(0, 0);
 tangle.update(renderer, 0, pipeline.depthTexture);
-await studio;
+await load.studio.track(studio);
+if (load.hdr) await load.hdr.track(loadHdr(load.hdr.set));
 updateReflections();
-await Promise.all([pipeline.compileAsync(scene, camera), tangle.compileAsync(renderer, camera)]);
+await load.compile.track(Promise.all([pipeline.compileAsync(scene, camera), tangle.compileAsync(renderer, camera)]), 4);
 // The other finishes and the cross-fade build in the background, so changing finish never stalls.
 const finishes = new Scene();
 for (let f = 0; f < 4; f++) {

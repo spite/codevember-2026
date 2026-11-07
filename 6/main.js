@@ -1,4 +1,4 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, randomize, keysHelp, setDay, addKey, getSeed, applyUrlState, addActionButton, onPause, showHint } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, randomize, keysHelp, setDay, addKey, getSeed, applyUrlState, addActionButton, onPause, showHint, showSoundHint, loadingStep } from "common";
 import { GUI, signal, effect } from "guspira";
 import { createAutoChange } from "modules/autoChange.js";
 import { Scene, Mesh, Group, InstancedMesh, InstancedBufferAttribute, BufferGeometry, BufferAttribute, SphereGeometry, Matrix4, Vector2, Vector3, Color, Raycaster, Sphere, DynamicDrawUsage } from "three";
@@ -58,6 +58,8 @@ const defaults = {
 };
 const params = fromDefaults(defaults);
 const capture = new URLSearchParams(location.search).has("capture");
+// Load progress: the sounds, the studio and the shader programs.
+const load = { sound: loadingStep(2), studio: loadingStep(1), compile: loadingStep(4) };
 
 const pipeline = new Pipeline(renderer, {
   quality: lowEnd ? "low" : "auto",
@@ -137,7 +139,7 @@ effect(() => {
 });
 pipeline.addGUI(gui);
 gui.addSeparator();
-const sound = createMachineSound();
+const sound = createMachineSound({ onProgress: load.sound.set });
 const soundButton = addActionButton("../assets/sound.svg", "Sound", () => toggleSound());
 function toggleSound() {
   sound.setEnabled(!sound.enabled);
@@ -152,6 +154,7 @@ gui.addText(
     : `Click turntables, dials and plates to set them moving. Drag to orbit, scroll to zoom.<br/>${keysHelp()}`,
 );
 showHint("Click turntables, dials and plates · drag to orbit · R for a new orrery", "Tap parts to pop them · tap {randomize} for a new one");
+showSoundHint();
 gui.show();
 
 const scene = new Scene();
@@ -1061,7 +1064,7 @@ onRandomize(() => gui.randomizeAll());
 
 // Programs don't depend on the plates' vertex data, so they compile in parallel with the first build.
 let atlasReady = false;
-const compiled = Promise.all([pipeline.compileAsync(scene, camera), motifAtlas.compile()]);
+const compiled = load.compile.track(Promise.all([pipeline.compileAsync(scene, camera), motifAtlas.compile()]), 4);
 applyUrlState();
 // Unknown names from the url fall back to the defaults.
 if (!(params.finish() in FINISHES)) params.finish.set(defaults.finish);
@@ -1071,7 +1074,9 @@ if (!["random", "symmetric"].includes(params.layout()) && !(params.layout() in P
 startRebuild(false);
 updateLook(1);
 updateInstances();
-await studio;
+await load.studio.track(studio);
+// The samples are in before the first frame, so the first click already sounds.
+await sound.downloaded;
 await compiled;
 atlasReady = true;
 motifAtlas.draw(shared.motifSeed.value);

@@ -1,4 +1,4 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, keysHelp, setDay, addKey, showHint } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, keysHelp, setDay, addKey, showHint, loadingStep } from "common";
 import { getSeed } from "modules/random.js";
 import { GUI } from "guspira";
 import { createAutoChange } from "modules/autoChange.js";
@@ -9,7 +9,7 @@ import { globalUniforms } from "modules/pipeline/uniforms.js";
 import { loadReflections } from "./reflections.js";
 import { bakeReflectionEnv } from "./reflectionEnv.js";
 import { createBackdrop } from "./backdrop.js";
-import { SHAPES, loadShape } from "./shapeAsset.js";
+import { SHAPES, loadShape, prefetchShapes } from "./shapeAsset.js";
 import { FINISHES, applyFinish, lookUniforms, createBodyMaterial, createDropMaterial, createPuddleMaterial } from "./materials.js";
 import { createRotation, MOTION_MODES } from "./rotation.js";
 import { createField } from "./field.js";
@@ -93,9 +93,9 @@ const studio = createStudioEnvironmentAsync(renderer, {
 const envs = {};
 studio.then((env) => (envs.studio = { envMap: env.envMap, maxLod: Math.max(env.envMap.mipmaps.length - 1, 0) })).catch(() => {});
 let hdrLoad = null;
-function loadHdr() {
+function loadHdr(onProgress) {
   return (hdrLoad ??= studio
-    .then((env) => loadReflections(renderer, "../assets/studio_small_03_2k.hdr", { keyDirection: KEY_DIRECTION, match: env.envMap }))
+    .then((env) => loadReflections(renderer, "../assets/studio_small_03_2k.hdr", { keyDirection: KEY_DIRECTION, match: env.envMap, onProgress }))
     .then((env) => {
       envs.hdr = env;
       lookKey = "";
@@ -358,12 +358,12 @@ function createMelt(next, walk = createSurfaceWalk(next.walk, next.topology())) 
   };
 }
 
-async function setShape(name) {
+async function setShape(name, onProgress) {
   shapeRequest = name;
   let next;
   try {
     // Densified on phones too: the hanging pools are drawn from the body's own vertices.
-    next = await loadShape(name, { lite, densify: pipeline.quality !== "low" });
+    next = await loadShape(name, { lite, densify: pipeline.quality !== "low", onProgress });
   } catch (e) {
     console.error(`Shape ${name} failed to load`, e);
     if (shapeRequest === name && shape) params.shape.set(shape.name);
@@ -517,15 +517,17 @@ function updateFraming() {
 onRandomize(() => gui.randomizeAll());
 // The url's seed and params first, so the first shape built and warmed is the one asked for.
 applyUrlState();
+// Load progress: the first shape, the studio, the studio HDR when it is picked, and the shader programs.
+const load = { shape: loadingStep(3), studio: loadingStep(1), hdr: params.reflections() === "hdr" ? loadingStep(6) : null, compile: loadingStep(4) };
 
 // Programs don't depend on the shape or the envs, so they compile while those load.
-const compiled = Promise.all([pipeline.compileAsync(scene, camera), bake.compileAsync(renderer)]);
+const compiled = load.compile.track(Promise.all([pipeline.compileAsync(scene, camera), bake.compileAsync(renderer)]), 4);
 updateLook();
-await setShape(params.shape());
-await studio;
+await load.shape.track(setShape(params.shape(), load.shape.set));
+await load.studio.track(studio);
 lookKey = "";
 updateLook();
-if (params.reflections() === "hdr") await loadHdr();
+if (load.hdr) await load.hdr.track(loadHdr(load.hdr.set));
 // The pools' profile tables, built while the GPU compiles rather than on the first frame.
 dropTables();
 await compiled;
@@ -533,7 +535,9 @@ await compiled;
 window.app = { canvas: renderer.domElement, camera, pipeline, controls, body, dropMesh, puddleMesh, drops, puddle, rotation, backdrop, scene, params, field, setShape, resetMelt, hit: hitBody, get shape() { return shape; }, get melt() { return melt; } };
 
 let wasPaused = false;
-render(({ time, dt }) => {
+render(({ time, dt, frame }) => {
+  // The other shapes download once the first frame is up, so a change only waits to build one.
+  if (frame === 1) prefetchShapes();
   // The first frame after a pause carries the paused time (up to 0.1 s); it steps as one substep.
   if (wasPaused && dt > 0) dt = Math.min(dt, SUBSTEP);
   wasPaused = dt === 0;
