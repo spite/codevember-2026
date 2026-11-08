@@ -394,6 +394,8 @@ class LampShadow {
       this.mesh.frustumCulled = false;
       this.scene.add(this.mesh);
     }
+    // A geometry made only for the glow (a sketch's) is dropped when replaced.
+    if (this.mesh.geometry !== geometry && this.mesh.geometry.userData.sketch) this.mesh.geometry.dispose();
     this.mesh.geometry = geometry;
   }
 

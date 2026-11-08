@@ -43,7 +43,7 @@ function createSketchLines({ color, opacity, width, depthTest, soft = false }) {
     fragmentShader,
     uniforms: { color: { value: color.isColor ? color : new Color(color) }, opacity: { value: opacity }, width: { value: width }, soft: { value: soft ? 1 : 0 }, resolution: { value: new Vector2(1, 1) } },
     transparent: true,
-    blending: soft ? AdditiveBlending : undefined,
+    ...(soft && { blending: AdditiveBlending }),
     depthTest,
     depthWrite: false,
   });

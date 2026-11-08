@@ -1,5 +1,6 @@
 // Ways for the light through the hollowed lattice: A* over a clearance grid of the final mesh, shortcut by line of
 // sight, so the light goes round the struts and through the holes instead of jumping across a wall.
+import { Heap } from "./surface.js";
 
 const NB = [];
 for (let c = -1; c <= 1; c++)
@@ -21,7 +22,7 @@ class LightPath {
     this.stamp = 0;
     const [nx, ny] = this.n;
     this.off = NB.map(([a, b, c, w]) => [a + nx * (b + ny * c), w, a, b, c]);
-    this.heap = { k: new Float64Array(4096), v: new Int32Array(4096), n: 0 };
+    this.heap = new Heap(4096);
   }
 
   node(x, y, z) {
@@ -49,43 +50,6 @@ class LightPath {
       if (this.at(a[0] + dx * t, a[1] + dy * t, a[2] + dz * t) < c) return false;
     }
     return true;
-  }
-
-  push(key, val) {
-    const H = this.heap;
-    if (H.n >= H.k.length) {
-      const k = new Float64Array(H.k.length * 2), v = new Int32Array(H.k.length * 2);
-      k.set(H.k); v.set(H.v);
-      H.k = k; H.v = v;
-    }
-    let i = H.n++;
-    while (i > 0) {
-      const p = (i - 1) >> 1;
-      if (H.k[p] <= key) break;
-      H.k[i] = H.k[p]; H.v[i] = H.v[p];
-      i = p;
-    }
-    H.k[i] = key; H.v[i] = val;
-  }
-
-  pop() {
-    const H = this.heap, K = H.k, V = H.v;
-    const val = V[0];
-    const n = --H.n;
-    if (n > 0) {
-      const key = K[n], v = V[n];
-      let i = 0;
-      for (;;) {
-        let c = 2 * i + 1;
-        if (c >= n) break;
-        if (c + 1 < n && K[c + 1] < K[c]) c++;
-        if (K[c] >= key) break;
-        K[i] = K[c]; V[i] = V[c];
-        i = c;
-      }
-      K[i] = key; V[i] = v;
-    }
-    return val;
   }
 
   // Points from `from` toward `to` through space with clearance c. If `to` can't be reached (inside a wall, or cut
@@ -119,13 +83,16 @@ class LightPath {
     this.seen[start] = stamp;
     this.cost[start] = 0;
     this.parent[start] = -1;
-    this.push(h(start), start);
+    this.heap.push(h(start), start);
     let best = start, bestH = h(start), expanded = 0;
     while (this.heap.n && expanded++ < maxExpand) {
-      const q = this.pop();
+      const q = this.heap.pop();
       const hq = h(q);
       if (hq < bestH) { bestH = hq; best = q; }
       if (q === goal) break;
+      // Border nodes are dead ends: a step from one would wrap to the far side of the grid.
+      const qi = q % nx, qj = ((q / nx) | 0) % ny, qk = (q / NXY) | 0;
+      if (qi === 0 || qj === 0 || qk === 0 || qi === nx - 1 || qj === ny - 1 || qk === this.n[2] - 1) continue;
       const cq = this.cost[q];
       for (const [o, w] of this.off) {
         const r = q + o;
@@ -136,7 +103,7 @@ class LightPath {
         this.seen[r] = stamp;
         this.cost[r] = cr;
         this.parent[r] = q;
-        this.push(cr + 2 * h(r), r);
+        this.heap.push(cr + 2 * h(r), r);
       }
     }
     const way = [];

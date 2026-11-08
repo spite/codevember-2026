@@ -1,4 +1,4 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, keysHelp, setDay, getSeed, applyUrlState, addKey, loadingStep } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, keysHelp, setDay, getSeed, applyUrlState, addKey, loadingStep, showHint } from "common";
 import { GUI } from "guspira";
 import { Scene, Mesh, Group, BufferGeometry, BufferAttribute, Vector2, Vector3, Matrix3, Quaternion, Color, SphereGeometry, Sphere, MathUtils } from "three";
 import { Pipeline } from "modules/pipeline/Pipeline.js";
@@ -121,7 +121,7 @@ function weighted(list, weight, u) {
 }
 function pickShape(f) {
   const a = Math.random(), b = Math.random();
-  const family = f === "random" ? weighted(Object.keys(FAMILIES), (k) => FAMILY_WEIGHT[k] ?? 1, a) : f;
+  const family = f in FAMILIES ? f : weighted(Object.keys(FAMILIES), (k) => FAMILY_WEIGHT[k] ?? 1, a);
   return weighted(familyOf(family), (s) => SHAPE_WEIGHT[s.id] ?? 1, b).id;
 }
 
@@ -663,18 +663,20 @@ function restart() {
   done = false;
   lastAsked = 0;
   pending = [];
+  const t = token;
   if (solid?.key === desc.key && solid.look === lookKey()) {
     const again = () => {
+      if (t !== token) return false;
       install(solid);
       shownLook = lookKey();
       ready = true;
     };
+    ready = false;
     if (morph.to === 0 || morph.queued) morph.queued = { solid: again };
     else again();
     return;
   }
   ready = false;
-  const t = token;
   const lk = lookKey();
   let tries = 0;
   const ask = () =>
@@ -682,7 +684,11 @@ function restart() {
       if (d.stale || t !== token) return;
       if (d.error) {
         console.warn("Hollow mesher:", d.error);
-        return ++tries < 3 ? ask() : firstMesh();
+        if (++tries < 3) return ask();
+        // Given up: the page carries on, and kiosk mode moves to another sculpture.
+        ready = done = true;
+        autoChange.restart();
+        return firstMesh();
       }
       onSolid(d);
     }, (f) => {
@@ -692,7 +698,7 @@ function restart() {
   // A finished build waits behind a shape change under way (shrink, backdrop, material), then grows in.
   const onSolid = (d) => {
     if (morph.to === 0 || morph.queued) {
-      morph.queued = { solid: () => showSolid(d) };
+      morph.queued = { solid: () => t === token && showSolid(d) };
       return;
     }
     showSolid(d);
@@ -715,6 +721,7 @@ function restart() {
     ready = true;
     firstMesh();
     schedule();
+    return true;
   };
   ask();
 }
@@ -781,8 +788,9 @@ function stepMorph() {
       applyLook();
       // A finished build goes in as it is, and a sketch if it is still the preview or the shape being built. Anything
       // else is out of date: nothing grows in until the build's own solid arrives, so the old shape never comes back.
-      if (d.solid) d.solid();
-      else if (previewing || (desc && d.shape === desc.shape && d.form === desc.form)) applySketch(d);
+      if (d.solid) {
+        if (d.solid() === false) return;
+      } else if (previewing || (desc && d.shape === desc.shape && d.form === desc.form)) applySketch(d);
       else return;
       scaleTo(1, 0.6, (t) => Easings.OutBack(t, 1.2));
     }
@@ -890,6 +898,7 @@ function applySketch(d) {
   const lg = new BufferGeometry();
   lg.setAttribute("position", new BufferAttribute(P2, 3));
   lg.setIndex(new BufferAttribute(I2, 1));
+  lg.userData.sketch = true;
   lampShadow.setGeometry(lg);
   lampDirty = true;
 }
@@ -1003,7 +1012,8 @@ function relook() {
   const w = workers.find((w) => !w.busy);
   if (!w) return;
   shownLook = key;
-  const t = token;
+  // Meshes on their way with the old look are dropped, so none of them lands after this one.
+  const t = ++token;
   const E = done ? 1 : shownE;
   if (!done) {
     pending = [];
@@ -1012,7 +1022,7 @@ function relook() {
   relooking = true;
   request(w, { desc, E, look: look() }, (d) => {
     relooking = false;
-    if (!d.stale && !d.error && t === token && (done || d.E >= shownE)) install(d);
+    if (!d.stale && !d.error && t === token && d.E >= shownE) install(d);
   });
 }
 let relooking = false;
@@ -1142,6 +1152,7 @@ window.app = {
   canvas: renderer.domElement,
   pipeline,
   params,
+  camera,
   controls,
   state: () => ({ shownE, done, ready, erosion: erosionAt(hollowT), pending: pending.length, workers: workers.map((w) => Math.round(w.ms)), shape: desc?.shape, meta: sculpture }),
   rehollow,
@@ -1182,6 +1193,7 @@ let exposureSet = null;
 let exposureBoost = 1;
 let envSet = null;
 let envScale = 1;
+showHint("Drag to orbit · scroll to zoom · the light follows the mouse · R for a new sculpture", "Drag to orbit · pinch to zoom · tap to move the light · tap {randomize} for a new sculpture");
 render(({ dt }) => {
   autoChange.update(dt);
   clock += dt;
