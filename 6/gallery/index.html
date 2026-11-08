@@ -38,6 +38,11 @@ h1 { font: 600 clamp(2.1rem, 5vw, 3.6rem)/1.05 var(--display); letter-spacing: 0
 .filters button[aria-pressed="true"] { color: var(--velvet); background: var(--gold); border-color: var(--gold); }
 .filters button:focus-visible, .card:focus-visible, dialog button:focus-visible, dialog a:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .count { font: 400 0.78rem/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.jump { display: flex; flex-wrap: wrap; gap: 8px 22px; font: 500 0.78rem/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
+.jump a { color: var(--gold); text-decoration: none; border-bottom: 1px solid var(--gold-dim); padding-bottom: 3px; }
+.jump a:hover { border-bottom-color: var(--gold); }
+#layouts, #finishes-section { scroll-margin-top: 24px; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
 .section-head { display: grid; gap: 10px; margin: 72px 0 28px; padding-top: 28px; border-top: 1px solid var(--rule); }
 .section-head h2 { font: 600 clamp(1.6rem, 3.6vw, 2.4rem)/1.1 var(--display); letter-spacing: 0.04em; margin: 0; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 28px 22px; }
@@ -74,8 +79,9 @@ footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--rule);
     <div class="eyebrow"><a href="../">Codevember 2026 · Day 6 · Orrery</a></div>
     <h1>The Orrery Collection</h1>
     <p class="lede">Every layout the machine can build, each in <em>black enamel and gold</em>. Channels run along great and small circles, a turntable sits at every crossing, and the faces between them become engraved plates. The engraving cycles through the five motif sets.</p>
+    <nav class="jump" aria-label="Sections"><a href="#layouts">The layouts</a><a href="#finishes-section">The finishes</a></nav>
   </header>
-  <div class="bar">
+  <div class="bar" id="layouts">
     <div class="filters" role="group" aria-label="Show">
       <button type="button" id="f-all" data-kind="all" aria-pressed="true">All</button>
       <button type="button" id="f-preset" data-kind="preset" aria-pressed="false">Presets</button>
@@ -85,7 +91,7 @@ footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--rule);
     <div class="count" id="count"></div>
   </div>
   <div class="grid" id="grid"></div>
-  <section class="section-head" aria-labelledby="finishes">
+  <section class="section-head" id="finishes-section" aria-labelledby="finishes">
     <h2 id="finishes">Finishes</h2>
     <p class="lede">All twenty-two finishes, each on a different layout, with the bead sets and engraving motifs taking turns: polished metals, blued and two-tone pairings, verdigris and niello, and the champlevé enamels.</p>
   </section>
