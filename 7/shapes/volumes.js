@@ -128,7 +128,7 @@ function trefoilField(p) {
 
 // ── Suzanne ────────────────────────────────────────────────────────────────────────────────────────────
 
-// 7_v2/tools/suzanne-sdf.mjs: N³ half floats at cell centres over [-EXTENT, EXTENT]³, x fastest.
+// tools/suzanne-sdf.mjs (assets/suzanne-sdf-96.bin): N³ half floats at cell centres over [-EXTENT, EXTENT]³, x fastest.
 const SUZ_N = 96, SUZ_EXTENT = 1.12;
 let suzanneRaw = null;
 
@@ -142,14 +142,14 @@ function halfToFloat(u) {
 // Synchronous, since build() is: an XHR in the mesher worker, the file system in node.
 function loadSuzanne() {
   if (suzanneRaw) return suzanneRaw;
-  const url = new URL("../suzanne.bin", import.meta.url);
+  const url = new URL("../../assets/suzanne-sdf-96.bin", import.meta.url);
   let buffer;
   if (typeof XMLHttpRequest !== "undefined") {
     const xhr = new XMLHttpRequest();
     xhr.open("GET", url.href, false);
     xhr.responseType = "arraybuffer";
     xhr.send();
-    if (xhr.status !== 200 && xhr.status !== 0) throw new Error(`suzanne.bin: ${xhr.status}`);
+    if (xhr.status !== 200 && xhr.status !== 0) throw new Error(`suzanne-sdf-96.bin: ${xhr.status}`);
     buffer = xhr.response;
   } else {
     const fs = globalThis.process.getBuiltinModule("node:fs");

@@ -11,7 +11,7 @@ across the floor and the sweep behind it.
 The shapes are the Volumes family:
 
 - **Volumes** (`shapes/volumes.js`): plain solids. A thick trefoil knot, Suzanne (from a baked distance field,
-  `suzanne.bin`, with the ears and brow thickened), a sphere, an egg or pebble, a torus, a rounded cube, the five
+  `assets/suzanne-sdf-96.bin`, baked by `tools/suzanne-sdf.mjs`, with the ears and brow thickened), a sphere, an egg or pebble, a torus, a rounded cube, the five
   Platonic solids, a capsule, and a smooth blend of two of them.
 
 Three more families (surfaces, knots and tangles, fractals) are still in `shapes/` but hidden: `FAMILIES` in
