@@ -33,8 +33,8 @@ gears lock with a ka-ching.
 ## Gallery
 
 `gallery/` (linked from the panel) shows every layout the machine can build, each rendered in black enamel
-and gold at capture quality: the presets, the symmetric orbits and random circles. Each one opens in the
-sketch.
+and gold at capture quality: the presets, the symmetric orbits and random circles. Then every finish, each
+on a different layout with the bead and motif sets taking turns. Each one opens in the sketch.
 
 ## Finishes
 
