@@ -2,65 +2,49 @@ November 7, 2026
 
 "Hollow"
 
-A strange 3D-printed sculpture that hollows itself out. A solid (a thick trefoil knot, Suzanne, a sphere, an
+A sculpture that hollows itself out. A solid (a thick trefoil knot, Suzanne, a sphere, an
 egg, a torus, a rounded cube, a Platonic solid, a capsule or a blend of two) floats above a studio floor as a smooth, solid skin. Shallow
 dimples appear on it, break through, and widen into a lattice of rounded Voronoi struts. Then it holds, tumbling
 slowly in the air, and a warm light inside it glows through the thin walls and throws the pattern of its holes
 across the floor and the sweep behind it.
 
-The shapes are the Volumes family:
-
-- **Volumes** (`shapes/volumes.js`): plain solids. A thick trefoil knot, Suzanne (from a baked distance field,
-  `assets/suzanne-sdf-96.bin`, baked by `tools/suzanne-sdf.mjs`, with the ears and brow thickened), a sphere, an egg or pebble, a torus, a rounded cube, the five
-  Platonic solids, a capsule, and a smooth blend of two of them.
-
-Three more families (surfaces, knots and tangles, fractals) are still in `shapes/` but hidden: `FAMILIES` in
-`shapes/index.js` lists the ones offered.
-
-A sheet keeps its thickness either side of the surface, with a half-round bead along any open edge. A solid becomes a
-hollow skin around its surface.
+The shapes (`shapes/volumes.js`): a thick trefoil knot, Suzanne (from a baked distance field,
+`assets/suzanne-sdf-96.bin`, baked by `tools/suzanne-sdf.mjs`, with the ears and brow thickened), a sphere, an egg or
+pebble, a torus, a rounded cube, the five Platonic solids, a capsule, and a smooth blend of two of them. Other families
+(surfaces, knots and tangles, fractals) are still in `shapes/` but hidden: `FAMILIES` in `shapes/index.js` lists the
+ones offered. The solid becomes a hollow skin around its surface.
 
 ## How it is made
 
 Everything is geometry on a surface mesh, like perforating a mesh in MeshLab; there is no 3D field at run time.
 
-- **A fair surface** (`surface.js`). A parametric sheet is evaluated on a grid in (u, v): rows of constant v, each
-  sampled along u by its own length (so a pole or a short row isn't oversampled) and zipped to the next row; the axis
-  whose rows vary most is taken as u. A clipped region is cut along its clip line in (u, v), with the cut points
-  evaluated on the surface. Seams and poles are welded, short edges collapsed (each surviving vertex is still an
-  exact sample), and normals come from the parametrisation itself, after the warp. Where a weld joins sheets that
-  only cross (a Roman surface's double line), the triangles round the shared edge are paired opposite each other,
-  so each sheet carries straight on through the other. The two-sheeted Riemann surface is cut along the curves
-  where its polynomial is real, so its sheets weld across the branch cuts and cross there instead of creasing. An implicit surface (the solids,
-  Scherk) is meshed by surface nets, sampled finely only next to the surface, relaxed along it and projected onto
-  the field with Newton steps; its normals are the field's gradient. A self-intersecting immersion (Klein, Boy, Roman,
-  cross-cap) stays self-intersecting. A non-orientable sheet is wound consistently and cut along a seam: the two
-  copies of a seam vertex carry the same data with opposite normals, so its thick wall closes up across the seam.
+- **A fair surface** (`surface.js`). The solid's distance field is meshed by surface nets, sampled finely only next
+  to the surface, relaxed along it and projected onto the field with Newton steps; its normals are the field's
+  gradient. The mesh is turned to its principal axes (Suzanne keeps a fixed upright frame) and scaled to a common
+  reach, so every shape fits the same view.
 - **Fields on the surface** (`hollow.js`, prepare). A coarse distance grid to the vertices gives each vertex its
-  clearance (how far along its normal to another part of the surface: a solid's thickness, or another sheet passing
+  clearance (how far along its normal to another part of the surface: a solid's thickness, or another part passing
   close), its occlusion either side (a few short rays), and places the light. Curvature is how fast the normal turns.
-- **Cells.** Sites are Poisson-disc samples over graph distance on the mesh, so a sheet passing close never blocks
+- **Cells.** Sites are Poisson-disc samples over graph distance on the mesh, so a part of the surface passing close never blocks
   another. Their spacing comes from Cells, varies with noise, and is smaller where the surface is tight (curved, or a
   solid that is thin), then the whole layout is scaled to keep near the count asked for, but never wider than a
   solid is thick, so a cell can't wrap round a thin tube and cut it. No site sits right by an open edge. A small
   surface gets a finer mesh, so its smaller cells still have smooth struts. Each vertex takes the
   nearest site over the mesh (Dijkstra), then the nearest in space among the cells around it, so cell borders are the
-  planes halfway between sites and there is no cross-talk between sheets.
+  planes halfway between sites and there is no cross-talk between parts that pass close.
 - **Distance to the border.** Every vertex stores b, half the gap between its distances to the nearest site and to
   each neighbouring one (Worley's F2 - F1), which is the same from either side of a border, so the strut is
   continuous across it. The gaps to all the neighbours are blended by a soft min (log-sum-exp, its width set by
   Roundness): the corners of the holes round off and the sides bow out, so the holes are ovals, and the struts
-  thicken a little towards the joints, which read as webs. A sheet's open edge (and the rails of a twisted prism)
-  counts as one more neighbour, carried over the mesh from the edge, so a rim as wide as a strut runs along it.
+  thicken a little towards the joints, which read as webs.
   b's gradient along the surface is kept for the normals.
 - **Cutting and thickening** (`hollow.js`, mesh). Each cell has a strut half-width w: the hole is where b > w. The
   wall's half-thickness follows a quarter round across the lip: with s = (w - b) / r (r the lip radius, Fillet × the
   strut's final half-width), it is t · sin θ where s = 1 - cos θ. So with w ≈ r ≈ t a strut is a round tube, with
   Fillet below 1 a rounded band. The triangles are cut along isolines of s at even steps of θ (marching triangles in
-  bands), so the lip's round profile is sampled finely whatever the mesh; the rim (s = 0) is shared by both faces, and
-  open edges of a sheet get a half-round bead. Normals are analytic: the face normal tilted by the profile's slope
+  bands), so the lip's round profile is sampled finely whatever the mesh; the rim (s = 0) is shared by both faces. Normals are analytic: the face normal tilted by the profile's slope
   along b's gradient. The wall is never thicker than the struts there are wide (so with a full Fillet every strut
-  is a round tube), than there is room for where another sheet passes close, or than the surface's radius of curvature (so it
+  is a round tube), than there is room for where another part passes close, or than the surface's radius of curvature (so it
   tapers to a point at a pinch point instead of folding through itself). Puff crowns the struts along their middle.
 - **Hollowing.** w is per cell, on its own clock, loosely spreading from the side facing the camera. At first it
   sits a lip radius past the cell's largest b: a closed skin. A shallow dimple runs ahead; then w comes down to that
@@ -72,10 +56,14 @@ Everything is geometry on a surface mesh, like perforating a mesh in MeshLab; th
   rays hit the skin, near the middle. A cube map rendered from it, in the sculpture's own frame, holds the length of
   wall along every ray, one layer per channel. Entering faces subtract their distance and leaving faces add it, under
   additive blending. Every surface the light reaches turns that into a transmittance per colour channel: porcelain
-  lets a little warm light through, amber passes orange. The cube is mip-mapped and sampled over a cone as wide as the
+  lets a little warm light through, wax the most. The cube is mip-mapped and sampled over a cone as wide as the
   light's penumbra at that distance, with a fixed spiral of taps, so the hole patterns on the floor and the sweep blur
   with distance. The cube turns with the sculpture, so tumbling never redraws it. As daylight goes, the glow bounced
   back by the room fills the outer skin from below and the camera side, so it keeps its form at night.
+- **The light's way** (`lightpath.js`). Once the lattice is open, a worker also sends a clearance grid of the final
+  mesh: the distance from every node to the nearest wall. The light walks to its target by A* over that grid, paying
+  more for ways closer to a wall than Light distance, so it goes round the struts and out through the holes instead of
+  jumping through a wall. The way is planned again a few times a second as the target moves.
 - **Staging.** The sculpture floats a little above the floor and bobs. It tumbles about two axes the whole time, while it is sketched, built and hollowed too.
   The key light's PCSS shadow falls beside it, and the floor under it is darkened as if a sphere the sculpture's size
   hid the studio from it.

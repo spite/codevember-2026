@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Hollow Hollows</title>
+<meta name="description" content="How Codevember 2026 day 7, Hollow, cuts a solid into a lattice of rounded Voronoi struts, opens it cell by cell, and lets a light inside find its way out through the holes.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* One reading column on Hollow's studio grey; figures sit on their own panels, accents from the glow. */
+:root {
+  --bg: #d6d3cd;
+  --panel: #e5e2dc;
+  --ink: #1c1915;
+  --muted: #5a544c;
+  --line: #bdb6ac;
+  --accent: #b04a0c;
+  --magenta: #9c1a6c;
+  --cyan: #b8860b;
+  --ground: #cbc7c0;
+  --env: #f1eee9;
+  --glow: #f2a24e;
+  --shell: #f4ece2;
+  --hole: #3b342d;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141210; --panel: #1f1c19; --ink: #eeeae4; --muted: #a8a097; --line: #3a3530;
+    --accent: #f29a5a; --magenta: #e27ab8; --cyan: #f2c76a; --ground: #26231f; --env: #2e2a26;
+    --glow: #ffb066; --shell: #d9cfc3; --hole: #0c0a08;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141210; --panel: #1f1c19; --ink: #eeeae4; --muted: #a8a097; --line: #3a3530;
+    --accent: #f29a5a; --magenta: #e27ab8; --cyan: #f2c76a; --ground: #26231f; --env: #2e2a26;
+    --glow: #ffb066; --shell: #d9cfc3; --hole: #0c0a08;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .holo { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .holo {
+    background: linear-gradient(100deg, var(--accent) 10%, var(--magenta) 55%, var(--cyan) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; }
+.hero figcaption, .still figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+.still { margin: 0; }
+.still img { display: block; width: 100%; height: auto; border-radius: 2px; }
+
+/* Figures */
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; }
+.scroll { overflow-x: auto; }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+select {
+  font: 400 13px/1.2 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 3px; padding: 6px 8px;
+}
+button {
+  font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px;
+  padding: 9px 14px; cursor: pointer;
+}
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 12.5px/1.2 var(--mono); color: var(--muted); }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid currentColor; vertical-align: middle; margin-right: 6px; }
+.legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: currentColor; vertical-align: middle; margin-right: 6px; }
+.legend .ring { display: inline-block; width: 9px; height: 9px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px currentColor; vertical-align: middle; margin-right: 6px; }
+.legend .sw { display: inline-block; width: 12px; height: 12px; border-radius: 2px; background: currentColor; vertical-align: middle; margin-right: 6px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+
+/* Frame order */
+.order { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+.order-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.order-col h3 { font-size: 15px; }
+.pass { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 3px; background: var(--bg); font: 400 13px/1.3 var(--mono); }
+.pass small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+.chips { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.chip { font: 600 10.5px/1 var(--mono); padding: 4px 6px; border-radius: 2px; background: var(--accent); color: var(--bg); letter-spacing: 0.04em; white-space: nowrap; }
+.chip.read { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
+.pass.own { box-shadow: inset 0 0 0 1.5px var(--accent); }
+
+/* Table */
+table { border-collapse: collapse; width: 100%; font: 400 13.5px/1.35 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+td b { color: var(--accent); }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.fact.warn { box-shadow: inset 3px 0 0 var(--magenta); }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: nowrap; }
+.formula .c { color: var(--muted); }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .two, .order { grid-template-columns: minmax(0, 1fr); }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+  th, td { padding: 8px 7px; font-size: 12.5px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow">Codevember 2026 · <b>Day 7</b> · Hollow</div>
+      <h1>How Hollow <span class="holo">hollows</span></h1>
+      <p class="lede">A solid floats in a studio as a smooth skin. Dimples appear on it, break through, and widen into a lattice of rounded Voronoi struts, while a warm light inside glows through the walls and throws the holes across the floor. Here is how the lattice is cut, how it opens, and how the light finds its way out.</p>
+      <div class="meta">
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>web workers</span><span>no build step</span><span>desktop and phones</span>
+      </div>
+    </div>
+    <figure>
+      <img src="../screenshots/7.jpg" width="1080" height="1080" alt="A white porcelain trefoil knot hollowed into rounded Voronoi openings, floating above a studio floor and glowing warm from a light inside.">
+      <figcaption>A porcelain trefoil, from the live page.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. The surface -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The surface · <b>surface.js</b></div>
+      <h2>A mesh, not a field</h2>
+      <p>The first versions of this day carved the holes out of a 3D distance field and meshed the result. It looked blobby: a field fine enough for crisp struts was too slow to re-mesh while the holes grow. So everything here is done on the surface instead, the way MeshLab perforates a mesh. The 3D field is only used once, to make that surface.</p>
+      <p>Each shape (a thick trefoil, Suzanne, a sphere, an egg, a torus, a rounded cube, the Platonic solids, a capsule or a blend of two) is a signed distance function. Surface nets mesh it, sampling finely only next to the surface. Then the vertices are relaxed along the surface and pulled back onto it with Newton steps, so the triangles are even and every vertex is an exact sample. Normals come from the field's gradient.</p>
+      <p>The mesh is turned to its principal axes and scaled to a common reach, so every shape fills the same view. Suzanne is the exception: her axes are nearly tied, so she keeps a fixed upright frame and faces the camera.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Suzanne</b><span>Blender's monkey, as a 96³ distance field baked offline from the mesh (<code>tools/suzanne-sdf.mjs</code>), with the ears and brow thickened so they survive hollowing.</span></div>
+      <div class="fact"><b>Once per shape</b><span>The surface, its curvature, its clearance (how far along the normal to the next wall) and the cells are prepared once per build, in a worker.</span></div>
+      <div class="fact"><b>Phones</b><span>A coarser mesh, fewer steps across a lip and larger erosion steps. A large surface is coarser everywhere, so a frame stays around half a million triangles.</span></div>
+    </div>
+  </section>
+
+  <!-- 2. Cells -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The cells · <b>hollow.js</b></div>
+      <h2>Holes from the distance to a cell's border</h2>
+      <p>Cell sites are Poisson-disc samples over the mesh. Their spacing comes from Cells and varies with a noise (Variation). Each vertex belongs to its nearest site, and stores <i>b</i>, its distance to the cell's border: half the gap between its distance to its own site and to a neighbouring one. That is Worley's F2 − F1. It is the same from either side of a border, so a strut is continuous across it.</p>
+      <p>The gaps to all the neighbours are blended with a soft minimum (log-sum-exp) as wide as Roundness. At 0 the holes are the cells' polygons, shrunk. As it grows, their corners round off, their sides bow out, and the struts thicken towards the joints, which read as webs.</p>
+      <p>A hole is wherever <i>b</i> is greater than the strut's half-width <i>w</i>. The figure below runs the same rules on a flat patch. Drag Erosion or press Play to watch it open.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A patch of skin, hollowing</h3>
+        <div class="controls">
+          <label>Erosion <input id="cE" type="range" min="0" max="1" step="0.005" value="1"><output id="cEo">1.00</output></label>
+          <label>Roundness <input id="cR" type="range" min="0" max="1" step="0.01" value="0.85"><output id="cRo">0.85</output></label>
+          <label>Strut <input id="cS" type="range" min="0.1" max="0.6" step="0.01" value="0.25"><output id="cSo">0.25</output></label>
+          <label>Cells <input id="cN" type="range" min="12" max="70" step="1" value="34"><output id="cNo">34</output></label>
+          <button id="cPlay" type="button" class="ghost">Play</button>
+          <button id="cSeed" type="button" class="ghost">New cells</button>
+        </div>
+      </div>
+      <canvas id="cellCanvas" aria-label="A flat patch of skin in relief. As Erosion grows, each cell dimples, breaks through in its middle and widens into a rounded hole, leaving a lattice of struts."></canvas>
+      <div class="legend"><span style="color:var(--muted)"><span class="dot"></span>cell site</span><span style="color:var(--accent)"><span class="dot"></span>open hole</span></div>
+      <p class="fig-cap">Shaded from the wall's thickness, with the lip profile of the next section and a full Fillet. The erosion drifts from the top left, the way the sculpture's starts on the side facing the camera, and each cell has a random delay on top. Cells too small for a clean hole stay closed, as they do on the sculpture.</p>
+    </div>
+  </section>
+
+  <!-- 3. The lip -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The lip · <b>hollow.js, mesh</b></div>
+      <h2>Rounded struts from a quarter circle</h2>
+      <p>The skin is thickened either side of the surface, and the thickness follows a quarter round across the lip. With <i>r</i> the lip radius (Fillet × the strut's half-width), each vertex gets <i>s</i> = (<i>w</i> − <i>b</i>) / <i>r</i>: 0 at the rim, 1 where the lip meets the face. The wall's half-thickness is <i>t</i> · sin θ, where <i>s</i> = 1 − cos θ.</p>
+      <p>So with a full Fillet and a wall as thick as the strut is wide, a strut is a round tube. With less Fillet it becomes a band with rounded edges. The triangles are cut along isolines of <i>s</i> at even steps of θ, marching triangles in bands, so the lip's curve is sampled finely whatever the mesh. Normals are analytic: the face normal, tilted by the profile's slope along the gradient of <i>b</i>.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>One strut in cross-section</h3>
+        <div class="controls">
+          <label>Fillet <input id="lF" type="range" min="0.1" max="1" step="0.01" value="1"><output id="lFo">1.00</output></label>
+          <label>Thickness <input id="lT" type="range" min="0.2" max="1" step="0.01" value="1"><output id="lTo">1.00</output></label>
+          <label>Lip steps <input id="lK" type="range" min="2" max="12" step="1" value="7"><output id="lKo">7</output></label>
+        </div>
+      </div>
+      <div class="scroll"><canvas id="lipCanvas" aria-label="A strut's cross-section between two holes: a wall of constant thickness that rounds off at each rim along a quarter circle, with the mesh's isolines marked along the lip."></canvas></div>
+      <div class="legend"><span style="color:var(--accent)"><i></i>wall outline</span><span style="color:var(--accent)"><span class="dot"></span>isolines of s, even in θ</span><span style="color:var(--muted)"><i style="border-top-style:dashed"></i>mid-surface</span></div>
+      <p class="fig-cap">Thickness is relative to the strut's half-width. The wall is also never thicker than there is room for where another part of the surface passes close, or than the surface's radius of curvature, so it tapers instead of folding through itself. Puff crowns the struts a little along their middle.</p>
+    </div>
+  </section>
+
+  <!-- 4. Hollowing -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Hollowing · <b>mesher.worker.js</b></div>
+      <h2>Every cell on its own clock</h2>
+      <p>The erosion <i>E</i> runs from 0 to 1 over Hollow time, and each cell has a delay. While a cell is closed, <i>w</i> sits a lip radius past its largest <i>b</i>, so its wall is whole. Then <i>w</i> comes down to that largest <i>b</i>: the wall thins in the middle of the cell to a dimple from both faces. It breaks through, and the hole widens to its final strut on an ease-out curve. A shallow dimple runs ahead of the main one, so the erosion shows from the start.</p>
+      <p>Workers (two on desktop) re-cut the surface at <i>E</i> steps a few hundredths apart. One cut is 2D work on the surface, 30 to 120 ms. Each cut also carries every vertex's velocity with erosion, so the vertex shader moves the surface on between cuts and the holes grow smoothly instead of in jumps. When meshing is slow, the clock slows down rather than outrunning the newest mesh.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Step size</b><span>The erosion step follows Hollow time, between 0.004 and 0.025, so even a slow hollowing gets a new mesh about every 0.15 s.</span></div>
+      <div class="fact"><b>Look changes</b><span>Strut, Fillet, Thickness and Puff don't move the cells, so they only cut the open lattice again. Meshes still on their way with the old values are dropped.</span></div>
+      <div class="fact"><b>No stall</b><span>Shaders compile against a stand-in mesh while the worker prepares the first sculpture, so the two waits overlap behind the loading pill.</span></div>
+    </div>
+  </section>
+
+  <!-- 5. The glow -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The glow · <b>materials.js</b></div>
+      <h2>Light through the walls</h2>
+      <p>The light inside renders a cube map of the sculpture from where it is, in the sculpture's own frame. It doesn't store depth but the length of wall along every ray. Faces the ray enters subtract their distance, faces it leaves add theirs, all under additive blending, so the sum is the total thickness crossed.</p>
+      <p>Every surface the light reaches reads that thickness and turns it into a transmittance, exp(−σ · thickness), per colour channel. Glossy glaze stops the most, wax the least, and red gets through further than blue, so thin walls glow warm. The cube is mip-mapped and sampled over a cone as wide as the light's penumbra at that distance, so the hole patterns on the floor sharpen close to the sculpture and blur further away.</p>
+      <p>Drag the light in the figure. It is a slice through a hollowed shell.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Rays from the light, dimmed by the wall they cross</h3>
+        <div class="controls">
+          <label>Finish <select id="gF"><option value="1.7">glossy</option><option value="1.35">plastic</option><option value="1" selected>porcelain</option><option value="0.5">wax</option></select></label>
+          <label>Translucency <input id="gT" type="range" min="0" max="1" step="0.01" value="0.75"><output id="gTo">0.75</output></label>
+        </div>
+      </div>
+      <canvas id="glowCanvas" aria-label="A cross-section of a hollow shell with gaps in it, a light inside. Rays leave the light; those through the gaps reach the room at full strength, those through the wall are dimmed by its thickness." style="touch-action:none"></canvas>
+      <p class="fig-cap">Each ray's brightness is exp(−σ · L), with L the wall length it crosses. The live page does this per channel with σ scaled for red, green and blue, and turns the cube with the sculpture, so tumbling never redraws it. It is drawn again only when the light moves relative to the sculpture, or when a new mesh lands.</p>
+    </div>
+  </section>
+
+  <!-- 6. The way -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The light's way · <b>lightpath.js</b></div>
+      <h2>Through the holes, not through the walls</h2>
+      <p>With Light on pointer, the light goes to the mouse. Going in a straight line would push it through the walls. Once the lattice is open, the worker that cut the last mesh also sends a clearance grid: the distance from every node to the nearest wall, 0.015 apart (0.022 on phones) on a sculpture about 2 across.</p>
+      <p>The light walks to its target by A* over that grid. Steps closer to a wall than Light distance cost more, so it keeps its distance where it can, but can still squeeze through a narrower hole. The way is planned again about five times a second as the target moves, and the light follows it at a fixed speed. If the target can't be reached, it stops at the nearest point it can reach.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Move the pointer: the light finds a way out</h3>
+        <div class="controls">
+          <label>Light distance <input id="pK" type="range" min="1" max="8" step="0.5" value="4"><output id="pKo">4</output></label>
+        </div>
+      </div>
+      <canvas id="pathCanvas" aria-label="A clearance grid around a hollow shell with gaps. A light inside follows a path planned by A* toward the pointer, going out through a gap rather than through the wall." style="touch-action:none"></canvas>
+      <div class="legend"><span style="color:var(--accent)"><i></i>planned way</span><span style="color:var(--muted)"><i style="border-top-style:dashed"></i>straight line to the target</span><span style="color:var(--muted)"><span class="sw" style="opacity:.35"></span>clearance</span></div>
+      <p class="fig-cap">The same weighted A* as the page: 8 neighbours here (26 in 3D), each step costing its length × (1 + 1.5 · max(0, keep − D) / keep), with the heuristic counted twice for speed. The page caps a search at 6000 nodes, which it rarely reaches; one plan takes about 0.2 ms.</p>
+    </div>
+  </section>
+
+  <!-- 7. Sketch and staging -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The sketch · <b>previz.js</b>, <b>sketchLines.js</b></div>
+      <h2>A sketch while the settings move</h2>
+      <p>A new sculpture takes a second or two to prepare, which is too slow to follow a slider. So while the Shape and Hollowing settings change, a third worker sketches the result. A coarse mesh of the shape (cached per shape) is celled with the mesher's rules, simplified, and the rims of the holes it will open are traced as glowing outlines. The outlines are drawn on the sculpture's own skin when only the cells change, or on the coarse mesh of a new shape.</p>
+      <p>The outlines are screen-space quads of a fixed width in pixels with a soft additive halo, offset to the outer face of the wall. The sculpture is built and hollowed 1.2 s after the last change.</p>
+      <p>A new shape shrinks the old one away. The backdrop then fades to the new palette, the new material goes on, and the new shape grows in with a little overshoot. The light, the view and the tumble carry on across the swap. In kiosk mode this happens by itself every 20 seconds once the sculpture has finished hollowing.</p>
+    </div>
+  </section>
+
+  <!-- 8. Cost -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Cost</div>
+      <h2>Where the time goes</h2>
+      <p>The meshing runs in workers, so it never blocks a frame. On the main thread, a frame is mostly the shared pipeline. Measured headlessly with seed 7: desktop at the high tier, and a phone tier (iPhone user agent, pixel ratio 2, medium).</p>
+    </div>
+    <div class="fig">
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Step</th><th>Desktop</th><th>Phone tier</th></tr></thead>
+          <tbody>
+            <tr><td>Pipeline, CPU per frame</td><td>1.7 ms</td><td>1.9 ms</td></tr>
+            <tr><td>Glow cube, CPU per redraw</td><td>0.41 ms</td><td>0.14 ms</td></tr>
+            <tr><td>Light way (A*), per plan</td><td>0.23 ms</td><td>0.18 ms</td></tr>
+            <tr><td>One cut of the surface (worker)</td><td>64–123 ms</td><td>27–66 ms</td></tr>
+            <tr><td>New shape, until it hollows</td><td>0.9–2.0 s</td><td>0.4–1.3 s</td></tr>
+            <tr><td>Sketch of a Cells change</td><td>0.58 s</td><td>0.33 s</td></tr>
+            <tr><td>JS heap</td><td>79 MB</td><td>42 MB</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="fig-cap">The phone tier cuts faster because its mesh is coarser. Its glow cube is 256² rather than 512², and is only redrawn when a new mesh lands or the light moves.</p>
+    </div>
+  </section>
+
+  <!-- 9. Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>Drag to orbit, scroll or pinch to zoom. With Light on pointer, the light follows the mouse (or the last tap).</li>
+      <li><b>Shape</b>: the solid and its own sliders. A change sketches, then builds and hollows.</li>
+      <li><b>Hollowing</b>: Cells, Variation, Roundness, and Hollow time.</li>
+      <li><b>Look</b>: Strut, Fillet, Thickness, Puff, palette, Translucency, finish and Tumble. These change the sculpture in place.</li>
+      <li><b>Light</b>: Glow, Brightness, Warmth, pointer or fixed, Light distance, Daylight and Flicker.</li>
+      <li><b>H</b> hollows it again, <b>L</b> switches the glow, <b>R</b> randomises.</li>
+      <li><b>Space</b> pauses, <b>Tab</b> hides the panel, <b>F</b> goes fullscreen, <b>P</b> saves a screenshot.</li>
+    </ul>
+  </section>
+
+  <footer class="col">
+    Day 7 of Codevember 2026 by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/7/">spite.github.io/codevember-2026/7</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/7">7/ of the codevember-2026 repository</a>. Rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>.
+  </footer>
+</main>
+
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const hex = (c) => { const m = c.replace("#", ""); return [0, 2, 4].map((i) => parseInt(m.slice(i, i + 2), 16)); };
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+
+  // A canvas sized to its CSS width at the device pixel ratio; draw() gets (ctx, width, height) in CSS pixels.
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      const w = canvas.clientWidth || 600, h = Math.round(typeof aspect === "function" ? aspect(w) : w * aspect);
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); canvas.style.height = h + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, w, h);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    return { redraw: () => fit(true) };
+  }
+  const bind = (id, fn, fmt = (v) => (+v).toFixed(2)) => {
+    const el = $(id), out = $(id + "o");
+    const set = () => { if (out) out.textContent = fmt(el.value); fn(+el.value); };
+    el.addEventListener("input", set);
+    if (out) out.textContent = fmt(el.value);
+    return el;
+  };
+
+  // 1. Cells: the mesher's border distance, strut width and per-cell erosion, on a flat patch.
+  {
+    const canvas = $("cellCanvas");
+    const P = { E: 1, round: 0.85, strut: 0.25, n: 34, seed: 7 };
+    let cells = null, field = null, view = null;
+    const RES = 2;
+    function makeCells(W, H) {
+      const rand = mulberry(P.seed * 9973 + P.n);
+      const rho0 = Math.sqrt((W * H) / (1.25 * P.n));
+      const S = [];
+      for (let tries = 0; tries < 6000 && S.length < P.n * 1.6; tries++) {
+        const x = rand() * W, y = rand() * H;
+        const nz = 0.5 + 0.5 * Math.sin(x * 0.013 + 1.7) * Math.cos(y * 0.017 - 0.4);
+        const r = rho0 * clamp(1 + 0.5 * 1.5 * (nz - 0.5), 0.55, 1.8);
+        if (S.every((s) => (s.x - x) ** 2 + (s.y - y) ** 2 >= (0.5 * (r + s.r)) ** 2 * 1.4)) S.push({ x, y, r });
+      }
+      const maxD = Math.hypot(W, H);
+      let rhoMean = 0;
+      for (const s of S) {
+        s.delay = Math.min(1, 0.45 * (Math.hypot(s.x, s.y) / maxD) + 0.5 * rand());
+        s.jitter = 0.88 + 0.24 * rand();
+        rhoMean += s.r / S.length;
+      }
+      return { S, rhoMean };
+    }
+    function makeField(W, H) {
+      const { S } = cells;
+      const nx = Math.ceil(W / RES) + 1, ny = Math.ceil(H / RES) + 1;
+      const B = new Float32Array(nx * ny), C = new Int16Array(nx * ny);
+      for (const s of S) s.bMax = 0;
+      for (let j = 0; j < ny; j++)
+        for (let i = 0; i < nx; i++) {
+          const x = i * RES, y = j * RES;
+          let c = 0, dc = Infinity;
+          const d = S.map((s, q) => { const v = Math.hypot(s.x - x, s.y - y); if (v < dc) { dc = v; c = q; } return v; });
+          const k = Math.max(1e-4, P.round * 0.22 * S[c].r);
+          let eMin = Infinity;
+          for (let q = 0; q < S.length; q++) if (q !== c) eMin = Math.min(eMin, d[q] - dc);
+          let sum = 0;
+          for (let q = 0; q < S.length; q++) if (q !== c) { const e = d[q] - dc - eMin; if (e < 40 * k) sum += Math.exp(-e / k); }
+          const b = 0.5 * (eMin - k * Math.log(sum));
+          B[i + j * nx] = b; C[i + j * nx] = c;
+          if (b > S[c].bMax) S[c].bMax = b;
+        }
+      return { B, C, nx, ny };
+    }
+    function cellState(s) {
+      const wNom = P.strut * 0.5 * Math.sqrt(s.r * cells.rhoMean) * s.jitter;
+      const wF = Math.min(wNom, 0.62 * s.bMax), r = wF;
+      if (s.bMax < 1.5 * wNom) return { w: s.bMax + 2 * r, r, open: -1 };
+      const e = clamp((P.E - 0.55 * s.delay) / 0.45, 0, 1);
+      if (e < 0.3) {
+        const dim = Math.max(smooth(0, 0.3, e), 0.5 * smooth(0, 0.2, P.E - 0.25 * s.delay));
+        return { w: s.bMax + 1.05 * r * (1 - dim), r, open: -1 };
+      }
+      const open = 1 - (1 - (e - 0.3) / 0.7) ** 2.2;
+      return { w: s.bMax - (s.bMax - wF) * open, r, open };
+    }
+    let rebuild = true;
+    const v = setup(canvas, (w) => clamp(w * 0.5, 260, 420), (ctx, W, H) => {
+      if (rebuild || !view || view.W !== W || view.H !== H) {
+        cells = makeCells(W, H); field = makeField(W, H); view = { W, H }; rebuild = false;
+      }
+      const { B, C, nx, ny } = field, S = cells.S;
+      const st = S.map(cellState);
+      const T = new Float32Array(nx * ny);
+      for (let q = 0; q < T.length; q++) {
+        const c = st[C[q]], s = (c.w - B[q]) / c.r;
+        T[q] = s <= 0 ? -1 : s >= 1 ? 1 : Math.sin(Math.acos(1 - s));
+      }
+      const img = ctx.createImageData(nx, ny);
+      const shell = hex(css("--shell")), hole = hex(css("--hole")), glow = hex(css("--glow"));
+      const amp = 9;
+      for (let j = 0; j < ny; j++)
+        for (let i = 0; i < nx; i++) {
+          const q = i + j * nx, t = T[q], o = q * 4;
+          if (t < 0) {
+            // Through the hole: the warm inside, brighter toward the middle of the cell; the rim is blended over a pixel.
+            const c = st[C[q]], s = (c.w - B[q]) / c.r, rim = clamp(1 + s * c.r / (1.2 * RES), 0, 1);
+            const g = 0.35 + 0.4 * clamp(B[q] / (S[C[q]].bMax + 1e-3), 0, 1);
+            for (let k = 0; k < 3; k++) img.data[o + k] = hole[k] + (glow[k] - hole[k]) * g + (shell[k] * 0.45 - hole[k] - (glow[k] - hole[k]) * g) * rim;
+          } else {
+            const tx = (T[Math.min(q + 1, q - i + nx - 1)] - T[Math.max(q - 1, q - i)]) * amp;
+            const ty = (T[Math.min(q + nx, T.length - 1)] - T[Math.max(q - nx, 0)]) * amp;
+            const n = Math.hypot(tx, ty, 1);
+            const lit = clamp((-tx * -0.55 + -ty * -0.6 + 0.58) / n, 0, 1);
+            const sh = 0.5 + 0.55 * lit;
+            const thin = 1 - t;
+            for (let k = 0; k < 3; k++) img.data[o + k] = clamp(shell[k] * sh * (1 - 0.18 * thin) + glow[k] * 0.35 * thin * thin, 0, 255);
+          }
+          img.data[o + 3] = 255;
+        }
+      const off = new OffscreenCanvas(nx, ny);
+      off.getContext("2d").putImageData(img, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(off, 0, 0, nx * RES, ny * RES);
+      for (let c = 0; c < S.length; c++) {
+        ctx.fillStyle = st[c].open > 0 ? css("--accent") : css("--muted");
+        ctx.globalAlpha = st[c].open > 0 ? 0.9 : 0.55;
+        ctx.beginPath(); ctx.arc(S[c].x, S[c].y, 2.2, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    });
+    const eIn = bind("cE", (x) => { P.E = x; v.redraw(); });
+    bind("cR", (x) => { P.round = x; rebuild = true; v.redraw(); });
+    bind("cS", (x) => { P.strut = x; v.redraw(); });
+    bind("cN", (x) => { P.n = x; rebuild = true; v.redraw(); }, (x) => String(x));
+    $("cSeed").addEventListener("click", () => { P.seed++; rebuild = true; v.redraw(); });
+    let playing = false, t0 = 0;
+    const btn = $("cPlay");
+    const tick = (now) => {
+      if (!playing) return;
+      const t = (now - t0) / 4000;
+      P.E = Math.min(1, t);
+      eIn.value = P.E; $("cEo").textContent = P.E.toFixed(2);
+      v.redraw();
+      if (t < 1.3) requestAnimationFrame(tick); else { playing = false; btn.textContent = "Play"; }
+    };
+    btn.addEventListener("click", () => {
+      playing = !playing; btn.textContent = playing ? "Stop" : "Play";
+      if (playing) { t0 = performance.now(); requestAnimationFrame(tick); }
+    });
+  }
+
+  // 2. The lip: wall half-thickness t·sin θ with s = (w − b)/r = 1 − cos θ, across one strut.
+  {
+    const canvas = $("lipCanvas");
+    const P = { fillet: 1, thick: 1, steps: 7 };
+    const v = setup(canvas, (w) => clamp(w * 0.42, 220, 340), (ctx, W, H) => {
+      const ink = css("--ink"), muted = css("--muted"), accent = css("--accent"), shell = css("--shell"), line = css("--line");
+      const w = 1, r = P.fillet * w, t = P.thick * w;
+      const span = 2.1, sx = Math.min(W / (2 * span), (H - 50) / (2 * 1.15)), sy = sx;
+      const X = (x) => W / 2 + x * sx, Y = (y) => (H - 20) / 2 + y * sy;
+      const half = (x) => {
+        const s = (w - Math.abs(x)) / r;
+        return s <= 0 ? null : s >= 1 ? t : t * Math.sin(Math.acos(1 - s));
+      };
+      ctx.clearRect(0, 0, W, H);
+      // Mid-surface.
+      ctx.setLineDash([5, 5]); ctx.strokeStyle = muted; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(X(-span), Y(0)); ctx.lineTo(X(span), Y(0)); ctx.stroke(); ctx.setLineDash([]);
+      // Wall.
+      const N = 400, top = [], bot = [];
+      for (let i = 0; i <= N; i++) {
+        const x = -w + (2 * w * i) / N, h = half(x) ?? 0;
+        top.push([X(x), Y(-h)]); bot.push([X(x), Y(h)]);
+      }
+      ctx.beginPath();
+      top.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      for (let i = bot.length - 1; i >= 0; i--) ctx.lineTo(bot[i][0], bot[i][1]);
+      ctx.closePath();
+      ctx.fillStyle = shell; ctx.fill();
+      ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.stroke();
+      // Isolines of s at even θ, both sides of the strut.
+      ctx.fillStyle = accent;
+      for (let k = 0; k <= P.steps; k++) {
+        const th = (k / P.steps) * (Math.PI / 2), s = 1 - Math.cos(th);
+        const b = w - s * r, h = t * Math.sin(th);
+        for (const sgn of [-1, 1]) for (const yy of [-h, h]) { ctx.beginPath(); ctx.arc(X(sgn * b), Y(yy), 3, 0, Math.PI * 2); ctx.fill(); }
+      }
+      // Labels.
+      ctx.font = font(11); ctx.fillStyle = muted; ctx.textAlign = "center";
+      ctx.fillText("hole", X(-1.6), Y(0) - 8); ctx.fillText("hole", X(1.6), Y(0) - 8);
+      ctx.fillText("b = 0, the cell border", X(0), H - 6);
+      ctx.strokeStyle = line; ctx.lineWidth = 1;
+      for (const x of [-w, w]) { ctx.beginPath(); ctx.moveTo(X(x), Y(-1.1)); ctx.lineTo(X(x), Y(1.1)); ctx.stroke(); }
+      ctx.fillStyle = ink; ctx.fillText("rim, b = w", X(w), Y(-1.1) - 4); ctx.fillText("rim", X(-w), Y(-1.1) - 4);
+    });
+    bind("lF", (x) => { P.fillet = x; v.redraw(); });
+    bind("lT", (x) => { P.thick = x; v.redraw(); });
+    bind("lK", (x) => { P.steps = x; v.redraw(); }, (x) => String(x));
+  }
+
+  // A slice through a hollow shell: a thick ring with gaps, shared by the glow and the path figures.
+  const ring = (() => {
+    const rand = mulberry(31);
+    const gaps = [];
+    let a = 0.2;
+    while (a < Math.PI * 2 - 0.3) { const g = 0.16 + rand() * 0.22; gaps.push([a, a + g]); a += g + 0.35 + rand() * 0.55; }
+    const R = 1, T = 0.11;
+    const inGap = (ang) => { ang = (ang + Math.PI * 2) % (Math.PI * 2); return gaps.some(([g0, g1]) => ang > g0 && ang < g1); };
+    // Inner strut across the middle, like a tube of a knot passing behind.
+    const wall = (x, y) => {
+      const d = Math.hypot(x, y);
+      if (Math.abs(d - R) < T / 2 && !inGap(Math.atan2(y, x))) return true;
+      return Math.abs(y + 0.15) < T / 2 && Math.abs(x + 0.15) < 0.45;
+    };
+    return { R, T, wall };
+  })();
+
+  // 3. The glow: per ray, the wall length crossed, as exp(−σ L).
+  {
+    const canvas = $("glowCanvas");
+    const P = { sigma: 1, trans: 0.75, lx: 0.25, ly: 0.3 };
+    let geo = null;
+    const v = setup(canvas, (w) => clamp(w * 0.6, 280, 460), (ctx, W, H) => {
+      const sc = Math.min(W / 2 / 1.9, H / 2 / 1.45), cx = W / 2, cy = H / 2;
+      geo = { sc, cx, cy };
+      ctx.fillStyle = css("--hole"); ctx.fillRect(0, 0, W, H);
+      const glow = hex(css("--glow"));
+      ctx.globalCompositeOperation = "lighter";
+      const NR = 900, step = 0.008, maxL = Math.hypot(W, H) / sc;
+      const k = (0.4 + 6 * (1 - P.trans)) * P.sigma / ring.T;
+      for (let i = 0; i < NR; i++) {
+        const a = (i / NR) * Math.PI * 2, dx = Math.cos(a), dy = Math.sin(a);
+        let L = 0, d = 0;
+        const pts = [];
+        let lastT = 1;
+        pts.push([P.lx, P.ly, 1]);
+        for (; d < maxL; d += step) {
+          const x = P.lx + dx * d, y = P.ly + dy * d;
+          if (ring.wall(x, y)) L += step;
+          const tr = Math.exp(-k * L);
+          if (Math.abs(tr - lastT) > 0.02) { pts.push([x, y, lastT]); pts.push([x, y, tr]); lastT = tr; }
+          if (Math.abs(x) * sc > W / 2 + 4 || Math.abs(y) * sc > H / 2 + 4) { pts.push([x, y, tr]); break; }
+        }
+        for (let p = 0; p + 1 < pts.length; p++) {
+          const [x0, y0, t0] = pts[p], [x1, y1] = pts[p + 1];
+          if (t0 < 0.01) continue;
+          ctx.strokeStyle = `rgba(${glow[0]},${glow[1]},${glow[2]},${0.13 * t0})`;
+          ctx.lineWidth = 1.6;
+          ctx.beginPath(); ctx.moveTo(cx + x0 * sc, cy - y0 * sc); ctx.lineTo(cx + x1 * sc, cy - y1 * sc); ctx.stroke();
+        }
+      }
+      ctx.globalCompositeOperation = "source-over";
+      // The wall itself.
+      ctx.fillStyle = css("--shell");
+      const g = 1 / sc;
+      for (let y = -1.2; y < 1.2; y += g) for (let x = -1.2; x < 1.2; x += g) if (ring.wall(x, y)) ctx.fillRect(cx + x * sc - 0.5, cy - y * sc - 0.5, 1.6, 1.6);
+      ctx.fillStyle = "#fff"; ctx.shadowColor = css("--glow"); ctx.shadowBlur = 16;
+      ctx.beginPath(); ctx.arc(cx + P.lx * sc, cy - P.ly * sc, 6, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.font = font(11); ctx.fillStyle = css("--muted"); ctx.fillText("drag the light", 10, H - 10);
+    });
+    const drag = (e) => {
+      if (!geo) return;
+      const r = canvas.getBoundingClientRect();
+      P.lx = (e.clientX - r.left - geo.cx) / geo.sc; P.ly = -(e.clientY - r.top - geo.cy) / geo.sc;
+      v.redraw();
+    };
+    let down = false;
+    canvas.addEventListener("pointerdown", (e) => { down = true; canvas.setPointerCapture(e.pointerId); drag(e); });
+    canvas.addEventListener("pointermove", (e) => down && drag(e));
+    canvas.addEventListener("pointerup", () => (down = false));
+    $("gF").addEventListener("change", (e) => { P.sigma = +e.target.value; v.redraw(); });
+    bind("gT", (x) => { P.trans = x; v.redraw(); });
+  }
+
+  // 4. The way: weighted A* over a clearance grid of the same slice, toward the pointer.
+  {
+    const canvas = $("pathCanvas");
+    const P = { keep: 4 };
+    const G = 0.04, EXT = 2.2, n = Math.round((2 * EXT) / G) + 1;
+    const D = new Float32Array(n * n);
+    {
+      // Clearance in grid nodes: a two-pass chamfer distance transform from the walls.
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) D[i + j * n] = ring.wall(-EXT + i * G, -EXT + j * G) ? 0 : 1e9;
+      const a = 1, b = Math.SQRT2;
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+        let d = D[i + j * n];
+        if (i > 0) d = Math.min(d, D[i - 1 + j * n] + a);
+        if (j > 0) d = Math.min(d, D[i + (j - 1) * n] + a);
+        if (i > 0 && j > 0) d = Math.min(d, D[i - 1 + (j - 1) * n] + b);
+        if (i < n - 1 && j > 0) d = Math.min(d, D[i + 1 + (j - 1) * n] + b);
+        D[i + j * n] = d;
+      }
+      for (let j = n - 1; j >= 0; j--) for (let i = n - 1; i >= 0; i--) {
+        let d = D[i + j * n];
+        if (i < n - 1) d = Math.min(d, D[i + 1 + j * n] + a);
+        if (j < n - 1) d = Math.min(d, D[i + (j + 1) * n] + a);
+        if (i < n - 1 && j < n - 1) d = Math.min(d, D[i + 1 + (j + 1) * n] + b);
+        if (i > 0 && j < n - 1) d = Math.min(d, D[i - 1 + (j + 1) * n] + b);
+        D[i + j * n] = d;
+      }
+    }
+    const NB = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+    const cost = new Float32Array(n * n), parent = new Int32Array(n * n), seen = new Uint32Array(n * n);
+    let stamp = 0;
+    const C = 1.6;
+    function plan(from, to) {
+      const st = ++stamp;
+      const node = ([x, y]) => clamp(Math.round((x + EXT) / G), 1, n - 2) + n * clamp(Math.round((y + EXT) / G), 1, n - 2);
+      const start = node(from), goal = node(to);
+      if (D[start] < C) return null;
+      const gi = goal % n, gj = (goal / n) | 0;
+      const h = (q) => Math.hypot((q % n) - gi, ((q / n) | 0) - gj);
+      const open = [[h(start), start]];
+      seen[start] = st; cost[start] = 0; parent[start] = -1;
+      let best = start, bestH = h(start), exp = 0;
+      while (open.length && exp++ < 6000) {
+        let m = 0;
+        for (let i = 1; i < open.length; i++) if (open[i][0] < open[m][0]) m = i;
+        const [, q] = open[m]; open[m] = open[open.length - 1]; open.pop();
+        const hq = h(q);
+        if (hq < bestH) { bestH = hq; best = q; }
+        if (q === goal) break;
+        const qi = q % n, qj = (q / n) | 0;
+        if (qi === 0 || qj === 0 || qi === n - 1 || qj === n - 1) continue;
+        for (const [a, b] of NB) {
+          const r = q + a + b * n;
+          if (D[r] < C) continue;
+          const cr = cost[q] + Math.hypot(a, b) * (1 + (1.5 * Math.max(0, P.keep - D[r])) / P.keep);
+          if (seen[r] === st && cr >= cost[r]) continue;
+          seen[r] = st; cost[r] = cr; parent[r] = q;
+          open.push([cr + 2 * h(r), r]);
+        }
+      }
+      const way = [];
+      for (let q = best; q >= 0; q = parent[q]) way.push([-EXT + (q % n) * G, -EXT + ((q / n) | 0) * G]);
+      return way.reverse();
+    }
+    const light = [0.35, 0.35];
+    // A first target the straight line can't reach: out through a wall, so the way has to bend to a hole.
+    let target = [1.5, 0];
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2, t = [Math.cos(a) * 1.45, Math.sin(a) * 1.25];
+      let blocked = false;
+      for (let k = 1; k < 60; k++) if (ring.wall(light[0] + (t[0] - light[0]) * k / 60, light[1] + (t[1] - light[1]) * k / 60)) blocked = true;
+      if (!blocked) continue;
+      const w = plan(light, t);
+      if (w && Math.hypot(w[w.length - 1][0] - t[0], w[w.length - 1][1] - t[1]) < 0.1) { target = t; break; }
+    }
+    let way = null, geo = null, last = 0, replanAt = 0;
+    const draw = (ctx, W, H) => {
+      const sc = Math.min(W / 2 / EXT, H / 2 / 1.55), cx = W / 2, cy = H / 2;
+      geo = { sc, cx, cy, ctx, W, H };
+      ctx.clearRect(0, 0, W, H);
+      const accent = css("--accent"), muted = css("--muted");
+      const ink = hex(css("--ink"));
+      const cell = G * sc;
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+        const d = D[i + j * n], x = cx + (-EXT + i * G) * sc, y = cy - (-EXT + j * G) * sc;
+        if (Math.abs(x - cx) > W / 2 + cell || Math.abs(y - cy) > H / 2 + cell) continue;
+        if (d === 0) { ctx.fillStyle = css("--shell"); ctx.fillRect(x - cell / 2, y - cell / 2, cell + 0.5, cell + 0.5); continue; }
+        const a = Math.max(0, 1 - d / (P.keep * 1.5)) * 0.22;
+        if (a > 0.005) { ctx.fillStyle = `rgba(${ink[0]},${ink[1]},${ink[2]},${a})`; ctx.fillRect(x - cell / 2, y - cell / 2, cell + 0.5, cell + 0.5); }
+      }
+      ctx.setLineDash([5, 5]); ctx.strokeStyle = muted; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx + light[0] * sc, cy - light[1] * sc); ctx.lineTo(cx + target[0] * sc, cy - target[1] * sc); ctx.stroke(); ctx.setLineDash([]);
+      if (way) {
+        ctx.strokeStyle = accent; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(cx + light[0] * sc, cy - light[1] * sc);
+        for (const [x, y] of way) ctx.lineTo(cx + x * sc, cy - y * sc);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = muted; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(cx + target[0] * sc, cy - target[1] * sc, 7, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = "#fff"; ctx.shadowColor = css("--glow"); ctx.shadowBlur = 14;
+      ctx.beginPath(); ctx.arc(cx + light[0] * sc, cy - light[1] * sc, 6, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.font = font(11); ctx.fillStyle = muted; ctx.fillText(matchMedia("(pointer: coarse)").matches ? "tap to move the target" : "move the pointer to move the target", 10, H - 10);
+    };
+    const v = setup(canvas, (w) => clamp(w * 0.62, 280, 480), draw);
+    const step = (now) => {
+      const dt = Math.min(0.05, (now - last) / 1000 || 0); last = now;
+      if (now > replanAt) { way = plan(light, target); replanAt = now + 200; }
+      if (way && way.length) {
+        // Follow the way at a fixed speed, dropping waypoints once reached.
+        let budget = 0.9 * dt;
+        while (budget > 0 && way.length) {
+          const [x, y] = way[0], d = Math.hypot(x - light[0], y - light[1]);
+          if (d <= budget) { light[0] = x; light[1] = y; budget -= d; way.shift(); }
+          else { light[0] += ((x - light[0]) / d) * budget; light[1] += ((y - light[1]) / d) * budget; budget = 0; }
+        }
+      }
+      if (geo) draw(geo.ctx, geo.W, geo.H);
+      requestAnimationFrame(step);
+    };
+    const move = (e) => {
+      if (!geo) return;
+      const r = canvas.getBoundingClientRect();
+      target = [(e.clientX - r.left - geo.cx) / geo.sc, -(e.clientY - r.top - geo.cy) / geo.sc];
+      replanAt = 0;
+    };
+    canvas.addEventListener("pointermove", move);
+    canvas.addEventListener("pointerdown", move);
+    bind("pK", (x) => { P.keep = x; replanAt = 0; }, (x) => String(x));
+    if (reduce) { way = plan(light, target); v.redraw(); } else requestAnimationFrame(step);
+  }
+})();
+</script>
+</body>
+</html>

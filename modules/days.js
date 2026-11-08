@@ -33,7 +33,7 @@ const prompts = [
   "Dissolve",
 ];
 
-const published = [1, 2, 3, 4, 5, 6];
+const published = [1, 2, 3, 4, 5, 6, 7];
 
 const days = prompts.map((prompt, i) => ({
   day: i + 1,
