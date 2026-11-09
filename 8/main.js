@@ -127,11 +127,15 @@ const pipeline = new Pipeline(renderer, {
   depthOfField: { aperture: 0, maxBlur: 0.025, lensSamples: 48 },
   shadow: { autoFit: true, denoise: true },
   // The room is two flat planes.
+  // The room is lit by the windows' own light, which AO/GI barely change.
+  gi: false,
   giOptions: { skipFlat: true },
   composite: (hdr, ctx) => infinity.render(renderer, hdr, ctx),
 });
 
 const fullQuality = pipeline.quality === "high" || pipeline.quality === "capture";
+// Deep pixels get extra rays at full quality, but not on dense screens, where the pixels are small enough already.
+const extraRays = () => pipeline.quality === "capture" || (fullQuality && renderer.getPixelRatio() < 1.5);
 // Bounce caps per tier, for most solids and for the dense ones.
 const BOUNCE_CAP = { low: [8, 6], medium: [12, 8] }[pipeline.quality] ?? [48, 10];
 const infinity = new InfinityPass({ dirSize: fullQuality ? 512 : 256 });
@@ -218,37 +222,65 @@ gui.show();
 // Floating free: each new one turns up at its own angle.
 // It eases from the old angle to the new one over the morph.
 const tumble = new Quaternion(), tumbleFrom = new Quaternion(), tumbleTo = new Quaternion();
-// A new one is another solid at its own angle, with its own glass flaws, haze and room light.
+// A new one is another solid at its own angle, with its own lights, glass flaws, haze and room light.
 onRandomize(() => {
-  clicked.clear();
   const r = Math.random;
   const others = SOLIDS.filter((n) => n !== params.solid());
-  params.solid.set(others[Math.floor(r() * others.length)]);
-  tumbleFrom.copy(tumble);
-  tumbleTo.setFromAxisAngle(new Vector3(r() - 0.5, 0, r() - 0.5).normalize(), r() * 0.6);
+  const solid = others[Math.floor(r() * others.length)];
+  const axis = new Vector3(r() - 0.5, 0, r() - 0.5).normalize(), angle = r() * 0.6;
   const range = (a, b) => Math.round((a + r() * (b - a)) * 100) / 100;
   // Mostly empty inside; now and then a nested solid, which grows in.
   const kinds = INNERS.filter((n) => n !== "none");
-  params.inner.set(r() < 0.2 ? kinds[Math.floor(r() * kinds.length)] : "none");
+  const inner = r() < 0.2 ? kinds[Math.floor(r() * kinds.length)] : "none";
   // White light half the time, as most of the real pieces are; colours otherwise.
-  const lights = Object.keys(LIGHTS);
-  tween.paletteFrom = shownColors;
-  params.lights.set(r() < 0.5 ? lights[Math.floor(r() * 3)] : lights[3 + Math.floor(r() * (lights.length - 3))]);
-  const look = { brightness: range(0.7, 1.5), mirror: range(0.6, 0.8), warp: range(0, 0.2), ripple: range(0, 0.2), tilt: range(0, 0.2), haze: range(0.5, 1), spill: range(0.75, 2) };
-  // On load they apply at once; later they ease in alongside the morph.
+  const names = Object.keys(LIGHTS);
+  const lights = r() < 0.5 ? names[Math.floor(r() * 3)] : names[3 + Math.floor(r() * (names.length - 3))];
+  const tubes = ["frosted", "neon", "filament"][Math.floor(r() * 3)];
+  startLook({ solid, inner, lights, tubes, brightness: range(0.7, 1.5), mirror: range(0.6, 0.8), warp: range(0, 0.2), ripple: range(0, 0.2), tilt: range(0, 0.2), haze: range(0.5, 1), spill: range(0.75, 2) }, axis, angle);
+});
+
+// Moves to a look ({ param: value }): the solid morphs and the nested one grows in on their own, numbers and colours
+// ease in over the morph, and the tube type switches halfway. On load (nothing shown yet) it all applies at once.
+function startLook(look, axis = null, angle = 0) {
+  clicked.clear();
+  const { solid, inner, lights, tubes, ...numbers } = look;
+  if (solid) params.solid.set(solid);
+  if (axis) {
+    tumbleFrom.copy(tumble);
+    tumbleTo.setFromAxisAngle(axis, angle);
+  }
+  if (inner) params.inner.set(inner);
+  if (lights) {
+    tween.paletteFrom = shownColors;
+    params.lights.set(lights);
+  }
+  if (tubes) {
+    tween.tubes = tubes;
+    if (!shown) params.tubes.set(tubes);
+  }
   tween.t = shown ? 0 : 1;
   tween.last = {};
-  for (const [key, value] of Object.entries(look)) {
+  tween.to = {};
+  for (const [key, value] of Object.entries(numbers)) {
+    if (!params[key]) continue;
+    if (typeof value !== "number") {
+      params[key].set(value);
+      continue;
+    }
     tween.from[key] = params[key]();
     tween.to[key] = value;
     if (!shown) params[key].set(value);
   }
-});
+}
 const tween = { from: {}, to: {}, last: {}, t: 1 };
 function updateTween(dt) {
   if (tween.t >= 1) return;
   tween.t = Math.min(1, tween.t + dt / MORPH_TIME);
   const e = ease(tween.t);
+  if (tween.tubes && tween.t >= 0.5) {
+    params.tubes.set(tween.tubes);
+    tween.tubes = null;
+  }
   if (tween.paletteFrom) {
     updateLight();
     if (tween.t >= 1) tween.paletteFrom = null;
@@ -621,7 +653,7 @@ function build(planes) {
   u.nodeRadius.value = params.nodes() ? 1.7 * sculpture.tube.radius : 0;
   // Pixels whose path goes deep get two more rays, at full quality and on the sparser solids.
   const faces = morph.t < 1 ? Math.max(morph.from.planes.length, morph.to.planes.length) : sculpture.faces.length;
-  u.deepStart.value = fullQuality && faces <= DENSE ? 3 : 99;
+  u.deepStart.value = extraRays() && faces <= DENSE ? 3 : 99;
   writeWindows(sculpture);
   frame.position.set(0, CENTER_Y, 0);
   walls.position.copy(frame.position);
@@ -1028,7 +1060,10 @@ controls.enablePan = false;
 controls.minDistance = 2.2;
 camera.lookAt(controls.target);
 
-onResize((w, h, dpr) => pipeline.setSize(w, h, dpr));
+onResize((w, h, dpr) => {
+  pipeline.setSize(w, h, dpr);
+  if (sculpture) build(morph.t < 1 ? morphPlanes(morph.from, morph.to, ease(morph.t)) : shown.planes);
+});
 
 // ---------------------------------------------------------------- frame
 
@@ -1067,7 +1102,7 @@ window.app = {
   controls,
   infinity,
   preload: () => Promise.resolve(),
-  nextLook: (look) => (look ? Object.entries(look).forEach(([k, v]) => params[k]?.set(v)) : randomize()),
+  nextLook: (look) => (look ? startLook(look) : randomize()),
   get morphing() {
     return morph.t < 1;
   },

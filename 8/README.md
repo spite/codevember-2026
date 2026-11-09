@@ -101,7 +101,7 @@ sharpness.
 nobody is interacting.
 
 Randomize morphs to another solid, hanging at a new angle, leaves it empty inside four times in five (otherwise
-any nested solid grows in), and eases in new lights (white half the time, colours otherwise), Brightness (0.7–1.5), glass flaws (Inner mirror 0.6–0.8; Warp,
+any nested solid grows in), switches the tubes to frosted, neon or filament halfway through, and eases in new lights (white half the time, colours otherwise), Brightness (0.7–1.5), glass flaws (Inner mirror 0.6–0.8; Warp,
 Ripple and Tilt up to 0.2), haze (0.5–1) and room light (0.75–2). Everything else stays as it is.
 
 Phones and the medium and low tiers trace fewer bounces and a smaller direction map, and get no extra rays.

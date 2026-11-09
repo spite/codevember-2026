@@ -65,7 +65,9 @@ uniform vec4 innerPlanes[64];
 uniform int innerCount;
 uniform int innerTubeCount;
 uniform float innerTubeRadius;
-uniform float innerBound;
+uniform float innerBound; // bounding radius of all its tubes, links included
+uniform float innerCore; // bounding radius of the solid and its edges
+uniform int innerEdgeCount; // its tubes before the links
 uniform float floorY;
 uniform float floorGloss;
 uniform float floorRough;
@@ -369,9 +371,11 @@ vec4 traceSculpture(vec3 ro, vec3 rd, float tLimit, float travelledBefore, float
     // The nested solid, a mirror, may come first.
     vec3 innerN = vec3(0.0);
     // Only where the ray passes the nested solid's bounding sphere before it leaves.
-    float ib = dot(o, d), idisc = ib * ib - dot(o, o) + innerBound * innerBound;
-    bool nearInner = innerCount > 0 && idisc > 0.0 && -ib + sqrt(idisc) > 0.0 && -ib - sqrt(idisc) < tExit;
-    float tInner = nearInner ? innerHit(o, d, innerN) : -1.0;
+    float ib = dot(o, d), oo = dot(o, o);
+    float cdisc = ib * ib - oo + innerCore * innerCore, ldisc = ib * ib - oo + innerBound * innerBound;
+    bool nearCore = innerCount > 0 && cdisc > 0.0 && -ib + sqrt(cdisc) > 0.0 && -ib - sqrt(cdisc) < tExit;
+    bool nearLinks = innerTubeCount > innerEdgeCount && ldisc > 0.0 && -ib + sqrt(ldisc) > 0.0 && -ib - sqrt(ldisc) < tExit;
+    float tInner = nearCore ? innerHit(o, d, innerN) : -1.0;
     bool atInner = tInner > 0.0 && tInner < tExit;
     float tEnd = atInner ? tInner : tExit;
     vec3 e = o + d * tEnd;
@@ -407,8 +411,8 @@ vec4 traceSculpture(vec3 ro, vec3 rd, float tLimit, float travelledBefore, float
         }
       }
     }
-    int innerTubesNear = nearInner ? innerTubeCount : 0;
-    for (int i = 0; i < innerTubesNear; i++) {
+    int innerFirst = nearCore ? 0 : innerEdgeCount, innerLast = nearLinks ? innerTubeCount : nearCore ? innerEdgeCount : 0;
+    for (int i = innerFirst; i < innerLast; i++) {
       vec4 aL = texelFetch(innerTubes, ivec2(2 * i, 0), 0);
       vec3 c = texelFetch(innerTubes, ivec2(2 * i + 1, 0), 0).xyz;
       vec3 q = raySegment(o, d, aL.xyz, c);
@@ -726,6 +730,8 @@ class InfinityPass {
         dirMap: { value: this.dirTarget.texture },
         dirSize: { value: dirSize },
         innerBound: { value: 0 },
+        innerCore: { value: 0 },
+        innerEdgeCount: { value: 0 },
         floorY: { value: -1 },
         floorGloss: { value: 0 },
         floorRough: { value: 0.02 },
@@ -870,8 +876,12 @@ class InfinityPass {
       const [a, b] = shape.edges[i];
       writeTube(data, i, _a.copy(a).applyQuaternion(q).multiplyScalar(s), _b.copy(b).applyQuaternion(q).multiplyScalar(s), fade);
     }
+    let core = 0;
+    for (const [a, b] of shape.edges) core = Math.max(core, a.length(), b.length());
+    core *= s;
+    u.innerEdgeCount.value = count;
     // Links: tubes given end to end in the sculpture's space, e.g. joining the nested solid to the outer one.
-    let reach = s;
+    let reach = core;
     for (const [a, b] of shape.links ?? []) {
       if (count >= MAX_INNER_TUBES) break;
       writeTube(data, count++, _a.copy(a).applyQuaternion(q).multiplyScalar(s), _b.copy(b), fade);
@@ -880,6 +890,7 @@ class InfinityPass {
     u.innerTubeCount.value = count;
     u.innerTubeRadius.value = radius;
     u.innerBound.value = reach + radius + 0.5 * u.maxFootprint.value + 1e-3;
+    u.innerCore.value = core + radius + 0.5 * u.maxFootprint.value + 1e-3;
     this.innerTexture.needsUpdate = true;
   }
 
