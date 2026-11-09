@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en" data-canvas="pipeline">
+  <head>
+    <title>Tesseract · Codevember 2026 #8</title>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="description" content="Tesseract: an infinity polyhedron in homage to Anthony James. A dark steel frame, two-way mirror faces and a light tube along every edge, ray traced inside into endless lattices of light that fill the room. Day 8 of Codevember 2026." />
+    <meta name="author" content="Jaume Sanchez Elias" />
+    <meta name="theme-color" content="#0b0c0c" />
+    <link rel="canonical" href="https://spite.github.io/codevember-2026/8/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Codevember 2026" />
+    <meta property="og:title" content="Tesseract · Codevember 2026 #8" />
+    <meta property="og:description" content="Tesseract: an infinity polyhedron in homage to Anthony James. A dark steel frame, two-way mirror faces and a light tube along every edge, ray traced inside into endless lattices of light that fill the room. Day 8 of Codevember 2026." />
+    <meta property="og:url" content="https://spite.github.io/codevember-2026/8/" />
+    <meta property="og:image" content="https://spite.github.io/codevember-2026/screenshots/8-social.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="A dark-framed icosahedron floating in a dim room, its glass faces opening onto endless reflected lattices of white light tubes." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@thespite" />
+    <meta name="twitter:creator" content="@thespite" />
+    <meta name="twitter:title" content="Tesseract · Codevember 2026 #8" />
+    <meta name="twitter:description" content="Tesseract: an infinity polyhedron in homage to Anthony James. A dark steel frame, two-way mirror faces and a light tube along every edge, ray traced inside into endless lattices of light that fill the room. Day 8 of Codevember 2026." />
+    <meta name="twitter:image" content="https://spite.github.io/codevember-2026/screenshots/8-social.jpg" />
+    <meta name="twitter:image:alt" content="A dark-framed icosahedron floating in a dim room, its glass faces opening onto endless reflected lattices of white light tubes." />
+    <link rel="stylesheet" type="text/css" href="../css/styles.css" />
+    <link rel="stylesheet" type="text/css" href="../css/gui.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "maf": "../modules/maf.js",
+          "guspira": "../third_party/guspira.js",
+          "common": "../modules/common.js",
+          "easings": "../modules/easings.js",
+          "three": "../third_party/three.module.js",
+          "three/": "../third_party/",
+          "third_party/": "../third_party/",
+          "shaders/": "../shaders/",
+          "modules/": "../modules/"
+        }
+      }
+    </script>
+    <script type="module" src="main.js"></script>
+  </head>
+  <body>
+    <div id="loading" style="--loading-background: #070808"><span>Tesseracting…</span></div>
+    <div id="main-gui">
+      <div id="randomize-button" class="button" title="Randomize">
+        <img src="../assets/randomize.svg" alt="Randomize" />
+      </div>
+      <div id="pause-button" class="button action" title="Pause">
+        <img src="../assets/pause.svg" alt="Pause" />
+      </div>
+      <div id="gui-container"></div>
+    </div>
+  </body>
+</html>

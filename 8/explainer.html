@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Tesseract Repeats</title>
+<meta name="description" content="How Codevember 2026 day 8, Tesseract, traces an infinity polyhedron in homage to Anthony James: two-way mirrors, light tubes found per face, footprint-filtered reflections, and windows that light the room.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* One reading column on gallery concrete; figures are small dark rooms, so the tubes glow. */
+:root {
+  --bg: #d8dad8;
+  --panel: #e6e8e6;
+  --ink: #141716;
+  --muted: #545b59;
+  --line: #b8bdbb;
+  --accent: #0c6c66;
+  --accent2: #5a4fb0;
+  --stage: #0b0d0d;
+  --stage-ink: #9aa5a2;
+  --steel: #3a3f40;
+  --glass: #5fb3aa;
+  --tube: #f3fbf8;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1111; --panel: #191c1c; --ink: #e8ecea; --muted: #9ca5a2; --line: #2f3434;
+    --accent: #7fd8cf; --accent2: #b3a8ff; --stage: #070808; --stage-ink: #8a9592;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1111; --panel: #191c1c; --ink: #e8ecea; --muted: #9ca5a2; --line: #2f3434;
+  --accent: #7fd8cf; --accent2: #b3a8ff; --stage: #070808; --stage-ink: #8a9592;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .holo { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .holo {
+    background: linear-gradient(100deg, var(--accent) 10%, var(--accent2) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+
+/* Figures */
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; border-radius: 3px; background: var(--stage); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+select {
+  font: 400 13px/1.2 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 3px; padding: 6px 8px;
+}
+button {
+  font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px;
+  padding: 9px 14px; cursor: pointer;
+}
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 12.5px/1.2 var(--mono); color: var(--muted); }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid currentColor; vertical-align: middle; margin-right: 6px; }
+.legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: currentColor; vertical-align: middle; margin-right: 6px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+.strip-label { font: 400 12px/1.2 var(--mono); color: var(--muted); margin-bottom: -8px; }
+
+/* Table */
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font: 400 13.5px/1.35 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: nowrap; }
+.formula .c { color: var(--muted); }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+  th, td { padding: 8px 7px; font-size: 12.5px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow">Codevember 2026 · <b>Day 8</b> · Tesseract</div>
+      <h1>How Tesseract <span class="holo">repeats</span></h1>
+      <p class="lede">A convex solid with a dark steel frame, two-way mirror faces and a light tube along every edge, after Anthony James's infinity sculptures. Inside, the tubes reflect back and forth without end. Here is how that inside is traced, how its windows light the room, and how one solid turns into another.</p>
+      <div class="meta">
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>per-pixel ray tracing</span><span>no build step</span><span>desktop and phones</span>
+      </div>
+    </div>
+    <figure>
+      <img src="../screenshots/8.jpg" width="1200" height="1200" alt="A dark-framed icosahedron floating in a dim room, its glass faces opening onto endless reflected lattices of white light tubes, its frame's shadow thrown across the floor and wall.">
+      <figcaption>The icosahedron, from the live page.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. The piece -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The homage</div>
+      <h2>A polytope that never ends</h2>
+      <p>Anthony James builds his infinity sculptures from the oldest shapes there are: an icosahedron, a dodecahedron, a cube. Each face is a pane of two-way mirror glass in a steel frame, and along every edge, inside, runs a light tube. The inner surfaces of the glass reflect the tubes back and forth, so from outside the solid opens onto a lattice of light that goes on in every direction, folded into a box you could carry.</p>
+      <p>The day's prompt was Tesseract, the four-dimensional cube. This is the prompt taken loosely: not the tesseract itself, but the feeling of looking into a solid that has more inside it than a solid can hold.</p>
+      <p>The day offers forty solids: the Platonic and Archimedean solids, the Catalan solids, and prisms, antiprisms and bipyramids, with up to 64 faces. Everything about them is described as planes.</p>
+    </div>
+  </section>
+
+  <!-- 2. Tracing -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The inside · <b>infinity.js</b></div>
+      <h2>Two-way mirrors, traced exactly</h2>
+      <p>The frame is an ordinary mesh, rendered by the shared pipeline. The inside is not: it is ray traced per pixel, in a full-screen pass that the pipeline runs over its lit image before bloom. A solid is a list of planes <i>n</i>·<i>p</i> ≤ <i>d</i>, which makes every step exact and cheap.</p>
+      <p>A ray enters through the plane it crosses last on the way in, and inside it leaves through the plane it meets first. Where it meets a plane, the frame mesh's own test says whether it is in that face's window or behind the bar: it is behind the bar if it lies within the rim of another face's plane. In the window, the inner side of the glass reflects most of the light back in (Inner mirror), and the ray goes on, for up to 48 bounces. A tube in its way ends it.</p>
+      <p>Move the pointer over the figure to aim the ray. Below it is what that eye sees across the window, one row of pixels: the same few tubes, over and over, fainter at each reflection.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A cross-section, from outside in</h3>
+        <div class="controls">
+          <label>Sides <input id="tN" type="range" min="3" max="8" step="1" value="5"><output id="tNo">5</output></label>
+          <label>Inner mirror <input id="tR" type="range" min="0.6" max="0.97" step="0.01" value="0.82"><output id="tRo">0.82</output></label>
+          <label>Bounces <input id="tB" type="range" min="2" max="48" step="1" value="14"><output id="tBo">14</output></label>
+        </div>
+      </div>
+      <canvas id="traceCanvas" aria-label="A regular polygon with a dark frame at each corner and glowing tube cross-sections just inside. A ray from an eye on the left enters through a window and bounces inside, fading at each reflection, until it meets a tube or a bar."></canvas>
+      <div class="strip-label">What the eye sees, one row</div>
+      <canvas id="stripCanvas" aria-label="One row of pixels across the polygon as the eye sees it: bright tube images repeating, dimmer each time."></canvas>
+      <div class="readout" id="tOut"></div>
+      <div class="legend"><span style="color:var(--glass)"><i></i>two-way glass</span><span style="color:var(--muted)"><i></i>steel frame</span><span style="color:var(--accent)"><span class="dot"></span>tube</span></div>
+      <p class="fig-cap">In 3D the tubes run along each window's edges, a little under the frame. A cross-section cuts them where they cross it, which is at the ends of each window. On the outside the glass shows a faint reflection of the room, more at grazing angles, and lets the See-through share of the inside out.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Tubes per face</b><span>A face's tubes all lie in a thin slab just under it, so a straight run inside the solid can only meet them if one of its ends is near that face. Each end marks the faces within reach in a 64-bit mask, and only their tubes are tested.</span></div>
+      <div class="fact"><b>One call site</b><span>The tracer is a heavy loop with loops inside. ANGLE on Direct3D 11 refuses to unroll it more than once, so the camera ray, the extra rays and the floor's mirror ray all go through one loop over a single call.</span></div>
+      <div class="fact"><b>Glass as built</b><span>Each pane bows a little, sits a little askew and ripples (Warp, Tilt, Ripple). The surface stays put and only its normal bends, as for any thin warped sheet.</span></div>
+    </div>
+  </section>
+
+  <!-- 3. Footprints -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Anti-aliasing · <b>footprints</b></div>
+      <h2>Twenty reflections deep, in one pixel</h2>
+      <p>Deep in the reflections the tubes are far thinner than a pixel and closer together than two. A single ray per pixel either hits one or misses it, and the lattice breaks into sparkling noise that crawls as the sculpture turns.</p>
+      <p>So every ray carries its footprint: the pixel's angle times the distance it has travelled. The warped glass widens it at each bounce, and a glossy floor's blur widens it from the floor on. Each tube is box-filtered against it: the share of the footprint the tube covers lights the pixel, and only the rest goes on to the next bounce. Far enough in, a tube fades to its mean, which is what a camera sees.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A receding row of tube images</h3>
+        <div class="controls">
+          <label>Pixels <input id="fP" type="range" min="40" max="240" step="1" value="90"><output id="fPo">90</output></label>
+          <label>Reflections <input id="fK" type="range" min="4" max="120" step="1" value="48"><output id="fKo">48</output></label>
+          <label>Slide <input id="fS" type="range" min="0" max="1" step="0.001" value="0"><output id="fSo">0.00</output></label>
+        </div>
+      </div>
+      <canvas id="footCanvas" aria-label="Three rows of pixels showing the same receding row of ever thinner tube images: point sampled, which breaks up and misses tubes, box filtered over the footprint, and a supersampled reference."></canvas>
+      <div class="readout" id="fOut"></div>
+      <p class="fig-cap">Slide moves the row by a fraction of a pixel, as a turning sculpture does: the point-sampled row flickers, the filtered row barely changes. Where a path goes deep on the sparser solids, two more rays across the pixel help at full quality. A ray with light left after the last bounce adds the mean of the rest: the tubes at the rate they cover the walls, over a geometric series of mirror bounces.</p>
+    </div>
+    <div class="formula">
+      <span class="c">// footprint at distance t along a segment, after b bounces</span><br>
+      w(t) = pixelAngle · (1 + b · aberration) · (travelled + t) + floorSpread · (travelled since the floor + t)<br>
+      <span class="c">// share of the footprint a tube of radius r covers, at distance h from its axis</span><br>
+      cov = clamp((min(h + w/2, r) − max(h − w/2, −r)) / w, 0, 1)
+    </div>
+  </section>
+
+  <!-- 4. The room -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The room's light · <b>main.js</b></div>
+      <h2>Every window is a light</h2>
+      <p>The sculpture is the only real light in the room; the studio is turned almost off. Each window gives off the inside's mean radiance through the two-way glass, so the floor and the wall are lit by a set of glowing polygons, one per face, with the frame's bars between them.</p>
+      <p>The soft way is exact. A polygon light of uniform radiance is integrated in closed form with the edge integral, one term per edge, the same one linearly transformed cosines are built on. Only the windows facing the point count: the convex solid hides the others. This gives broad, blurred shadows of the bars.</p>
+      <p>The sharp way treats it as if all the light came from the centre, through the windows, like a lamp through a gobo. A map baked once per solid says, for every direction from the centre, which face it leaves through and whether it leaves through the window or a bar. The floor then shows the frame's pattern crisply. Shadow sharpness blends the two, with the gobo scaled to carry the same power, so the room keeps its brightness.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Windows over a floor</h3>
+        <div class="controls">
+          <label>Shadow sharpness <input id="gS" type="range" min="0" max="1" step="0.01" value="0.5"><output id="gSo">0.50</output></label>
+          <label>Sides <input id="gN" type="range" min="3" max="8" step="1" value="6"><output id="gNo">6</output></label>
+          <label>Turn <input id="gT" type="range" min="0" max="1" step="0.01" value="0.2"><output id="gTo">0.20</output></label>
+        </div>
+      </div>
+      <canvas id="goboCanvas" aria-label="A polygon with framed windows hanging above a floor. Light wedges fan from its centre through each window. Under the floor, a band and a curve show the light it receives: soft with sharpness 0, the windows' crisp pattern with sharpness 1."></canvas>
+      <div class="legend"><span style="color:var(--accent)"><i></i>floor light (blend)</span><span style="color:var(--stage-ink)"><i></i>soft: windows as area lights</span><span style="color:var(--accent2)"><i></i>sharp: through the windows from the centre</span></div>
+      <p class="fig-cap">In 2D a window's form factor seen from a point is half the difference of the sines of its ends' angles, and a point light falls off as 1/r rather than 1/r². The sculpture does the same with polygons in 3D.</p>
+    </div>
+    <div class="col prose">
+      <p>The haze uses the same map. The air around the sculpture scatters the light of its windows: along each camera ray, six samples are placed equiangularly around the sculpture's centre, where the scattering is strongest, and each is lit through the window its direction leaves through, or not, behind a bar. That draws the shafts of light out into the room. The samples move between the frames the pipeline averages while nothing moves, so they converge.</p>
+    </div>
+  </section>
+
+  <!-- 5. Morphing -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Morphing · <b>sculpture.js</b></div>
+      <h2>From one solid to the next, by its planes</h2>
+      <p>A change of solid morphs, over a little more than two seconds. Because a solid is a set of planes, the solids in between are easy to make and always convex. Take every face direction of both solids. Put each plane at the blend of the two solids' support distances along it: how far each solid reaches in that direction.</p>
+      <p>At the start, the new solid's planes only touch the old one, at a vertex or an edge. As the blend goes on they cut in, and faces grow from those vertices and edges while the old ones shrink away into the new solid's. Every in-between is built in full: the faces, the windows, the tubes and the frame mesh. Window lights follow their face by its normal while faces come and go.</p>
+    </div>
+    <div class="formula">
+      <span class="c">// support distance: how far solid S reaches along n</span><br>
+      h<sub>S</sub>(n) = max<sub>v ∈ S</sub> n · v<br>
+      <span class="c">// in between, for every face normal n of A and of B</span><br>
+      d(n, t) = (1 − t) · h<sub>A</sub>(n) + t · h<sub>B</sub>(n)
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Two polygons, blended by their planes</h3>
+        <div class="controls">
+          <label>From <select id="mA"></select></label>
+          <label>To <select id="mB"></select></label>
+          <label>Blend <input id="mT" type="range" min="0" max="1" step="0.005" value="0.4"><output id="mTo">0.40</output></label>
+          <button id="mPlay" type="button" class="ghost">Play</button>
+        </div>
+      </div>
+      <canvas id="morphCanvas" aria-label="A polygon midway between two regular polygons, each drawn as an outline, with the planes of both solids as faint lines; the faces of the in-between grow and shrink as the blend changes."></canvas>
+      <div class="legend"><span style="color:var(--stage-ink)"><i></i>planes</span><span style="color:var(--accent2)"><i></i>from</span><span style="color:var(--accent)"><i></i>to</span><span style="color:var(--tube)"><i></i>in between</span></div>
+      <p class="fig-cap">Both polygons have a vertex pointing down, as every solid does in the day, so the morph grows out of shared corners. In 3D, mid-morph between two large solids, only the 64 biggest faces are kept; the rest are slivers.</p>
+    </div>
+  </section>
+
+  <!-- 6. Glass and inside -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Variations</div>
+      <h2>Glass, tubes and a solid inside</h2>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Dichroic</b><span>A thin-film coating whose colour shifts with the angle and a little across the panel. It reflects one colour and passes the others, and is kept from gaining light in any channel, so many bounces never blow out.</span></div>
+      <div class="fact"><b>Smoked</b><span>Darker, greyer bounces and less of the inside showing through.</span></div>
+      <div class="fact"><b>Cracked</b><span>Each panel breaks into Voronoi shards, each at its own angle and depth, so the reflections jump from shard to shard, with dark seams between.</span></div>
+      <div class="fact"><b>Open</b><span>Some panels are missing. A ray leaving through one goes into the room: straight through, it shows what the raster drew behind; after a bounce, the room's mean light.</span></div>
+      <div class="fact"><b>Tubes</b><span>Frosted diffusers, LED pixels (box-filtered dots that fade to their mean), neon with a white-hot core, or a filament in clear glass.</span></div>
+      <div class="fact"><b>Inside</b><span>A smaller mirror solid with a tube on every edge, turning slowly, kept within the outer solid's inradius. Its reflections and the outer ones multiply each other.</span></div>
+      <div class="fact"><b>Patterns and animation</b><span>Colours per window, per tube, in segments or as a gradient; windows that breathe, wave, scan, light in sequence, flicker or chase. The room, haze and tail follow each window's light.</span></div>
+      <div class="fact"><b>Floor</b><span>On a glossy floor the mirror image of the camera ray is traced too, with the floor's roughness widening its footprint, so the lattice reflects softly.</span></div>
+    </div>
+  </section>
+
+  <!-- 7. Cost -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Cost</div>
+      <h2>Where the time goes</h2>
+      <p>The trace scales with the number of faces: crossing planes, testing windows and the haze all loop over them. Measured headlessly on a desktop GPU, one run at a time, GPU-synced, with the camera orbiting so the still never converges, on a 2528 × 1410 canvas.</p>
+    </div>
+    <div class="fig">
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Configuration</th><th>Frames per second</th></tr></thead>
+          <tbody>
+            <tr><td>Icosahedron, defaults, high tier</td><td>76</td></tr>
+            <tr><td>Icosahedron, no haze</td><td>81</td></tr>
+            <tr><td>Icosahedron, medium tier</td><td>86</td></tr>
+            <tr><td>Truncated icosidodecahedron (62 faces)</td><td>41</td></tr>
+            <tr><td>Phone emulation (iPhone, pixel ratio 2)</td><td>115</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="fig-cap">Solids with more than 30 faces trace fewer bounces and get no extra rays. The medium and low tiers cap the bounces lower still, and use a smaller direction map. While nothing moves, the pipeline averages jittered frames into a still, up to 32 of them.</p>
+    </div>
+  </section>
+
+  <!-- 8. Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>Drag to turn the sculpture in your hand (a flick keeps it turning). Right-drag or two fingers orbit, scroll or pinch zoom.</li>
+      <li>Click or tap a window to switch its light.</li>
+      <li><b>Shape</b>: Solid (morphs), Rim, Nodes, Inside and its size and spin, Spin.</li>
+      <li><b>Lighting</b>: Brightness, Lights, Tubes, Pattern, Dark windows, Animation.</li>
+      <li><b>Surface</b>: Glass and Amount, Inner mirror, See-through, Warp, Ripple, Tilt, Uneven, Bounces.</li>
+      <li><b>Room</b>: gallery or sphere, Haze, Floor gloss, Room light, Shadow sharpness.</li>
+      <li><b>Camera</b>: Aperture and Focus.</li>
+      <li><b>R</b> randomises, <b>Space</b> pauses, <b>Tab</b> hides the panel, <b>F</b> goes fullscreen, <b>P</b> saves a screenshot.</li>
+    </ul>
+  </section>
+  <footer class="col">
+    Day 8 of Codevember 2026 by Jaume Sanchez Elias, after the infinity sculptures of Anthony James. See it live at <a href="https://spite.github.io/codevember-2026/8/">spite.github.io/codevember-2026/8</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/8">8/ of the codevember-2026 repository</a>. Rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>.
+  </footer>
+</main>
+
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+
+  // A canvas sized to its CSS width at the device pixel ratio; draw() gets (ctx, width, height) in CSS pixels.
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      const w = canvas.clientWidth || 600, h = Math.round(typeof aspect === "function" ? aspect(w) : w * aspect);
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); canvas.style.height = h + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, w, h);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    return { redraw: () => fit(true) };
+  }
+  const bind = (id, fn, fmt = (v) => (+v).toFixed(2)) => {
+    const el = $(id), out = $(id + "o");
+    const set = () => { if (out) out.textContent = fmt(el.value); fn(+el.value); };
+    el.addEventListener("input", set);
+    if (out) out.textContent = fmt(el.value);
+    return el;
+  };
+
+  // A regular polygon of circumradius 1 as planes, with its windows and the tubes at their ends.
+  // turn: rotation in turns of one side; rim: frame width as a fraction of the side.
+  function polygon(n, { turn = 0, rim = 0.16, cx = 0, cy = 0 } = {}) {
+    const a0 = -Math.PI / 2 + Math.PI / n + (turn * 2 * Math.PI) / n;
+    const V = Array.from({ length: n }, (_, k) => [cx + Math.cos(a0 + (2 * Math.PI * k) / n), cy + Math.sin(a0 + (2 * Math.PI * k) / n)]);
+    const L = 2 * Math.sin(Math.PI / n), w = rim * L;
+    const edges = V.map((a, i) => {
+      const b = V[(i + 1) % n];
+      const ex = (b[0] - a[0]) / L, ey = (b[1] - a[1]) / L;
+      const nx = ey, ny = -ex;
+      return { a, b, ex, ey, nx, ny, d: nx * a[0] + ny * a[1] };
+    });
+    const tubeR = 0.032, depth = 0.055;
+    const tubes = [];
+    for (const e of edges)
+      for (const s of [w, L - w]) tubes.push([e.a[0] + e.ex * s - e.nx * depth, e.a[1] + e.ey * s - e.ny * depth]);
+    return { n, V, L, w, edges, tubes, tubeR };
+  }
+  // Along-edge position of p on edge e, and whether it is in the window rather than behind a bar.
+  const inWindow = (P, e, p) => {
+    const s = (p[0] - e.a[0]) * e.ex + (p[1] - e.a[1]) * e.ey;
+    return s >= P.w && s <= P.L - P.w;
+  };
+
+  // ---------------------------------------------------------------- 1. tracing
+  {
+    const T = { n: 5, R: 0.82, B: 14, aim: null };
+    let P = polygon(T.n);
+    const eye = [-2.55, -0.55];
+    // Traces from o along d; returns the light it gathers and its path.
+    function trace(o, d, maxB, path) {
+      let tIn = -Infinity, tOut = Infinity, fIn = -1;
+      for (const [i, e] of P.edges.entries()) {
+        const dn = e.nx * d[0] + e.ny * d[1], dist = e.d - (e.nx * o[0] + e.ny * o[1]);
+        if (Math.abs(dn) < 1e-9) { if (dist < 0) tIn = Infinity; continue; }
+        const t = dist / dn;
+        if (dn < 0) { if (t > tIn) { tIn = t; fIn = i; } } else tOut = Math.min(tOut, t);
+      }
+      if (!(tIn <= tOut && tIn > 0)) { path?.push({ a: o, b: [o[0] + d[0] * 6, o[1] + d[1] * 6], thr: 1, miss: true }); return { kind: "miss", light: 0, bounces: 0 }; }
+      let p = [o[0] + d[0] * tIn, o[1] + d[1] * tIn];
+      path?.push({ a: o, b: p, thr: 1 });
+      if (!inWindow(P, P.edges[fIn], p)) return { kind: "frame", light: 0, bounces: 0 };
+      let thr = 1, light = 0, dir = d.slice(), b = 0;
+      for (; b < maxB; b++) {
+        let tEx = Infinity, fEx = -1;
+        for (const [i, e] of P.edges.entries()) {
+          const dn = e.nx * dir[0] + e.ny * dir[1];
+          if (dn > 1e-9) { const t = (e.d - (e.nx * p[0] + e.ny * p[1])) / dn; if (t < tEx) { tEx = t; fEx = i; } }
+        }
+        let tHit = tEx;
+        for (const c of P.tubes) {
+          const ox = p[0] - c[0], oy = p[1] - c[1];
+          const bb = ox * dir[0] + oy * dir[1], disc = bb * bb - (ox * ox + oy * oy - P.tubeR * P.tubeR);
+          if (disc > 0) { const t = -bb - Math.sqrt(disc); if (t > 1e-6 && t < tHit) tHit = t; }
+        }
+        const q = [p[0] + dir[0] * tHit, p[1] + dir[1] * tHit];
+        path?.push({ a: p, b: q, thr });
+        if (tHit < tEx) return { kind: "tube", light: light + thr, bounces: b + 1, end: q };
+        const e = P.edges[fEx];
+        if (!inWindow(P, e, q)) return { kind: "frame", light, bounces: b + 1, end: q };
+        const dn = dir[0] * e.nx + dir[1] * e.ny;
+        dir = [dir[0] - 2 * dn * e.nx, dir[1] - 2 * dn * e.ny];
+        p = [q[0] - e.nx * 1e-6, q[1] - e.ny * 1e-6];
+        thr *= T.R;
+        if (thr < 0.004) break;
+      }
+      return { kind: "fade", light, bounces: b, thrLeft: thr };
+    }
+    let geo = null;
+    const v = setup($("traceCanvas"), (w) => clamp(w * 0.5, 260, 440), (ctx, W, H) => {
+      const sc = Math.min(W / 4.6, H / 2.5), cx = W - 1.25 * sc - Math.max(0, (W - 4.6 * sc) / 2), cy = H / 2;
+      geo = { sc, cx, cy };
+      const X = (p) => cx + p[0] * sc, Y = (p) => cy - p[1] * sc;
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const aim = T.aim ?? [0.25, 0.32];
+      const len = Math.hypot(aim[0] - eye[0], aim[1] - eye[1]);
+      const d = [(aim[0] - eye[0]) / len, (aim[1] - eye[1]) / len];
+      const path = [];
+      const r = trace(eye, d, T.B, path);
+      // Glass.
+      ctx.lineCap = "round";
+      ctx.strokeStyle = css("--glass"); ctx.globalAlpha = 0.6; ctx.lineWidth = 1.5;
+      ctx.beginPath(); P.V.forEach((p, i) => (i ? ctx.lineTo(X(p), Y(p)) : ctx.moveTo(X(p), Y(p)))); ctx.closePath(); ctx.stroke();
+      ctx.globalAlpha = 1;
+      // The ray, fading with each bounce.
+      const tube = css("--tube");
+      for (const s of path) {
+        ctx.strokeStyle = s.miss ? css("--stage-ink") : tube;
+        ctx.globalAlpha = s.miss ? 0.4 : 0.15 + 0.85 * s.thr;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(X(s.a), Y(s.a)); ctx.lineTo(X(s.b), Y(s.b)); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      // Frame bars at the corners.
+      ctx.strokeStyle = css("--steel"); ctx.lineWidth = Math.max(6, 0.07 * sc); ctx.lineCap = "butt";
+      for (const e of P.edges) {
+        for (const [s0, s1] of [[0, P.w], [P.L - P.w, P.L]]) {
+          const p0 = [e.a[0] + e.ex * s0 + e.nx * 0.03, e.a[1] + e.ey * s0 + e.ny * 0.03];
+          const p1 = [e.a[0] + e.ex * s1 + e.nx * 0.03, e.a[1] + e.ey * s1 + e.ny * 0.03];
+          ctx.beginPath(); ctx.moveTo(X(p0), Y(p0)); ctx.lineTo(X(p1), Y(p1)); ctx.stroke();
+        }
+      }
+      // Tubes.
+      ctx.shadowColor = tube; ctx.shadowBlur = 10; ctx.fillStyle = tube;
+      for (const c of P.tubes) { ctx.beginPath(); ctx.arc(X(c), Y(c), Math.max(2.5, P.tubeR * sc), 0, 2 * Math.PI); ctx.fill(); }
+      ctx.shadowBlur = 0;
+      if (r.end) { ctx.strokeStyle = r.kind === "tube" ? css("--accent") : css("--stage-ink"); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(r.end), Y(r.end), 7, 0, 2 * Math.PI); ctx.stroke(); }
+      // The eye.
+      ctx.fillStyle = css("--stage-ink");
+      ctx.beginPath(); ctx.arc(X(eye), Y(eye), 5, 0, 2 * Math.PI); ctx.fill();
+      ctx.font = font(11); ctx.fillText("eye", X(eye) - 10, Y(eye) + 20);
+      const ends = { tube: "met a tube", frame: "met a bar", fade: "faded out", miss: "missed the solid" };
+      $("tOut").innerHTML = `<span>Bounces <b>${r.bounces}</b></span><span>Light gathered <b>${r.light.toFixed(2)}</b></span><span>The ray <b>${ends[r.kind]}</b></span>`;
+      drawStrip();
+    });
+    // The view across the solid: one ray per column, between the eye's tangents to it.
+    const strip = setup($("stripCanvas"), () => 34, (ctx, W, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const angs = P.V.map((p) => Math.atan2(p[1] - eye[1], p[0] - eye[0]));
+      const a0 = Math.min(...angs), a1 = Math.max(...angs);
+      const cols = Math.min(Math.round(W), 700), cw = W / cols;
+      const steel = css("--steel");
+      for (let i = 0; i < cols; i++) {
+        const a = a1 + ((a0 - a1) * (i + 0.5)) / cols;
+        const r = trace(eye, [Math.cos(a), Math.sin(a)], T.B);
+        if (r.kind === "frame" && r.bounces === 0) ctx.fillStyle = steel;
+        else {
+          const g = Math.round(255 * (1 - Math.exp(-2.2 * r.light)));
+          ctx.fillStyle = `rgb(${g},${Math.min(255, g + 4)},${Math.min(255, g + 2)})`;
+          if (r.kind === "miss") continue;
+        }
+        ctx.fillRect(i * cw, 0, cw + 0.6, H);
+      }
+    });
+    function drawStrip() { strip.redraw(); }
+    const canvas = $("traceCanvas");
+    const move = (e) => {
+      if (!geo) return;
+      const r = canvas.getBoundingClientRect();
+      const p = [(e.clientX - r.left - geo.cx) / geo.sc, -(e.clientY - r.top - geo.cy) / geo.sc];
+      if (p[0] < eye[0] + 0.3) return;
+      T.aim = p;
+      v.redraw();
+    };
+    canvas.addEventListener("pointermove", move);
+    canvas.addEventListener("pointerdown", move);
+    bind("tN", (x) => { T.n = x; P = polygon(x); v.redraw(); }, (x) => String(x));
+    bind("tR", (x) => { T.R = x; v.redraw(); });
+    bind("tB", (x) => { T.B = x; v.redraw(); }, (x) => String(x));
+  }
+
+  // ---------------------------------------------------------------- 2. footprints
+  {
+    const F = { px: 90, K: 48, slide: 0 };
+    // Image k of a tube seen through k reflections: its centre and width across [0, 1], and how bright.
+    const images = () => Array.from({ length: F.K }, (_, k) => ({ c: 1 - 0.94 / (1 + 0.22 * k) + F.slide / F.px, w: 0.026 / (1 + 0.22 * k), a: 0.92 ** k }));
+    const v = setup($("footCanvas"), () => 3 * 44 + 2 * 22 + 6, (ctx, W, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const im = images(), N = F.px, pw = W / N;
+      const rows = [
+        ["Point sampled", (x0, x1) => { const x = (x0 + x1) / 2; let s = 0; for (const t of im) if (Math.abs(x - t.c) < t.w / 2) s += t.a; return s; }],
+        ["Box filtered over the footprint", (x0, x1) => { let s = 0; for (const t of im) s += (t.a * Math.max(0, Math.min(x1, t.c + t.w / 2) - Math.max(x0, t.c - t.w / 2))) / (x1 - x0); return s; }],
+        ["Reference, 64 samples per pixel", (x0, x1) => { let s = 0; for (let j = 0; j < 64; j++) { const x = x0 + ((j + 0.5) / 64) * (x1 - x0); for (const t of im) if (Math.abs(x - t.c) < t.w / 2) s += t.a; } return s / 64; }],
+      ];
+      const vals = rows.map(([, f]) => Array.from({ length: N }, (_, i) => f(i / N, (i + 1) / N)));
+      const tone = (v) => Math.round(255 * (1 - Math.exp(-2.4 * v)));
+      ctx.font = font(11); ctx.textBaseline = "middle";
+      rows.forEach(([label], r) => {
+        const y = r * 66 + 22;
+        ctx.fillStyle = css("--stage-ink"); ctx.fillText(label, 8, y - 11);
+        vals[r].forEach((v, i) => { const g = tone(v); ctx.fillStyle = `rgb(${g},${Math.min(255, g + 4)},${Math.min(255, g + 2)})`; ctx.fillRect(i * pw, y, pw + 0.5, 40); });
+      });
+      const err = (r) => vals[r].reduce((s, v, i) => s + Math.abs(v - vals[2][i]), 0) / N;
+      $("fOut").innerHTML = `<span>Mean error, point sampled <b>${err(0).toFixed(3)}</b></span><span>Box filtered <b>${err(1).toFixed(3)}</b></span>`;
+    });
+    bind("fP", (x) => { F.px = x; v.redraw(); }, (x) => String(x));
+    bind("fK", (x) => { F.K = x; v.redraw(); }, (x) => String(x));
+    bind("fS", (x) => { F.slide = x; v.redraw(); });
+  }
+
+  // ---------------------------------------------------------------- 3. window lights
+  {
+    const G = { s: 0.5, n: 6, turn: 0.2 };
+    const C = [0, 2.05];
+    const v = setup($("goboCanvas"), (w) => clamp(w * 0.5, 260, 420), (ctx, W, H) => {
+      const P = polygon(G.n, { turn: G.turn, rim: 0.2, cx: C[0], cy: C[1] });
+      const band = 34, floorY = H - band - 6;
+      const sc = Math.min(W / 8.4, (floorY - 10) / 3.15);
+      const X = (x) => W / 2 + x * sc, Y = (y) => floorY - y * sc;
+      const x0 = -W / 2 / sc, x1 = W / 2 / sc, N = Math.max(120, Math.round(W / 3));
+      // Soft: windows facing the point as line lights; sharp: the window the direction from the centre leaves through.
+      const soft = [], sharp = [];
+      for (let i = 0; i < N; i++) {
+        const p = [x0 + ((x1 - x0) * (i + 0.5)) / N, 0];
+        let f = 0;
+        for (const e of P.edges) {
+          if (e.nx * p[0] + e.ny * p[1] <= e.d) continue;
+          const A = [e.a[0] + e.ex * P.w, e.a[1] + e.ey * P.w], B = [e.a[0] + e.ex * (P.L - P.w), e.a[1] + e.ey * (P.L - P.w)];
+          const sa = (A[0] - p[0]) / Math.hypot(A[0] - p[0], A[1] - p[1]), sb = (B[0] - p[0]) / Math.hypot(B[0] - p[0], B[1] - p[1]);
+          f += 0.5 * Math.abs(sb - sa);
+        }
+        soft.push(f);
+        const ux = p[0] - C[0], uy = p[1] - C[1], r = Math.hypot(ux, uy), u = [ux / r, uy / r];
+        let best = Infinity, face = null;
+        for (const e of P.edges) {
+          const dn = e.nx * u[0] + e.ny * u[1];
+          const t = (e.d - (e.nx * C[0] + e.ny * C[1])) / dn;
+          if (dn > 1e-6 && t < best) { best = t; face = e; }
+        }
+        const q = [C[0] + u[0] * best, C[1] + u[1] * best];
+        sharp.push(face && inWindow(P, face, q) ? Math.max(-u[1], 0) / r : 0);
+      }
+      const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
+      const K = mean(soft) / Math.max(mean(sharp), 1e-6);
+      const blend = soft.map((f, i) => (1 - G.s) * f + G.s * K * sharp[i]);
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      // Light wedges from the centre through each window, as the gobo sees them.
+      ctx.fillStyle = css("--tube");
+      for (const e of P.edges) {
+        const A = [e.a[0] + e.ex * P.w, e.a[1] + e.ey * P.w], B = [e.a[0] + e.ex * (P.L - P.w), e.a[1] + e.ey * (P.L - P.w)];
+        ctx.globalAlpha = 0.03 + 0.07 * G.s;
+        const far = (Q) => [C[0] + (Q[0] - C[0]) * 12, C[1] + (Q[1] - C[1]) * 12];
+        const fb = far(B), fa = far(A);
+        ctx.beginPath(); ctx.moveTo(X(A[0]), Y(A[1])); ctx.lineTo(X(B[0]), Y(B[1])); ctx.lineTo(X(fb[0]), Y(fb[1])); ctx.lineTo(X(fa[0]), Y(fa[1])); ctx.closePath(); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      // The floor line, its light as a band, and the three curves.
+      ctx.strokeStyle = css("--stage-ink"); ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, floorY + 0.5); ctx.lineTo(W, floorY + 0.5); ctx.stroke(); ctx.globalAlpha = 1;
+      const peak = Math.max(...blend, ...soft, ...sharp.map((s) => K * s), 1e-6);
+      const bw = W / N;
+      blend.forEach((b, i) => { const g = Math.round(255 * (1 - Math.exp(-3 * b / peak))); ctx.fillStyle = `rgb(${g},${Math.min(255, g + 4)},${Math.min(255, g + 2)})`; ctx.fillRect(i * bw, floorY + 4, bw + 0.5, band); });
+      const curve = (arr, k, color, width, alpha) => {
+        ctx.strokeStyle = color; ctx.lineWidth = width; ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        arr.forEach((a, i) => { const x = (i + 0.5) * bw, y = floorY - 6 - (a * k / peak) * (floorY * 0.3); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+        ctx.stroke(); ctx.globalAlpha = 1;
+      };
+      curve(soft, 1, css("--stage-ink"), 1.2, 0.8);
+      curve(sharp, K, css("--accent2"), 1.2, 0.8);
+      curve(blend, 1, css("--accent"), 2.2, 1);
+      // The sculpture: glass windows, steel bars and the glow inside.
+      ctx.fillStyle = css("--tube"); ctx.globalAlpha = 0.12;
+      ctx.beginPath(); P.V.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1])))); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.lineCap = "butt";
+      for (const e of P.edges) {
+        ctx.strokeStyle = css("--tube"); ctx.lineWidth = 2.5; ctx.shadowColor = css("--tube"); ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.moveTo(X(e.a[0] + e.ex * P.w), Y(e.a[1] + e.ey * P.w)); ctx.lineTo(X(e.a[0] + e.ex * (P.L - P.w)), Y(e.a[1] + e.ey * (P.L - P.w))); ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = css("--steel"); ctx.lineWidth = Math.max(5, 0.08 * sc);
+        for (const [s0, s1] of [[0, P.w], [P.L - P.w, P.L]]) {
+          ctx.beginPath(); ctx.moveTo(X(e.a[0] + e.ex * s0), Y(e.a[1] + e.ey * s0)); ctx.lineTo(X(e.a[0] + e.ex * s1), Y(e.a[1] + e.ey * s1)); ctx.stroke();
+        }
+      }
+    });
+    bind("gS", (x) => { G.s = x; v.redraw(); });
+    bind("gN", (x) => { G.n = x; v.redraw(); }, (x) => String(x));
+    bind("gT", (x) => { G.turn = x; v.redraw(); });
+  }
+
+  // ---------------------------------------------------------------- 4. morphing
+  {
+    const SHAPES = { triangle: 3, square: 4, pentagon: 5, hexagon: 6, octagon: 8 };
+    const M = { a: "triangle", b: "hexagon", t: 0.4 };
+    // Regular polygon with vertex 0 pointing down, as { verts, normals }.
+    const shape = (n) => {
+      const verts = Array.from({ length: n }, (_, k) => { const a = -Math.PI / 2 + (2 * Math.PI * k) / n; return [Math.cos(a), Math.sin(a)]; });
+      const normals = verts.map((p, k) => { const q = verts[(k + 1) % n], mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2, l = Math.hypot(mx, my); return [mx / l, my / l]; });
+      return { verts, normals };
+    };
+    const support = (S, n) => Math.max(...S.verts.map((v) => v[0] * n[0] + v[1] * n[1]));
+    const clip = (poly, n, d) => {
+      const out = [];
+      poly.forEach((p, i) => {
+        const q = poly[(i + 1) % poly.length];
+        const dp = n[0] * p[0] + n[1] * p[1] - d, dq = n[0] * q[0] + n[1] * q[1] - d;
+        if (dp <= 0) out.push(p);
+        if (dp * dq < 0) { const s = dp / (dp - dq); out.push([p[0] + (q[0] - p[0]) * s, p[1] + (q[1] - p[1]) * s]); }
+      });
+      return out;
+    };
+    for (const id of ["mA", "mB"]) for (const k of Object.keys(SHAPES)) $(id).add(new Option(k, k));
+    $("mA").value = M.a; $("mB").value = M.b;
+    const v = setup($("morphCanvas"), (w) => clamp(w * 0.5, 260, 400), (ctx, W, H) => {
+      const A = shape(SHAPES[M.a]), B = shape(SHAPES[M.b]);
+      const planes = [];
+      for (const S of [A, B]) for (const n of S.normals) if (!planes.some((p) => p.n[0] * n[0] + p.n[1] * n[1] > 1 - 1e-6)) planes.push({ n, d: (1 - M.t) * support(A, n) + M.t * support(B, n) });
+      let poly = [[-4, -4], [4, -4], [4, 4], [-4, 4]];
+      for (const p of planes) poly = clip(poly, p.n, p.d);
+      const sc = Math.min(W, H) * 0.36, X = (p) => W / 2 + p[0] * sc, Y = (p) => H / 2 - p[1] * sc;
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      // Every plane, faint; those that make a face of the in-between, brighter.
+      for (const p of planes) {
+        const o = [p.n[0] * p.d, p.n[1] * p.d], t = [-p.n[1], p.n[0]];
+        const face = poly.some((q, i) => { const r = poly[(i + 1) % poly.length]; return Math.abs(p.n[0] * q[0] + p.n[1] * q[1] - p.d) < 1e-6 && Math.abs(p.n[0] * r[0] + p.n[1] * r[1] - p.d) < 1e-6 && Math.hypot(r[0] - q[0], r[1] - q[1]) > 1e-4; });
+        ctx.strokeStyle = css("--stage-ink"); ctx.globalAlpha = face ? 0.45 : 0.18; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(X([o[0] - t[0] * 4, o[1] - t[1] * 4]), Y([o[0] - t[0] * 4, o[1] - t[1] * 4])); ctx.lineTo(X([o[0] + t[0] * 4, o[1] + t[1] * 4]), Y([o[0] + t[0] * 4, o[1] + t[1] * 4])); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      const outline = (pts, color, dash, width) => {
+        ctx.setLineDash(dash); ctx.strokeStyle = color; ctx.lineWidth = width;
+        ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(X(p), Y(p)) : ctx.moveTo(X(p), Y(p)))); ctx.closePath(); ctx.stroke();
+        ctx.setLineDash([]);
+      };
+      outline(A.verts, css("--accent2"), [5, 5], 1.5);
+      outline(B.verts, css("--accent"), [2, 4], 1.5);
+      ctx.fillStyle = css("--tube"); ctx.globalAlpha = 0.08;
+      ctx.beginPath(); poly.forEach((p, i) => (i ? ctx.lineTo(X(p), Y(p)) : ctx.moveTo(X(p), Y(p)))); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.shadowColor = css("--tube"); ctx.shadowBlur = 8;
+      outline(poly, css("--tube"), [], 2.2);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = css("--stage-ink"); ctx.font = font(11);
+      const faces = poly.filter((p, i) => Math.hypot(poly[(i + 1) % poly.length][0] - p[0], poly[(i + 1) % poly.length][1] - p[1]) > 1e-4).length;
+      ctx.fillText(`${faces} sides`, 12, H - 12);
+    });
+    const tIn = bind("mT", (x) => { M.t = x; v.redraw(); });
+    $("mA").addEventListener("change", (e) => { M.a = e.target.value; v.redraw(); });
+    $("mB").addEventListener("change", (e) => { M.b = e.target.value; v.redraw(); });
+    let playing = false, t0 = 0;
+    const step = (now) => {
+      if (!playing) return;
+      const t = Math.min(1, (now - t0) / 2200);
+      M.t = t * t * (3 - 2 * t);
+      tIn.value = M.t; $("mTo").textContent = M.t.toFixed(2);
+      v.redraw();
+      if (t < 1) requestAnimationFrame(step);
+      else { playing = false; $("mPlay").textContent = "Play"; }
+    };
+    $("mPlay").addEventListener("click", () => {
+      if (reduce) { M.t = 1; tIn.value = 1; $("mTo").textContent = "1.00"; v.redraw(); return; }
+      playing = true; t0 = performance.now(); $("mPlay").textContent = "Playing";
+      requestAnimationFrame(step);
+    });
+  }
+})();
+</script>
+</body>
+</html>
