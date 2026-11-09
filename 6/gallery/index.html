@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script src="../../modules/theme.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Orrery Collection · Codevember 2026 #6</title>
 <meta name="description" content="Every layout the day 6 orrery can build, in black enamel and gold: presets, symmetric orbits and random circles.">
@@ -21,7 +22,18 @@
   --display: "Cinzel", "Trajan Pro", Georgia, serif;
   --body: "Spectral", Georgia, "Times New Roman", serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --backdrop: rgb(8 7 9 / 0.86);
   color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --velvet: #f2ede3; --case: #e8e1d3; --rule: #d2c8b5; --gold: #8a6420; --gold-dim: #b39457;
+    --ivory: #1f1b16; --muted: #6b6357; --backdrop: rgb(242 237 227 / 0.9); color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --velvet: #f2ede3; --case: #e8e1d3; --rule: #d2c8b5; --gold: #8a6420; --gold-dim: #b39457;
+  --ivory: #1f1b16; --muted: #6b6357; --backdrop: rgb(242 237 227 / 0.9); color-scheme: light;
 }
 * { box-sizing: border-box; }
 body { background: var(--velvet); color: var(--ivory); font: 400 1rem/1.55 var(--body); }
@@ -55,7 +67,7 @@ h1 { font: 600 clamp(2.1rem, 5vw, 3.6rem)/1.05 var(--display); letter-spacing: 0
 .name { font: 600 1.02rem/1.25 var(--display); letter-spacing: 0.03em; }
 .figs { font: 400 0.76rem/1.45 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 dialog { width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 1px solid var(--rule); background: var(--case); color: var(--ivory); }
-dialog::backdrop { background: rgb(8 7 9 / 0.86); }
+dialog::backdrop { background: var(--backdrop); }
 .view { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
 .view img { width: 100%; height: auto; display: block; }
 .detail { display: grid; align-content: start; gap: 18px; padding: 28px 26px; min-width: 0; }

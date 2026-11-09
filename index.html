@@ -3,6 +3,7 @@
   <head>
     <title>Codevember 2026</title>
     <meta charset="utf-8" />
+    <script src="modules/theme.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="A three.js sketch every day of November 2026 by Jaume Sanchez Elias." />
     <meta name="author" content="Jaume Sanchez Elias" />
@@ -24,6 +25,28 @@
     <meta name="twitter:image" content="https://spite.github.io/codevember-2026/screenshots/4-social.jpg" />
     <meta name="twitter:image:alt" content="A coil of twisted iridescent bands in blue, purple and pink chrome, from day 4, Tangle." />
     <style>
+      :root {
+        --bg: #fff;
+        --ink: #333;
+        --muted: #999;
+        --tile: #eee;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg: #121214;
+          --ink: #dcdcdf;
+          --muted: #77777d;
+          --tile: #232326;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme="dark"] {
+        --bg: #121214;
+        --ink: #dcdcdf;
+        --muted: #77777d;
+        --tile: #232326;
+        color-scheme: dark;
+      }
       * {
         box-sizing: border-box;
         margin: 0;
@@ -33,7 +56,8 @@
         font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
         font-size: 16px;
         padding: 1em;
-        color: #333;
+        color: var(--ink);
+        background: var(--bg);
       }
       h1 {
         font-size: 1.4em;
@@ -56,7 +80,7 @@
       .gallery li {
         position: relative;
         aspect-ratio: 1;
-        background: #eee center / cover no-repeat;
+        background: var(--tile) center / cover no-repeat;
         border-radius: 6px;
         overflow: hidden;
       }
@@ -79,7 +103,7 @@
         pointer-events: none;
       }
       .gallery .soon a {
-        color: #333;
+        color: var(--ink);
         background: none;
       }
       h2 {
@@ -96,7 +120,7 @@
         .number {
           display: inline-block;
           min-width: 2em;
-          color: #999;
+          color: var(--muted);
         }
       }
     </style>

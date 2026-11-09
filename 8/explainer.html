@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script src="../modules/theme.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>How Tesseract Repeats</title>
 <meta name="description" content="How Codevember 2026 day 8, Tesseract, traces an infinity polyhedron in homage to Anthony James: two-way mirrors, light tubes found per face, footprint-filtered reflections, and windows that light the room.">
@@ -374,6 +375,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     };
     new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    new MutationObserver(() => fit(true)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     return { redraw: () => fit(true) };
   }
   const bind = (id, fn, fmt = (v) => (+v).toFixed(2)) => {
