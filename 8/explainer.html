@@ -143,8 +143,8 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       </div>
     </div>
     <figure>
-      <img src="../screenshots/8.jpg" width="1200" height="1200" alt="A dark-framed icosahedron floating in a dim room, its glass faces opening onto endless reflected lattices of white light tubes, its frame's shadow thrown across the floor and wall.">
-      <figcaption>The icosahedron, from the live page.</figcaption>
+      <img src="../screenshots/8.jpg" width="1200" height="1200" alt="A thin-framed glass cube floating in a pale dome, a smaller cube nested inside it and joined to it at every corner, its mirrors opening onto endless reflected lattices of white light tubes.">
+      <figcaption>The cube with its tesseract, as the page opens.</figcaption>
     </figure>
   </header>
 
@@ -154,7 +154,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="eyebrow">The homage</div>
       <h2>A polytope that never ends</h2>
       <p>Anthony James builds his infinity sculptures from the oldest shapes there are: an icosahedron, a dodecahedron, a cube. Each face is a pane of two-way mirror glass in a steel frame, and along every edge, inside, runs a light tube. The inner surfaces of the glass reflect the tubes back and forth, so from outside the solid opens onto a lattice of light that goes on in every direction, folded into a box you could carry.</p>
-      <p>The day's prompt was Tesseract, the four-dimensional cube. This is the prompt taken loosely: not the tesseract itself, but the feeling of looking into a solid that has more inside it than a solid can hold.</p>
+      <p>The day's prompt was Tesseract, the four-dimensional cube. The page opens on its familiar picture: a cube with a smaller cube inside, joined to it at every corner, the way a hypercube is drawn in three dimensions. The mirrors do the rest, repeating it in every direction, so the solid seems to hold more inside than a solid can. Any other solid can nest itself the same way.</p>
       <p>The day offers forty solids: the Platonic and Archimedean solids, the Catalan solids, and prisms, antiprisms and bipyramids, with up to 64 faces. Everything about them is described as planes.</p>
     </div>
   </section>
@@ -166,7 +166,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <h2>Two-way mirrors, traced exactly</h2>
       <p>The frame is an ordinary mesh, rendered by the shared pipeline. The inside is not: it is ray traced per pixel, in a full-screen pass that the pipeline runs over its lit image before bloom. A solid is a list of planes <i>n</i>·<i>p</i> ≤ <i>d</i>, which makes every step exact and cheap.</p>
       <p>A ray enters through the plane it crosses last on the way in, and inside it leaves through the plane it meets first. Where it meets a plane, the frame mesh's own test says whether it is in that face's window or behind the bar: it is behind the bar if it lies within the rim of another face's plane. In the window, the inner side of the glass reflects most of the light back in (Inner mirror), and the ray goes on, for up to 48 bounces. A tube in its way ends it.</p>
-      <p>Move the pointer over the figure to aim the ray. Below it is what that eye sees across the window, one row of pixels: the same few tubes, over and over, fainter at each reflection.</p>
+      <p>Move the pointer over the figure to aim the ray. Below it is what that eye sees across the whole solid, one row of pixels: the same few tubes, over and over, fainter at each reflection. The marked pixel is the ray you are aiming.</p>
     </div>
     <div class="fig">
       <div class="fig-head"><h3>A cross-section, from outside in</h3>
@@ -187,6 +187,12 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="fact"><b>Tubes per face</b><span>A face's tubes all lie in a thin slab just under it, so a straight run inside the solid can only meet them if one of its ends is near that face. Each end marks the faces within reach in a 64-bit mask, and only their tubes are tested.</span></div>
       <div class="fact"><b>One call site</b><span>The tracer is a heavy loop with loops inside. ANGLE on Direct3D 11 refuses to unroll it more than once, so the camera ray, the extra rays and the floor's mirror ray all go through one loop over a single call.</span></div>
       <div class="fact"><b>Glass as built</b><span>Each pane bows a little, sits a little askew and ripples (Warp, Tilt, Ripple). The surface stays put and only its normal bends, as for any thin warped sheet.</span></div>
+    </div>
+    <div class="col prose">
+      <h3>Imperfect glass</h3>
+      <p>Real infinity sculptures are not perfect: the panes are not quite flat, not quite parallel, and the lattice inside bends and drifts the deeper it goes. That is where most of their life is, so the day reproduces it, without giving up the exact planes the tracer relies on. A pane's surface stays where it is; only the normal used to reflect off it is bent.</p>
+      <p><b>Warp</b> bows each pane like a faint convex or concave mirror: the normal leans in proportion to how far the hit is from the face's centre, by a random amount and sign per pane. <b>Tilt</b> sets each pane a little askew, a fixed random lean for the whole pane. <b>Ripple</b> adds a smooth 3D noise to the normal, the waviness of float glass. A small error per bounce compounds: twenty reflections deep, the tubes have wandered off their lines and the corridors curve, as they do in the real pieces. A bent normal is never allowed to send the ray out through the glass it just met; that bounce falls back to the flat reflection.</p>
+      <p>The same flaws spread each ray's footprint at every bounce (see below), so deep reflections blur as they wander instead of shimmering. <b>Uneven</b> is the light, not the glass: each tube gets its own brightness and a slightly warmer or cooler white, as no two LED strips match. Every pane's and every tube's randomness is keyed by the direction its face points, not by its number, so it keeps its flaws when a morph adds or drops faces around it.</p>
     </div>
   </section>
 
@@ -240,6 +246,9 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <p class="fig-cap">In 2D a window's form factor seen from a point is half the difference of the sines of its ends' angles, and a point light falls off as 1/r rather than 1/r². The sculpture does the same with polygons in 3D.</p>
     </div>
     <div class="col prose">
+      <p>The soft light changes slowly across the room, so it is worked out per vertex, not per pixel: the floor, the wall and the dome are meshes whose vertices bunch up near the sculpture, where the light changes fastest, and thin out far away. A window that is far from a vertex for its size counts as a point (its area, times the two cosines, over the squared distance); a near one gets the exact edge integral, blended between the two so no seam shows. The sharp light stays per pixel. In the sphere room, the default, the dome all around catches every window's light.</p>
+    </div>
+    <div class="col prose">
       <p>The haze uses the same map. The air around the sculpture scatters the light of its windows: along each camera ray, six samples are placed equiangularly around the sculpture's centre, where the scattering is strongest, and each is lit through the window its direction leaves through, or not, behind a bar. That draws the shafts of light out into the room. The samples move between the frames the pipeline averages while nothing moves, so they converge.</p>
     </div>
   </section>
@@ -271,6 +280,9 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="legend"><span style="color:var(--stage-ink)"><i></i>planes</span><span style="color:var(--accent2)"><i></i>from</span><span style="color:var(--accent)"><i></i>to</span><span style="color:var(--tube)"><i></i>in between</span></div>
       <p class="fig-cap">Both polygons have a vertex pointing down, as every solid does in the day, so the morph grows out of shared corners. In 3D, mid-morph between two large solids, only the 64 biggest faces are kept; the rest are slivers.</p>
     </div>
+    <div class="col prose">
+      <p>Keeping it smooth takes care at both ends, where faces are slivers: thin strips and tiny corners that appear from nothing or vanish into nothing. Through a mirror lattice any jump is multiplied by every reflection, so a sliver must fade in and out rather than pop. Each face has a presence that grows with its inradius. A sliver's edges barely inset its neighbours' windows, barely count towards the rim's width, and barely shape the haze; its tubes, and any tube shorter than a few radii, are dimmed in proportion; and the window outlines are cleaned of the stray corners a sliver leaves along an edge. When a sliver finally drops out of the list, nothing it did is still visible. The angle the solid hangs at, the lights and the glass flaws ease over the same two seconds.</p>
+    </div>
   </section>
 
   <!-- 6. Glass and inside -->
@@ -285,9 +297,11 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="fact"><b>Cracked</b><span>Each panel breaks into Voronoi shards, each at its own angle and depth, so the reflections jump from shard to shard, with dark seams between.</span></div>
       <div class="fact"><b>Open</b><span>Some panels are missing. A ray leaving through one goes into the room: straight through, it shows what the raster drew behind; after a bounce, the room's mean light.</span></div>
       <div class="fact"><b>Tubes</b><span>Frosted diffusers, LED pixels (box-filtered dots that fade to their mean), neon with a white-hot core, or a filament in clear glass.</span></div>
-      <div class="fact"><b>Inside</b><span>A smaller mirror solid with a tube on every edge, turning slowly, kept within the outer solid's inradius. Its reflections and the outer ones multiply each other.</span></div>
+      <div class="fact"><b>Inside</b><span>A smaller mirror solid with a tube on every edge, turning slowly, kept within the outer solid's inradius. Its reflections and the outer ones multiply each other. A change of Inside shrinks the old one away and grows the new one in.</span></div>
+      <div class="fact"><b>Tesseract</b><span>The outer solid nested in itself, smaller and aligned, with a tube from each inner corner out to the outer one: the familiar drawing of a hypercube, for any solid. It follows the outer solid through a morph. Its edges are tested only near it; the long corner tubes have their own bound.</span></div>
       <div class="fact"><b>Patterns and animation</b><span>Colours per window, per tube, in segments or as a gradient; windows that breathe, wave, scan, light in sequence, flicker or chase. The room, haze and tail follow each window's light.</span></div>
       <div class="fact"><b>Floor</b><span>On a glossy floor the mirror image of the camera ray is traced too, with the floor's roughness widening its footprint, so the lattice reflects softly.</span></div>
+      <div class="fact"><b>Depth of field</b><span>The pipeline blurs by depth, and the traced inside is in no depth buffer, so after the trace the solid's hull is drawn into the pipeline's depth. Aperture and Focus then work as for any mesh: a quick blur while moving, and an exact average over the lens once still.</span></div>
     </div>
   </section>
 
@@ -296,22 +310,22 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">Cost</div>
       <h2>Where the time goes</h2>
-      <p>The trace scales with the number of faces: crossing planes, testing windows and the haze all loop over them. Measured headlessly on a desktop GPU, one run at a time, GPU-synced, with the camera orbiting so the still never converges, on a 2528 × 1410 canvas.</p>
+      <p>The trace scales with the number of faces: crossing planes, testing windows and the haze all loop over them. Measured headlessly on a desktop GPU, one run at a time, GPU-synced, with the camera orbiting so the still never converges, on a 2528 × 1410 canvas (pixel ratio 2).</p>
     </div>
     <div class="fig">
       <div class="scroll">
         <table>
           <thead><tr><th>Configuration</th><th>Frames per second</th></tr></thead>
           <tbody>
-            <tr><td>Icosahedron, defaults, high tier</td><td>76</td></tr>
-            <tr><td>Icosahedron, no haze</td><td>81</td></tr>
-            <tr><td>Icosahedron, medium tier</td><td>86</td></tr>
-            <tr><td>Truncated icosidodecahedron (62 faces)</td><td>41</td></tr>
-            <tr><td>Phone emulation (iPhone, pixel ratio 2)</td><td>115</td></tr>
+            <tr><td>Cube with its tesseract, defaults, high tier</td><td>108</td></tr>
+            <tr><td>The same, no haze</td><td>124</td></tr>
+            <tr><td>The same, medium tier</td><td>120</td></tr>
+            <tr><td>Truncated icosidodecahedron (62 faces), empty</td><td>54</td></tr>
+            <tr><td>Phone emulation (iPhone, pixel ratio 2)</td><td>168</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="fig-cap">Solids with more than 30 faces trace fewer bounces and get no extra rays. The medium and low tiers cap the bounces lower still, and use a smaller direction map. While nothing moves, the pipeline averages jittered frames into a still, up to 32 of them.</p>
+      <p class="fig-cap">Deep pixels get two extra rays only on screens below a pixel ratio of 1.5, where pixels are big enough to alias, and in captures. Solids with more than 30 faces trace fewer bounces and get no extra rays. The medium and low tiers cap the bounces lower still and use a smaller direction map. The pipeline's AO and GI are off: the room is lit by the windows, which they barely change. While nothing moves, the pipeline averages jittered frames into a still, up to 32 of them.</p>
     </div>
   </section>
 
@@ -503,6 +517,16 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
           if (r.kind === "miss") continue;
         }
         ctx.fillRect(i * cw, 0, cw + 0.6, H);
+      }
+      // The pixel of the ray being aimed.
+      const aim = T.aim ?? [0.25, 0.32];
+      const a = Math.atan2(aim[1] - eye[1], aim[0] - eye[0]);
+      const x = ((a1 - a) / (a1 - a0)) * W;
+      if (x >= 0 && x <= W) {
+        ctx.strokeStyle = css("--stage"); ctx.lineWidth = 4;
+        ctx.strokeRect(x - 5, 2, 10, H - 4);
+        ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2;
+        ctx.strokeRect(x - 5, 2, 10, H - 4);
       }
     });
     function drawStrip() { strip.redraw(); }

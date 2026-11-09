@@ -6,8 +6,9 @@ An infinity polyhedron, in homage to Anthony James. His sculptures are convex so
 dodecahedron, a cube) with a dark steel frame, faces of two-way mirror glass, and a light tube along every edge
 inside. Seen from outside, the mirrors inside send the tubes back and forth between the faces without end, and the
 solid opens onto a lattice of light that goes on in every direction: a higher-dimensional polytope folded into a
-three-dimensional one, which is the day's prompt taken loosely. The piece floats in a dim room, which it lights
-through its windows.
+three-dimensional one. The page opens on the prompt itself: a cube with a smaller cube nested inside and joined to it
+at every corner, the usual picture of a tesseract, repeated without end by the mirrors. The piece floats in a pale
+dome, which it lights through its windows.
 
 The solids (`sculpture.js`): the Platonic and Archimedean solids, the Catalan solids, and prisms, antiprisms and
 bipyramids, up to 64 faces. A change of solid morphs from one to the next.
@@ -104,4 +105,6 @@ Randomize morphs to another solid, hanging at a new angle, leaves it empty insid
 any nested solid grows in), switches the tubes to frosted, neon or filament halfway through, and eases in new lights (white half the time, colours otherwise), Brightness (0.7–1.5), glass flaws (Inner mirror 0.6–0.8; Warp,
 Ripple and Tilt up to 0.2), haze (0.5–1) and room light (0.75–2). Everything else stays as it is.
 
-Phones and the medium and low tiers trace fewer bounces and a smaller direction map, and get no extra rays.
+Phones and the medium and low tiers trace fewer bounces and a smaller direction map, and get no extra rays; on any
+screen at a pixel ratio of 1.5 or more the extra rays are skipped too. The pipeline's AO/GI is off: the windows light
+the room, and it barely changed it.
