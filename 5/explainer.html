@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Moss Grows</title>
+<meta name="description" content="How Codevember 2026 day 5, Moss, grows a sculpture by 3D reaction-diffusion on the GPU, meshes it in a worker, and overgrows it with moss made of fur shells sliced through a field of shoots.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* One reading column on misty sage; figures are small dark rooms, so stone and moss read. */
+:root {
+  --bg: #d9dcd4;
+  --panel: #e6e9e1;
+  --ink: #161a14;
+  --muted: #545c4f;
+  --line: #b8bfb1;
+  --accent: #4d6a10;
+  --accent2: #956412;
+  --stage: #171a15;
+  --stage-ink: #98a293;
+  --stone: #c4bcab;
+  --moss: #9cc02a;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111310; --panel: #1a1d18; --ink: #e7ebe3; --muted: #9da695; --line: #30352d;
+    --accent: #a9cf4c; --accent2: #e0ad55; --stage: #0b0c0a; --stage-ink: #8b9586;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111310; --panel: #1a1d18; --ink: #e7ebe3; --muted: #9da695; --line: #30352d;
+  --accent: #a9cf4c; --accent2: #e0ad55; --stage: #0b0c0a; --stage-ink: #8b9586;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .grow { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .grow {
+    background: linear-gradient(100deg, var(--accent) 15%, var(--accent2) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+
+/* Figures */
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; border-radius: 3px; background: var(--stage); }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pair > div { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+input[type="checkbox"] { accent-color: var(--accent); }
+select {
+  font: 400 13px/1.2 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 3px; padding: 6px 8px;
+}
+button {
+  font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px;
+  padding: 9px 14px; cursor: pointer;
+}
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 12.5px/1.2 var(--mono); color: var(--muted); }
+.legend .sw { display: inline-block; width: 11px; height: 11px; border-radius: 2px; background: currentColor; vertical-align: -1px; margin-right: 6px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+.strip-label { font: 400 12px/1.2 var(--mono); color: var(--muted); }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: nowrap; }
+.formula .c { color: var(--muted); }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+}
+@media (max-width: 520px) {
+  .pair { grid-template-columns: minmax(0, 1fr); }
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow">Codevember 2026 · <b>Day 5</b> · Moss</div>
+      <h1>How Moss <span class="grow">grows</span></h1>
+      <p class="lede">A sculpture that nobody carved: a reaction left to run inside a sphere, a torus or a minimal surface until it settles into tunnels and ridges. Then moss finds the best spots on it and spreads. Here is how the stone is grown, how it becomes a mesh, and how the moss is made of slices.</p>
+      <div class="meta">
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>3D reaction-diffusion</span><span>fur shells</span><span>no build step</span><span>desktop and phones</span>
+      </div>
+    </div>
+    <figure>
+      <img src="../screenshots/5.jpg" width="1080" height="1080" alt="A pale, porous stone sphere full of worm-like tunnels hovering over a misty floor, its upper side covered in cushions of green moss.">
+      <figcaption>A lattice sphere, half overgrown.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. Reaction-diffusion -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The stone · <b>rd.js</b></div>
+      <h2>Two chemicals in a box</h2>
+      <p>Gray-Scott is the simplest recipe for growth that looks alive. Two substances, <i>U</i> and <i>V</i>, fill a volume. <i>U</i> is fed in everywhere at a steady rate; <i>V</i> feeds on it, two molecules of <i>V</i> turning one of <i>U</i> into more <i>V</i>, and is removed at its own rate. Both diffuse, <i>U</i> twice as fast. From a few random seeds of <i>V</i>, spots, worms and mazes appear and spread until they fill the space, and which of them depends only on the feed and kill rates.</p>
+      <p>The day runs it in 3D, in a 128³ volume (96³ on phones). WebGL2 cannot render into a 3D texture slice by slice cheaply, so the volume is a 2D atlas: one tile per z slice, sixteen tiles across and eight down. A single full-screen draw advances every voxel, reading its neighbours across tiles. The day takes 2600 steps, a few hundred per frame, as many as the device keeps up with.</p>
+      <p>The reaction runs only inside a shape. Outside it, <i>U</i> is marked as −1, and a neighbour there is read as the voxel itself: no flux through the edge. A wall of fixed values would line the surface with a skin of pattern; zero flux lets the pattern run straight out through it, so the tunnels open onto the surface as they would in a sponge.</p>
+    </div>
+    <div class="formula">
+      <span class="c">// per voxel, per step</span><br>
+      U += dt · (D<sub>u</sub> ∇²U − U V² + F (1 − U))<br>
+      V += dt · (D<sub>v</sub> ∇²V + U V² − (F + k) V)
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A slice through the reaction, and the solid it leaves</h3>
+        <div class="controls">
+          <label>Shape <select id="rShape"><option>sphere</option><option>torus</option><option>gyroid</option></select></label>
+          <label>Structure <select id="rStruct"><option>lattice</option><option>coral</option><option>sponge</option><option>solid</option></select></label>
+          <label>Pattern <select id="rPat"><option>worms</option><option>sponge</option><option>coral</option><option>pores</option></select></label>
+          <label>Scale <input id="rScale" type="range" min="0.3" max="0.6" step="0.01" value="0.55"><output id="rScaleo">0.55</output></label>
+          <label>Erosion <input id="rEro" type="range" min="0" max="0.15" step="0.005" value="0.05"><output id="rEroo">0.050</output></label>
+          <button id="rGo" type="button" class="ghost">Regrow</button>
+        </div>
+      </div>
+      <div class="pair">
+        <div><div class="strip-label">V, as it reacts</div><canvas id="rdCanvas" aria-label="A square slice of the volume: inside a circular shape, bright green worm-like stripes of the chemical V grow from random seeds and spread until they fill the region where the reaction runs."></canvas></div>
+        <div><div class="strip-label">The solid, after packing</div><canvas id="packCanvas" aria-label="The same slice as solid stone: pale, embossed regions where the pattern and the shape say there is stone, dark where there is air."></canvas></div>
+      </div>
+      <div class="readout" id="rOut"></div>
+      <div class="legend"><span style="color:var(--moss)"><span class="sw"></span>V</span><span style="color:#5c5a4e"><span class="sw"></span>inside, no reaction</span><span style="color:var(--stone)"><span class="sw"></span>stone</span></div>
+      <p class="fig-cap">The same equations in 2D, on a grid the size of one slice of the day's volume, with its feed and kill rates and the same seeding. A 2D slice through a 3D lattice shows islands where the real one is connected above and below the cut. Lattice runs the reaction in a skin under the surface, so the middle stays empty; solid only lets it erode grooves Erosion deep.</p>
+    </div>
+  </section>
+
+  <!-- 2. Packing and structures -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">From chemistry to solid · <b>pack</b></div>
+      <h2>Where there is <i>V</i>, there is air</h2>
+      <p>When the reaction is done, one more pass turns it into a signed distance, in voxels, negative inside the stone. <i>V</i> is blurred by a voxel, compared with an iso level and scaled, so a voxel with little <i>V</i> is stone and one with a lot is a tunnel. That is then combined with the shape's own distance by smooth minimum and maximum, a voxel and a half wide, so every edge where pattern meets surface is rounded rather than cut.</p>
+      <p>The four structures are four ways of combining them. <b>Lattice</b> intersects the pattern with a hollow skin of the shape, so the result is a shell of tunnels around an empty middle. <b>Coral</b> grows the pattern over a solid core, a smaller copy of the shape. <b>Sponge</b> lets it fill the whole body. <b>Solid</b> keeps the shape whole and lets the pattern carve its surface only as deep as Erosion. The implicit shapes, the gyroid and its relatives, always get a thin solid core under the pattern too, so their tubes and sheets stay chunky instead of fraying into threads.</p>
+    </div>
+    <div class="formula">
+      <span class="c">// distances in voxels; s: the shape, negative inside; smax/smin with k = 1.5</span><br>
+      rd = (iso − blur(V)) · gain &nbsp;&nbsp;<span class="c">// −rd for pores</span><br>
+      lattice: d = smax(smax(rd, s), −s − wall)<br>
+      coral: &nbsp;&nbsp;d = smin(smax(rd, s), s + wall)<br>
+      sponge: &nbsp;d = smax(rd, s)<br>
+      solid: &nbsp;&nbsp;d = smax(s, smin(rd, s + erosion))
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Patterns</b><span>Worms (F 0.029, k 0.057), sponge (0.042, 0.0615) and coral (0.055, 0.062) are three points in the feed and kill plane. Pores uses mitosis spots (0.0367, 0.0649) and inverts them, so each spot becomes a hole.</span></div>
+      <div class="fact"><b>Pattern size</b><span>Diffusion per step cannot grow much before the explicit update goes unstable. To make holes up to 2.5× bigger, the reaction runs on a coarser grid, with the seeds and diffusion scaled to match, and the pack pass resamples it trilinearly onto the full one.</span></div>
+      <div class="fact"><b>Variation</b><span>A slow noise over the body nudges feed and kill by a few percent, so the pattern is denser in one place and looser in another, like stone that formed unevenly.</span></div>
+      <div class="fact"><b>A better Laplacian</b><span>On a grid this coarse the 7-point stencil turns patterns blocky, lined up with the axes. A 19-point one, faces plus edges, is close enough to isotropic that worms turn freely.</span></div>
+      <div class="fact"><b>16 bits over two bytes</b><span>The distance is packed into the red and green bytes of an 8-bit target, clamped to ±8 voxels, and read back asynchronously: an 8-bit target reads back the same way on every device.</span></div>
+      <div class="fact"><b>Suzanne</b><span>The one shape with no formula: a 64³ distance field baked offline from the mesh, its sign from the winding number, dilated and blurred so the ears survive and the creases round off.</span></div>
+    </div>
+  </section>
+
+  <!-- 3. Meshing -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The mesh · <b>mesher.worker.js</b></div>
+      <h2>Meshed while it grows</h2>
+      <p>The field goes to a worker, which builds the mesh with surface nets: one vertex per cell of the voxel lattice whose corners disagree on the sign, placed at the mean of the points where its edges cross zero, and one quad for every lattice edge that crosses. Surface nets gives a closed, well-shaped mesh with far fewer slivers than marching cubes. Three rounds of smoothing then move each vertex toward its neighbours along the surface only, and step it back onto the zero level, so the form keeps its shape while the voxel steps melt away.</p>
+      <p>A reaction this size leaves crumbs: tiny pieces that the pattern cut free. A union-find over the triangles drops every connected piece smaller than four percent of the largest. Nothing floats.</p>
+      <p>The worker also bakes what the shading will need. A <b>curvature</b> per vertex, from the umbrella operator smoothed over a few rings, tells ridges from hollows. An <b>occlusion</b> per vertex marches six directions around the normal through the field itself, with steps that grow by half each time and switch to halved copies of the field (keeping the most solid value) further out, so a deep tunnel is dark even where the screen-space AO cannot see into it.</p>
+      <p>A change of shape should not mean staring at a loading bar. While the reaction runs, the field is read back at half resolution every hundred milliseconds or so and meshed as a preview, on two workers so the previews overlap. The sculpture is seen growing out of noise into its final form in a couple of seconds, and only the last, full-resolution mesh gets the moss.</p>
+    </div>
+  </section>
+
+  <!-- 4. Where the moss goes -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The moss · <b>where it grows</b></div>
+      <h2>Best spots first</h2>
+      <p>Moss settles where water and light stay: on tops, on faces that look out rather than into a tunnel, in the open. The mesher gives every vertex a score from those three, its height-facing normal counting most, plus a large-scale noise so the cover breaks into patches rather than a neat cap. Then it throws the score away and keeps the <b>rank</b>: the vertex's place in the sorted list, from 0 to 1.</p>
+      <p>The rank is what makes the controls exact. Overgrowth of 0.6 covers the vertices ranked above 0.4: six tenths of the surface, whatever the shape. Growth over time sweeps the same threshold down from 1, so the moss spreads from the best spots outward. Just ahead of the front, the stone is stained green.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A cross-section, ranked and overgrown</h3>
+        <div class="controls">
+          <label>Overgrowth <input id="mCover" type="range" min="0" max="1" step="0.01" value="0.6"><output id="mCovero">0.60</output></label>
+          <label>Depth <input id="mDepth" type="range" min="0" max="1" step="0.01" value="0.5"><output id="mDeptho">0.50</output></label>
+          <label><input id="mRank" type="checkbox"> Show rank</label>
+          <button id="mGrow" type="button">Grow</button>
+          <button id="mNew" type="button" class="ghost">New stone</button>
+        </div>
+      </div>
+      <canvas id="mossCanvas" aria-label="A lumpy stone outline in cross-section. Green cushions of moss cover its top and its most open faces, thickest at the best-ranked spots, with a green stain just beyond where the moss ends."></canvas>
+      <div class="readout" id="mOut"></div>
+      <div class="legend"><span style="color:#4f5e18"><span class="sw"></span>species 1</span><span style="color:#5d7a3c"><span class="sw"></span>species 2</span><span style="color:#66881c"><span class="sw"></span>species 3</span><span style="color:#9cc02a"><span class="sw"></span>species 4</span><span style="color:var(--accent2)"><span class="sw"></span>rank, high</span></div>
+      <p class="fig-cap">The moss is drawn five times as thick as in the day. Its thickness swells in cushions, one dome per cell of a Voronoi over the surface, and is fuller towards the best-ranked spots, so a patch is thin at its edge and deep in its middle.</p>
+    </div>
+    <div class="col prose">
+      <p>The triangles are sorted too. The worker puts them in 32 bins by rank, highest first, so the moss draws only a prefix of the index buffer: at 30 percent cover, the shells skip seven tenths of the mesh without a single discarded fragment. Four species, each with its own colour, height and leaf shape, sit in large patches with small islands of another one inside.</p>
+    </div>
+  </section>
+
+  <!-- 5. Shells -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The moss · <b>fur shells</b></div>
+      <h2>A forest in slices</h2>
+      <p>Moss is millions of shoots a millimetre across. No mesh could hold them, so the day draws them the way fur is often drawn: as shells. The sculpture's mesh is drawn again, instanced, up to 26 times, each copy pushed a little further out along its normals. Each shell is a slice through a 3D field of shoots, and keeps only the fragments where its slice cuts a shoot. Stacked, the slices read as a canopy.</p>
+      <p>The shoots are a tileable 3D Voronoi, baked once into a 64³ texture with eight cells per side: each cell is a shoot, the texture holds how close a point is to its stem, plus a random height and tint. A shoot is fat at the base and thin near its tip, and leaves come out of it as lobes, cut by the angle around the stem, from three to seven per species. Near the top the slice drifts downhill, so the tips droop over the edge of a cushion.</p>
+      <p>The bottom 40 percent of the thickness is not shells at all: the sculpture itself is displaced out by that much where the moss grows, a dense mat that the canopy stands on. Shells, mat and stone all render through the pipeline, so the moss casts soft shadows and takes AO and GI like any other surface.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Shells over a mat, side on</h3>
+        <div class="controls">
+          <label>Layers <input id="sL" type="range" min="2" max="26" step="1" value="8"><output id="sLo">8</output></label>
+          <label>Lean <input id="sLean" type="range" min="0" max="1.5" step="0.01" value="0.4"><output id="sLeano">0.40</output></label>
+          <label><input id="sJit" type="checkbox" checked> Jitter</label>
+          <label><input id="sRef" type="checkbox" checked> True shoots</label>
+        </div>
+      </div>
+      <canvas id="shellCanvas" aria-label="A side view of moss on a flat stone: a dark mat, then horizontal rows of short dashes, one row per shell, where each shell cuts a shoot. Faintly behind them, the continuous silhouettes of the shoots with their leaves."></canvas>
+      <div class="readout" id="sOut"></div>
+      <p class="fig-cap">The shells used per tier: 6 on low, 8 on medium (phones), 18 on high and 26 for captures. With few layers, the gaps between them show as stripes. Jitter evaluates each fragment at a slice moved by up to half a layer, at random, so the stripes break into a fine grain that the pipeline's temporal accumulation then smooths.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>One layer per pixel</b><span>Shading 26 layers of alpha-tested moss would multiply the lighting cost by 26. Instead a depth-only copy of the shells, the same program with its colour output compiled away, runs first; the lit shells then draw with an equal depth test, so each pixel shades only the one layer it sees.</span></div>
+      <div class="fact"><b>Half the layers for light</b><span>The shadow map and the prepass for AO and velocity draw every other layer. Nobody can count the layers in a soft shadow.</span></div>
+      <div class="fact"><b>Fewer when small</b><span>The number of layers follows how many pixels deep the moss is on screen: zoomed out, a dozen layers would land on the same pixel.</span></div>
+      <div class="fact"><b>Velvet in the distance</b><span>Once a shoot covers only a few pixels, its slice is replaced by a soft solid canopy, which is what moss looks like from a metre away and which does not shimmer.</span></div>
+      <div class="fact"><b>Lit from inside</b><span>A fragment counts how much moss lies above it towards the key light and darkens by that much, a self-shadow that the shadow map is too coarse to give. The young tips are paler, have a sheen and let a little light through.</span></div>
+    </div>
+  </section>
+
+  <!-- 6. Stone -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The stone's skin · <b>materials.js</b></div>
+      <h2>Weathered, per pixel</h2>
+      <p>A grown form with a perfect surface looks like plastic. The stone is shaded per pixel from noise in the sculpture's own space, so its detail turns with it, and every layer of detail fades out once a pixel covers half of its period, so nothing aliases at a distance. Weathering sets how far it has all gone.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Relief</b><span>A slow swell, grit and fine grain from simplex noise with analytic gradients, plus solution grooves where a warped noise crosses its midpoint and scattered pits from a Voronoi. They bend the normal along the surface only; the mesh never moves.</span></div>
+      <div class="fact"><b>Colour</b><span>Mineral mottling, pale bleached patches, faint strata in height, and darker pits and grooves, over one of four stones: bone, limestone, bark or clay.</span></div>
+      <div class="fact"><b>Wear and grime</b><span>The baked curvature wears the ridges paler and smoother and leaves grime in the hollows. Streaks run down the steep sides.</span></div>
+      <div class="fact"><b>Lichen</b><span>Crustose rosettes on open, upward stone, where the moss is not: grey-green, pale grey or, rarely, ochre, tinted from the stone so they sit in its light, with lobed ragged edges, a dark margin, cracked areoles, and a rim that stands slightly proud.</span></div>
+      <div class="fact"><b>Damp</b><span>Hollows and the stone near moss go darker, greener and a little glossier as the moss grows.</span></div>
+      <div class="fact"><b>Turned, then grown</b><span>The sculpture hangs at a random turn from the seed (Tumble scales it back to upright). The turn is baked into the mesh before the moss is ranked, so the moss always settles on what faces up.</span></div>
+    </div>
+  </section>
+
+  <!-- 7. The room -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The room</div>
+      <h2>Overcast, with mist</h2>
+      <p>The light is a soft, overcast studio, a large key from above with a cool fill, through the shared photographic pipeline: PCSS shadows, screen-space AO and one bounce of indirect light, AgX tonemapping. The sculpture hovers over the floor, and its contact shadow softens with height through an analytic occluder that follows it.</p>
+      <p>The mist is the pipeline's composite pass, a full-screen shader over the lit image before bloom. It reads the depth buffer, rebuilds each pixel's position, and fades it toward a gradient of mist with distance, plus a layer that pools on the floor and thins with height. The far backdrop dissolves; the sculpture stays sharp. Depth of field is shallow by default, focused on the sculpture's front, so the moss on its far side goes soft as in a macro shot.</p>
+    </div>
+  </section>
+
+  <!-- 8. Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>Drag to orbit, scroll or pinch to zoom.</li>
+      <li><b>Form</b>: Shape, Structure, Pattern, Scale, Pattern size, Erosion, Variation, Tumble.</li>
+      <li><b>Stone</b>: Stone and Weathering.</li>
+      <li><b>Moss</b>: palette, Overgrowth, Depth, Shoots, Grow time, Regrow.</li>
+      <li><b>Scene</b>: Spin, Float, Aperture and Focus.</li>
+      <li><b>Auto change</b> brings a new sculpture every 15 seconds, by default.</li>
+      <li><b>R</b> randomises, <b>G</b> regrows the moss, <b>Space</b> pauses, <b>Tab</b> hides the panel, <b>F</b> goes fullscreen, <b>P</b> saves a screenshot.</li>
+    </ul>
+  </section>
+  <footer class="col">
+    Day 5 of Codevember 2026 by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/5/">spite.github.io/codevember-2026/5</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/5">5/ of the codevember-2026 repository</a>. Rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>.
+  </footer>
+</main>
+
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const mix = (a, b, t) => a + (b - a) * t;
+  const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+  const rgb = (hex) => [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255];
+  const lerp3 = (a, b, t) => [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)];
+  const toCss = (c, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+
+  // A canvas sized to its CSS width at the device pixel ratio; draw() gets (ctx, width, height) in CSS pixels.
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      const w = canvas.clientWidth || 600, h = Math.round(typeof aspect === "function" ? aspect(w) : w * aspect);
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); canvas.style.height = h + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, w, h);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    return { redraw: () => fit(true) };
+  }
+  const bind = (id, fn, fmt = (v) => (+v).toFixed(2)) => {
+    const el = $(id), out = $(id + "o");
+    const set = () => { if (out) out.textContent = fmt(el.value); fn(+el.value); };
+    el.addEventListener("input", set);
+    if (out) out.textContent = fmt(el.value);
+    return el;
+  };
+  // Runs fn each frame while the element is on screen.
+  function whileVisible(el, fn) {
+    let on = false, raf = 0;
+    const loop = () => { if (!on) return; if (fn() !== false) raf = requestAnimationFrame(loop); else on = false; };
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting && !on) { on = true; raf = requestAnimationFrame(loop); } else if (!e.isIntersecting) { on = false; cancelAnimationFrame(raf); } });
+    io.observe(el);
+    return { kick: () => { io.unobserve(el); io.observe(el); } };
+  }
+
+  function hash(x, y, s = 0) {
+    let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(s | 0, 2147483647);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+  function vnoise(x, y, s = 0) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    let fx = x - ix, fy = y - iy;
+    fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+    return mix(mix(hash(ix, iy, s), hash(ix + 1, iy, s), fx), mix(hash(ix, iy + 1, s), hash(ix + 1, iy + 1, s), fx), fy);
+  }
+  // Nearest cell of a 2D Voronoi: squared distance, its random value, and the offset from its point.
+  function worley(x, y, s = 0) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    let d1 = 9, id = 0, ox = 0, oy = 0;
+    for (let j = -1; j <= 1; j++)
+      for (let i = -1; i <= 1; i++) {
+        const cx = ix + i, cy = iy + j;
+        const dx = x - (cx + 0.15 + 0.7 * hash(cx, cy, s + 1)), dy = y - (cy + 0.15 + 0.7 * hash(cx, cy, s + 2));
+        const d = dx * dx + dy * dy;
+        if (d < d1) { d1 = d; id = hash(cx, cy, s + 3); ox = dx; oy = dy; }
+      }
+    return { d2: d1, id, dx: ox, dy: oy };
+  }
+  const smax = (a, b, k) => { const h = clamp(0.5 - 0.5 * (b - a) / k, 0, 1); return mix(b, a, h) + k * h * (1 - h); };
+  const smin = (a, b, k) => { const h = clamp(0.5 + 0.5 * (b - a) / k, 0, 1); return mix(b, a, h) - k * h * (1 - h); };
+
+  const STONE = rgb(0xc4bcab);
+  const ROOT = rgb(0x0c1004);
+  const TIPS = [0x4f5e18, 0x66881c, 0x9cc02a, 0x5d7a3c].map(rgb);
+  const speciesIndex = (s) => (s < 0.42 ? 0 : s < 0.7 ? 3 : s < 0.88 ? 1 : 2);
+  const speciesHeight = (s) => (s < 0.42 ? 0.7 : s < 0.7 ? 0.85 : s < 0.88 ? 1.15 : 1.0);
+
+  // ---------------------------------------------------------------- 1. reaction-diffusion
+  {
+    const PATTERNS = {
+      worms: { feed: 0.029, kill: 0.057 },
+      sponge: { feed: 0.042, kill: 0.0615 },
+      coral: { feed: 0.055, kill: 0.062 },
+      pores: { feed: 0.0367, kill: 0.0649, invert: true, iso: 0.1 },
+    };
+    const STEPS = 2600, G = 128, EXT = 1.12, VOX = (2 * EXT) / G;
+    const R = { shape: "sphere", structure: "lattice", pattern: "worms", scale: 0.55, erosion: 0.05, seed: 1, steps: 0 };
+    let U = new Float32Array(G * G), V = new Float32Array(G * G), U2 = new Float32Array(G * G), V2 = new Float32Array(G * G);
+    const sdf = new Float32Array(G * G), wvar = new Float32Array(G * G);
+    let live = new Int32Array(0);
+    const world = (i) => ((i + 0.5) / G * 2 - 1) * EXT;
+
+    // The shapes as cut through their middle, in world units, negative inside.
+    function shapeSDF(x, y) {
+      if (R.shape === "sphere") return Math.hypot(x, y) - 1;
+      if (R.shape === "torus") return Math.hypot(Math.abs(x) - 0.7, y) - 0.36;
+      const f = (x, y) => { x *= 2.7; y *= 2.7; return Math.sin(x) * Math.cos(y) + Math.sin(y) - 0.3; };
+      const e = 0.004, gx = (f(x + e, y) - f(x - e, y)) / (2 * e), gy = (f(x, y + e) - f(x, y - e)) / (2 * e);
+      return smax(f(x, y) / Math.max(Math.hypot(gx, gy), 0.5), Math.hypot(x, y) - 1, 0.08);
+    }
+    const wall = () => (R.structure === "lattice" ? 0.42 : 0.32);
+    const alive = (s) => s < 0 && (R.structure === "coral" || R.structure === "sponge" || s > -wall());
+
+    function reset() {
+      const off = R.seed * 37.3, w = wall();
+      const list = [];
+      for (let j = 0; j < G; j++)
+        for (let i = 0; i < G; i++) {
+          const k = i + G * j, x = world(i), y = world(j);
+          const s = shapeSDF(x, y);
+          sdf[k] = s;
+          wvar[k] = vnoise(x * 1.7 + off, y * 1.7, 7);
+          if (!alive(s)) { U[k] = -1; V[k] = 0; continue; }
+          const n = vnoise(x * 14 + off, y * 14 + off, 1) * 0.7 + vnoise(x * 30.8 + off, y * 30.8, 2) * 0.3;
+          const v = n > 0.7 ? 0.5 : 0;
+          U[k] = v > 0 ? 0.5 : 1; V[k] = v;
+          list.push(k);
+        }
+      live = Int32Array.from(list);
+      U2.set(U); V2.set(V);
+      R.steps = 0;
+    }
+    function run(count) {
+      const p = PATTERNS[R.pattern], Du = 0.16 * R.scale, Dv = 0.08 * R.scale, dt = 1.6;
+      for (let n = 0; n < count && R.steps < STEPS; n++, R.steps++) {
+        for (let q = 0; q < live.length; q++) {
+          const k = live[q], cu = U[k], cv = V[k];
+          let fu = 0, fv = 0, eu = 0, ev = 0;
+          // 9-point isotropic Laplacian with zero flux: a neighbour outside reads as this cell.
+          for (const o of [1, -1, G, -G]) { const u = U[k + o]; if (u < 0) { fu += cu; fv += cv; } else { fu += u; fv += V[k + o]; } }
+          for (const o of [G + 1, G - 1, -G + 1, -G - 1]) { const u = U[k + o]; if (u < 0) { eu += cu; ev += cv; } else { eu += u; ev += V[k + o]; } }
+          const lu = (4 * fu + eu - 20 * cu) / 6, lv = (4 * fv + ev - 20 * cv) / 6;
+          const w = (wvar[k] - 0.5) * 0.15, F = p.feed * (1 + w), K = p.kill * (1 - 0.03 * w);
+          const uvv = cu * cv * cv;
+          U2[k] = clamp(cu + dt * (Du * lu - uvv + F * (1 - cu)), 0, 1);
+          V2[k] = clamp(cv + dt * (Dv * lv + uvv - (F + K) * cv), 0, 1);
+        }
+        [U, U2] = [U2, U]; [V, V2] = [V2, V];
+      }
+    }
+    // The pack pass: blurred V against the iso level, combined with the shape; voxels, clamped to ±8.
+    const D = new Float32Array(G * G);
+    function pack() {
+      const p = PATTERNS[R.pattern], iso = p.iso ?? 0.2, sign = p.invert ? -1 : 1, w = wall() / VOX, ero = R.erosion / VOX;
+      const core = R.shape === "gyroid" ? 0.08 / VOX : 0;
+      for (let j = 0; j < G; j++)
+        for (let i = 0; i < G; i++) {
+          const k = i + G * j;
+          let v = 0, ws = 0;
+          for (let b = -1; b <= 1; b++)
+            for (let a = -1; a <= 1; a++) {
+              const ii = clamp(i + a, 0, G - 1), jj = clamp(j + b, 0, G - 1), wt = (a ? 1 : 2) * (b ? 1 : 2);
+              v += V[ii + G * jj] * wt; ws += wt;
+            }
+          const rd = (iso - v / ws) * 14 * sign, s = sdf[k] / VOX;
+          let d;
+          if (R.structure === "lattice") d = smax(smax(rd, s, 1.5), -s - w, 1.5);
+          else if (R.structure === "solid") d = smax(s, smin(rd, s + ero, 1.5), 1.5);
+          else d = smax(rd, s, 1.5);
+          if (R.structure === "coral") d = smin(d, s + w, 2);
+          if (core > 0) d = smin(d, s + core, 1.5);
+          D[k] = clamp(d, -8, 8);
+        }
+    }
+    const sampleD = (x, y) => {
+      x = clamp(x, 0, G - 1.001); y = clamp(y, 0, G - 1.001);
+      const i = Math.floor(x), j = Math.floor(y), tx = x - i, ty = y - j, k = i + G * j;
+      return mix(mix(D[k], D[k + 1], tx), mix(D[k + G], D[k + G + 1], tx), ty);
+    };
+
+    const img = new ImageData(G, G);
+    const buf = document.createElement("canvas");
+    buf.width = buf.height = G;
+    const left = setup($("rdCanvas"), 1, (ctx, W, H) => {
+      const bg = rgb(parseInt(css("--stage").slice(1), 16)), dead = [92, 90, 78], lo = [34, 42, 22], hi = rgb(0xb8dc48);
+      for (let k = 0; k < G * G; k++) {
+        const c = U[k] < 0 ? (sdf[k] < 0 ? dead : bg) : lerp3(lo, hi, clamp(V[k] / 0.38, 0, 1));
+        const t = ((G - 1 - Math.floor(k / G)) * G + (k % G)) * 4;
+        img.data[t] = c[0]; img.data[t + 1] = c[1]; img.data[t + 2] = c[2]; img.data[t + 3] = 255;
+      }
+      buf.getContext("2d").putImageData(img, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(buf, 0, 0, W, H);
+    });
+    let out = null, outCtx = null;
+    const right = setup($("packCanvas"), 1, (ctx, W, H) => {
+      pack();
+      const n = Math.max(64, Math.round(W * Math.min(1.5, devicePixelRatio || 1)));
+      if (!out || out.width !== n) { out = document.createElement("canvas"); out.width = out.height = n; outCtx = out.getContext("2d"); }
+      const im = outCtx.createImageData(n, n), bg = rgb(parseInt(css("--stage").slice(1), 16));
+      const px = n / G, L = [-0.45, 0.55, 0.7], ll = Math.hypot(...L);
+      for (let y = 0; y < n; y++)
+        for (let x = 0; x < n; x++) {
+          const gx = ((x + 0.5) / n) * G - 0.5, gy = ((n - 1 - y + 0.5) / n) * G - 0.5;
+          const d = sampleD(gx, gy);
+          const a = clamp(0.5 - d * px, 0, 1);
+          const t = (y * n + x) * 4;
+          let c = bg;
+          if (a > 0) {
+            // Emboss from the distance's gradient: a rounded bevel at every edge, flat where it clamps.
+            const dx = sampleD(gx + 0.5, gy) - sampleD(gx - 0.5, gy), dy = sampleD(gx, gy + 0.5) - sampleD(gx, gy - 0.5);
+            const nl = Math.hypot(dx, dy, 1.2);
+            const sh = 0.5 + 0.55 * Math.max(0, (-dx * L[0] - dy * L[1] + 1.2 * L[2]) / (nl * ll));
+            c = lerp3(bg, STONE.map((v) => Math.min(255, v * sh)), a);
+          }
+          im.data[t] = c[0]; im.data[t + 1] = c[1]; im.data[t + 2] = c[2]; im.data[t + 3] = 255;
+        }
+      outCtx.putImageData(im, 0, 0);
+      ctx.drawImage(out, 0, 0, W, H);
+    });
+    const readout = () => {
+      const p = PATTERNS[R.pattern];
+      $("rOut").innerHTML = `<span>Step <b>${R.steps}</b> of ${STEPS}</span><span>Feed <b>${p.feed}</b></span><span>Kill <b>${p.kill}</b></span><span>Reacting cells <b>${live.length.toLocaleString("en")}</b></span>`;
+    };
+    const draw = () => { left.redraw(); right.redraw(); readout(); };
+    const anim = whileVisible($("rdCanvas"), () => {
+      if (R.steps >= STEPS) return false;
+      run(26);
+      draw();
+    });
+    const restart = (newSeed) => {
+      if (newSeed) R.seed++;
+      reset();
+      if (reduce) run(STEPS);
+      draw();
+      anim.kick();
+    };
+    $("rShape").addEventListener("change", (e) => { R.shape = e.target.value; restart(); });
+    $("rStruct").addEventListener("change", (e) => { R.structure = e.target.value; restart(); });
+    $("rPat").addEventListener("change", (e) => { R.pattern = e.target.value; restart(); });
+    bind("rScale", (x) => { R.scale = x; restart(); });
+    bind("rEro", (x) => { R.erosion = x; right.redraw(); }, (x) => (+x).toFixed(3));
+    $("rGo").addEventListener("click", () => restart(true));
+    restart();
+  }
+
+  // ---------------------------------------------------------------- 2. rank and overgrowth
+  {
+    const NB = 480, EXAG = 5;
+    const M = { cover: 0.6, depth: 0.5, rank: false, seed: 4, progress: 1 };
+    let B = null;
+    function build() {
+      const s = M.seed, ph = [1, 2, 3, 4].map((i) => hash(s, i, 9) * 6.283);
+      const Rf = (a) => 0.82 * (1 + 0.17 * Math.sin(2 * a + ph[0]) + 0.13 * Math.sin(3 * a + ph[1]) + 0.08 * Math.sin(5 * a + ph[2]) + 0.05 * Math.sin(8 * a + ph[3]));
+      const inside = (x, y) => Math.hypot(x, y) < Rf(Math.atan2(y, x));
+      const P = [], N = [];
+      for (let i = 0; i < NB; i++) { const a = (2 * Math.PI * i) / NB, r = Rf(a); P.push([r * Math.cos(a), r * Math.sin(a)]); }
+      for (let i = 0; i < NB; i++) {
+        const a = P[(i + NB - 1) % NB], b = P[(i + 1) % NB], tx = b[0] - a[0], ty = b[1] - a[1], l = Math.hypot(tx, ty);
+        N.push([ty / l, -tx / l]);
+      }
+      const off = s * 13.1;
+      const score = [], species = [], cushion = [];
+      for (let i = 0; i < NB; i++) {
+        const [x, y] = P[i], [nx, ny] = N[i];
+        const up = clamp((ny + 0.45) / 1.35, 0, 1);
+        const outward = (nx * x + ny * y) / Math.hypot(x, y);
+        // Occlusion: march six directions around the normal against the outline.
+        let open = 0;
+        for (const deg of [-70, -42, -14, 14, 42, 70]) {
+          const a = Math.atan2(ny, nx) + (deg * Math.PI) / 180, rx = Math.cos(a), ry = Math.sin(a);
+          let vis = 1;
+          for (let t = 0.03; t < 0.9; t *= 1.45) if (inside(x + rx * t, y + ry * t)) { vis = 0.35 * (t / 0.9) ** 2; break; }
+          open += vis;
+        }
+        const ao = open / 6;
+        const n1 = (vnoise(x * 2.2 + off, y * 2.2, 3) + 0.5 * vnoise(x * 4.5 + off, y * 4.5, 4)) / 1.5;
+        const n2 = vnoise(x * 9 + off, y * 9, 5);
+        score.push(1.1 * up * up + 0.25 * outward + 0.45 * ao + 2 * (n1 - 0.5) + 0.25 * n2);
+        const id = worley(x * 2.4 + off, y * 2.4, 11).id, isl = worley(x * 8 + off, y * 8, 12);
+        species.push(isl.d2 < 0.32 * 0.32 && isl.id > 0.55 ? isl.id : id);
+        const cw = worley(x * 5.6 + off, y * 5.6, 13), dome = Math.max(0, 1 - cw.d2 * 1.3);
+        cushion.push(0.06 + 0.94 * dome ** 0.75 * (0.5 + vnoise(x * 2.25 + off, y * 2.25, 14)));
+      }
+      const order = score.map((_, i) => i).sort((a, b) => score[a] - score[b]);
+      const rank = new Float32Array(NB);
+      order.forEach((v, r) => (rank[v] = r / (NB - 1)));
+      B = { P, N, rank, species, cushion };
+    }
+    const v = setup($("mossCanvas"), (w) => clamp(w * 0.6, 300, 560), (ctx, W, H) => {
+      const g = M.cover * (1 - (1 - M.progress) ** 2.2);
+      const sc = Math.min(W / 2.7, H / 2.6), cx = W / 2, cy = H / 2 + 0.03 * sc;
+      const X = (p) => cx + p[0] * sc, Y = (p) => cy - p[1] * sc;
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const { P, N, rank, species, cushion } = B;
+      const depth = (0.01 + 0.04 * M.depth) * EXAG;
+      const h = P.map((_, i) => {
+        const cover = smoothstep(1 - g, 1 - g + 0.14, rank[i]), core = smoothstep(1 - g, 1, rank[i]);
+        return cover * depth * cushion[i] * speciesHeight(species[i]) * (0.45 + 0.55 * Math.sqrt(core));
+      });
+      // Stone, then its rim: stained ahead of the front, or coloured by rank.
+      ctx.fillStyle = toCss(STONE.map((c) => c * 0.86));
+      ctx.beginPath(); P.forEach((p, i) => (i ? ctx.lineTo(X(p), Y(p)) : ctx.moveTo(X(p), Y(p)))); ctx.closePath(); ctx.fill();
+      const accent2 = rgb(parseInt(css("--accent2").slice(1), 16) || 0x956412), low = [70, 68, 60];
+      ctx.lineWidth = Math.max(5, sc * 0.045); ctx.lineCap = "butt";
+      for (let i = 0; i < NB; i++) {
+        const j = (i + 1) % NB, r = rank[i];
+        let c;
+        if (M.rank) c = lerp3(low, accent2, r);
+        else {
+          const ahead = smoothstep(1 - g - 0.25, 1 - g, r) * (1 - smoothstep(1 - g, 1 - g + 0.14, r));
+          c = lerp3(STONE, [96, 116, 40], ahead * 0.75 * (g > 0 ? 1 : 0));
+        }
+        const inset = ctx.lineWidth / 2 / sc;
+        ctx.strokeStyle = toCss(c);
+        ctx.beginPath();
+        ctx.moveTo(X([P[i][0] - N[i][0] * inset, P[i][1] - N[i][1] * inset]), Y([P[i][0] - N[i][0] * inset, P[i][1] - N[i][1] * inset]));
+        ctx.lineTo(X([P[j][0] - N[j][0] * inset, P[j][1] - N[j][1] * inset]), Y([P[j][0] - N[j][0] * inset, P[j][1] - N[j][1] * inset]));
+        ctx.stroke();
+      }
+      // Moss: a quad per segment out along the normals, its species' colour, paler at the tips.
+      for (let i = 0; i < NB; i++) {
+        const j = (i + 1) % NB;
+        if (h[i] <= 1e-4 && h[j] <= 1e-4) continue;
+        const a = P[i], b = P[j], ta = [a[0] + N[i][0] * h[i], a[1] + N[i][1] * h[i]], tb = [b[0] + N[j][0] * h[j], b[1] + N[j][1] * h[j]];
+        const tip = TIPS[speciesIndex(species[i])];
+        const grad = ctx.createLinearGradient(X(a), Y(a), X(ta), Y(ta));
+        grad.addColorStop(0, toCss(lerp3(ROOT, tip, 0.35)));
+        grad.addColorStop(0.5, toCss(tip));
+        grad.addColorStop(1, toCss(lerp3(tip, [210, 235, 120], 0.35)));
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.moveTo(X(a), Y(a)); ctx.lineTo(X(b), Y(b)); ctx.lineTo(X(tb), Y(tb)); ctx.lineTo(X(ta), Y(ta)); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 0.8; ctx.stroke();
+      }
+      let covered = 0;
+      for (let i = 0; i < NB; i++) if (rank[i] > 1 - g) covered++;
+      $("mOut").innerHTML = `<span>Growth <b>${g.toFixed(2)}</b></span><span>Vertices covered <b>${((100 * covered) / NB).toFixed(1)}%</b></span>`;
+    });
+    bind("mCover", (x) => { M.cover = x; M.progress = 1; v.redraw(); });
+    bind("mDepth", (x) => { M.depth = x; v.redraw(); });
+    $("mRank").addEventListener("change", (e) => { M.rank = e.target.checked; v.redraw(); });
+    let t0 = 0, playing = false;
+    const step = (now) => {
+      if (!playing) return;
+      M.progress = Math.min(1, (now - t0) / 3200);
+      v.redraw();
+      if (M.progress < 1) requestAnimationFrame(step);
+      else playing = false;
+    };
+    $("mGrow").addEventListener("click", () => {
+      if (reduce) { M.progress = 1; v.redraw(); return; }
+      playing = true; t0 = performance.now(); requestAnimationFrame(step);
+    });
+    $("mNew").addEventListener("click", () => { M.seed++; build(); v.redraw(); });
+    build();
+  }
+
+  // ---------------------------------------------------------------- 3. shells
+  {
+    const S = { L: 8, lean: 0.4, jitter: true, ref: true };
+    // Species 4's height, leaf length and leaf count; the slice runs through the shoots at depth Z0.
+    const SP = [0.7, 0.55, 7], Z0 = 0.37, BODY = 0.4;
+    // Whether the slice at height t (0 at the mat, 1 at the top) keeps column u (in shoot cells), and its tt.
+    function shoot(u, t) {
+      if (t > SP[0] * 1.3) return null;
+      u += t * t * S.lean;
+      const ix = Math.floor(u), iz = Math.floor(Z0);
+      let d1 = 9, hh = 0, tint = 0, ang = 0;
+      for (let b = -1; b <= 1; b++)
+        for (let a = -1; a <= 1; a++) {
+          const cx = ix + a, cz = iz + b;
+          const dx = u - (cx + 0.15 + 0.7 * hash(cx, cz, 21)), dz = Z0 - (cz + 0.15 + 0.7 * hash(cx, cz, 22));
+          const d = dx * dx + dz * dz;
+          if (d < d1) { d1 = d; hh = hash(cx, cz, 23); tint = hash(cx, cz, 24); ang = Math.atan2(dz, dx); }
+        }
+      const d = Math.min(Math.sqrt(d1), 0.75);
+      const hgt = SP[0] * (0.6 + 0.4 * hh) * (hh > 0.94 ? 1.3 : 1);
+      const tt = t / hgt;
+      if (tt > 1) return null;
+      const env = smoothstep(0.05, 0.3, tt) * (1 - smoothstep(0.7, 1, tt));
+      const leaves = (0.5 + 0.5 * Math.cos(SP[2] * ang + tint * 6.283 + tt * 5)) ** 4;
+      const reach = mix(0.6, 0.16, tt ** 1.3) + SP[1] * 0.6 * leaves * env;
+      return d <= reach || tt < 0.06 ? tt : null;
+    }
+    const colour = (tt) => {
+      const base = TIPS[2];
+      const stem = lerp3(lerp3(ROOT, base, 0.45), base.map((c, i) => c * [0.55, 0.5, 0.35][i]), smoothstep(0, 0.5, tt));
+      let c = lerp3(stem, base, smoothstep(0.25, 0.75, tt));
+      return lerp3(c, base.map((v, i) => Math.min(255, v * [1.2, 1.25, 0.7][i])), smoothstep(0.75, 1, tt));
+    };
+    let refImg = null;
+    const v = setup($("shellCanvas"), (w) => clamp(w * 0.45, 260, 400), (ctx, W, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const base = H - 34, Hm = base - 22, cell = clamp(W / 22, 28, 46);
+      const yOf = (t) => base - Hm * mix(BODY, 1, t);
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      // The true shoots: every height, faint.
+      if (S.ref) {
+        const w = Math.round(W), h = Math.round(Hm * (1 - BODY));
+        refImg = new ImageData(w, h);
+        for (let y = 0; y < h; y++) {
+          const t = 1 - (y + 0.5) / h;
+          for (let x = 0; x < w; x++) {
+            const tt = shoot((x + 0.5) / cell, t);
+            if (tt === null) continue;
+            const c = colour(tt), o = (y * w + x) * 4;
+            refImg.data[o] = c[0]; refImg.data[o + 1] = c[1]; refImg.data[o + 2] = c[2]; refImg.data[o + 3] = 120;
+          }
+        }
+        const tmp = document.createElement("canvas");
+        tmp.width = w; tmp.height = h;
+        tmp.getContext("2d").putImageData(refImg, 0, 0);
+        ctx.drawImage(tmp, 0, yOf(1), W, h);
+      }
+      // Stone below, the displaced mat on it.
+      ctx.fillStyle = toCss(STONE.map((c) => c * 0.8)); ctx.fillRect(0, base, W, H - base);
+      ctx.fillStyle = toCss(lerp3(ROOT, TIPS[2], 0.3)); ctx.fillRect(0, yOf(0), W, base - yOf(0));
+      // One row per shell, kept where its slice cuts a shoot.
+      const lw = Math.max(1.5, Math.min(3, (Hm * (1 - BODY)) / S.L * 0.35));
+      const step = 1 / dpr;
+      for (let i = 0; i < S.L; i++) {
+        const t = (S.L - i) / S.L, y = yOf(t);
+        for (let x = 0; x < W; x += step) {
+          const te = S.jitter ? t + (hash(Math.round(x * dpr), i, 31) - 0.5) / S.L : t;
+          const tt = shoot((x + 0.5) / cell, clamp(te, 0, 1));
+          if (tt === null) continue;
+          ctx.fillStyle = toCss(colour(tt));
+          ctx.fillRect(x, y - lw / 2, step + 0.05, lw);
+        }
+      }
+      ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.font = font(11); ctx.textBaseline = "middle";
+      ctx.fillText("stone", 8, base + 17);
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.fillText("mat", 8, (yOf(0) + base) / 2);
+      $("sOut").innerHTML = `<span>Shells <b>${S.L}</b> over the top ${Math.round(100 * (1 - BODY))}% of the moss</span><span>Gap between shells <b>${((Hm * (1 - BODY)) / S.L).toFixed(1)} px</b></span>`;
+    });
+    bind("sL", (x) => { S.L = x; v.redraw(); }, (x) => String(x));
+    bind("sLean", (x) => { S.lean = x; v.redraw(); });
+    $("sJit").addEventListener("change", (e) => { S.jitter = e.target.checked; v.redraw(); });
+    $("sRef").addEventListener("change", (e) => { S.ref = e.target.checked; v.redraw(); });
+  }
+})();
+</script>
+</body>
+</html>
