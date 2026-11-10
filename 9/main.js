@@ -623,13 +623,13 @@ function rebuild(first = false) {
     spawn();
   } else {
     transition.pending = 0.45;
-    // The old set gives way and the container reshapes: a long, rubbery stretch.
+    // The old set gives way and the container reshapes: a suction pop.
     sound.play("stretch", { gain: 1 });
   }
 }
 
 function spawn() {
-  // The new set slides in, wet, once the growth shows.
+  // The new set swells in, sucked into place, once the growth shows.
   setTimeout(() => sound.play("swell", { gain: 1 }), 250);
   for (const spec of place(newBodies())) {
     const body = world.addBody({ ...spec, scale: GROW_FROM, quaternion: randomQuat() });
@@ -727,19 +727,34 @@ function updateSpin(dt, time) {
   world.omega[0] = omega.x;
   world.omega[1] = omega.y;
   world.omega[2] = omega.z;
+  updateSwoosh(dt);
+}
+
+// A swoosh when the spin picks up or swings to a new axis; not again while it just coasts.
+const swooshFrom = new Vector3();
+let swooshCool = 0;
+function updateSwoosh(dt) {
+  swooshCool -= dt;
+  const s = omega.length();
+  if (s < 1) swooshFrom.set(0, 0, 0);
+  if (swooshCool <= 0 && s > 2.5 && omega.distanceTo(swooshFrom) > 2.5 && s > swooshFrom.length() * 0.7) {
+    sound.play("swoosh", { gain: 0.3 + 0.7 * Math.min(1, (s - 2.5) / 6), rate: 0.95 + Math.min(s, 10) * 0.01 });
+    swooshFrom.copy(omega);
+    swooshCool = 0.35;
+  }
 }
 
 // Sounds from sudden changes of velocity: a body's centre for squishes and thuds, the floaters for soft taps.
 const motion = new Map();
 const _v = new Vector3();
-const soundStats = { squish: 0, thud: 0, tap: 0 };
+const soundStats = { squish: 0 };
 function panOf(x, y, z) {
   _v.set(x, y, z).project(camera);
   return _v.x * 0.8;
 }
 let heard = -1;
-// While things rest, a body now and then squelches softly or shifts with a faint stretch, panned to where it sits: no
-// spin, no drag, no new set swelling in.
+// While things rest, a body now and then squishes softly, panned to where it sits: no spin, no drag, no new set
+// swelling in.
 let stillness = 0;
 let nextIdle = 2;
 function updateIdleSounds(dt) {
@@ -754,8 +769,7 @@ function updateIdleSounds(dt) {
   if (!bodies.length) return;
   const b = bodies[Math.floor(nativeRandom() * bodies.length)];
   const size = Math.min(1, b.radius * b.scale * 2.2);
-  if (nativeRandom() < 0.8) sound.play("squish", { gain: 0.18 + 0.12 * nativeRandom(), pan: panOf(...b.c), rate: 0.8 - size * 0.15 });
-  else sound.play("stretch", { gain: 0.2 + 0.1 * nativeRandom(), pan: panOf(...b.c), rate: 1.2 - size * 0.2 });
+  sound.play("squish", { gain: 0.18 + 0.12 * nativeRandom(), pan: panOf(...b.c), rate: 0.6 - size * 0.12 });
 }
 
 function updateSounds() {
@@ -785,26 +799,21 @@ function updateSounds() {
       const g = Math.min(1, (dv - 0.45) / 2) * size;
       const pan = panOf(...b.c);
       soundStats.squish++;
-      sound.play("squish", { gain: 0.45 + g * 0.55, pan, rate: 1.25 - size * 0.4 });
-      // A hard knock wobbles the jelly; the hardest also slap.
-      if (dv > 2.4) soundStats.thud++, sound.play("bounce", { gain: g, pan, rate: 1.1 - size * 0.3 });
-      if (dv > 4) sound.play("thud", { gain: g * 0.6, pan, rate: 1.1 - size * 0.3 });
+      sound.play("marble", { gain: 0.45 + g * 0.55, pan });
+      // A firmer knock adds a deeper voop; a hard one wobbles the jelly.
+      if (dv > 1.6) sound.play("deep", { gain: 0.5 + g * 0.5, pan, rate: 0.55 - size * 0.15 });
+      if (dv > 2.4) sound.play("bounce", { gain: g, pan, rate: 1.1 - size * 0.3 });
       m.cool = 0.3;
     }
+    // Floaters knocking about inside: a marble rolling against rubber.
     for (let j = 0; j < b.fcount; j++) {
       const k = (b.fstart + j) * 3, o = j * 6;
       const fx = (x[k] - m.f[o]) / dt, fy = (x[k + 1] - m.f[o + 1]) / dt, fz = (x[k + 2] - m.f[o + 2]) / dt;
       const fdv = Math.hypot(fx - m.f[o + 3], fy - m.f[o + 4], fz - m.f[o + 5]);
-      m.f[o] = x[k];
-      m.f[o + 1] = x[k + 1];
-      m.f[o + 2] = x[k + 2];
-      m.f[o + 3] = fx;
-      m.f[o + 4] = fy;
-      m.f[o + 5] = fz;
+      m.f.set([x[k], x[k + 1], x[k + 2], fx, fy, fz], o);
       m.fcool[j] -= dt;
       if (m.fcool[j] <= 0 && fdv > 2.2 && b.floaters[j].radius < 0.3) {
-        soundStats.tap++;
-        sound.play("tap", { gain: Math.min(0.7, (fdv - 2.2) / 3) + 0.2, pan: panOf(x[k], x[k + 1], x[k + 2]), rate: 1.1 });
+        sound.play("marble", { gain: Math.min(0.6, (fdv - 2.2) / 4) + 0.3, pan: panOf(x[k], x[k + 1], x[k + 2]) });
         m.fcool[j] = 0.4;
       }
     }

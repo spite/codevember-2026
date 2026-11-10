@@ -34,10 +34,10 @@ Notable:
   the jelly image, at a blur that grows with the distance behind the wall.
 - The volume's shadow on the sweep is a soft shadow marched through the same field, tinted by the jelly.
 
-Sound: wet squelches, slaps and soft plops triggered by sudden changes in velocity, a suction stretch when the shape
-changes, and while the bodies rest they now and then squelch softly or shift with a faint stretch; all muffled, with a
-short dark echo, as if heard through jelly and glass. Cut from CC0 recordings on freesound.org: "wet squish 1" by 45t,
-"Squelch.wav" by APallot, "Squish.wav" by SaxOman7, "Squishes for Mud, Fruit, and Blood" by JelloApocalypse, "Squishy
-Gore.mp3" by DigPro120, "Step on a slug (Splat!) 2" by Breviceps, "WET SLAP NOISE" by MaddieCooper, "Suction Cups
-Popping.wav" by ross_sinc, "Plunger Pop.wav" by praxis_bard, "plop.wav" by gecop and "A series of Plopp sounds" by
-dermotte. Hard knocks bounce ("jellybounce_00.wav" and "jellybounce.wav" by Mixtos). A new set slips in with squelches played backwards.
+Sound: a swoosh as the volume is swung round, a rubbery voop when bodies knock together, a deeper one under firmer knocks and a low wobbling bounce under
+the hardest, a rubber marble rolling as the floaters knock about inside, and now and then a soft one while they rest; a suction pop as a
+set leaves and squelches played backwards as the next swells in. All muffled, with a short dark echo, as if heard
+through jelly and glass. Cut from CC0 recordings on freesound.org: "swoosh" by Halgrimm, "Woosh (stick swung in the air)" by Dalesome, "Swing Woosh" by Jofae, "Whoosh #1" by Kinoton, "voop.boaay" by BOAAY, "2017 03 rubber marble in a plastic bowl.flac" by arseniiv, "jellybounce_00.wav" and "jellybounce.wav" by Mixtos, "Suction Cups Popping.wav"
+by ross_sinc, "Plunger Pop.wav" by praxis_bard, and for the swells "wet squish 1" by 45t, "Squelch.wav" by APallot,
+"Squish.wav" by SaxOman7, "Squishes for Mud, Fruit, and Blood" by JelloApocalypse, "Squishy Gore.mp3" by DigPro120
+and "Step on a slug (Splat!) 2" by Breviceps.

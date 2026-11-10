@@ -1,14 +1,17 @@
-// Wet squelches, slaps, suction stretches and soft plops: one-shots cut from CC0 recordings (freesound.org, see
+// Rubbery voops, suction pops and squelches played backwards: one-shots cut from CC0 recordings (freesound.org, see
 // README), played with a random variant, pitch and pan, muffled and given a short dark echo, as if heard through jelly
 // and glass. The AudioContext is created on load: it runs at once if the browser allows it, otherwise it resumes on
 // the first gesture.
 import { nativeRandom } from "modules/random.js";
 
-// Impacts, floater taps and the stretch of a transformation; bodies at rest reuse squishes and stretches, softly.
-// A swell: wet squelches played backwards, sucked in as a new set slips into place.
+// Impacts between bodies, which bodies at rest reuse softly; a pop as a set leaves and a swell as the next comes in.
 // A bounce: the jelly's low, wobbling "hmm-hum" on a hard knock.
-const SETS = { squish: 9, thud: 4, tap: 10, stretch: 4, swell: 5, bounce: 2 };
-const SPACING = { squish: 0.05, thud: 0.12, tap: 0.04, stretch: 0.4, swell: 0.4, bounce: 0.12 };
+// A marble: floaters knocking about inside the bodies.
+// A swoosh: the container swung round.
+const SETS = { squish: 3, stretch: 3, swell: 5, bounce: 2, marble: 5, swoosh: 4 };
+// A deep voop: the impact clips, pitched well down, under their own name so they never block the squishes.
+const ALIAS = { deep: "squish" };
+const SPACING = { squish: 0.05, stretch: 0.4, swell: 0.4, bounce: 0.12, deep: 0.1, marble: 0.05, swoosh: 0.3 };
 const MAX_VOICES = 16;
 const PRIORITY = new Set(["stretch", "swell"]);
 
@@ -89,10 +92,10 @@ function createSound({ base = "./sounds/", onProgress } = {}) {
     if (!on || paused || ctx.state !== "running" || gain < 0.01) return false;
     const now = ctx.currentTime;
     if (now - (lastAt[name] ?? -1) < SPACING[name]) return false;
-    const list = buffers[name]?.filter(Boolean);
+    const list = buffers[ALIAS[name] ?? name]?.filter(Boolean);
     if (!list?.length) return false;
     voices = voices.filter((t) => t > now);
-    // The transformation's sounds always play; impacts give way when the voices are full.
+    // The shape change's sounds always play; impacts give way when the voices are full.
     if (voices.length >= MAX_VOICES && !PRIORITY.has(name)) return false;
     lastAt[name] = now;
     const buffer = list[pick(name, list.length)];
