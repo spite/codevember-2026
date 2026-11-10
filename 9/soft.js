@@ -41,9 +41,10 @@ class SoftWorld {
     this.skin = 0.12;
     this.floaterStiffness = 1;
 
-    this.hashSize = capacity * 2;
-    this.cellStart = new Int32Array(this.hashSize + 1);
+    this.cellStart = new Int32Array(1);
     this.cellEntries = new Int32Array(capacity);
+    this.cellKey = new Int32Array(capacity);
+    this.cellXYZ = new Int32Array(capacity * 3);
     this.queryIds = new Int32Array(capacity);
     this._s = [0, 0, 0, 0];
   }
@@ -403,18 +404,30 @@ class SoftWorld {
 
   // Candidate pairs of shell particles from different bodies, gathered once per frame with room for the frame's travel.
   findPairs(margin) {
-    const { x, r, kind, owner, n, hashSize, cellStart, cellEntries } = this;
+    const { x, r, kind, owner, n, cellEntries, cellKey, cellXYZ } = this;
     let maxR = 0;
     for (let i = 0; i < n; i++) if (kind[i] === SHELL && r[i] > maxR) maxR = r[i];
     this.pairCount = 0;
     if (maxR <= 0) return;
     const reach = 2 * maxR + margin;
     const invS = 1 / reach;
-    const hash = (ix, iy, iz) => Math.abs(Math.imul(ix, 92837111) ^ Math.imul(iy, 689287499) ^ Math.imul(iz, 283923481)) % hashSize;
+    // A power-of-two table about twice the particle count, so clearing it costs as little as filling it.
+    let hashSize = 1024;
+    while (hashSize < n * 2) hashSize *= 2;
+    const mask = hashSize - 1;
+    if (this.cellStart.length !== hashSize + 1) this.cellStart = new Int32Array(hashSize + 1);
+    const cellStart = this.cellStart;
+    const hash = (ix, iy, iz) => (Math.imul(ix, 92837111) ^ Math.imul(iy, 689287499) ^ Math.imul(iz, 283923481)) & mask;
     cellStart.fill(0);
     for (let i = 0; i < n; i++) {
       if (kind[i] !== SHELL) continue;
-      cellStart[hash(Math.floor(x[i * 3] * invS), Math.floor(x[i * 3 + 1] * invS), Math.floor(x[i * 3 + 2] * invS))]++;
+      const ix = Math.floor(x[i * 3] * invS), iy = Math.floor(x[i * 3 + 1] * invS), iz = Math.floor(x[i * 3 + 2] * invS);
+      cellXYZ[i * 3] = ix;
+      cellXYZ[i * 3 + 1] = iy;
+      cellXYZ[i * 3 + 2] = iz;
+      const hsh = hash(ix, iy, iz);
+      cellKey[i] = hsh;
+      cellStart[hsh]++;
     }
     let start = 0;
     for (let i = 0; i < hashSize; i++) {
@@ -422,11 +435,7 @@ class SoftWorld {
       cellStart[i] = start;
     }
     cellStart[hashSize] = start;
-    for (let i = 0; i < n; i++) {
-      if (kind[i] !== SHELL) continue;
-      const hsh = hash(Math.floor(x[i * 3] * invS), Math.floor(x[i * 3 + 1] * invS), Math.floor(x[i * 3 + 2] * invS));
-      cellEntries[--cellStart[hsh]] = i;
-    }
+    for (let i = 0; i < n; i++) if (kind[i] === SHELL) cellEntries[--cellStart[cellKey[i]]] = i;
     let pairs = this.pairs ?? (this.pairs = new Int32Array(1 << 16));
     let count = 0;
     // Own cell (later particles only) and the 13 cells "ahead" of it: each neighbouring pair of cells is visited once.
@@ -435,7 +444,7 @@ class SoftWorld {
       if (kind[i] !== SHELL) continue;
       const ki = i * 3;
       const xi = x[ki], yi = x[ki + 1], zi = x[ki + 2];
-      const ix = Math.floor(xi * invS), iy = Math.floor(yi * invS), iz = Math.floor(zi * invS);
+      const ix = cellXYZ[ki], iy = cellXYZ[ki + 1], iz = cellXYZ[ki + 2];
       const oi = owner[i], ri = r[i] + margin;
       for (let c = 0; c < AHEAD.length; c += 3) {
         const own = c === 0;

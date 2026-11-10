@@ -60,6 +60,8 @@ const pipeline = new Pipeline(renderer, {
   vignette: 0.15,
   grain: 0.02,
   shadow: { autoFit: true, denoise: true },
+  // The bodies are drawn outside the pipeline, so its AO/GI only reaches the floor and floaters, invisibly.
+  gi: false,
   composite: (hdr, ctx) => volume.render(renderer, hdr, ctx),
 });
 const lite = ["low", "medium"].includes(pipeline.quality);
@@ -327,13 +329,42 @@ controls.enablePan = false;
 controls.minDistance = 4;
 controls.maxDistance = 12;
 controls.maxPolarAngle = 1.62;
-onResize((w, h, dpr) => pipeline.setSize(w, h, dpr));
+
+const capturing = new URLSearchParams(location.search).has("capture");
+// Render scale: big screens stay under a pixel budget, and the scale drops while frames are slow and climbs back once
+// they keep up with the display.
+const view = { w: 1, h: 1, dpr: 1, scale: 1, ema: 16, last: 0, checked: 0 };
+const budget = lite ? 2.6e6 : 4.2e6;
+const applySize = () => {
+  const fit = capturing ? 1 : Math.min(1, Math.sqrt(budget / (view.w * view.h * view.dpr * view.dpr)));
+  const ratio = view.dpr * fit * view.scale;
+  if (renderer.getPixelRatio() !== ratio) renderer.setPixelRatio(ratio);
+  pipeline.setSize(view.w, view.h, ratio);
+};
+onResize((w, h, dpr) => {
+  Object.assign(view, { w, h, dpr });
+  applySize();
+});
+function adaptScale(now) {
+  const frame = view.last ? now - view.last : 16;
+  view.last = now;
+  if (capturing || frame > 250) return;
+  view.ema += (frame - view.ema) * 0.05;
+  if (now - view.checked < 1500) return;
+  view.checked = now;
+  let s = view.scale;
+  if (view.ema > 24 && s > 0.5) s = Math.max(0.5, s * 0.85);
+  else if (view.ema < 18 && s < 1) s = Math.min(1, s * 1.1);
+  if (Math.abs(s - view.scale) > 0.02) {
+    view.scale = s;
+    applySize();
+  }
+}
 
 const container = new Container(params.shape());
 container.wall = params.walls();
 // The physics runs in a worker; this is its last state, one step behind.
 // Recordings step it on the main thread instead, in step with their virtual clock.
-const capturing = new URLSearchParams(location.search).has("capture");
 const world = new (capturing ? LocalPhysics : PhysicsClient)(container, { capacity: 9000, center: CENTER, substeps: touch ? 5 : 8 });
 const detail = touch ? 2 : 3;
 
@@ -890,6 +921,7 @@ window.app = {
 };
 
 render(({ time, dt }) => {
+  adaptScale(performance.now());
   autoChange.update(dt);
   if (key() !== built) {
     built = key();
