@@ -1,0 +1,1290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../modules/theme.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Membrane Squeezes</title>
+<meta name="description" content="How Codevember 2026 day 9, Membrane, packs soft jelly bodies into a thin glass shell: particle shells with pressure and shape matching in a worker, walls that turn under them, jelly drawn as signed thickness, and glass sphere-traced from a distance field.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* One reading column on the studio's warm grey; figures are small sweeps lit like the day. */
+:root {
+  --bg: #d9d4ce;
+  --panel: #e5e1dc;
+  --ink: #1d1716;
+  --muted: #5d5450;
+  --line: #bdb5ae;
+  --accent: #a3192e;
+  --accent2: #c0602a;
+  --stage: #cdc7c1;
+  --stage-ink: #6d625d;
+  --glass: #6f8a98;
+  --backdrop: #ebe6e0;
+  --core: #2a0609;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121010; --panel: #1c1918; --ink: #ece6e2; --muted: #a59b96; --line: #353030;
+    --accent: #f0707e; --accent2: #f2a46a; --stage: #0d0b0b; --stage-ink: #8c827d; --glass: #a9c3cf;
+    --backdrop: #57504b; --core: #0c0203;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121010; --panel: #1c1918; --ink: #ece6e2; --muted: #a59b96; --line: #353030;
+  --accent: #f0707e; --accent2: #f2a46a; --stage: #0d0b0b; --stage-ink: #8c827d; --glass: #a9c3cf;
+  --backdrop: #57504b; --core: #0c0203;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .holo { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .holo {
+    background: linear-gradient(100deg, var(--accent) 10%, var(--accent2) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+
+/* Figures */
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; border-radius: 3px; background: var(--stage); }
+.fig canvas.grab { touch-action: none; cursor: grab; }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+input[type="checkbox"] { accent-color: var(--accent); }
+select {
+  font: 400 13px/1.2 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 3px; padding: 6px 8px;
+}
+button {
+  font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px;
+  padding: 9px 14px; cursor: pointer;
+}
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 12.5px/1.2 var(--mono); color: var(--muted); }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid currentColor; vertical-align: middle; margin-right: 6px; }
+.legend i.dash { border-top-style: dashed; }
+.legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: currentColor; vertical-align: middle; margin-right: 6px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+.swatch { display: inline-block; width: 26px; height: 12px; border-radius: 2px; vertical-align: -1px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 25%, transparent); }
+.strip-label { font: 400 12px/1.2 var(--mono); color: var(--muted); margin-bottom: -8px; }
+
+/* Table */
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font: 400 13.5px/1.35 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+td.sub { padding-left: 28px; color: var(--muted); }
+th { font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: nowrap; }
+.formula .c { color: var(--muted); }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+  th, td { padding: 8px 7px; font-size: 12.5px; }
+  td.sub { padding-left: 16px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow">Codevember 2026 · <b>Day 9</b> · Membrane</div>
+      <h1>How Membrane <span class="holo">squeezes</span></h1>
+      <p class="lede">Soft jelly bodies packed into a thin glass shell. Turn the shell and they tumble, slide and squeeze against each other and the walls. Here is how a body keeps its volume but not its shape, how the walls drag it along as they turn, and how jelly is drawn without ever being drawn.</p>
+      <div class="meta">
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>soft bodies in a worker</span><span>no build step</span><span>desktop and phones</span>
+      </div>
+    </div>
+    <figure>
+      <img src="../screenshots/9.jpg" width="1200" height="1200" alt="Translucent red jelly bodies with beads floating inside, squeezed together in a frosted, thin-walled glass cross on a pale studio sweep, casting a soft red shadow.">
+      <figcaption>The ruby look in the cube, as the page opens.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>Jelly in a glass box</h2>
+      <p>The references were product shots of cast resin: a frosted block on a pale floor with a deep coloured shape inside, sharp where it meets the surface and dissolving into a soft glow further in. Day 9's prompt was Membrane, so the shape inside went soft: a dozen jelly bodies, each with a skin, packed into a hollow shell that you can pick up and turn.</p>
+      <p>Turn it and the bodies tumble and slide, flatten against the walls and bulge into the gaps between each other, and settle again under their own weight. Beads, dice, rings or a single dark core float inside each body and push its skin around from within. The shell is a rounded cube, slab, tower, sphere, capsule, torus, T, L, cross or peanut; the bodies are balls, cushions, pills and five-lobed gumdrops.</p>
+      <p>Two halves make it work: a soft-body solver that runs in a worker, and a renderer that lays the jelly over the frame as a volume, in the <a href="../modules/pipeline/explainer.html">shared pipeline</a>'s composite hook rather than as its meshes, then sphere-traces the glass from the same distance field the physics collides with.</p>
+    </div>
+  </section>
+
+  <!-- 2. Soft bodies -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Soft bodies · <b>soft.js</b></div>
+      <h2>A skin of particles, held round by pressure</h2>
+      <p>Each body is a shell of particles: the vertices of a subdivided icosahedron, scaled so it holds the volume of a unit ball, then pushed into a cushion (a superellipsoid), a pill or a gumdrop. The particles carry no orientation and no springs to a centre; four kinds of constraint hold the shell together, solved position by position (XPBD) many times a frame.</p>
+      <p><b>Edges</b> keep neighbouring particles at their rest distance. <b>Volume</b> is the pressure: the shell's enclosed volume, summed over its triangles, is pushed back to the rest volume along its gradient, so a body squashed one way bulges another. <b>Shape matching</b> finds the rotation that best fits the rest shape onto the particles (the polar decomposition, by Müller's iterative method, warm-started from last substep's rotation) and pulls every particle a little toward it, which keeps a shell from tangling or turning inside out. <b>Bending</b> pulls each particle toward the mean of its neighbours plus its rotated rest offset from that mean, so the skin keeps its local curvature and squashes without creasing.</p>
+      <p>The figure is the same solver in two dimensions: rings of 24 particles, one heavy core in each, in a box you can turn. Drag it round.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Five bodies in a turning box</h3>
+        <div class="controls">
+          <label>Softness <input id="sS" type="range" min="0" max="1" step="0.01" value="0.6"><output id="sSo">0.60</output></label>
+          <label>Skin <input id="sK" type="range" min="0" max="0.3" step="0.01" value="0.12"><output id="sKo">0.12</output></label>
+          <label>Tumble <input id="sT" type="range" min="0" max="4" step="0.05" value="0.8"><output id="sTo">0.80</output></label>
+          <label><input id="sP" type="checkbox"> Particles</label>
+          <button id="sNew" type="button" class="ghost">New set</button>
+          <button id="sRun" type="button" class="ghost">Pause</button>
+        </div>
+      </div>
+      <canvas id="softCanvas" class="grab" aria-label="A rounded square box turning slowly, holding five translucent red rings with dark cores. The rings squash against the walls and each other and slide as the box turns; drag to turn it by hand."></canvas>
+      <div class="readout" id="sOut"></div>
+      <p class="fig-cap">Particles shows the shell's particles, each with the radius it collides with, and the dashed skin around each core. The 2D rings use an area constraint where the day uses volume. Softness moves the same settings as in the day, together: compliances, shape stiffness, bending and gravity, with constants tuned for 2D.</p>
+    </div>
+    <div class="formula">
+      <span class="c">// XPBD: each constraint C(x) = 0 moves its particles along its gradient, over a substep h</span><br>
+      λ = −C / (Σ<sub>i</sub> w<sub>i</sub> |∇<sub>i</sub>C|² + α / h²) &nbsp;&nbsp; Δx<sub>i</sub> = λ w<sub>i</sub> ∇<sub>i</sub>C<br>
+      <span class="c">// edge: C = |x<sub>i</sub> − x<sub>j</sub>| − L &nbsp;&nbsp; volume: C = Σ<sub>triangles</sub> x<sub>a</sub> · (x<sub>b</sub> × x<sub>c</sub>) / 6 − V<sub>0</sub></span><br>
+      <span class="c">// shape matching and bending: a fixed share of the way to their goal, converted per substep</span><br>
+      k<sub>substep</sub> = 1 − (1 − k)<sup>1 / substeps</sup>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Softness</b><span>One slider drives them all. Soft bodies keep their volume but let go of their shape: less shape matching and bending, more edge compliance, and a little more gravity, so they slump and bulge into the gaps.</span></div>
+      <div class="fact"><b>Shells</b><span>An icosahedron with each face split into 16 triangles: 162 particles on desktop, 92 on phones, and one level fewer for the smallest bodies.</span></div>
+      <div class="fact"><b>Fixed substeps</b><span>Eight substeps per 1/60 s on desktop and five on phones, each of the same length at any frame rate. Time left over carries to the next frame; a slow frame gets at most half again as many, and drops the rest.</span></div>
+      <div class="fact"><b>Crushed bodies firm up</b><span>Each body measures how far it sits from its best-fit rest shape. Past a normal squash, its shape matching stiffens until it recovers, so a body under a heap is never flattened for good.</span></div>
+    </div>
+  </section>
+
+  <!-- 3. Floaters -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">What floats inside · <b>skin</b></div>
+      <h2>Kept a skin's thickness from the surface</h2>
+      <p>The beads, dice, rings and cores are particles too, heavier than the shell's (a core weighs eight, a bead two), and the physics treats each one as a ball. They collide with each other and with their own body's shell particles, but at a larger distance than they touch: their radius, plus the particle's, plus a skin thickness (a fraction of the body's radius). A floater pressing outward moves the shell before it reaches it, so it bulges the jelly from inside and never pokes through.</p>
+      <p>That alone can be beaten by a hard knock, so there is a backstop: each substep, a floater is pulled back inside the body's rest shape, placed by the same best-fit rotation as shape matching and shrunk by the skin. The floaters also shrink to fit the room inside the skin: loosely packed, together filling no more than about a third of it, none wider than most of it. Their meshes, drawn by the pipeline with matte materials, fit inside each ball.</p>
+    </div>
+  </section>
+
+  <!-- 4. Container -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The walls · <b>container.js</b></div>
+      <h2>A field that turns, with friction</h2>
+      <p>The shell is a signed distance field: up to two rounded boxes (which also make the sphere and the capsule) or a torus, joined plainly or with a smooth minimum (the peanut is two balls blended into a waist). The same field is written in JavaScript for the physics and in GLSL for the glass and the floor's shadow, so what you see is exactly what the bodies touch.</p>
+      <p>The volume turns about its centre. Every particle near a wall is carried into the volume's own frame, the field and its gradient are sampled there, and a particle inside the wall is pushed back out along the normal. Then friction, which is what makes turning the shell feel like turning a box of jelly rather than spinning a glass around still contents: the slide along the wall over the substep is measured against the wall's own motion, ω × r. Below a static threshold the slide is undone entirely, so a body resting on a wall goes where the wall goes; above it, only a kinetic share is. Velocity into the wall, again relative to the wall, is removed after the substep.</p>
+      <p>Most particles are nowhere near a wall. A particle that finds itself well inside remembers how far, and skips the field until it could have travelled that far, counting down by its own possible travel plus the wall's at each substep.</p>
+    </div>
+    <div class="formula">
+      <span class="c">// slide along the wall this substep, relative to the wall (pen: how far it was pushed back out)</span><br>
+      s = (x − x<sub>prev</sub>) − (ω × r) h, &nbsp; tangential part only<br>
+      |s| &lt; 0.4 · pen &nbsp;→ undo all of it &nbsp;&nbsp;<span class="c">// static</span><br>
+      otherwise &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ undo min(1, 0.25 · pen / |s|) of it &nbsp;&nbsp;<span class="c">// kinetic</span>
+    </div>
+    <div class="col prose">
+      <h3>Shells against shells</h3>
+      <p>Bodies collide particle against particle: two shell particles of different bodies can't come closer than the sum of their radii, which are a little over half an edge, so the shells are closed to each other. Candidate pairs are gathered once a frame, not once a substep, from a spatial hash: cells as wide as the largest contact plus a margin for the frame's fastest travel, in a power-of-two table about twice the particle count (so clearing it costs as little as filling it), and each pair of neighbouring cells visited once, from the particle's own cell and the 13 cells ahead of it. The substeps then only resolve that list.</p>
+    </div>
+  </section>
+
+  <!-- 5. Worker and watchdog -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Off the main thread · <b>physics.worker.js</b></div>
+      <h2>One step behind, and a watchdog</h2>
+      <p>The solver runs in a Web Worker. Each frame the page sends the time that has passed, the spin, the panel's physics settings, each body's scale, and any bodies added or removed; the worker steps and sends back the particles and every body's centre and rotation, with the buffers transferred rather than copied. The page draws the last state it received, one step behind. Frames that arrive while the worker is still busy add their time to the next step. Recordings, whose virtual clock a worker can't follow frame by frame, step the same solver on the main thread instead.</p>
+      <p>The page only rebuilds the skins when a new state arrives. Each shell is pushed out by its particle radius along its normals, then smoothed by one level of Loop subdivision, applied as a fixed stencil worked out once per shell (every new vertex is a fixed weighted sum of old ones), so a 162-particle shell becomes a 642-vertex skin with a few multiply-adds per vertex.</p>
+      <p>A soft solver can get restless: a hard flick or a tight squeeze can set a body thrashing or crush it out of shape. The worker reports the fastest particle (relative to the spinning walls) and the most deformed body. When either passes its limit, the page firms everything up for a moment: softness drops to a fifth and damping rises. It eases in over a few frames, holds for half a second after things calm down, and eases back to the panel's softness over about a second. Bodies swelling in move fast on purpose, so only their shape is watched then. The figure above runs the same watchdog; Softness at 1 and a fast drag can trip it.</p>
+    </div>
+  </section>
+
+  <!-- 6. Jelly -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The jelly · <b>render.js</b></div>
+      <h2>Drawing jelly without drawing it</h2>
+      <p>The bodies are never drawn as surfaces by the pipeline. The pipeline renders the floor and the floaters, and hands its lit image and depth to the day's own passes (its composite hook), which lay the jelly over it.</p>
+      <p>Two passes draw the skins. The first keeps the nearest surface: its normal and distance from the eye. The second draws every skin again, both sides, adding into one target: a back face adds its distance from the eye and a front face subtracts it. Along any pixel's ray, each body contributes back minus front, which is the length of jelly that ray crosses, however many bodies it goes through and in whatever order they are drawn. Each body's contribution is weighted by its absorption (the log of its colour, times Colour), so the target holds the optical depth per channel, and the plain thickness in alpha. Distances are clipped at the depth of whatever is opaque, so a floater cuts the ray short, and taken from a reference distance so half floats keep them precise.</p>
+      <p>Aim the ray through the bodies below. Front faces are marked −, back faces +; fragments behind the floater are clipped to its depth.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>One ray, the additive pass</h3>
+        <div class="controls">
+          <label>Colour <input id="tD" type="range" min="0" max="4" step="0.05" value="1.4"><output id="tDo">1.40</output></label>
+        </div>
+      </div>
+      <canvas id="thickCanvas" aria-label="A cross-section of four round jelly bodies, three with dark floaters inside, in front of a backdrop. A ray from the eye crosses them; its entry points are marked minus and its exit points plus."></canvas>
+      <div class="strip-label">What the eye sees, one row</div>
+      <canvas id="rowCanvas" aria-label="One row of pixels across the bodies: the backdrop seen through the jelly, darker and redder where more jelly is crossed, dark where a floater is hit."></canvas>
+      <div class="readout" id="tOut"></div>
+      <div class="legend"><span style="color:var(--accent)"><i></i>jelly crossed</span><span style="color:var(--stage-ink)"><i class="dash"></i>clipped by a floater</span><span style="color:var(--core)"><span class="dot"></span>floater</span></div>
+      <p class="fig-cap">Each pixel of the row is the backdrop, or the floater, times e<sup>−τ</sup>, where τ is the sum the additive pass holds. The day adds scattering (Milk) on top, in the jelly's own colour.</p>
+    </div>
+    <div class="col prose">
+      <p>A full-screen pass then shades the jelly. What's behind is the pipeline's image, shifted by the surface's slope for refraction (a little more in red and less in blue at high Refraction), scaled by a smoothed thickness, because the raw one drops at every floater's outline and would draw lines there. It is blurred by how much jelly it crosses, then absorbed: e<sup>−τ</sup>. Milk scatters light out of the ray and back in, in the colour recovered from the jelly's own absorption per unit length: the studio's ambient light from all round, the key light scattered forward, and a glow of the backdrop carried through. A dielectric specular sits on top, from the nearest surface's normal.</p>
+    </div>
+  </section>
+
+  <!-- 7. Pyramids -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Blur · <b>Gaussian pyramids</b></div>
+      <h2>Sharp against the wall, a glow further in</h2>
+      <p>The frosted look is a blur that depends on distance: a body pressed against the wall reads sharp, one further in is a soft glow. Every pixel needs its own blur radius, so the blur is read from a Gaussian pyramid: the image halved again and again, each level made from the one above with a 13-tap filter, so level <i>i</i> is blurred by about 2<sup><i>i</i></sup> pixels. A pixel takes the two levels around log<sub>2</sub> of its radius and mixes them.</p>
+      <p>The levels are packed into one atlas texture. One texture and no branching per level keeps the shaders small for the Direct3D compiler behind ANGLE. Coarse levels are magnified a lot, so they are read with a cubic B-spline built from four bilinear taps, which stays smooth where bilinear would show blocks. Four images get a pyramid each: the pipeline's frame, the jelly's optical depth, the finished jelly, and the light map for the shadow.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A row through frosted glass</h3>
+        <div class="controls">
+          <label>Frost <input id="pF" type="range" min="0" max="0.6" step="0.01" value="0.15"><output id="pFo">0.15</output></label>
+        </div>
+      </div>
+      <canvas id="pyrCanvas" aria-label="Rows of pixels: the distance of each body behind the wall, the sharp row, five pyramid levels each half as wide as the one above, a reference blur, and the pyramid's blur, in which the body touching the wall stays sharp and the far one becomes a glow."></canvas>
+      <div class="readout" id="pOut"></div>
+      <p class="fig-cap">The radius is Frost times the distance from the inside of the wall to the jelly, in pixels at that distance. The reference is an exact Gaussian per pixel, which would cost a loop of taps that grows with the radius; the pyramid costs two bicubic reads, so at most eight bilinear taps, at any radius.</p>
+    </div>
+  </section>
+
+  <!-- 8. Glass -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The shell · <b>render.js, volumeFragment</b></div>
+      <h2>Thin glass, traced from the field</h2>
+      <p>The shell is not a mesh. A full-screen pass sphere-traces its distance field per pixel, starting from a bounding sphere; where a ray just misses, how close it came antialiases the silhouette. The step count is a uniform, so ANGLE's Direct3D backend keeps the loop a loop instead of unrolling it.</p>
+      <p>The walls are thin slabs, and that choice is what keeps the image clean. A ray through a slab with parallel faces comes out parallel to how it went in, shifted by a fraction of the wall's thickness. So each wall only tints and reflects (Fresnel at both of its faces, and no total internal reflection, since the inner face reflects as much as the outer one at the same angle), and the eye ray crosses the inside straight, in register with the jelly image, which is in screen space. A thick refracting block would bend every ray away from the jelly image, and leave marks along the inner outline.</p>
+      <p>Where a ray grazes the wall and comes out again without reaching the inside, it is the rim: a long path through glass, bent like a lens, tinted and darkened. Move the pointer over the figure to aim.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A ray through the wall</h3>
+        <div class="controls">
+          <label>Walls <input id="gW" type="range" min="0.01" max="0.2" step="0.005" value="0.06"><output id="gWo">0.060</output></label>
+        </div>
+      </div>
+      <canvas id="glassCanvas" aria-label="A cross-section of a rounded glass shell with a thin wall. A ray from the eye on the left enters the wall and refracts. Through the face of the wall its exact path runs close to the straight one the shader uses; near the silhouette, where the straight ray only crosses glass, it is the rim."></canvas>
+      <div class="readout" id="gOut"></div>
+      <div class="legend"><span style="color:var(--accent)"><i></i>exact path (Snell)</span><span style="color:var(--stage-ink)"><i class="dash"></i>the shader's straight ray</span><span style="color:var(--glass)"><i></i>glass</span></div>
+      <p class="fig-cap">Through the face of a wall the exact ray and the straight one barely part. Toward the silhouette the wall curves under the ray and the exact ray turns more and more. Where the straight ray would cross only glass, the shader stops treating it as straight and shades the rim as bent, tinted glass.</p>
+    </div>
+    <div class="col prose">
+      <p>Inside, the ray crosses straight to the jelly: its distance comes from the jelly pass, and the jelly is read from its pyramid at a blur of Frost times the distance from the inner wall, which is the satin finish. Haze is scattering in the walls' material: Beer–Lambert over each stretch of glass, dimming what's behind and adding the studio and the key light scattered in. Where the ray misses the jelly it reaches the far wall, which reflects a little of the inside back and passes the rest through to the backdrop.</p>
+    </div>
+  </section>
+
+  <!-- 9. Shadow and motion blur -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The floor · <b>light map</b> · and the spin</div>
+      <h2>A coloured shadow, and a shutter</h2>
+      <p>The shadow on the sweep is the key light coloured by the jelly it crossed. The skins are drawn once more from the light, orthographically, with the same signed trick: front faces subtract their distance along the light and back faces add it, weighted by absorption, so each texel of a 512 × 512 map (256 on phones) holds the jelly's optical depth toward the light. It is turned into transmittance, with milk scattering part of the light out, and given its own pyramid. The floor reads it at a blur of the light's angular size times the gap to the bodies, so the shadow softens with distance the way a penumbra does.</p>
+      <p>The shell's share is marched through the same field from each floor point toward the light, as a soft shadow: a thin shell loses a little light at its surfaces. The bodies, as spheres, also darken the floor near them by how opaque they are and bounce their colour onto it, and the field gives the floor a soft contact shadow under the shell.</p>
+      <p>The image is then streaked by the spin, as a camera shutter would. Everything that moves turns with the volume, so one angular velocity describes all the motion: each pixel's velocity is ω × (P − c) at the depth of what it shows, the shell's surface or the jelly, and the image is gathered along it with nine taps over the shutter. Pixels off the volume assume the near half of it, so a silhouette smears outward over the backdrop.</p>
+    </div>
+    <div class="formula">
+      <span class="c">// per pixel: P is what it shows, c the volume's centre, shutter = Motion blur / 60 s</span><br>
+      v = ω × (P − c) · shutter &nbsp;&nbsp;<span class="c">// projected from P − v/2 to P + v/2, nine taps</span>
+    </div>
+  </section>
+
+  <!-- 10. Changing shape -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">A new one · <b>main.js</b></div>
+      <h2>Shrink, morph, swell</h2>
+      <p>A change never cuts. The old bodies shrink away over half a second, their particles following the shrinking rest shape, and are removed. Meanwhile the volume morphs into its next shape over 1.4 seconds: the physics and the glass both mix the two fields with a smoothstep, so the walls push the contents along as they move. After 0.45 seconds the new set appears at 30% of its size, each body with a small random delay, and swells to full size over about a second, pushing the others aside as it grows.</p>
+      <p>The new set is sized to fill the target shape: the shape's volume and the largest ball that fits in it are estimated on a 28³ grid, and the bodies' sizes, drawn with some variety, are scaled until together they take up Fill of that volume. In a narrow shape the biggest is capped by the shape's width, so more bodies are added to make up the fill. Each is placed where it fits at its starting size, inside both the morphing shape and the target, away from the others.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A slice through the change</h3>
+        <div class="controls">
+          <label>From <select id="mA"></select></label>
+          <label>To <select id="mB"></select></label>
+          <label>Time <input id="mT" type="range" min="0" max="2.2" step="0.01" value="0.7"><output id="mTo">0.70 s</output></label>
+          <button id="mPlay" type="button" class="ghost">Play</button>
+        </div>
+      </div>
+      <canvas id="morphCanvas" aria-label="A slice through the middle of the volume as it morphs from one shape to another: the old bodies shrink away while the wall moves, and the new ones swell in."></canvas>
+      <div class="readout" id="mOut"></div>
+      <p class="fig-cap">The day's own shapes, sliced at the middle (a torus slices into two circles). Here the bodies are placed at full size and simply scaled; in the day they start small and the physics makes room as they swell.</p>
+    </div>
+  </section>
+
+  <!-- 11. Sound -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Sound · <b>sound.js</b></div>
+      <h2>Heard through jelly and glass</h2>
+      <p>Every sound is a one-shot cut from CC0 recordings on freesound.org, played with a random variant, pitch and pan. The page watches each body's centre between physics states: a sudden change of velocity is a knock, played as a rubber marble, with a deep voop under a firmer one and a low wobbling jelly bounce under the hardest. Beads knocking about inside their body play the marble too. While everything rests, a body now and then squishes softly, panned to where it sits. A change of shape plays a suction pop as the old set leaves and squelches played backwards as the new one swells in, and swinging the volume round fast, or onto a new axis, gives a swoosh.</p>
+      <p>Everything goes through a soft low-pass and a short, dark echo, convolved with a room impulse the page generates itself (a few early reflections, then a noise tail that darkens as it decays), as if heard from inside. Sixteen voices at most; the shape change's sounds always get one.</p>
+    </div>
+  </section>
+
+  <!-- 12. Cost -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Cost</div>
+      <h2>Where the time goes</h2>
+      <p>Measured at 1080p on a desktop GPU, one run at a time, with the volume turning. The GPU spends about 3 ms a frame. The physics runs in parallel in its worker, so it costs the frame nothing as long as it keeps up.</p>
+    </div>
+    <div class="fig">
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Work</th><th>Time</th></tr></thead>
+          <tbody>
+            <tr><td>GPU, whole frame, 1080p</td><td>~3 ms</td></tr>
+            <tr><td class="sub">Main scene pass (floor, floaters), 4× MSAA</td><td>1.1 ms</td></tr>
+            <tr><td class="sub">Glass shell (volume pass)</td><td>0.3 ms</td></tr>
+            <tr><td class="sub">Jelly composite</td><td>0.1 ms</td></tr>
+            <tr><td class="sub">Each Gaussian pyramid (four a frame)</td><td>0.08 ms</td></tr>
+            <tr><td>Physics worker, one step, 16 bodies, 1820 particles</td><td>1.8 ms</td></tr>
+            <tr><td class="sub">Collision pair search, of that</td><td>0.6 ms</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="fig-cap">The rest of the frame is spread across the smaller passes: the shadow map, the prepass, the skins' front and thickness passes, the light map, bloom and the final pass.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Pixel budget</b><span>Fullscreen on a 16" MacBook the canvas is far bigger than 1080p. Rendering is capped at about 4.2 megapixels (2.6 on the medium and low tiers), which took that screen from 61 to 140 frames per second.</span></div>
+      <div class="fact"><b>Adaptive scale</b><span>Under the cap, the render scale drops by 15% while frames run slow, down to half, and climbs back by 10% once they keep up, checked every second and a half. Recordings skip both.</span></div>
+      <div class="fact"><b>No AO or GI</b><span>The bodies are drawn outside the pipeline, so its ambient occlusion and indirect light only reached the floor and the floaters, invisibly. Turning them off saved about 25% with no visible difference.</span></div>
+      <div class="fact"><b>Phones</b><span>Five substeps instead of eight, 92-particle shells and a Count of at most 14. Phones get the medium tier, which also means 48 steps for the glass instead of 72 and the smaller light map.</span></div>
+    </div>
+  </section>
+
+  <!-- 13. Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>Drag to turn the volume (it keeps spinning a little when let go, and tumbles slowly by itself when left alone). Scroll or pinch to zoom.</li>
+      <li><b>Space</b> pauses; while paused, dragging orbits the camera instead.</li>
+      <li><b>Look</b>: the palette, which also sets the frost, haze and jelly sliders to suit it.</li>
+      <li><b>Container</b>: Shape (morphs), Visible, Walls, Frost, Haze, Tumble, Motion blur.</li>
+      <li><b>Bodies</b>: Count, Variety, Fill, Softness, the mix of Spheres, Cushions, Pills and Gumdrops, Floaters, Skin thickness.</li>
+      <li><b>Jelly</b>: Colour, Milk, Scatter, Refraction. <b>Light</b>: Colour, Brightness, Key light.</li>
+      <li><b>R</b> makes a new one, <b>M</b> or the speaker button toggles sound, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot.</li>
+      <li>Auto change brings a new one every 12 seconds; randomizing, pausing or any interaction starts the count over.</li>
+    </ul>
+  </section>
+  <footer class="col">
+    Day 9 of Codevember 2026 by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/9/">spite.github.io/codevember-2026/9</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/9">9/ of the codevember-2026 repository</a>. The floor and floaters are rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>. Sounds are CC0 recordings from freesound.org, credited in the day's README.
+  </footer>
+</main>
+
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+  const hex = (h) => { const n = parseInt(h.replace("#", ""), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+  const rgb = (c) => `rgb(${c.map((v) => Math.round(clamp(v, 0, 255))).join(",")})`;
+  // The ruby look's jelly colours and core, as in looks.js.
+  const JELLY = ["#c8243a", "#9e1020", "#d63a4e", "#7a0c22", "#c8243a"];
+  const CORE = "#3a0509";
+
+  // A canvas sized to its CSS width at the device pixel ratio; draw() gets (ctx, width, height) in CSS pixels.
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1, W = 0, H = 0;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      W = canvas.clientWidth || 600; H = Math.round(typeof aspect === "function" ? aspect(W) : W * aspect);
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, W, H);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    new MutationObserver(() => fit(true)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return { redraw: () => fit(true), paint: () => W && draw(ctx, W, H) };
+  }
+  const bind = (id, fn, fmt = (v) => (+v).toFixed(2)) => {
+    const el = $(id), out = $(id + "o");
+    const set = () => { if (out) out.textContent = fmt(el.value); fn(+el.value); };
+    el.addEventListener("input", set);
+    if (out) out.textContent = fmt(el.value);
+    return el;
+  };
+  // Animates while on screen: step(dt) each frame.
+  function animate(el, step) {
+    let on = false, running = true, last = 0, raf = 0;
+    const loop = (now) => {
+      raf = 0;
+      if (!on || !running) return;
+      const dt = last ? Math.min((now - last) / 1000, 1 / 20) : 1 / 60;
+      last = now;
+      step(dt);
+      raf = requestAnimationFrame(loop);
+    };
+    const kick = () => { if (on && running && !raf) { last = 0; raf = requestAnimationFrame(loop); } };
+    new IntersectionObserver(([e]) => { on = e.isIntersecting; kick(); }).observe(el);
+    return { set running(v) { running = v; kick(); }, get running() { return running; } };
+  }
+  function mulberry(seed) {
+    return () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+
+  // ---------------------------------------------------------------- 1. soft rings in a turning box
+  function makeSim(S) {
+    const N = 24, SUB = 8, h = 1 / (60 * SUB);
+    const BOX = [0.95, 0.95], BR = 0.1;
+    const radii = [0.44, 0.4, 0.37, 0.34, 0.31];
+    const at = [[-0.42, 0.42], [0.44, 0.4], [-0.42, -0.42], [0.42, -0.44], [0.02, 0.0]];
+    const cap = radii.length * (N + 1);
+    const x = new Float64Array(cap * 2), px = new Float64Array(cap * 2), v = new Float64Array(cap * 2), cn = new Float64Array(cap * 2);
+    const w = new Float64Array(cap), r = new Float64Array(cap), owner = new Int32Array(cap);
+    const rings = [];
+    let n = 0;
+    radii.forEach((R, b) => {
+      const start = n, a0 = b * 0.7;
+      const rest = [];
+      for (let i = 0; i < N; i++) {
+        const a = a0 + (2 * Math.PI * i) / N;
+        rest.push(Math.cos(a), Math.sin(a));
+        x[n * 2] = px[n * 2] = at[b][0] + Math.cos(a) * R * 0.3;
+        x[n * 2 + 1] = px[n * 2 + 1] = at[b][1] + Math.sin(a) * R * 0.3;
+        w[n] = 1; owner[n] = b; n++;
+      }
+      const lapK = 1 - Math.cos((2 * Math.PI) / N);
+      const lap = rest.map((q) => q * lapK);
+      const f = n;
+      x[f * 2] = px[f * 2] = at[b][0]; x[f * 2 + 1] = px[f * 2 + 1] = at[b][1] + 0.05;
+      w[f] = 1 / 8; owner[f] = b; n++;
+      rings.push({ start, R0: R, R, rest, lap, f, c: [...at[b]], ang: 0, dev: 0, s: 0.3, t: 0, delay: b * 0.06, rp: 0, edge: 0, area: 0, area0: 1 });
+    });
+    const st = { x, r, n, N, rings, BOX, BR, theta: 0, omega: 0, calm: 0, calmT: 0, hold: 0, carry: 0, pairs: [], speed: 0, devMax: 0, trips: 0 };
+    function boxSample(lx, ly) {
+      const sx = lx < 0 ? -1 : 1, sy = ly < 0 ? -1 : 1;
+      const qx = Math.abs(lx) - BOX[0] + BR, qy = Math.abs(ly) - BOX[1] + BR;
+      const ox = Math.max(qx, 0), oy = Math.max(qy, 0), o = Math.hypot(ox, oy);
+      if (o > 0) return [o - BR, (sx * ox) / o, (sy * oy) / o];
+      return qx >= qy ? [qx - BR, sx, 0] : [qy - BR, 0, sy];
+    }
+    st.floaterRadius = (g) => {
+      const room = Math.max(g.R - g.rp - S.skin * g.R, 1e-3), rf = 0.42 * (g.R + g.rp);
+      return rf * Math.min(1, Math.cbrt((0.35 * room ** 3) / rf ** 3), (0.7 * room) / rf);
+    };
+    function substep(p) {
+      st.theta += st.omega * h;
+      for (let i = 0; i < n; i++) {
+        v[i * 2 + 1] -= p.g * h;
+        px[i * 2] = x[i * 2]; px[i * 2 + 1] = x[i * 2 + 1];
+        x[i * 2] += v[i * 2] * h; x[i * 2 + 1] += v[i * 2 + 1] * h;
+      }
+      const aE = p.edgeC / (h * h), aA = p.areaC / (h * h);
+      const kS0 = 1 - Math.pow(1 - p.shape, 1 / SUB), kB = 1 - Math.pow(1 - p.bend, 1 / SUB);
+      for (const g of rings) {
+        const o = g.start, R = g.R0 * g.s;
+        g.R = R;
+        g.edge = 2 * R * Math.sin(Math.PI / N);
+        g.rp = g.edge * 0.55;
+        g.area0 = 0.5 * N * R * R * Math.sin((2 * Math.PI) / N);
+        for (let k = 0; k < N; k++) r[o + k] = g.rp;
+        // Edges.
+        for (let e = 0; e < N; e++) {
+          const i = o + e, j = o + ((e + 1) % N);
+          const dx = x[i * 2] - x[j * 2], dy = x[i * 2 + 1] - x[j * 2 + 1], d = Math.hypot(dx, dy);
+          if (d < 1e-9) continue;
+          const l = (-(d - g.edge) / (w[i] + w[j] + aE)) / d;
+          x[i * 2] += dx * l * w[i]; x[i * 2 + 1] += dy * l * w[i];
+          x[j * 2] -= dx * l * w[j]; x[j * 2 + 1] -= dy * l * w[j];
+        }
+        // Area, the 2D volume: pressure.
+        let A = 0, den = aA;
+        const gx = [], gy = [];
+        for (let k = 0; k < N; k++) {
+          const i = o + k, nx = o + ((k + 1) % N), pv = o + ((k + N - 1) % N);
+          A += x[i * 2] * x[nx * 2 + 1] - x[nx * 2] * x[i * 2 + 1];
+          gx[k] = 0.5 * (x[nx * 2 + 1] - x[pv * 2 + 1]);
+          gy[k] = 0.5 * (x[pv * 2] - x[nx * 2]);
+          den += w[i] * (gx[k] * gx[k] + gy[k] * gy[k]);
+        }
+        A *= 0.5;
+        g.area = A;
+        const lam = -(A - g.area0) / den;
+        for (let k = 0; k < N; k++) { x[(o + k) * 2] += gx[k] * lam * w[o + k]; x[(o + k) * 2 + 1] += gy[k] * lam * w[o + k]; }
+        // Shape matching: the best-fit rotation is closed form in 2D.
+        let cx = 0, cy = 0;
+        for (let k = 0; k < N; k++) { cx += x[(o + k) * 2]; cy += x[(o + k) * 2 + 1]; }
+        cx /= N; cy /= N; g.c[0] = cx; g.c[1] = cy;
+        let sn = 0, cs = 0;
+        for (let k = 0; k < N; k++) {
+          const dx = x[(o + k) * 2] - cx, dy = x[(o + k) * 2 + 1] - cy, qx = g.rest[k * 2] * R, qy = g.rest[k * 2 + 1] * R;
+          sn += qx * dy - qy * dx; cs += qx * dx + qy * dy;
+        }
+        g.ang = Math.atan2(sn, cs);
+        const C = Math.cos(g.ang), Sn = Math.sin(g.ang);
+        const kS = Math.max(kS0, Math.min(Math.max((g.dev - 0.22) * 1.5, 0), 0.3));
+        let dev = 0;
+        for (let k = 0; k < N; k++) {
+          const i = o + k, qx = g.rest[k * 2] * R, qy = g.rest[k * 2 + 1] * R;
+          const tx = cx + C * qx - Sn * qy, ty = cy + Sn * qx + C * qy;
+          dev += Math.hypot(tx - x[i * 2], ty - x[i * 2 + 1]);
+          x[i * 2] += (tx - x[i * 2]) * kS; x[i * 2 + 1] += (ty - x[i * 2 + 1]) * kS;
+        }
+        g.dev = dev / N / R;
+        // Bending: toward the neighbours' mean plus the turned rest offset.
+        const tx = [], ty = [];
+        for (let k = 0; k < N; k++) {
+          const a = o + ((k + N - 1) % N), b = o + ((k + 1) % N), lx = g.lap[k * 2] * R, ly = g.lap[k * 2 + 1] * R;
+          tx[k] = 0.5 * (x[a * 2] + x[b * 2]) + C * lx - Sn * ly;
+          ty[k] = 0.5 * (x[a * 2 + 1] + x[b * 2 + 1]) + Sn * lx + C * ly;
+        }
+        for (let k = 0; k < N; k++) { const i = o + k; x[i * 2] += (tx[k] - x[i * 2]) * kB; x[i * 2 + 1] += (ty[k] - x[i * 2 + 1]) * kB; }
+        // The floater, kept a skin's thickness inside.
+        const f = g.f, rf = st.floaterRadius(g), skin = S.skin * R;
+        r[f] = rf;
+        for (let k = 0; k < N; k++) {
+          const i = o + k, dx = x[f * 2] - x[i * 2], dy = x[f * 2 + 1] - x[i * 2 + 1], min = rf + r[i] + skin, d2 = dx * dx + dy * dy;
+          if (d2 >= min * min || d2 < 1e-12) continue;
+          const d = Math.sqrt(d2), c = (min - d) / (w[f] + w[i]) / d;
+          x[f * 2] += dx * c * w[f]; x[f * 2 + 1] += dy * c * w[f];
+          x[i * 2] -= dx * c * w[i]; x[i * 2 + 1] -= dy * c * w[i];
+        }
+        const dx = x[f * 2] - cx, dy = x[f * 2 + 1] - cy, len = Math.hypot(dx, dy) || 1, out = len - R + rf + skin;
+        if (out > 0) { const k = Math.min(out, len) / len; x[f * 2] -= dx * k; x[f * 2 + 1] -= dy * k; }
+      }
+      // Shells against each other, from the frame's candidate pairs.
+      const P = st.pairs;
+      for (let q = 0; q < P.length; q += 2) {
+        const i = P[q], j = P[q + 1];
+        const dx = x[i * 2] - x[j * 2], dy = x[i * 2 + 1] - x[j * 2 + 1], min = r[i] + r[j], d2 = dx * dx + dy * dy;
+        if (d2 >= min * min || d2 < 1e-12) continue;
+        const d = Math.sqrt(d2), c = (min - d) / (w[i] + w[j]) / d;
+        x[i * 2] += dx * c * w[i]; x[i * 2 + 1] += dy * c * w[i];
+        x[j * 2] -= dx * c * w[j]; x[j * 2 + 1] -= dy * c * w[j];
+      }
+      // The turning box, with friction against its moving walls.
+      const C = Math.cos(st.theta), Sn = Math.sin(st.theta), om = st.omega;
+      for (let i = 0; i < n; i++) {
+        cn[i * 2] = cn[i * 2 + 1] = 0;
+        const wx = x[i * 2], wy = x[i * 2 + 1];
+        const [d, lnx, lny] = boxSample(C * wx + Sn * wy, -Sn * wx + C * wy);
+        const pen = d + r[i];
+        if (pen <= 0) continue;
+        const nx = C * lnx - Sn * lny, ny = Sn * lnx + C * lny;
+        x[i * 2] -= nx * pen; x[i * 2 + 1] -= ny * pen;
+        let tx = x[i * 2] - px[i * 2] + om * wy * h, ty = x[i * 2 + 1] - px[i * 2 + 1] - om * wx * h;
+        const tn = tx * nx + ty * ny;
+        tx -= tn * nx; ty -= tn * ny;
+        const tl = Math.hypot(tx, ty);
+        if (tl > 1e-9) {
+          const k = tl < 0.4 * pen ? 1 : Math.min(1, (0.25 * pen) / tl);
+          x[i * 2] -= tx * k; x[i * 2 + 1] -= ty * k;
+        }
+        cn[i * 2] = -nx; cn[i * 2 + 1] = -ny;
+      }
+      const damp = Math.exp(-p.damping * h);
+      for (let i = 0; i < n; i++) {
+        let vx = (x[i * 2] - px[i * 2]) / h, vy = (x[i * 2 + 1] - px[i * 2 + 1]) / h;
+        const cx = cn[i * 2], cy = cn[i * 2 + 1];
+        if (cx || cy) {
+          const ux = -om * x[i * 2 + 1], uy = om * x[i * 2];
+          const vn = (vx - ux) * cx + (vy - uy) * cy, fix = Math.max(vn, 0) - vn;
+          vx += fix * cx; vy += fix * cy;
+        }
+        v[i * 2] = vx * damp; v[i * 2 + 1] = vy * damp;
+      }
+    }
+    function findPairs(margin) {
+      const P = [];
+      for (let i = 0; i < n; i++) {
+        if (i === rings[owner[i]].f) continue;
+        for (let j = i + 1; j < n; j++) {
+          if (owner[j] === owner[i] || j === rings[owner[j]].f) continue;
+          const lim = r[i] + r[j] + 2 * margin, dx = x[i * 2] - x[j * 2], dy = x[i * 2 + 1] - x[j * 2 + 1];
+          if (dx * dx + dy * dy < lim * lim) P.push(i, j);
+        }
+      }
+      st.pairs = P;
+    }
+    st.step = (dt) => {
+      dt = Math.min(dt, 1 / 30);
+      const s = S.soft * (1 - 0.8 * st.calm);
+      const p = {
+        edgeC: 1e-7 + s * s * 3e-5, areaC: 2e-7 + s * 6e-7,
+        shape: 0.3 * (1 - s) ** 2 + 0.001, bend: 0.003 + 0.1 * (1 - s) ** 2,
+        g: 6 + 4 * S.soft, damping: 0.3 + 4 * st.calm,
+      };
+      for (const g of rings) {
+        g.t = Math.min(1, g.t + dt / 1.3);
+        const a = 1 - Math.pow(1 - Math.min(1, Math.max(0, g.t * 1.3 - g.delay)), 3);
+        g.s = 0.3 + 0.7 * a;
+      }
+      st.carry += dt;
+      const cap = Math.ceil(SUB * 1.5);
+      const k = Math.min(Math.floor(st.carry / h), cap);
+      st.carry = k === cap ? 0 : st.carry - k * h;
+      if (!k) return;
+      let vmax = 0;
+      for (let i = 0; i < n; i++) vmax = Math.max(vmax, Math.abs(v[i * 2]) + Math.abs(v[i * 2 + 1]));
+      findPairs(Math.min(1.5 * vmax * k * h + 0.005, 0.05));
+      for (let i = 0; i < k; i++) substep(p);
+      // Watchdog: restless or crushed bodies firm up for a moment.
+      let sp = 0, dv = 0;
+      for (let i = 0; i < n; i++) sp = Math.max(sp, Math.hypot(v[i * 2] + st.omega * x[i * 2 + 1], v[i * 2 + 1] - st.omega * x[i * 2]));
+      for (const g of rings) dv = Math.max(dv, g.dev);
+      st.speed = sp; st.devMax = dv;
+      const growing = rings.some((g) => g.t < 1);
+      if ((!growing && st.calmT === 0 && sp > 12) || dv > 0.5) { if (!st.calmT) st.trips++; st.calmT = 1; st.hold = 0.5; }
+      else if (st.hold > 0) st.hold -= dt;
+      else st.calmT = 0;
+      st.calm = st.calmT ? Math.min(1, st.calm + dt * 8) : Math.max(0, st.calm - dt);
+    };
+    return st;
+  }
+
+  {
+    const S = { soft: 0.6, skin: 0.12, spin: 0.8, particles: false };
+    let sim = makeSim(S);
+    const canvas = $("softCanvas");
+    const drag = { on: false, id: -1, a: 0, acc: 0 };
+    let geo = null, frame = 0;
+    const v = setup(canvas, (w) => clamp(w * 0.6, 300, 520), (ctx, W, H) => {
+      const sc = Math.min(W, H) / 2 / 1.42, cx = W / 2, cy = H / 2;
+      geo = { sc, cx, cy };
+      const X = (x) => cx + x * sc, Y = (y) => cy - y * sc;
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      // The box, turned.
+      const { BOX, BR, theta } = sim;
+      ctx.save();
+      ctx.translate(cx, cy); ctx.rotate(-theta);
+      ctx.fillStyle = css("--backdrop"); ctx.globalAlpha = 0.35;
+      ctx.beginPath(); ctx.roundRect(-BOX[0] * sc, -BOX[1] * sc, 2 * BOX[0] * sc, 2 * BOX[1] * sc, BR * sc); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = css("--glass"); ctx.lineWidth = Math.max(2, 0.03 * sc);
+      const o = 0.015 * sc;
+      ctx.beginPath(); ctx.roundRect(-BOX[0] * sc - o, -BOX[1] * sc - o, 2 * BOX[0] * sc + 2 * o, 2 * BOX[1] * sc + 2 * o, BR * sc + o); ctx.stroke();
+      ctx.restore();
+      // The skins: the shell pushed out by its particle radius, through the edge midpoints.
+      const { x, N } = sim;
+      sim.rings.forEach((g, b) => {
+        const pts = [];
+        for (let k = 0; k < N; k++) {
+          const i = g.start + k, a = g.start + ((k + N - 1) % N), c = g.start + ((k + 1) % N);
+          let tx = x[c * 2] - x[a * 2], ty = x[c * 2 + 1] - x[a * 2 + 1];
+          const l = Math.hypot(tx, ty) || 1;
+          pts.push([x[i * 2] + (ty / l) * g.rp, x[i * 2 + 1] - (tx / l) * g.rp]);
+        }
+        ctx.beginPath();
+        for (let k = 0; k <= N; k++) {
+          const p = pts[k % N], q = pts[(k + 1) % N], m = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+          if (k === 0) ctx.moveTo(X(m[0]), Y(m[1])); else ctx.quadraticCurveTo(X(p[0]), Y(p[1]), X(m[0]), Y(m[1]));
+        }
+        ctx.closePath();
+        ctx.fillStyle = JELLY[b]; ctx.globalAlpha = 0.62; ctx.fill();
+        ctx.globalAlpha = 0.9; ctx.strokeStyle = JELLY[b]; ctx.lineWidth = 1.2; ctx.stroke();
+        ctx.globalAlpha = 1;
+        const f = g.f;
+        ctx.fillStyle = css("--core");
+        ctx.beginPath(); ctx.arc(X(x[f * 2]), Y(x[f * 2 + 1]), sim.r[f] * sc, 0, 2 * Math.PI); ctx.fill();
+        if (S.particles) {
+          ctx.strokeStyle = css("--ink"); ctx.globalAlpha = 0.55; ctx.lineWidth = 1;
+          for (let k = 0; k < N; k++) { const i = g.start + k; ctx.beginPath(); ctx.arc(X(x[i * 2]), Y(x[i * 2 + 1]), g.rp * sc, 0, 2 * Math.PI); ctx.stroke(); }
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath(); ctx.arc(X(x[f * 2]), Y(x[f * 2 + 1]), (sim.r[f] + S.skin * g.R) * sc, 0, 2 * Math.PI); ctx.stroke();
+          ctx.setLineDash([]); ctx.globalAlpha = 1;
+        }
+      });
+      if (sim.calm > 0.01) {
+        ctx.fillStyle = css("--accent"); ctx.globalAlpha = sim.calm; ctx.font = font(11, 600);
+        ctx.fillText("firming up", 12, H - 12); ctx.globalAlpha = 1;
+      }
+    });
+    const readout = () => {
+      $("sOut").innerHTML = `<span>Particles <b>${sim.n}</b></span><span>Substeps <b>8</b> per 1/60 s</span><span>Contact pairs <b>${sim.pairs.length / 2}</b></span><span>Most deformed <b>${sim.devMax.toFixed(2)}</b></span><span>Watchdog trips <b>${sim.trips}</b></span>`;
+    };
+    const run = animate(canvas, (dt) => {
+      if (drag.on) {
+        sim.omega += (drag.acc / dt - sim.omega) * (1 - Math.exp(-dt * 25));
+        drag.acc = 0;
+      } else sim.omega += (S.spin - sim.omega) * (1 - Math.exp(-dt * 1.2));
+      sim.step(dt);
+      v.paint();
+      if (++frame % 8 === 0) readout();
+    });
+    const angle = (e) => {
+      const r = canvas.getBoundingClientRect();
+      return Math.atan2(-(e.clientY - r.top - geo.cy), e.clientX - r.left - geo.cx);
+    };
+    canvas.addEventListener("pointerdown", (e) => {
+      if (!geo) return;
+      drag.on = true; drag.id = e.pointerId; drag.a = angle(e); drag.acc = 0;
+      canvas.setPointerCapture(e.pointerId);
+      if (!run.running) { run.running = true; $("sRun").textContent = "Pause"; }
+    });
+    canvas.addEventListener("pointermove", (e) => {
+      if (!drag.on || e.pointerId !== drag.id) return;
+      const a = angle(e);
+      let d = a - drag.a;
+      if (d > Math.PI) d -= 2 * Math.PI; else if (d < -Math.PI) d += 2 * Math.PI;
+      drag.acc += d; drag.a = a;
+    });
+    for (const t of ["pointerup", "pointercancel"]) canvas.addEventListener(t, (e) => { if (e.pointerId === drag.id) drag.on = false; });
+    bind("sS", (x) => { S.soft = x; });
+    bind("sK", (x) => { S.skin = x; });
+    bind("sT", (x) => { S.spin = x; });
+    $("sP").addEventListener("change", (e) => { S.particles = e.target.checked; v.paint(); });
+    $("sNew").addEventListener("click", () => { sim = makeSim(S); v.paint(); readout(); });
+    $("sRun").addEventListener("click", () => { run.running = !run.running; $("sRun").textContent = run.running ? "Pause" : "Play"; });
+    if (reduce) { run.running = false; $("sRun").textContent = "Play"; for (let i = 0; i < 150; i++) sim.step(1 / 60); }
+    readout();
+  }
+
+  // ---------------------------------------------------------------- 2. signed thickness along a ray
+  {
+    const T = { density: 1.4, aim: null };
+    const eye = [-3.3, 0.05], backX = 2.5;
+    const bodies = [
+      { c: [-0.75, 0.38], R: 0.62, col: JELLY[0] },
+      { c: [0.32, -0.22], R: 0.66, col: JELLY[1] },
+      { c: [0.18, 0.88], R: 0.42, col: JELLY[2] },
+      { c: [1.32, 0.42], R: 0.55, col: JELLY[3] },
+    ];
+    const floaters = [{ c: [-0.7, 0.32], r: 0.2 }, { c: [0.38, -0.3], r: 0.22 }, { c: [1.36, 0.47], r: 0.17 }];
+    const sigmaOf = (col) => hex(col).map((c) => -Math.log(Math.max(c / 255, 0.02)));
+    const hitCircle = (o, d, c, R) => {
+      const ox = o[0] - c[0], oy = o[1] - c[1], b = ox * d[0] + oy * d[1], h = b * b - (ox * ox + oy * oy - R * R);
+      if (h < 0) return null;
+      const s = Math.sqrt(h);
+      return [-b - s, -b + s];
+    };
+    // Every fragment the additive pass draws for this ray, and what it adds up to.
+    function trace(d) {
+      let scene = (backX - eye[0]) / d[0], opaque = "backdrop";
+      for (const f of floaters) { const t = hitCircle(eye, d, f.c, f.r); if (t && t[0] > 0 && t[0] < scene) { scene = t[0]; opaque = "floater"; } }
+      const frags = [], tau = [0, 0, 0];
+      let thick = 0;
+      for (const b of bodies) {
+        const t = hitCircle(eye, d, b.c, b.R);
+        if (!t || t[1] <= 0) continue;
+        const t0 = Math.min(t[0], scene), t1 = Math.min(t[1], scene), sg = sigmaOf(b.col);
+        frags.push({ t: t[0], s: -t0, front: true, clipped: t[0] > scene, b }, { t: t[1], s: t1, front: false, clipped: t[1] > scene, b });
+        thick += t1 - t0;
+        for (let k = 0; k < 3; k++) tau[k] += sg[k] * T.density * (t1 - t0);
+      }
+      return { frags, tau, thick, scene, opaque };
+    }
+    const shade = (r) => {
+      const behind = r.opaque === "floater" ? hex(CORE) : hex(css("--backdrop"));
+      return behind.map((c, k) => c * Math.exp(-r.tau[k]));
+    };
+    let geo = null;
+    const yRange = [-1.15, 1.45];
+    const aimDir = () => {
+      const a = T.aim ?? [0.2, 0.18];
+      const l = Math.hypot(a[0] - eye[0], a[1] - eye[1]);
+      return [(a[0] - eye[0]) / l, (a[1] - eye[1]) / l];
+    };
+    const v = setup($("thickCanvas"), (w) => clamp(w * 0.46, 250, 400), (ctx, W, H) => {
+      const sc = Math.min(W / 6.2, H / 2.9), cx = W / 2 + 0.35 * sc, cy = H / 2 + 0.21 * sc;
+      geo = { sc, cx, cy };
+      const X = (p) => cx + p[0] * sc, Y = (p) => cy - p[1] * sc;
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = css("--backdrop"); ctx.fillRect(X([backX, 0]), 0, W - X([backX, 0]), H);
+      for (const b of bodies) {
+        ctx.fillStyle = b.col; ctx.globalAlpha = 0.32;
+        ctx.beginPath(); ctx.arc(X(b.c), Y(b.c), b.R * sc, 0, 2 * Math.PI); ctx.fill();
+        ctx.globalAlpha = 0.85; ctx.strokeStyle = b.col; ctx.lineWidth = 1.2; ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = css("--core");
+      for (const f of floaters) { ctx.beginPath(); ctx.arc(X(f.c), Y(f.c), f.r * sc, 0, 2 * Math.PI); ctx.fill(); }
+      const d = aimDir(), r = trace(d);
+      const P = (t) => [eye[0] + d[0] * t, eye[1] + d[1] * t];
+      // The ray, then the stretches of jelly it crosses, clipped at what's opaque.
+      ctx.strokeStyle = css("--stage-ink"); ctx.lineWidth = 1; ctx.globalAlpha = 0.8;
+      ctx.beginPath(); ctx.moveTo(X(eye), Y(eye)); ctx.lineTo(X(P(r.scene)), Y(P(r.scene))); ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.lineCap = "round";
+      for (let i = 0; i < r.frags.length; i += 2) {
+        const a = r.frags[i], b = r.frags[i + 1];
+        const t0 = Math.max(a.t, 0), t1 = Math.min(b.t, r.scene);
+        if (t1 > t0) { ctx.strokeStyle = css("--accent"); ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(X(P(t0)), Y(P(t0))); ctx.lineTo(X(P(t1)), Y(P(t1))); ctx.stroke(); }
+        if (b.t > r.scene) {
+          ctx.strokeStyle = css("--stage-ink"); ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+          ctx.beginPath(); ctx.moveTo(X(P(Math.max(r.scene, a.t))), Y(P(Math.max(r.scene, a.t)))); ctx.lineTo(X(P(b.t)), Y(P(b.t))); ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+      ctx.lineCap = "butt";
+      ctx.font = font(12, 600); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      for (const f of r.frags) {
+        const p = P(f.t);
+        ctx.fillStyle = f.clipped ? css("--stage") : css("--ink");
+        ctx.strokeStyle = f.clipped ? css("--stage-ink") : css("--ink");
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(X(p), Y(p), 7, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = f.clipped ? css("--stage-ink") : css("--stage");
+        ctx.fillText(f.front ? "−" : "+", X(p), Y(p) + 0.5);
+      }
+      ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+      ctx.fillStyle = css("--stage-ink");
+      ctx.beginPath(); ctx.arc(X(eye), Y(eye), 5, 0, 2 * Math.PI); ctx.fill();
+      ctx.font = font(11); ctx.fillText("eye", X(eye) - 10, Y(eye) + 20);
+      ctx.textAlign = "right"; ctx.fillText("backdrop", W - 6, 16); ctx.textAlign = "left";
+      const c = shade(r);
+      const list = [...r.frags].sort((a, b) => a.t - b.t).map((f) => `${f.front ? "−" : "+"}${Math.abs(f.s).toFixed(2)}`).join(" ");
+      $("tOut").innerHTML = `<span>Fragments <b>${list || "none"}</b></span><span>Thickness <b>${r.thick.toFixed(2)}</b></span><span>τ <b>${r.tau.map((t) => t.toFixed(2)).join(" · ")}</b></span><span>Pixel <span class="swatch" style="background:${rgb(c)}"></span></span>`;
+      row.paint();
+    });
+    const row = setup($("rowCanvas"), () => 34, (ctx, W, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const cols = Math.min(Math.round(W), 700), cw = W / cols;
+      const ang = (y) => Math.atan2(y - eye[1], 0.4 - eye[0]);
+      const a0 = ang(yRange[1]), a1 = ang(yRange[0]);
+      for (let i = 0; i < cols; i++) {
+        const a = a0 + ((a1 - a0) * (i + 0.5)) / cols;
+        ctx.fillStyle = rgb(shade(trace([Math.cos(a), Math.sin(a)])));
+        ctx.fillRect(i * cw, 0, cw + 0.6, H);
+      }
+      const d = aimDir(), a = Math.atan2(d[1], d[0]), xm = ((a - a0) / (a1 - a0)) * W;
+      if (xm >= 0 && xm <= W) {
+        ctx.strokeStyle = css("--stage"); ctx.lineWidth = 4; ctx.strokeRect(xm - 5, 2, 10, H - 4);
+        ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2; ctx.strokeRect(xm - 5, 2, 10, H - 4);
+      }
+    });
+    const canvas = $("thickCanvas");
+    const move = (e) => {
+      if (!geo) return;
+      const r = canvas.getBoundingClientRect();
+      const p = [(e.clientX - r.left - geo.cx) / geo.sc, -(e.clientY - r.top - geo.cy) / geo.sc];
+      if (p[0] < eye[0] + 0.4) return;
+      const a = Math.atan2(p[1] - eye[1], p[0] - eye[0]);
+      const lo = Math.atan2(yRange[0] - eye[1], 0.4 - eye[0]), hi = Math.atan2(yRange[1] - eye[1], 0.4 - eye[0]);
+      const c = clamp(a, lo, hi);
+      T.aim = [eye[0] + Math.cos(c), eye[1] + Math.sin(c)];
+      v.redraw();
+    };
+    canvas.addEventListener("pointermove", move);
+    canvas.addEventListener("pointerdown", move);
+    bind("tD", (x) => { T.density = x; v.redraw(); });
+  }
+
+  // ---------------------------------------------------------------- 3. blur from a pyramid
+  {
+    const F = { frost: 0.15 };
+    const N = 256, LEVELS = 5;
+    // Bodies behind the wall: centre, radius, and how far behind the wall their nearest point is.
+    const bodies = [
+      { c: 0.17, R: 0.12, gap: 0, col: JELLY[0] },
+      { c: 0.47, R: 0.13, gap: 0.3, col: JELLY[1] },
+      { c: 0.79, R: 0.14, gap: 0.8, col: JELLY[2] },
+    ];
+    const FAR = 1.6;
+    function signal() {
+      const back = hex(css("--backdrop"));
+      const col = [], depth = [];
+      for (let i = 0; i < N; i++) {
+        const u = (i + 0.5) / N;
+        let c = back, d = FAR;
+        for (const b of bodies) {
+          const q = Math.abs(u - b.c);
+          if (q >= b.R) continue;
+          const chord = Math.sqrt(b.R * b.R - q * q);
+          const sg = hex(b.col).map((x) => -Math.log(Math.max(x / 255, 0.02)));
+          c = q < b.R * 0.38 ? hex(CORE) : back.map((x, k) => x * Math.exp(-sg[k] * chord * 9));
+          d = b.gap + b.R - chord;
+        }
+        col.push(c); depth.push(d);
+      }
+      return { col, depth };
+    }
+    // Each level from the one above: halved with a [1 3 3 1] / 8 filter.
+    function pyramid(base) {
+      const levels = [base];
+      for (let l = 1; l <= LEVELS; l++) {
+        const src = levels[l - 1], m = src.length >> 1, out = [];
+        const at = (i) => src[clamp(i, 0, src.length - 1)];
+        for (let j = 0; j < m; j++) out.push([0, 1, 2].map((k) => (at(2 * j - 1)[k] + 3 * at(2 * j)[k] + 3 * at(2 * j + 1)[k] + at(2 * j + 2)[k]) / 8));
+        levels.push(out);
+      }
+      return levels;
+    }
+    // Cubic B-spline read of a level at base-pixel position x.
+    function readLevel(levels, l, x) {
+      const src = levels[l], s = (x + 0.5) / (1 << l) - 0.5, i = Math.floor(s), f = s - i;
+      const w = [(1 - f) ** 3 / 6, (4 - 6 * f * f + 3 * f ** 3) / 6, (1 + 3 * f + 3 * f * f - 3 * f ** 3) / 6, f ** 3 / 6];
+      const out = [0, 0, 0];
+      for (let k = 0; k < 4; k++) { const p = src[clamp(i - 1 + k, 0, src.length - 1)]; for (let c = 0; c < 3; c++) out[c] += p[c] * w[k]; }
+      return out;
+    }
+    const radiusOf = (d) => F.frost * d * 110;
+    const v = setup($("pyrCanvas"), () => 12 + 50 + 3 * 46 + LEVELS * 16 + 22, (ctx, W, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const { col, depth } = signal(), levels = pyramid(col);
+      const pw = W / N;
+      ctx.font = font(11); ctx.textBaseline = "middle";
+      const label = (t, y) => { ctx.fillStyle = css("--stage-ink"); ctx.fillText(t, 8, y); };
+      let y = 12;
+      // Distance behind the wall.
+      label("Distance behind the wall", y); y += 10;
+      ctx.strokeStyle = css("--accent"); ctx.lineWidth = 1.6; ctx.beginPath();
+      depth.forEach((d, i) => { const yy = y + (d / FAR) * 30; i ? ctx.lineTo((i + 0.5) * pw, yy) : ctx.moveTo((i + 0.5) * pw, yy); });
+      ctx.stroke();
+      ctx.strokeStyle = css("--glass"); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, y - 1); ctx.lineTo(W, y - 1); ctx.stroke();
+      y += 40;
+      const rowAt = (t, f) => {
+        label(t, y + 6); y += 14;
+        for (let i = 0; i < N; i++) { ctx.fillStyle = rgb(f(i)); ctx.fillRect(i * pw, y, pw + 0.5, 26); }
+        y += 32;
+      };
+      rowAt("Sharp", (i) => col[i]);
+      for (let l = 1; l <= LEVELS; l++) {
+        const src = levels[l], lw = W / src.length;
+        for (let j = 0; j < src.length; j++) { ctx.fillStyle = rgb(src[j]); ctx.fillRect(j * lw, y, lw + 0.5, 12); }
+        ctx.fillStyle = css("--stage-ink"); ctx.fillText(`level ${l}`, W - 58, y + 6);
+        y += 16;
+      }
+      y += 2;
+      const exact = (i) => {
+        const r = radiusOf(depth[i]), sg = Math.max(0.6 * r, 0.3), reach = Math.ceil(3 * sg), out = [0, 0, 0];
+        let ws = 0;
+        for (let k = -reach; k <= reach; k++) { const wk = Math.exp((-k * k) / (2 * sg * sg)), p = col[clamp(i + k, 0, N - 1)]; ws += wk; for (let c = 0; c < 3; c++) out[c] += p[c] * wk; }
+        return out.map((c) => c / ws);
+      };
+      const pyr = (i) => {
+        const lod = clamp(Math.log2(Math.max(radiusOf(depth[i]), 1)), 0, LEVELS), l = Math.floor(lod), f = lod - l;
+        const a = readLevel(levels, l, i), b = readLevel(levels, Math.min(l + 1, LEVELS), i);
+        return a.map((x, k) => x + (b[k] - x) * f);
+      };
+      rowAt("Reference: a Gaussian per pixel", exact);
+      rowAt("Pyramid: two levels mixed by log₂ radius", pyr);
+      const maxR = Math.max(...depth.map(radiusOf));
+      $("pOut").innerHTML = `<span>Radius against the wall <b>${radiusOf(0).toFixed(1)} px</b></span><span>Furthest <b>${maxR.toFixed(1)} px</b></span><span>Level read there <b>${clamp(Math.log2(Math.max(maxR, 1)), 0, LEVELS).toFixed(2)}</b></span>`;
+    });
+    bind("pF", (x) => { F.frost = x; v.redraw(); });
+  }
+
+  // ---------------------------------------------------------------- 4. a ray through a thin wall
+  {
+    const G = { wall: 0.06, aim: null };
+    const B = [1.15, 0.85], BR = 0.55, IOR = 1.5;
+    const eye = [-4.4, 0.2];
+    const f = (p) => {
+      const qx = Math.abs(p[0]) - B[0] + BR, qy = Math.abs(p[1]) - B[1] + BR;
+      return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - BR;
+    };
+    const grad = (p) => {
+      const e = 1e-4, gx = f([p[0] + e, p[1]]) - f([p[0] - e, p[1]]), gy = f([p[0], p[1] + e]) - f([p[0], p[1] - e]), l = Math.hypot(gx, gy) || 1;
+      return [gx / l, gy / l];
+    };
+    const add = (p, d, t) => [p[0] + d[0] * t, p[1] + d[1] * t];
+    // n faces against d; eta = n_from / n_to. Returns null on total internal reflection.
+    const refract = (d, n, eta) => {
+      const c = -(d[0] * n[0] + d[1] * n[1]), k = 1 - eta * eta * (1 - c * c);
+      if (k < 0) return null;
+      const s = eta * c - Math.sqrt(k);
+      return [eta * d[0] + s * n[0], eta * d[1] + s * n[1]];
+    };
+    const reflect = (d, n) => { const c = d[0] * n[0] + d[1] * n[1]; return [d[0] - 2 * c * n[0], d[1] - 2 * c * n[1]]; };
+    const fresnel = (cosI, eta) => {
+      cosI = clamp(cosI, 0, 1);
+      const s2 = eta * eta * (1 - cosI * cosI);
+      if (s2 >= 1) return 1;
+      const cosT = Math.sqrt(1 - s2), rs = (eta * cosI - cosT) / (eta * cosI + cosT), rp = (cosI - eta * cosT) / (cosI + eta * cosT);
+      return 0.5 * (rs * rs + rp * rp);
+    };
+    // First t where cond(f) holds along the ray, by small steps and bisection.
+    const cross = (o, d, cond, tmax = 4) => {
+      const step = Math.min(G.wall / 30, 0.004);
+      let a = 1e-5;
+      for (let t = step; t < tmax; t += step) {
+        if (cond(f(add(o, d, t)))) {
+          let lo = a, hi = t;
+          for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (cond(f(add(o, d, m)))) hi = m; else lo = m; }
+          return hi;
+        }
+        a = t;
+      }
+      return null;
+    };
+    function trace(d0) {
+      const w = G.wall;
+      let t = 0;
+      for (let i = 0; i < 200; i++) { const s = f(add(eye, d0, t)); if (s < 1e-6) break; t += s; if (t > 12) return null; }
+      if (t > 12) return null;
+      const P1 = add(eye, d0, t), n1 = grad(P1);
+      const out = { P1, F1: fresnel(-(d0[0] * n1[0] + d0[1] * n1[1]), 1 / IOR), path: [eye, P1] };
+      // The shader's test, along the straight ray: the inside, or only glass (the rim).
+      const sIn = cross(P1, d0, (s) => s + w <= 0), sOut = cross(P1, d0, (s) => s >= 0);
+      out.rim = sIn === null || (sOut !== null && sOut < sIn);
+      out.glass = sOut ?? 0;
+      const d1 = refract(d0, n1, 1 / IOR);
+      // Glass: the inner face, or out again (the rim).
+      const tIn = cross(P1, d1, (s) => s + w <= 0), tOut = cross(P1, d1, (s) => s >= 0);
+      if (tIn === null || (tOut !== null && tOut < tIn)) {
+        const Q = add(P1, d1, tOut ?? 1), nq = grad(Q);
+        const d2 = refract(d1, [-nq[0], -nq[1]], IOR) ?? reflect(d1, [-nq[0], -nq[1]]);
+        out.path.push(Q, add(Q, d2, 3));
+        out.turn = Math.acos(clamp(d2[0] * d0[0] + d2[1] * d0[1], -1, 1)) * 180 / Math.PI;
+        return out;
+      }
+      const P2 = add(P1, d1, tIn), n2 = grad(P2);
+      out.P2 = P2;
+      out.F2 = fresnel(Math.abs(d0[0] * n2[0] + d0[1] * n2[1]), 1 / IOR);
+      const d2 = refract(d1, n2, IOR) ?? reflect(d1, n2);
+      out.d2 = d2;
+      // Across the inside, to the far wall, through it and out.
+      let c = 1e-4;
+      for (let i = 0; i < 300; i++) { const s = -(f(add(P2, d2, c)) + w); if (s < 1e-6) break; c += Math.max(s, 1e-4); }
+      const P3 = add(P2, d2, c), n3 = grad(P3);
+      const d3 = refract(d2, [-n3[0], -n3[1]], 1 / IOR);
+      const t4 = cross(P3, d3, (s) => s >= 0) ?? 0;
+      const P4 = add(P3, d3, t4), n4 = grad(P4);
+      const d4 = refract(d3, [-n4[0], -n4[1]], IOR) ?? reflect(d3, [-n4[0], -n4[1]]);
+      out.path.push(P2, P3, P4, add(P4, d4, 3));
+      // How far the exact ray inside sits from the straight one, and its turn.
+      const ex = P2[0] - eye[0], ey = P2[1] - eye[1];
+      out.shift = Math.abs(ex * d0[1] - ey * d0[0]);
+      out.turn = Math.acos(clamp(d2[0] * d0[0] + d2[1] * d0[1], -1, 1)) * 180 / Math.PI;
+      return out;
+    }
+    let geo = null;
+    const v = setup($("glassCanvas"), (w) => clamp(w * 0.46, 250, 400), (ctx, W, H) => {
+      const sc = Math.min(W / 6.4, H / 2.3), cx = W - 1.55 * sc - Math.max(0, (W - 6.4 * sc) / 2), cy = H / 2;
+      geo = { sc, cx, cy };
+      const X = (p) => cx + p[0] * sc, Y = (p) => cy - p[1] * sc;
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const w = G.wall;
+      // A couple of bodies inside, for scale.
+      for (const [c, r, col] of [[[0.35, -0.3], 0.4, JELLY[0]], [[-0.4, -0.38], 0.32, JELLY[2]]]) {
+        ctx.fillStyle = col; ctx.globalAlpha = 0.25; ctx.beginPath(); ctx.arc(X(c), Y(c), r * sc, 0, 2 * Math.PI); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      // The wall band.
+      ctx.beginPath();
+      ctx.roundRect(X([-B[0], 0]), Y([0, B[1]]), 2 * B[0] * sc, 2 * B[1] * sc, BR * sc);
+      ctx.roundRect(X([-B[0] + w, 0]), Y([0, B[1] - w]), 2 * (B[0] - w) * sc, 2 * (B[1] - w) * sc, Math.max(BR - w, 0) * sc);
+      ctx.fillStyle = css("--glass"); ctx.globalAlpha = 0.35; ctx.fill("evenodd");
+      ctx.globalAlpha = 0.9; ctx.strokeStyle = css("--glass"); ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.globalAlpha = 1;
+      const a = G.aim ?? [-0.2, 0.62];
+      const l = Math.hypot(a[0] - eye[0], a[1] - eye[1]), d0 = [(a[0] - eye[0]) / l, (a[1] - eye[1]) / l];
+      const r = trace(d0);
+      // The shader's straight ray.
+      ctx.strokeStyle = css("--stage-ink"); ctx.lineWidth = 1.3; ctx.setLineDash([5, 4]);
+      const far = add(eye, d0, 9);
+      ctx.beginPath(); ctx.moveTo(X(eye), Y(eye)); ctx.lineTo(X(far), Y(far)); ctx.stroke();
+      ctx.setLineDash([]);
+      if (r) {
+        ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2; ctx.lineJoin = "round";
+        ctx.beginPath(); r.path.forEach((p, i) => (i ? ctx.lineTo(X(p), Y(p)) : ctx.moveTo(X(p), Y(p)))); ctx.stroke();
+      }
+      ctx.fillStyle = css("--stage-ink");
+      ctx.beginPath(); ctx.arc(X(eye), Y(eye), 5, 0, 2 * Math.PI); ctx.fill();
+      ctx.font = font(11); ctx.fillText("eye", X(eye) - 10, Y(eye) + 20);
+      let html;
+      if (!r) html = `<span>The ray <b>misses the shell</b></span>`;
+      else if (r.rim) html = `<span>The straight ray <b>only crosses glass: the rim</b></span><span>Glass crossed <b>${(r.glass / w).toFixed(1)}×</b> the wall</span><span>The exact ray turns <b>${r.turn.toFixed(0)}°</b></span>`;
+      else html = `<span>The ray <b>reaches the inside</b></span><span>Reflected <b>${(r.F1 * 100).toFixed(1)}%</b> outside, <b>${(r.F2 * 100).toFixed(1)}%</b> inside</span><span>Exact ray shifted <b>${(r.shift / w).toFixed(2)}×</b> the wall, turned <b>${r.turn.toFixed(1)}°</b></span>`;
+      $("gOut").innerHTML = html;
+    });
+    const canvas = $("glassCanvas");
+    const move = (e) => {
+      if (!geo) return;
+      const r = canvas.getBoundingClientRect();
+      const p = [(e.clientX - r.left - geo.cx) / geo.sc, -(e.clientY - r.top - geo.cy) / geo.sc];
+      if (p[0] < eye[0] + 0.5) return;
+      G.aim = p;
+      v.redraw();
+    };
+    canvas.addEventListener("pointermove", move);
+    canvas.addEventListener("pointerdown", move);
+    bind("gW", (x) => { G.wall = x; v.redraw(); }, (x) => (+x).toFixed(3));
+  }
+
+  // ---------------------------------------------------------------- 5. morphing the volume
+  {
+    // The day's shapes (container.js), sliced at z = 0: a box is [cx, cy, bx, by, r], a torus [cx, cy, R, r, -1].
+    const SHAPES = {
+      cube: [[0, 0, 0.95, 0.95, 0.05]],
+      slab: [[0, 0, 1.12, 0.62, 0.05]],
+      tower: [[0, 0, 0.68, 1.12, 0.05]],
+      sphere: [[0, 0, 1.12, 1.12, 1.12]],
+      capsule: [[0, 0, 0.7, 1.22, 0.7]],
+      torus: [[0, 0, 0.82, 0.44, -1]],
+      tee: [[0, 0.55, 0.98, 0.32, 0.05], [0, -0.3, 0.44, 0.82, 0.05]],
+      ell: [[-0.45, 0.02, 0.4, 0.98, 0.05], [0.07, -0.56, 0.92, 0.4, 0.05]],
+      cross: [[0, 0, 1.05, 0.42, 0.05], [0, 0, 0.42, 1.05, 0.05]],
+      peanut: [[0, 0.5, 0.7, 0.7, 0.7], [0, -0.5, 0.7, 0.7, 0.7, 0.45]],
+    };
+    const prim = (p, x, y) => {
+      x -= p[0]; y -= p[1];
+      if (p[4] < 0) return Math.hypot(Math.abs(x) - p[2], y) - p[3];
+      const qx = Math.abs(x) - p[2] + p[4], qy = Math.abs(y) - p[3] + p[4];
+      return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - p[4];
+    };
+    const shapeSDF = (s, x, y) => {
+      const k = s[1]?.[5] ?? 0;
+      if (k > 0) {
+        const a = prim(s[0], x, y), b = prim(s[1], x, y), h = clamp(0.5 + (0.5 * (b - a)) / k, 0, 1);
+        return b + (a - b) * h - k * h * (1 - h);
+      }
+      return Math.min(...s.map((p) => prim(p, x, y)));
+    };
+    const smooth = (t) => t * t * (3 - 2 * t);
+    const ease = (x) => 1 - Math.pow(1 - x, 3);
+    const WALL = 0.04;
+    const M = { a: "cube", b: "torus", t: 0.7, sets: null };
+    const fieldAt = (t, x, y) => {
+      const s = smooth(clamp(t / 1.4, 0, 1)), A = shapeSDF(SHAPES[M.a], x, y), Bd = shapeSDF(SHAPES[M.b], x, y);
+      return A + (Bd - A) * s + WALL;
+    };
+    // Bodies sized to fill a share of the slice, placed largest first where they fit.
+    function setFor(name, alsoAt) {
+      const rnd = mulberry([...name].reduce((h, c) => h * 31 + c.charCodeAt(0), 7) + (alsoAt ? 1 : 0));
+      const sdf = (x, y) => Math.max(shapeSDF(SHAPES[name], x, y) + WALL, alsoAt ? fieldAt(alsoAt, x, y) : -9);
+      let area = 0, inner = 0;
+      const g = 60, s = 2.8 / g;
+      for (let i = 0; i < g; i++) for (let j = 0; j < g; j++) {
+        const d = shapeSDF(SHAPES[name], -1.4 + (i + 0.5) * s, -1.4 + (j + 0.5) * s) + WALL;
+        if (d < 0) area += s * s;
+        inner = Math.max(inner, -d);
+      }
+      const sizes = Array.from({ length: 12 }, () => Math.pow(1 - 0.5 * 0.65 * rnd(), 1.3));
+      let k = Math.sqrt((0.5 * area) / (Math.PI * sizes.reduce((a, r) => a + r * r, 0)));
+      k = Math.min(k, (inner * 0.92) / Math.max(...sizes));
+      const placed = [];
+      for (const r0 of sizes.map((r) => r * k).sort((p, q) => q - p)) {
+        let best = null, score = -Infinity;
+        for (let tries = 0; tries < 400; tries++) {
+          const x = (rnd() * 2 - 1) * 1.3, y = (rnd() * 2 - 1) * 1.3;
+          const d = sdf(x, y);
+          if (d > -r0) continue;
+          let clear = Infinity;
+          for (const o of placed) clear = Math.min(clear, Math.hypot(x - o.x, y - o.y) - o.r - r0);
+          if (clear > 0.01) { best = { x, y }; break; }
+          if (clear > score) { score = clear; best = { x, y }; }
+        }
+        if (best) placed.push({ ...best, r: r0, delay: rnd() * 0.3, col: JELLY[placed.length % 4] });
+      }
+      return placed;
+    }
+    const rebuild = () => { M.sets = { old: setFor(M.a, 0), young: setFor(M.b, 0.45) }; };
+    const off = document.createElement("canvas");
+    rebuild();
+    const v = setup($("morphCanvas"), (w) => clamp(w * 0.5, 260, 420), (ctx, W, H) => {
+      const sc = Math.min(W / 3.2, H / 2.9), cx = W / 2, cy = H / 2;
+      const X = (x) => cx + x * sc, Y = (y) => cy - y * sc;
+      const T = M.t;
+      // The field, rasterised at half resolution: the wall band in glass, the inside faintly lit.
+      const step = 2, iw = Math.ceil(W / step), ih = Math.ceil(H / step);
+      const img = ctx.createImageData(iw, ih), data = img.data;
+      const stage = hex(css("--stage")), glass = hex(css("--glass")), inside = hex(css("--backdrop"));
+      const px = step / sc;
+      for (let j = 0; j < ih; j++) for (let i = 0; i < iw; i++) {
+        const x = ((i + 0.5) * step - cx) / sc, y = (cy - (j + 0.5) * step) / sc;
+        const d = fieldAt(T, x, y) - WALL;
+        const inW = clamp(0.5 - d / px, 0, 1), inI = clamp(0.5 - (d + WALL) / px, 0, 1);
+        const o = (j * iw + i) * 4;
+        for (let k = 0; k < 3; k++) {
+          let c = stage[k] + (glass[k] - stage[k]) * inW * 0.75;
+          c += (inside[k] - c) * inI * 0.55;
+          data[o + k] = c;
+        }
+        data[o + 3] = 255;
+      }
+      off.width = iw; off.height = ih;
+      off.getContext("2d").putImageData(img, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(off, 0, 0, iw * step, ih * step);
+      // Old bodies shrink over 0.5 s; new ones appear at 0.45 s at 30% and swell over about a second.
+      const drawBody = (b, s) => {
+        if (s <= 0.01) return;
+        ctx.fillStyle = b.col; ctx.globalAlpha = 0.62;
+        ctx.beginPath(); ctx.arc(X(b.x), Y(b.y), b.r * s * sc, 0, 2 * Math.PI); ctx.fill();
+        ctx.globalAlpha = 1; ctx.fillStyle = css("--core");
+        ctx.beginPath(); ctx.arc(X(b.x), Y(b.y), b.r * s * 0.4 * sc, 0, 2 * Math.PI); ctx.fill();
+      };
+      const oldS = T < 0.5 ? Math.max(0.05, 1 - ease(T / 0.5)) : 0;
+      for (const b of M.sets.old) drawBody(b, oldS);
+      let grown = 0;
+      if (T >= 0.45) for (const b of M.sets.young) {
+        const t = Math.min(1, (T - 0.45) / 1.3), a = ease(Math.max(0, t * 1.3 - b.delay));
+        const s = 0.3 + 0.7 * Math.min(a, 1);
+        if (s > 0.99) grown++;
+        drawBody(b, s);
+      }
+      $("mOut").innerHTML = `<span>Morph <b>${(smooth(clamp(T / 1.4, 0, 1)) * 100).toFixed(0)}%</b></span><span>Old set <b>${T < 0.5 ? `shrinking, ${(oldS * 100).toFixed(0)}%` : "gone"}</b></span><span>New set <b>${T < 0.45 ? "not yet" : `${grown} of ${M.sets.young.length} grown`}</b></span>`;
+    });
+    for (const id of ["mA", "mB"]) for (const k of Object.keys(SHAPES)) $(id).add(new Option(k, k));
+    $("mA").value = M.a; $("mB").value = M.b;
+    const tIn = bind("mT", (x) => { M.t = x; v.redraw(); }, (x) => `${(+x).toFixed(2)} s`);
+    $("mA").addEventListener("change", (e) => { M.a = e.target.value; rebuild(); v.redraw(); });
+    $("mB").addEventListener("change", (e) => { M.b = e.target.value; rebuild(); v.redraw(); });
+    let playing = false, t0 = 0;
+    const show = (t) => { M.t = t; tIn.value = t; $("mTo").textContent = `${t.toFixed(2)} s`; v.redraw(); };
+    const step = (now) => {
+      if (!playing) return;
+      const t = Math.min(2.2, (now - t0) / 1000);
+      show(t);
+      if (t < 2.2) requestAnimationFrame(step);
+      else { playing = false; $("mPlay").textContent = "Play"; }
+    };
+    $("mPlay").addEventListener("click", () => {
+      if (reduce) { show(2.2); return; }
+      playing = true; t0 = performance.now(); $("mPlay").textContent = "Playing";
+      requestAnimationFrame(step);
+    });
+  }
+})();
+</script>
+</body>
+</html>

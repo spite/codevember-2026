@@ -33,11 +33,13 @@ Notable:
   it's the rim, bent and tinted by the long path through glass. What it meets is sampled from a Gaussian pyramid of
   the jelly image, at a blur that grows with the distance behind the wall.
 - The volume's shadow on the sweep is a soft shadow marched through the same field, tinted by the jelly.
+- Large screens render under a pixel budget (about 4 megapixels, 2.6 on phones) and the scale drops further while
+  frames are slow. The pipeline's AO/GI is off: the bodies are drawn outside it, so it only reached the floor.
 
-Sound: a swoosh as the volume is swung round, a rubbery voop when bodies knock together, a deeper one under firmer knocks and a low wobbling bounce under
-the hardest, a rubber marble rolling as the floaters knock about inside, and now and then a soft one while they rest; a suction pop as a
-set leaves and squelches played backwards as the next swells in. All muffled, with a short dark echo, as if heard
-through jelly and glass. Cut from CC0 recordings on freesound.org: "swoosh" by Halgrimm, "Woosh (stick swung in the air)" by Dalesome, "Swing Woosh" by Jofae, "Whoosh #1" by Kinoton, "voop.boaay" by BOAAY, "2017 03 rubber marble in a plastic bowl.flac" by arseniiv, "jellybounce_00.wav" and "jellybounce.wav" by Mixtos, "Suction Cups Popping.wav"
+Sound: a swoosh as the volume is swung round; a rubber marble rolling when bodies knock together or the floaters
+knock about inside them, a deep voop under firmer knocks and a low wobbling bounce under the hardest; now and then a
+soft voop while they rest; a suction pop as a set leaves and squelches played backwards as the next swells in. All
+muffled, with a short dark echo, as if heard through jelly and glass. Cut from CC0 recordings on freesound.org: "swoosh" by Halgrimm, "Woosh (stick swung in the air)" by Dalesome, "Swing Woosh" by Jofae, "Whoosh #1" by Kinoton, "voop.boaay" by BOAAY, "2017 03 rubber marble in a plastic bowl.flac" by arseniiv, "jellybounce_00.wav" and "jellybounce.wav" by Mixtos, "Suction Cups Popping.wav"
 by ross_sinc, "Plunger Pop.wav" by praxis_bard, and for the swells "wet squish 1" by 45t, "Squelch.wav" by APallot,
 "Squish.wav" by SaxOman7, "Squishes for Mud, Fruit, and Blood" by JelloApocalypse, "Squishy Gore.mp3" by DigPro120
 and "Step on a slug (Splat!) 2" by Breviceps.
