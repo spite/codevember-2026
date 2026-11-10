@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<script src="../modules/theme.js"></script>
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>How Moss Grows</title>
 <meta name="description" content="How Codevember 2026 day 5, Moss, grows a sculpture by 3D reaction-diffusion on the GPU, meshes it in a worker, and overgrows it with moss made of fur shells sliced through a field of shoots.">
@@ -132,16 +132,13 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
 <main>
   <header class="hero">
     <div class="hero-text">
-      <div class="eyebrow">Codevember 2026 · <b>Day 5</b> · Moss</div>
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 5</b> · Moss</div>
       <h1>How Moss <span class="grow">grows</span></h1>
       <p class="lede">A sculpture that nobody carved: a reaction left to run inside a sphere, a torus or a minimal surface until it settles into tunnels and ridges. Then moss finds the best spots on it and spreads. Here is how the stone is grown, how it becomes a mesh, and how the moss is made of slices.</p>
-      <div class="meta">
-        <span><b>three.js</b> r187</span><span>WebGL2</span><span>3D reaction-diffusion</span><span>fur shells</span><span>no build step</span><span>desktop and phones</span>
-      </div>
     </div>
     <figure>
-      <img src="../screenshots/5.jpg" width="1080" height="1080" alt="A pale, porous stone sphere full of worm-like tunnels hovering over a misty floor, its upper side covered in cushions of green moss.">
-      <figcaption>A lattice sphere, half overgrown.</figcaption>
+      <img src="../screenshots/5.jpg" width="1080" height="1080" alt="A pale stone sphere carved into deep, folded ridges and channels, most of it overgrown with cushions of bumpy green moss, floating against a misty grey-green backdrop." fetchpriority="high" decoding="async">
+      <figcaption>A carved stone sphere, mostly overgrown.</figcaption>
     </figure>
   </header>
 
@@ -321,7 +318,10 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </ul>
   </section>
   <footer class="col">
-    Day 5 of Codevember 2026 by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/5/">spite.github.io/codevember-2026/5</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/5">5/ of the codevember-2026 repository</a>. Rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>.
+    <div class="meta">
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>3D reaction-diffusion</span><span>fur shells</span><span>no build step</span><span>desktop and phones</span>
+      </div>
+    Day 5 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/5/">spite.github.io/codevember-2026/5</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/5">5/ of the codevember-2026 repository</a>. Rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>.
   </footer>
 </main>
 

@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><script src="../theme.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><script src="../theme.js"></script><script src="../page.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>The Photographic Pipeline</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -136,10 +136,9 @@ select { font: 400 13px var(--mono); color: var(--ink); background: var(--bg); b
 <main>
   <header class="hero">
     <div class="hero-text">
-      <div class="eyebrow">Codevember 2026 · <b>shared</b> · modules/pipeline</div>
+      <div class="eyebrow"><a href="../../">Codevember 2026</a> · <b>shared</b> · modules/pipeline</div>
       <h1>The photographic <span class="drip">pipeline</span></h1>
       <p class="lede">Every day of Codevember 2026 renders through one custom forward pipeline built on three.js. It is made to look like a product photograph: soft shadows, ambient occlusion and a bounce of indirect light, physical shading, a filmic tonemapper, grain. This page walks through one frame, pass by pass.</p>
-      <div class="meta"><span><b>three.js</b> r187</span><span>WebGL2</span><span>forward + MSAA</span><span>four quality tiers</span></div>
     </div>
     <div class="fig" style="align-self:stretch">
       <div class="fig-head"><h3>One frame</h3>
@@ -338,7 +337,8 @@ select { font: 400 13px var(--mono); color: var(--ink); background: var(--bg); b
   </section>
 
   <footer class="col">
-    Part of Codevember 2026 by Jaume Sanchez Elias. Source in <span class="mono">modules/pipeline/</span> and <span class="mono">shaders/pipeline/</span> of the codevember-2026 repository. Explainers for the days: <a href="../../1/explainer.html">Fold</a>, <a href="../../2/explainer.html">Shatter</a>, <a href="../../3/explainer.html">Melt</a>, <a href="../../4/explainer.html">Tangle</a>, <a href="../../6/explainer.html">Orrery</a>.
+    <div class="meta"><span><b>three.js</b> r187</span><span>WebGL2</span><span>forward + MSAA</span><span>four quality tiers</span></div>
+    Part of <a href="../../">Codevember 2026</a> by Jaume Sanchez Elias. Source in <span class="mono">modules/pipeline/</span> and <span class="mono">shaders/pipeline/</span> of the codevember-2026 repository. Explainers for the days: <a href="../../1/explainer.html">Fold</a>, <a href="../../2/explainer.html">Shatter</a>, <a href="../../3/explainer.html">Melt</a>, <a href="../../4/explainer.html">Tangle</a>, <a href="../../5/explainer.html">Moss</a>, <a href="../../6/explainer.html">Orrery</a>, <a href="../../7/explainer.html">Hollow</a>, <a href="../../8/explainer.html">Tesseract</a>, <a href="../../9/explainer.html">Membrane</a>.
   </footer>
 </main>
 
@@ -365,7 +365,7 @@ select { font: 400 13px var(--mono); color: var(--ink); background: var(--bg); b
       c.width = Math.round(w * d); c.height = Math.round(h * d); c.style.height = h + "px";
       const ctx = c.getContext("2d"); ctx.setTransform(d, 0, 0, d, 0, 0); draw(ctx, w, h);
     };
-    new ResizeObserver(go).observe(c);
+    new ResizeObserver(() => requestAnimationFrame(go)).observe(c);
     redrawers.push(go);
     return go;
   }

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<script src="../modules/theme.js"></script>
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>How Hollow Hollows</title>
 <meta name="description" content="How Codevember 2026 day 7, Hollow, cuts a solid into a lattice of rounded Voronoi struts, opens it cell by cell, and lets a light inside find its way out through the holes.">
@@ -158,15 +158,12 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
 <main>
   <header class="hero">
     <div class="hero-text">
-      <div class="eyebrow">Codevember 2026 · <b>Day 7</b> · Hollow</div>
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 7</b> · Hollow</div>
       <h1>How Hollow <span class="holo">hollows</span></h1>
       <p class="lede">A solid floats in a studio as a smooth skin. Dimples appear on it, break through, and widen into a lattice of rounded Voronoi struts, while a warm light inside glows through the walls and throws the holes across the floor. Here is how the lattice is cut, how it opens, and how the light finds its way out.</p>
-      <div class="meta">
-        <span><b>three.js</b> r187</span><span>WebGL2</span><span>web workers</span><span>no build step</span><span>desktop and phones</span>
-      </div>
     </div>
     <figure>
-      <img src="../screenshots/7.jpg" width="1080" height="1080" alt="A white porcelain trefoil knot hollowed into rounded Voronoi openings, floating above a studio floor and glowing warm from a light inside.">
+      <img src="../screenshots/7.jpg" width="1080" height="1080" alt="A white porcelain trefoil knot hollowed into rounded Voronoi openings, floating above a studio floor and glowing warm from a light inside." fetchpriority="high" decoding="async">
       <figcaption>A porcelain trefoil, from the live page.</figcaption>
     </figure>
   </header>
@@ -346,7 +343,10 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
   </section>
 
   <footer class="col">
-    Day 7 of Codevember 2026 by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/7/">spite.github.io/codevember-2026/7</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/7">7/ of the codevember-2026 repository</a>. Rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>.
+    <div class="meta">
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>web workers</span><span>no build step</span><span>desktop and phones</span>
+      </div>
+    Day 7 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/7/">spite.github.io/codevember-2026/7</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/7">7/ of the codevember-2026 repository</a>. Rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>.
   </footer>
 </main>
 

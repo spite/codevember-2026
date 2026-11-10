@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<script src="../modules/theme.js"></script>
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>How Tesseract Repeats</title>
 <meta name="description" content="How Codevember 2026 day 8, Tesseract, traces an infinity polyhedron in homage to Anthony James: two-way mirrors, light tubes found per face, footprint-filtered reflections, and windows that light the room.">
@@ -136,15 +136,12 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
 <main>
   <header class="hero">
     <div class="hero-text">
-      <div class="eyebrow">Codevember 2026 · <b>Day 8</b> · Tesseract</div>
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 8</b> · Tesseract</div>
       <h1>How Tesseract <span class="holo">repeats</span></h1>
       <p class="lede">A convex solid with a dark steel frame, two-way mirror faces and a light tube along every edge, after Anthony James's infinity sculptures. Inside, the tubes reflect back and forth without end. Here is how that inside is traced, how its windows light the room, and how one solid turns into another.</p>
-      <div class="meta">
-        <span><b>three.js</b> r187</span><span>WebGL2</span><span>per-pixel ray tracing</span><span>no build step</span><span>desktop and phones</span>
-      </div>
     </div>
     <figure>
-      <img src="../screenshots/8.jpg" width="1200" height="1200" alt="A thin-framed glass cube floating in a pale dome, a smaller cube nested inside it and joined to it at every corner, its mirrors opening onto endless reflected lattices of white light tubes.">
+      <img src="../screenshots/8.jpg" width="1200" height="1200" alt="A dark-framed glass cube lined with glowing white light tubes, floating in a grey dome, a smaller cube nested inside it and joined to it at every corner, its mirrors opening onto endless reflected lattices of tubes." fetchpriority="high" decoding="async">
       <figcaption>The cube with its tesseract, as the page opens.</figcaption>
     </figure>
   </header>
@@ -348,7 +345,10 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </ul>
   </section>
   <footer class="col">
-    Day 8 of Codevember 2026 by Jaume Sanchez Elias, after the infinity sculptures of Anthony James. See it live at <a href="https://spite.github.io/codevember-2026/8/">spite.github.io/codevember-2026/8</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/8">8/ of the codevember-2026 repository</a>. Rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>.
+    <div class="meta">
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>per-pixel ray tracing</span><span>no build step</span><span>desktop and phones</span>
+      </div>
+    Day 8 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias, after the infinity sculptures of Anthony James. See it live at <a href="https://spite.github.io/codevember-2026/8/">spite.github.io/codevember-2026/8</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/8">8/ of the codevember-2026 repository</a>. Rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>.
   </footer>
 </main>
 

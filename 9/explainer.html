@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<script src="../modules/theme.js"></script>
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>How Membrane Squeezes</title>
 <meta name="description" content="How Codevember 2026 day 9, Membrane, packs soft jelly bodies into a thin glass shell: particle shells with pressure and shape matching in a worker, walls that turn under them, jelly drawn as signed thickness, and glass sphere-traced from a distance field.">
@@ -144,16 +144,13 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
 <main>
   <header class="hero">
     <div class="hero-text">
-      <div class="eyebrow">Codevember 2026 · <b>Day 9</b> · Membrane</div>
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 9</b> · Membrane</div>
       <h1>How Membrane <span class="holo">squeezes</span></h1>
       <p class="lede">Soft jelly bodies packed into a thin glass shell. Turn the shell and they tumble, slide and squeeze against each other and the walls. Here is how a body keeps its volume but not its shape, how the walls drag it along as they turn, and how jelly is drawn without ever being drawn.</p>
-      <div class="meta">
-        <span><b>three.js</b> r187</span><span>WebGL2</span><span>soft bodies in a worker</span><span>no build step</span><span>desktop and phones</span>
-      </div>
     </div>
     <figure>
-      <img src="../screenshots/9.jpg" width="1200" height="1200" alt="Translucent red jelly bodies with beads floating inside, squeezed together in a frosted, thin-walled glass cross on a pale studio sweep, casting a soft red shadow.">
-      <figcaption>The ruby look in the cube, as the page opens.</figcaption>
+      <img src="../screenshots/9.jpg" width="1200" height="1200" alt="Translucent red jelly bodies with beads floating inside, squeezed together in a frosted, thin-walled glass cross on a pale studio sweep, casting a soft red shadow." fetchpriority="high" decoding="async">
+      <figcaption>The ruby look in the cross shell.</figcaption>
     </figure>
   </header>
 
@@ -419,7 +416,10 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </ul>
   </section>
   <footer class="col">
-    Day 9 of Codevember 2026 by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/9/">spite.github.io/codevember-2026/9</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/9">9/ of the codevember-2026 repository</a>. The floor and floaters are rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>. Sounds are CC0 recordings from freesound.org, credited in the day's README.
+    <div class="meta">
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>soft bodies in a worker</span><span>no build step</span><span>desktop and phones</span>
+      </div>
+    Day 9 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/9/">spite.github.io/codevember-2026/9</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/9">9/ of the codevember-2026 repository</a>. The floor and floaters are rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>. Sounds are CC0 recordings from freesound.org, credited in the day's README.
   </footer>
 </main>
 

@@ -4,6 +4,7 @@
     <title>Codevember 2026</title>
     <meta charset="utf-8" />
     <script src="modules/theme.js"></script>
+    <script src="modules/page.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="A three.js sketch every day of November 2026 by Jaume Sanchez Elias." />
     <meta name="author" content="Jaume Sanchez Elias" />
@@ -24,143 +25,215 @@
     <meta name="twitter:description" content="A three.js sketch every day of November 2026 by Jaume Sanchez Elias." />
     <meta name="twitter:image" content="https://spite.github.io/codevember-2026/screenshots/4-social.jpg" />
     <meta name="twitter:image:alt" content="A coil of twisted iridescent bands in blue, purple and pink chrome, from day 4, Tangle." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap" />
     <style>
       :root {
-        --bg: #fff;
-        --ink: #333;
-        --muted: #999;
-        --tile: #eee;
+        --bg: #ecebe8;
+        --panel: #f6f5f2;
+        --ink: #1a1a1d;
+        --muted: #6b6a66;
+        --line: #d2d0cb;
+        --tile: #dddbd6;
+        --accent: #c43a2b;
+        --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
       }
       @media (prefers-color-scheme: dark) {
         :root:not([data-theme="light"]) {
-          --bg: #121214;
-          --ink: #dcdcdf;
-          --muted: #77777d;
-          --tile: #232326;
+          --bg: #121214; --panel: #1b1b1e; --ink: #ebe9e4; --muted: #8f8d88; --line: #2e2e32; --tile: #202023; --accent: #ef6a54;
           color-scheme: dark;
         }
       }
       :root[data-theme="dark"] {
-        --bg: #121214;
-        --ink: #dcdcdf;
-        --muted: #77777d;
-        --tile: #232326;
+        --bg: #121214; --panel: #1b1b1e; --ink: #ebe9e4; --muted: #8f8d88; --line: #2e2e32; --tile: #202023; --accent: #ef6a54;
         color-scheme: dark;
       }
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
       body {
-        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-        font-size: 16px;
-        padding: 1em;
+        font: 400 16px/1.5 var(--display);
         color: var(--ink);
         background: var(--bg);
+        padding: 0 max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px));
       }
-      h1 {
-        font-size: 1.4em;
-      }
-      a {
-        color: inherit;
-        text-decoration: none;
+      main { max-width: 1240px; margin: 0 auto; }
+      a { color: inherit; }
 
-        &:hover {
-          text-decoration: underline;
-        }
-      }
-      .gallery {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-        gap: 10px;
-        margin: 2em 0;
-        list-style-type: none;
-      }
-      .gallery li {
-        position: relative;
-        aspect-ratio: 1;
-        background: var(--tile) center / cover no-repeat;
-        border-radius: 6px;
-        overflow: hidden;
+      header { padding: 72px 0 40px; display: grid; gap: 18px; }
+      .eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+      .eyebrow b { color: var(--accent); font-weight: 600; }
+      h1 { font-weight: 800; font-size: clamp(48px, 10vw, 120px); line-height: 0.95; letter-spacing: -0.04em; }
+      h1 span { color: var(--accent); }
+      .lede { font-size: clamp(18px, 2.2vw, 22px); line-height: 1.4; max-width: 38ch; color: var(--ink); }
+      .progress { display: flex; align-items: center; gap: 14px; font: 400 13px/1 var(--mono); color: var(--muted); }
+      .bar { width: min(240px, 40vw); height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+      .bar i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+
+      .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; list-style: none; }
+      .gallery li { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--tile); }
+      .gallery img {
+        position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+        transition: opacity 0.6s ease, transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
       }
       .gallery a {
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-end;
-        height: 100%;
-        padding: 0.6em;
-        color: #fff;
-        background: linear-gradient(transparent 50%, rgba(0, 0, 0, 0.6));
+        position: relative; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; height: 100%;
+        padding: 14px; color: #fff; text-decoration: none;
+        background: linear-gradient(transparent 55%, rgba(0, 0, 0, 0.55));
       }
-      .gallery .number {
-        font-size: 2em;
-        font-weight: bold;
-        line-height: 1;
-      }
-      .gallery .soon {
-        opacity: 0.4;
-        pointer-events: none;
-      }
-      .gallery .soon a {
-        color: var(--ink);
-        background: none;
-      }
-      h2 {
-        font-size: 1.1em;
-        margin-bottom: 0.6em;
-      }
-      .explainers {
-        margin-bottom: 2em;
-        list-style-type: none;
+      .gallery .number { font: 600 12px/1 var(--mono); letter-spacing: 0.06em; opacity: 0.85; }
+      .gallery .prompt { font-weight: 700; font-size: 24px; line-height: 1.05; letter-spacing: -0.015em; }
+      .gallery img:not(.shown) { opacity: 0; }
+      .gallery li:hover img, .gallery li:focus-within img { transform: scale(1.045); }
+      .gallery a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 8px; }
+      .gallery .next { background: transparent; box-shadow: inset 0 0 0 1.5px var(--accent); }
+      .gallery .next a { color: var(--ink); background: none; }
+      .gallery .next .when { position: absolute; top: 14px; left: 14px; font: 600 12px/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+      .gallery .next .number { color: var(--muted); }
 
-        li {
-          padding: 0.2em 0;
-        }
-        .number {
-          display: inline-block;
-          min-width: 2em;
-          color: var(--muted);
-        }
+      .upcoming { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0 24px; list-style: none; margin-top: 28px; }
+      .upcoming li { display: flex; align-items: baseline; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); color: var(--muted); }
+      .upcoming b { font: 400 12px/1 var(--mono); min-width: 2ch; }
+      .upcoming span { font-weight: 500; font-size: 17px; }
+      .upcoming-title { margin-top: 40px; font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+      section { padding-top: 72px; }
+      h2 { font-weight: 700; font-size: clamp(28px, 4vw, 40px); letter-spacing: -0.02em; line-height: 1.05; margin-bottom: 8px; }
+      .sub { color: var(--muted); margin-bottom: 24px; max-width: 60ch; }
+      .explainers { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; list-style: none; }
+      .explainers a {
+        display: flex; align-items: center; gap: 14px; padding: 10px; height: 100%;
+        background: var(--panel); border-radius: 8px; text-decoration: none;
+        box-shadow: inset 0 0 0 1px transparent; transition: box-shadow 0.2s ease;
+      }
+      .explainers a:hover, .explainers a:focus-visible { box-shadow: inset 0 0 0 1px var(--line); outline: none; }
+      .explainers .thumb { flex: none; width: 64px; height: 64px; border-radius: 5px; overflow: hidden; background: var(--tile); display: grid; place-items: center; }
+      .explainers .thumb img { width: 100%; height: 100%; object-fit: cover; }
+      .explainers .thumb svg { width: 30px; height: 30px; stroke: var(--accent); fill: none; stroke-width: 1.6; }
+      .explainers .label { display: grid; gap: 4px; }
+      .explainers .label small { font: 400 12px/1 var(--mono); color: var(--muted); letter-spacing: 0.04em; }
+      .explainers .label span { font-weight: 700; font-size: 18px; line-height: 1.15; }
+      .explainers .label span::after { content: " →"; color: var(--accent); opacity: 0; transition: opacity 0.2s ease; }
+      .explainers a:hover .label span::after { opacity: 1; }
+
+      footer {
+        margin-top: 72px; padding-top: 20px; border-top: 1px solid var(--line);
+        display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between;
+        font: 400 13px/1.5 var(--mono); color: var(--muted);
+      }
+      footer nav { display: flex; gap: 18px; }
+      footer a { color: var(--ink); text-decoration: none; }
+      footer a:hover { color: var(--accent); }
+
+      @media (max-width: 600px) {
+        header { padding: 64px 0 28px; }
+        .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        .gallery a { padding: 10px; }
+        .gallery .prompt { font-size: 19px; }
+        .gallery .next .when { top: 10px; left: 10px; }
+        section { padding-top: 56px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .gallery img { transition: opacity 0.6s ease; }
+        .gallery li:hover img, .gallery li:focus-within img { transform: none; }
       }
     </style>
   </head>
 
   <body>
-    <h1>Codevember 2026</h1>
-    <ul class="gallery"></ul>
-    <h2>How they work</h2>
-    <ul class="explainers"></ul>
-    <p>
-      Jaume Sanchez Elias
-      <a href="https://twitter.com/thespite">twitter</a>
-      <a href="https://github.com/spite">github</a>
-    </p>
-    <p><a href="https://github.com/spite/codevember-2026">Source code on GitHub</a></p>
+    <main>
+      <header>
+        <div class="eyebrow">November 2026 · <b>one sketch a day</b> · three.js</div>
+        <h1>Codevember <span>2026</span></h1>
+        <p class="lede">A three.js sketch for every day of November, built with coding agents.</p>
+        <div class="progress"><div class="bar"><i></i></div><span class="count"></span></div>
+      </header>
+
+      <ul class="gallery"></ul>
+      <p class="upcoming-title">Still to come</p>
+      <ul class="upcoming"></ul>
+
+      <section>
+        <h2>How they work</h2>
+        <p class="sub">Long-form explainers with live diagrams: the maths, the shaders and the tricks behind each day.</p>
+        <ul class="explainers"></ul>
+      </section>
+
+      <footer>
+        <span>By Jaume Sanchez Elias</span>
+        <nav>
+          <a href="https://twitter.com/thespite">Twitter</a>
+          <a href="https://github.com/spite">GitHub</a>
+          <a href="https://github.com/spite/codevember-2026">Source code</a>
+        </nav>
+      </footer>
+    </main>
+
     <script type="module">
       import { days } from "./modules/days.js";
 
-      const gallery = document.querySelector(".gallery");
-      for (const { day, prompt, title } of days) {
-        const li = document.createElement("li");
-        if (title) {
-          li.style.backgroundImage = `url(screenshots/${day}.jpg)`;
-        } else {
-          li.className = "soon";
-        }
-        const a = document.createElement("a");
-        a.href = `./${day}/`;
-        const number = document.createElement("span");
-        number.className = "number";
-        number.textContent = day;
-        const label = document.createElement("span");
-        label.textContent = prompt;
-        a.append(number, label);
-        li.append(a);
-        gallery.append(li);
-      }
+      const el = (tag, cls, text) => {
+        const e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (text != null) e.textContent = text;
+        return e;
+      };
+      const image = (src) => {
+        const img = document.createElement("img");
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.width = img.height = 1080;
+        img.alt = "";
+        img.src = src;
+        return img;
+      };
 
-      // Explainers of published days, then the shared ones.
+      const published = days.filter((d) => d.title).length;
+      document.querySelector(".bar i").style.width = `${(published / days.length) * 100}%`;
+      document.querySelector(".count").textContent = `${published} of ${days.length} days`;
+
+      const gallery = document.querySelector(".gallery");
+      const next = days.find((d) => !d.title)?.day;
+      const upcoming = document.querySelector(".upcoming");
+      // Gallery images fade in one after another, each once it has loaded and the previous one is in.
+      const stagger = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 90;
+      let sequence = Promise.resolve();
+      const reveal = (img) => {
+        const loaded = new Promise((resolve) => {
+          if (img.complete) resolve();
+          img.addEventListener("load", resolve, { once: true });
+          img.addEventListener("error", resolve, { once: true });
+        });
+        sequence = sequence
+          .then(() => loaded)
+          .then(() => {
+            img.classList.add("shown");
+            return new Promise((resolve) => setTimeout(resolve, stagger));
+          });
+      };
+      for (const { day, prompt, title } of days) {
+        const li = el("li");
+        if (title || day === next) {
+          const a = el("a");
+          if (title) {
+            a.href = `./${day}/`;
+            const img = image(`screenshots/${day}.jpg`);
+            li.append(img);
+            reveal(img);
+          } else {
+            li.className = "next";
+            a.append(el("span", "when", "Next up"));
+          }
+          a.append(el("span", "number", `Day ${String(day).padStart(2, "0")}`), el("span", "prompt", prompt));
+          li.append(a);
+          gallery.append(li);
+        } else {
+          li.append(el("b", null, day), el("span", null, prompt));
+          upcoming.append(li);
+        }
+      }
+      if (!upcoming.children.length) document.querySelector(".upcoming-title").remove();
+
       const explainers = [
         [1, "How Fold Folds"],
         [2, "How Shatter Bursts"],
@@ -173,18 +246,21 @@
         [9, "How Membrane Squeezes"],
       ]
         .filter(([day]) => days[day - 1].title)
-        .map(([day, title]) => ({ number: day, title, href: `./${day}/explainer.html` }));
-      explainers.push({ number: "", title: "The Photographic Pipeline", href: "./modules/pipeline/explainer.html" });
+        .map(([day, title]) => ({ small: `Day ${day} · ${days[day - 1].prompt}`, title, href: `./${day}/explainer.html`, thumb: `screenshots/${day}.jpg` }));
+      explainers.push({ small: "Shared · every day", title: "The Photographic Pipeline", href: "./modules/pipeline/explainer.html" });
+
       const list = document.querySelector(".explainers");
-      for (const { number, title, href } of explainers) {
-        const li = document.createElement("li");
-        const n = document.createElement("span");
-        n.className = "number";
-        n.textContent = number;
-        const a = document.createElement("a");
+      for (const { small, title, href, thumb } of explainers) {
+        const li = el("li");
+        const a = el("a");
         a.href = href;
-        a.textContent = title;
-        li.append(n, a);
+        const t = el("span", "thumb");
+        if (thumb) t.append(image(thumb));
+        else t.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="6"/><circle cx="16" cy="16" r="12" stroke-dasharray="3 3"/><path d="M16 2v4M16 26v4M2 16h4M26 16h4"/></svg>';
+        const label = el("span", "label");
+        label.append(el("small", null, small), el("span", null, title));
+        a.append(t, label);
+        li.append(a);
         list.append(li);
       }
     </script>
