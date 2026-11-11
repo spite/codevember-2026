@@ -11,6 +11,10 @@ blows planish the blank and raise the motifs, the piece goes into the acid, whic
 (fizzing, bubbling, fuming) and drains off it, a patina creeps into the recesses, and a burnish brings the tops back to bright metal.
 Twenty-one finishes, from copper with verdigris to champlevé enamel, which adds its own stages after the etch.
 
+`gallery/` (linked from the panel) is The Etcher's Pattern Book: all 14 shapes in copper with the Art Nouveau
+pattern, all 16 patterns on a silver sphere, and all 21 finishes, each on a different shape and pattern, rendered at
+capture quality at the end of the process; each plate opens in the sketch.
+
 Shape, Metal (the finish), Pattern and Symmetry are each their own selector, and every combination works. The
 Symmetry select lists only the groups the shape (and, for interlace, the pattern) can take, the sliders under the
 Pattern are the ones that pattern reads, named for what they do in it, and R picks a coherent piece (a scale that

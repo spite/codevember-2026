@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../../modules/theme.js"></script>
+<script src="../../modules/page.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Etcher's Pattern Book · Codevember 2026 #10</title>
+<meta name="description" content="Every shape, pattern and finish of day 10, Caustic, rendered: polished blanks etched with generative ornament in copper, silver, enamel, niello and more.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* An etcher's pattern book: numbered plates on warm paper (or a dark bench), copper for figures and rules. */
+:root {
+  --bg: #dcd6cf; --panel: #e7e2dc; --ink: #1d1714; --muted: #5e544d; --line: #c0b6ad;
+  --accent: #9b4422; --accent2: #2d7262; --backdrop: rgb(220 214 207 / 0.92);
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121010; --panel: #1c1817; --ink: #ece5df; --muted: #a69a92; --line: #362f2c;
+    --accent: #ea8d5f; --accent2: #6cc3a9; --backdrop: rgb(10 8 8 / 0.88); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121010; --panel: #1c1817; --ink: #ece5df; --muted: #a69a92; --line: #362f2c;
+  --accent: #ea8d5f; --accent2: #6cc3a9; --backdrop: rgb(10 8 8 / 0.88); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 17px/1.6 var(--body); }
+.wrap { max-width: 1320px; margin: 0 auto; padding-block: 56px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { display: grid; gap: 16px; margin-bottom: 8px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+h1 { font: 800 clamp(40px, 7vw, 84px)/1 var(--display); letter-spacing: -0.03em; margin: 0; text-wrap: balance; }
+h1 span { color: var(--accent); }
+.lede { max-width: 64ch; margin: 0; color: var(--muted); font-size: 1.05rem; }
+.lede em { color: var(--ink); font-style: normal; font-weight: 600; }
+.jump { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 4px; font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
+.jump a { color: var(--accent); text-decoration: none; border-bottom: 1px solid currentColor; padding-bottom: 3px; }
+.jump a:hover { color: var(--ink); }
+section { scroll-margin-top: 24px; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+.section-head { display: grid; gap: 8px; margin: 64px 0 28px; padding-top: 28px; border-top: 1px solid var(--line); }
+.section-head h2 { font: 700 clamp(28px, 4vw, 42px)/1.05 var(--display); letter-spacing: -0.02em; margin: 0; }
+.section-head .count { font: 400 12px/1 var(--mono); color: var(--muted); letter-spacing: 0.04em; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 28px 20px; }
+.card { display: grid; gap: 10px; background: none; border: 0; padding: 0; color: inherit; text-align: left; cursor: zoom-in; font: inherit; }
+.card .plate { aspect-ratio: 1; overflow: hidden; background: var(--panel); border-radius: 3px; }
+.card img { display: block; width: 100%; height: 100%; object-fit: cover; transition: opacity 0.6s ease, transform 0.6s ease; }
+.card:hover img { transform: scale(1.04); }
+.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 3px; }
+.meta { display: grid; gap: 3px; min-width: 0; }
+.no { font: 600 11px/1 var(--mono); letter-spacing: 0.1em; color: var(--accent); font-variant-numeric: tabular-nums; text-transform: uppercase; }
+.name { font: 700 19px/1.2 var(--display); letter-spacing: -0.01em; }
+.figs { font: 400 12.5px/1.45 var(--mono); color: var(--muted); }
+dialog { width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 0; border-radius: 4px; background: var(--panel); color: var(--ink); }
+dialog::backdrop { background: var(--backdrop); }
+.view { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+.view img { width: 100%; height: auto; display: block; aspect-ratio: 1; }
+.detail { display: grid; align-content: start; gap: 16px; padding: 28px 26px; min-width: 0; }
+.detail h2 { margin: 0; font: 700 30px/1.1 var(--display); letter-spacing: -0.02em; text-wrap: balance; }
+.detail p { margin: 0; color: var(--muted); font-size: 15.5px; line-height: 1.55; }
+dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 18px; margin: 0; font: 400 13.5px/1.4 var(--mono); }
+dt { color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-size: 11.5px; padding-top: 2px; }
+dd { margin: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.actions a, .actions button { font: 600 12px/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 11px 14px; border-radius: 3px; cursor: pointer; text-decoration: none; }
+.actions a { background: var(--accent); color: var(--bg); border: 1px solid var(--accent); }
+.actions button { background: none; color: var(--ink); border: 1px solid var(--line); }
+.actions button:hover { border-color: var(--muted); }
+.actions a:focus-visible, .actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+footer { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--line); font: 400 13px/1.6 var(--mono); color: var(--muted); }
+footer a { color: var(--accent); }
+@media (max-width: 760px) { .view { grid-template-columns: 1fr; } .detail { padding: 20px 18px; } }
+@media (prefers-reduced-motion: reduce) { .card img { transition: opacity 0.6s ease; } .card:hover img { transform: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 10</b> · Caustic</div>
+    <h1>The Etcher's <span>Pattern Book</span></h1>
+    <p class="lede">Every blank, every pattern and every finish the sketch can etch, each rendered as it comes out of the process: scribed, hammered, bitten by the acid, patinated and burnished. The shapes are in <em>copper</em> with the Art Nouveau pattern; the patterns are on a <em>silver</em> sphere; the finishes each take a different shape and pattern.</p>
+    <nav class="jump" aria-label="Sections"><a href="#shapes">The shapes</a><a href="#patterns">The patterns</a><a href="#finishes">The finishes</a></nav>
+  </header>
+  <section id="shapes"><div class="section-head"><h2>Shapes</h2><span class="count"></span></div><div class="grid"></div></section>
+  <section id="patterns"><div class="section-head"><h2>Patterns</h2><span class="count"></span></div><div class="grid"></div></section>
+  <section id="finishes"><div class="section-head"><h2>Finishes</h2><span class="count"></span></div><div class="grid"></div></section>
+  <footer>Rendered with the sketch's capture quality, each piece at the end of its process with the default variation and no symmetry. Open any plate in the sketch to watch it being made. Day 10 of <a href="../../">Codevember 2026</a> by Jaume Sanchez Elias · <a href="../explainer.html">how it works</a>.</footer>
+</div>
+<dialog id="view" aria-label="Plate">
+  <div class="view">
+    <img id="v-img" alt="" width="900" height="900">
+    <div class="detail">
+      <div class="no" id="v-no"></div>
+      <h2 id="v-name"></h2>
+      <p id="v-desc"></p>
+      <dl id="v-dl"></dl>
+      <div class="actions">
+        <a id="v-open" href="#">Open in the sketch</a>
+        <button type="button" id="v-close">Close</button>
+      </div>
+      <div class="actions">
+        <button type="button" id="v-prev">Previous</button>
+        <button type="button" id="v-next">Next</button>
+      </div>
+    </div>
+  </div>
+</dialog>
+<script>
+const SHAPES = {"sphere": {"name": "Sphere", "desc": "The plain blank: analytic, with an exact closest-point projection, meshed as a fine grid."}, "torus": {"name": "Torus", "desc": "An analytic ring; the ornament's grids follow its two angles."}, "box": {"name": "Rounded box", "desc": "A cube with rounded edges and corners, analytic like the sphere and torus."}, "pillow": {"name": "Cushion", "desc": "A superellipsoid cushion, (|x|⁶ + |z|⁶)^½ + |y|³ = 1 on scaled axes, found by Newton steps on its distance field."}, "lens": {"name": "Lentil", "desc": "A vesica turned about its axis and offset by a small radius for a soft rim."}, "dodeca": {"name": "Dodecahedron", "desc": "The solid offset by a ball: flat faces, cylindrical edges, spherical corners, projected exactly."}, "icosa": {"name": "Icosahedron", "desc": "The rounded dodecahedron's dual, sharing all its symmetries and its grid of kites."}, "knot": {"name": "Trefoil knot", "desc": "A tube round a trefoil, projected exactly from the closest point on its curve."}, "knot25": {"name": "Cinquefoil knot", "desc": "The trefoil's curve generalised to a (2, 5) torus knot, with 5-fold rotations."}, "twist": {"name": "Twisted ring", "desc": "A rounded triangle turning a third of a turn on the way round, so one edge runs round three times."}, "moebius": {"name": "Möbius band", "desc": "A flat band turning half a turn on the way round, so the ornament runs over both faces without a seam."}, "blob": {"name": "Blobs", "desc": "A cluster of spheres under a soft minimum, meshed from its distance field."}, "gyroid": {"name": "Gyroid", "desc": "A sheet of constant thickness round Schoen's gyroid, cut to a ball with rounded corners."}, "suzanne": {"name": "Suzanne", "desc": "Day 7's baked distance field of Blender's monkey, sampled by a cubic B-spline."}};
+const PATTERNS = {"rinceau": {"name": "Rinceau", "family": "floral", "desc": "Flow-line stems ending in volutes, scrolls peeling off them, then leaves, rosettes, berries and buds packed until no ground is wider than the gap."}, "nouveau": {"name": "Nouveau", "family": "floral", "desc": "The airy one: a few whiplash stems carrying irises, poppies and lily pads on long S-shaped stalks, with the matted ground showing between."}, "arabesque": {"name": "Arabesque", "family": "classic", "desc": "Flat straps laid by Hankin's polygons-in-contact, interlacing at every edge, with stars filled by split palmettes, scrolls and pellets."}, "knotwork": {"name": "Knotwork", "family": "classic", "desc": "Ribbons woven over and under along the medial graph of a mesh on the blank, broken here and there into knots and panels."}, "scales": {"name": "Scales", "family": "classic", "desc": "Rows of fish, dragon or snake scales along level lines, each cut back by the row above so the ground shows in crescents."}, "seigaiha": {"name": "Seigaiha", "family": "classic", "desc": "The scales' rows as Japanese wave fans: discs of concentric rings, cut back by the row above."}, "paisley": {"name": "Paisley", "family": "classic", "desc": "Boteh teardrops laid largest first, outlined in bands and beads, tips curling into spirals, flowers in the bulb."}, "feathers": {"name": "Feathers", "family": "classic", "desc": "Plumes walked from the quill along level lines, tips curling over, vanes overlapping, barbs splitting here and there."}, "friezes": {"name": "Friezes", "family": "classic", "desc": "Bands of classical mouldings as on a chased beaker: egg-and-dart, Vitruvian wave and guilloche, with bead-and-reel between."}, "meander": {"name": "Meander", "family": "geometric", "desc": "A Greek key labyrinth on a square lattice: walkers turning only by right angles wind square spirals into straps."}, "strapwork": {"name": "Strapwork", "family": "geometric", "desc": "Voronoi cells raised as ribbed straps with a boss at every junction, each cell holding a turned medallion."}, "girih": {"name": "Girih", "family": "geometric", "desc": "Persian ten-fold strapwork on framed panels: decagon stars ringed by petals, interlacing where they cross."}, "guilloche": {"name": "Guilloché", "family": "geometric", "desc": "Engine-turned panels, Fabergé-like: rose-engine rings, sunbursts, waves, barleycorn and clous de Paris cut at a fine pitch."}, "veins": {"name": "Veins", "family": "alien", "desc": "Grown by space colonization: trunks tapering into capillaries, with pods, bulbs and pored cysts in the spaces."}, "biomech": {"name": "Biomech", "family": "alien", "desc": "After Giger: spines of vertebrae with rib cages, bundles of corrugated hoses, sphincter rings and nodules."}, "coral": {"name": "Coral", "family": "alien", "desc": "Brain coral: a labyrinth of rounded ridges a pitch apart that wander, fork and turn round each other's ends."}};
+const LOOKS = {"copper": {"name": "Copper", "desc": "Copper stained brown to red-black by the bite, with a verdigris patina in the recesses and the tops burnished bright."}, "silver": {"name": "Silver", "desc": "Silver gone frosty grey in the acid, darkened in the recesses and burnished on the tops."}, "gilt": {"name": "Gilt bronze", "desc": "Gilt bronze, the gold warmed by the bite and its patina."}, "steel": {"name": "Blued steel", "desc": "Steel with a blued patina, the raised motifs polished back to bright metal."}, "bronze": {"name": "Antique bronze", "desc": "Bronze with a dark antique patina gathered along the walls."}, "niello": {"name": "Niello", "desc": "Black silver sulphide packed into the etched silver ground, fused in the kiln, ground flush and polished."}, "parcel-gilt": {"name": "Parcel-gilt", "desc": "The motifs turn gold over a silver ground."}, "damascene": {"name": "Damascene", "desc": "Gold motifs inlaid in a blackened steel ground."}, "champlevé turquoise": {"name": "Champlevé turquoise", "desc": "Opaque turquoise enamel in the etched ground, a coral line hugging the metal, fired and ground flush."}, "champlevé cobalt": {"name": "Champlevé cobalt", "desc": "Cobalt blue enamel in the etched ground with a white line along the metal."}, "champlevé oxblood": {"name": "Champlevé oxblood", "desc": "Deep oxblood enamel fired into the etched ground."}, "basse-taille": {"name": "Basse-taille", "desc": "Translucent blue enamel over an engine-turned ground, the grooves lit through the glass."}, "shakudō": {"name": "Shakudō", "desc": "Gilded motifs over a blue-black patinated ground."}, "mokume-gane": {"name": "Mokume-gane", "desc": "A woodgrain laminate of copper, silver and brass that the relief and the etch cut down through, so the domes show rings."}, "damascus": {"name": "Damascus", "desc": "Pattern-welded steel: bright nickel steel and carbon steel layers, the softer ones bitten deeper and blackened."}, "titanium": {"name": "Titanium", "desc": "Heat-tinted titanium, its oxide's interference colour thickening up the relief from straw to teal."}, "cloisonné": {"name": "Cloisonné", "desc": "Each motif becomes a cell: the etch leaves a wire round its rim, coral enamel fills inside and turquoise out."}, "gunmetal": {"name": "Gunmetal", "desc": "Dark glossy steel."}, "excavated": {"name": "Excavated bronze", "desc": "A heavy verdigris crust with only the crowns rubbed back to metal."}, "rusted iron": {"name": "Rusted iron", "desc": "Bright silver motifs inlaid in a rusted iron ground."}, "mother-of-pearl": {"name": "Mother-of-pearl", "desc": "Nacre laid into the etched ground, its colours shifting with the view and its growth layers."}};
+const ENTRIES = [
+{"section": "shapes", "img": "img/g-sphere.jpg", "shape": "sphere", "look": "copper", "motif": "nouveau", "symmetry": "none", "pattern": 1},
+{"section": "shapes", "img": "img/g-torus.jpg", "shape": "torus", "look": "copper", "motif": "nouveau", "symmetry": "none", "pattern": 1},
+{"section": "shapes", "img": "img/g-box.jpg", "shape": "box", "look": "copper", "motif": "nouveau", "symmetry": "none", "pattern": 1},
+{"section": "shapes", "img": "img/g-pillow.jpg", "shape": "pillow", "look": "copper", "motif": "nouveau", "symmetry": "none", "pattern": 1},
+{"section": "shapes", "img": "img/g-lens.jpg", "shape": "lens", "look": "copper", "motif": "nouveau", "symmetry": "none", "pattern": 1},
+{"section": "shapes", "img": "img/g-dodeca.jpg", "shape": "dodeca", "look": "copper", "motif": "nouveau", "symmetry": "none", "pattern": 1},
+{"section": "shapes", "img": "img/g-icosa.jpg", "shape": "icosa", "look": "copper", "motif": "nouveau", "symmetry": "none", "pattern": 1},
+{"section": "shapes", "img": "img/g-knot.jpg", "shape": "knot", "look": "copper", "motif": "nouveau", "symmetry": "none", "pattern": 1},
+{"section": "shapes", "img": "img/g-knot25.jpg", "shape": "knot25", "look": "copper", "motif": "nouveau", "symmetry": "none", "pattern": 1},
+{"section": "shapes", "img": "img/g-twist.jpg", "shape": "twist", "look": "copper", "motif": "nouveau", "symmetry": "none", "pattern": 1},
+{"section": "shapes", "img": "img/g-moebius.jpg", "shape": "moebius", "look": "copper", "motif": "nouveau", "symmetry": "none", "pattern": 1},
+{"section": "shapes", "img": "img/g-blob.jpg", "shape": "blob", "look": "copper", "motif": "nouveau", "symmetry": "none", "pattern": 1},
+{"section": "shapes", "img": "img/g-gyroid.jpg", "shape": "gyroid", "look": "copper", "motif": "nouveau", "symmetry": "none", "pattern": 1},
+{"section": "shapes", "img": "img/g-suzanne.jpg", "shape": "suzanne", "look": "copper", "motif": "nouveau", "symmetry": "none", "pattern": 1},
+{"section": "patterns", "img": "img/p-rinceau.jpg", "shape": "sphere", "look": "silver", "motif": "rinceau", "symmetry": "none", "pattern": 1},
+{"section": "patterns", "img": "img/p-nouveau.jpg", "shape": "sphere", "look": "silver", "motif": "nouveau", "symmetry": "none", "pattern": 1},
+{"section": "patterns", "img": "img/p-arabesque.jpg", "shape": "sphere", "look": "silver", "motif": "arabesque", "symmetry": "none", "pattern": 1},
+{"section": "patterns", "img": "img/p-knotwork.jpg", "shape": "sphere", "look": "silver", "motif": "knotwork", "symmetry": "none", "pattern": 1},
+{"section": "patterns", "img": "img/p-scales.jpg", "shape": "sphere", "look": "silver", "motif": "scales", "symmetry": "none", "pattern": 1},
+{"section": "patterns", "img": "img/p-seigaiha.jpg", "shape": "sphere", "look": "silver", "motif": "seigaiha", "symmetry": "none", "pattern": 1},
+{"section": "patterns", "img": "img/p-paisley.jpg", "shape": "sphere", "look": "silver", "motif": "paisley", "symmetry": "none", "pattern": 1},
+{"section": "patterns", "img": "img/p-feathers.jpg", "shape": "sphere", "look": "silver", "motif": "feathers", "symmetry": "none", "pattern": 1},
+{"section": "patterns", "img": "img/p-friezes.jpg", "shape": "sphere", "look": "silver", "motif": "friezes", "symmetry": "none", "pattern": 1},
+{"section": "patterns", "img": "img/p-meander.jpg", "shape": "sphere", "look": "silver", "motif": "meander", "symmetry": "none", "pattern": 1},
+{"section": "patterns", "img": "img/p-strapwork.jpg", "shape": "sphere", "look": "silver", "motif": "strapwork", "symmetry": "none", "pattern": 1},
+{"section": "patterns", "img": "img/p-girih.jpg", "shape": "sphere", "look": "silver", "motif": "girih", "symmetry": "none", "pattern": 1},
+{"section": "patterns", "img": "img/p-guilloche.jpg", "shape": "sphere", "look": "silver", "motif": "guilloche", "symmetry": "none", "pattern": 1},
+{"section": "patterns", "img": "img/p-veins.jpg", "shape": "sphere", "look": "silver", "motif": "veins", "symmetry": "none", "pattern": 1},
+{"section": "patterns", "img": "img/p-biomech.jpg", "shape": "sphere", "look": "silver", "motif": "biomech", "symmetry": "none", "pattern": 1},
+{"section": "patterns", "img": "img/p-coral.jpg", "shape": "sphere", "look": "silver", "motif": "coral", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-copper.jpg", "shape": "torus", "look": "copper", "motif": "nouveau", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-silver.jpg", "shape": "box", "look": "silver", "motif": "strapwork", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-gilt.jpg", "shape": "pillow", "look": "gilt", "motif": "rinceau", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-steel.jpg", "shape": "knot", "look": "steel", "motif": "meander", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-niello.jpg", "shape": "sphere", "look": "niello", "motif": "arabesque", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-parcel-gilt.jpg", "shape": "twist", "look": "parcel-gilt", "motif": "paisley", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-damascene.jpg", "shape": "moebius", "look": "damascene", "motif": "feathers", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-bronze.jpg", "shape": "blob", "look": "bronze", "motif": "scales", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-champleve-turquoise.jpg", "shape": "dodeca", "look": "champlevé turquoise", "motif": "friezes", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-champleve-cobalt.jpg", "shape": "icosa", "look": "champlevé cobalt", "motif": "knotwork", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-champleve-oxblood.jpg", "shape": "lens", "look": "champlevé oxblood", "motif": "veins", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-basse-taille.jpg", "shape": "knot25", "look": "basse-taille", "motif": "girih", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-shakudo.jpg", "shape": "gyroid", "look": "shakudō", "motif": "rinceau", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-mokume-gane.jpg", "shape": "torus", "look": "mokume-gane", "motif": "coral", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-damascus.jpg", "shape": "dodeca", "look": "damascus", "motif": "feathers", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-titanium.jpg", "shape": "sphere", "look": "titanium", "motif": "guilloche", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-cloisonne.jpg", "shape": "pillow", "look": "cloisonné", "motif": "paisley", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-gunmetal.jpg", "shape": "twist", "look": "gunmetal", "motif": "biomech", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-excavated.jpg", "shape": "suzanne", "look": "excavated", "motif": "rinceau", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-rusted-iron.jpg", "shape": "blob", "look": "rusted iron", "motif": "seigaiha", "symmetry": "none", "pattern": 1},
+{"section": "finishes", "img": "img/f-mother-of-pearl.jpg", "shape": "lens", "look": "mother-of-pearl", "motif": "nouveau", "symmetry": "none", "pattern": 1}
+];
+const KIND = { shapes: "Shape", patterns: "Pattern", finishes: "Finish" };
+const pad = (n) => "No. " + String(n).padStart(2, "0");
+const title = (e) => (e.section === "shapes" ? SHAPES[e.shape].name : e.section === "patterns" ? PATTERNS[e.motif].name : LOOKS[e.look].name);
+const desc = (e) => (e.section === "shapes" ? SHAPES[e.shape].desc : e.section === "patterns" ? PATTERNS[e.motif].desc : LOOKS[e.look].desc);
+const figs = (e) =>
+  e.section === "shapes" ? `${LOOKS[e.look].name.toLowerCase()} · ${PATTERNS[e.motif].name.toLowerCase()}`
+  : e.section === "patterns" ? `${PATTERNS[e.motif].family} · on a ${SHAPES[e.shape].name.toLowerCase()}`
+  : `${SHAPES[e.shape].name.toLowerCase()} · ${PATTERNS[e.motif].name.toLowerCase()}`;
+const alt = (e) => `${PATTERNS[e.motif].name} etched on a ${SHAPES[e.shape].name.toLowerCase()} in ${LOOKS[e.look].name.toLowerCase()}`;
+const href = (e) => "../?" + new URLSearchParams({ shape: e.shape, look: e.look, motif: e.motif, symmetry: e.symmetry, pattern: e.pattern }).toString();
+
+const lists = {};
+for (const section of Object.keys(KIND)) {
+  const list = (lists[section] = ENTRIES.filter((e) => e.section === section));
+  const root = document.getElementById(section);
+  root.querySelector(".count").textContent = `${list.length} plates`;
+  root.querySelector(".grid").replaceChildren(
+    ...list.map((e, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "card";
+      b.innerHTML = `<div class="plate"><img loading="lazy" decoding="async" width="900" height="900" src="${e.img}" alt="${alt(e)}"></div><div class="meta"><span class="no">${pad(i + 1)} · ${KIND[section]}</span><span class="name">${title(e)}</span><span class="figs">${figs(e)}</span></div>`;
+      b.addEventListener("click", () => open(list, i));
+      return b;
+    }),
+  );
+}
+
+const dlg = document.getElementById("view");
+let shown = [], current = 0;
+// Previous and next step through the section the plate was opened from.
+function open(list, i) {
+  shown = list;
+  current = (i + list.length) % list.length;
+  const e = list[current];
+  const img = document.getElementById("v-img");
+  img.src = e.img;
+  img.alt = alt(e);
+  document.getElementById("v-no").textContent = `${pad(current + 1)} · ${KIND[e.section]}`;
+  document.getElementById("v-name").textContent = title(e);
+  document.getElementById("v-desc").textContent = desc(e);
+  const rows = [["Shape", SHAPES[e.shape].name], ["Pattern", `${PATTERNS[e.motif].name} (${PATTERNS[e.motif].family})`], ["Metal", LOOKS[e.look].name], ["Variation", e.pattern]];
+  document.getElementById("v-dl").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  document.getElementById("v-open").href = href(e);
+  if (!dlg.open) dlg.showModal();
+}
+document.getElementById("v-close").addEventListener("click", () => dlg.close());
+document.getElementById("v-prev").addEventListener("click", () => open(shown, current - 1));
+document.getElementById("v-next").addEventListener("click", () => open(shown, current + 1));
+dlg.addEventListener("click", (ev) => { if (ev.target === dlg) dlg.close(); });
+dlg.addEventListener("keydown", (ev) => { if (ev.key === "ArrowLeft") open(shown, current - 1); if (ev.key === "ArrowRight") open(shown, current + 1); });
+</script>
+</body>
+</html>

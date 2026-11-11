@@ -694,6 +694,7 @@ gui.addSeparator();
 let clock = 0;
 const replay = () => ((clock = 0), fumes.reset(), autoChange.restart());
 addKey("KeyE", "replay the etching", replay);
+gui.addText('<a href="gallery/">The Etcher\'s Pattern Book</a>: every shape, pattern and finish, rendered.');
 gui.addText(keysHelp());
 showHint("Drag to spin the piece · scroll to zoom · Space, then drag to look around · R for a new piece", "Drag to spin the piece · pause, then drag to look around · tap {randomize} for a new piece");
 
