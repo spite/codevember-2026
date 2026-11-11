@@ -269,7 +269,12 @@ void main() {
   vec3 L = normalize(lightDirection);
   vec3 H = normalize(L + V);
   // A geometric back face gets no key, even where the shading normal tilts toward it.
+  #ifdef PIPELINE_SOFT_TERMINATOR
+  // Opt-in: fades it over the terminator instead, for strong per-pixel relief.
+  float NdotL = clamp(dot(n, L), 0.0, 1.0) * smoothstep(-0.25, 0.15, dot(N, L));
+  #else
   float NdotL = clamp(dot(n, L), 0.0, 1.0) * step(0.0, dot(N, L));
+  #endif
   float NdotH = clamp(dot(n, H), 0.0, 1.0);
   float VdotH = clamp(dot(V, H), 0.0, 1.0);
   #ifdef OPAQUE
