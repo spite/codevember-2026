@@ -9,7 +9,7 @@ it: a floral rinceau, an airy Art Nouveau, or one of the classic (arabesque, kno
 feathers, friezes), geometric (meander, strapwork, girih, guilloché) or alien (veins, biomech, coral) patterns. Hammer
 blows planish the blank and raise the motifs, the piece goes into the acid, which bites the ground away around them
 (fizzing, bubbling, fuming) and drains off it, a patina creeps into the recesses, and a burnish brings the tops back to bright metal.
-Sixteen finishes, from copper with verdigris to champlevé enamel, which adds its own stages after the etch.
+Twenty-one finishes, from copper with verdigris to champlevé enamel, which adds its own stages after the etch.
 
 Shape, Metal (the finish), Pattern and Symmetry are each their own selector, and every combination works. The
 Symmetry select lists only the groups the shape (and, for interlace, the pattern) can take, the sliders under the
@@ -137,8 +137,8 @@ reads well, no scales, seigaiha or guilloché under enamel, which needs ground t
   rosettes, beads) are packed in data textures with a grid of cells over the shape. The fragment shader sums
   the few near each pixel into a signed distance and a height, then takes the normal by finite differences, so
   the detail is as fine up close as the screen allows and needs no UVs. The scribed line follows the union's outline.
-- **The etch**: the bath rises over the piece from below, bites, then drains off it downward (in world space, so the
-  last of it runs off the bottom whichever way the piece has turned, trailing drips). The bite starts at the resist
+- **The etch**: the acid spreads over the piece from a few places, bites, then the rinse thins it into patches and
+  away. The bite starts at the resist
   walls and spreads out across the ground, faster where the acid is agitated (a noise), and leaves the walls steep and
   rounded with a cove at their foot (an isotropic etch), deeper in open ground, matted and pitted. Under the bath the
   metal is seen dark through yellow-green acid, and the film adds its own sharp reflection, from a surface of its own:
@@ -180,8 +180,8 @@ reads well, no scales, seigaiha or guilloché under enamel, which needs ground t
   mokume-gane is a woodgrain laminate of copper, silver and brass, wavy layers that the relief and the etch cut down
   through, so the domes show rings; titanium is heat-tinted, its oxide's interference colour (straw, bronze, purple,
   blue, teal) thickening up the relief.
-- **The process**, in seconds at speed 1: draw 0.3–6.5, hammer 7–11.5, etch 12–20 (the bath rises by 12.3, drains
-  18.7–19.6), patina 19.8–23.3, burnish 23.6–26.3, done at 26.8. Enamel and niello keep the first three, then fill
+- **The process**, in seconds at speed 1: draw 0.3–6.5, hammer 7–11.5, etch 12–20 (the acid has spread by 13.6, rinses
+  17.3–19.8), patina 19.8–23.3, burnish 23.6–26.3, done at 26.8. Enamel and niello keep the first three, then fill
   20.3–23.1, fire (with the firescale patina) 23.3–26.1, grind 26.5–29.9 and burnish 30.1–32.7, done at 33.2; auto
   change waits for the longer run.
 

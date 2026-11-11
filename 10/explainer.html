@@ -1,0 +1,1528 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Caustic Bites</title>
+<meta name="description" content="How Codevember 2026 day 10, Caustic, scribes, hammers and acid-etches a generative ornament into a metal blank: patterns grown on any surface, a relief evaluated per pixel from packed primitives, an etch that bites from the walls out, and a stable-fluids smoke stirred by the spinning piece.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* One reading column on the workshop's warm grey; figures are small benches in copper and acid. */
+:root {
+  --bg: #dcd6cf;
+  --panel: #e7e2dc;
+  --ink: #1d1714;
+  --muted: #5e544d;
+  --line: #c0b6ad;
+  --accent: #9b4422;
+  --accent2: #2d7262;
+  --stage: #cec7bf;
+  --stage-ink: #6e6259;
+  --metal: #c47a4e;
+  --metal-hi: #f3cfae;
+  --ground: #3e2418;
+  --section: #b98a66;
+  --acid: #a4b43c;
+  --patina: #3f9a83;
+  --enamel: #1f8f84;
+  --coral: #c0442a;
+  --smoke: #6e4a2c;
+  --kiln: #e0592a;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121010; --panel: #1c1817; --ink: #ece5df; --muted: #a69a92; --line: #362f2c;
+    --accent: #ea8d5f; --accent2: #6cc3a9; --stage: #0d0b0a; --stage-ink: #8d8079; --metal: #d48a5c;
+    --metal-hi: #ffdcbd; --ground: #2a1710; --section: #7d5539; --acid: #b9c94e; --patina: #57b49b;
+    --enamel: #2aa597; --coral: #dd5a3c; --smoke: #d2a77b; --kiln: #ff6a33;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121010; --panel: #1c1817; --ink: #ece5df; --muted: #a69a92; --line: #362f2c;
+  --accent: #ea8d5f; --accent2: #6cc3a9; --stage: #0d0b0a; --stage-ink: #8d8079; --metal: #d48a5c;
+  --metal-hi: #ffdcbd; --ground: #2a1710; --section: #7d5539; --acid: #b9c94e; --patina: #57b49b;
+  --enamel: #2aa597; --coral: #dd5a3c; --smoke: #d2a77b; --kiln: #ff6a33;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .holo { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .holo {
+    background: linear-gradient(100deg, var(--accent) 10%, var(--accent2) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+
+/* Figures */
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; border-radius: 3px; background: var(--stage); }
+.fig canvas.grab { touch-action: none; cursor: grab; }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+input[type="checkbox"] { accent-color: var(--accent); }
+select {
+  font: 400 13px/1.2 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 3px; padding: 6px 8px;
+}
+button {
+  font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px;
+  padding: 9px 14px; cursor: pointer;
+}
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 12.5px/1.2 var(--mono); color: var(--muted); }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid currentColor; vertical-align: middle; margin-right: 6px; }
+.legend i.dash { border-top-style: dashed; }
+.legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: currentColor; vertical-align: middle; margin-right: 6px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+
+/* Table */
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font: 400 13.5px/1.35 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+td.sub { padding-left: 28px; color: var(--muted); }
+th { font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: nowrap; }
+.formula .c { color: var(--muted); }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+  th, td { padding: 8px 7px; font-size: 12.5px; }
+  td.sub { padding-left: 16px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 10</b> · Caustic</div>
+      <h1>How Caustic <span class="holo">bites</span></h1>
+      <p class="lede">A polished metal blank gets an ornament scribed on it, hammered up, eaten into by acid, patinated and burnished, all in about half a minute. Here is how a pattern grows on any surface, how tens of thousands of motifs are found per pixel, and how the acid bites and fumes.</p>
+    </div>
+    <figure>
+      <img src="../screenshots/10.jpg" width="1200" height="1200" alt="A metal piece covered in a raised, generated ornament, its bright motifs standing over a dark etched and patinated ground, floating above a soft studio sweep." fetchpriority="high" decoding="async">
+      <figcaption>A finished piece on the studio sweep.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>A blank, a pattern and a bath of acid</h2>
+      <p>The references were repoussé and chased silver, crowded with flowers and acanthus over a matted ground, and copper panels of scrolling leaves with verdigris in every hollow. Day 10's prompt was Caustic, so the ornament isn't modelled. It is made the way a workshop would make it: drawn onto a blank, raised by the hammer, and left standing when acid eats the ground away around it.</p>
+      <p>There are 14 blanks: a sphere, torus, rounded box, superellipsoid cushion, trefoil and cinquefoil knots, a twisted triangular ring, a Möbius band, soft blobs, Suzanne, a gyroid sheet cut to a ball, a rounded dodecahedron and icosahedron, and a lentil. There are 16 patterns and 21 metals, from copper with verdigris to champlevé enamel. Shape, Pattern, Metal and Symmetry each have their own selector, and every combination works.</p>
+      <p>The work is split three ways. A worker grows the ornament as a list of primitives. The <a href="../modules/pipeline/explainer.html">shared pipeline</a> renders the blank as an ordinary mesh, and its fragment shader finds the primitives near each pixel and builds the relief there. A small fluid solver on the GPU makes the fumes.</p>
+    </div>
+  </section>
+
+  <!-- 2. The process -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The process · <b>main.js, STAGES</b></div>
+      <h2>Half a minute in the workshop</h2>
+      <p>Every piece runs the same clock. Each stage is a window of it, and the shader gets each window as a fraction from 0 to 1: <code>ornDraw</code>, <code>ornHammer</code>, <code>ornEtch</code>, <code>ornPatina</code>, <code>ornBurnish</code>, and for enamel <code>ornFill</code>, <code>ornFire</code> and <code>ornGrind</code>. Nothing is baked, so the whole history is in the shader and E replays it from zero. Speed scales the clock. The clock stops while pieces change over, and auto change waits for the run to end, then for Change every seconds more.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The two runs, in seconds at speed 1</h3></div>
+      <canvas id="tlCanvas" aria-label="A timeline of the two processes. Plain metals: draw from 0.3 to 6.5 seconds, hammer 7 to 11.5, etch 12 to 20, patina 19.8 to 23.3, burnish 23.6 to 26.3, done at 26.8. Enamel and niello share the first three, then fill 20.3 to 23.1, fire 23.3 to 26.1, grind 26.5 to 29.9, burnish 30.1 to 32.7, done at 33.2."></canvas>
+      <p class="fig-cap">Inside the etch: the acid spreads over the piece in its first fifth (to 13.6 s). The bite runs from 4% to 84% of it (12.3 to 18.7 s), and the rinse thins the acid away from 66% to 97% (17.3 to 19.8 s). Enamel lays its patina, the kiln's firescale, during the fire.</p>
+    </div>
+  </section>
+
+  <!-- 3. Blanks -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The blanks · <b>shapes.js, fields.js, mesher.js</b></div>
+      <h2>Anything with a closest point</h2>
+      <p>The generators never see a mesh. All they need from a blank is <code>project(x, y, z)</code>, the closest point on the surface and its normal, plus its area, its bounds and the symmetries it has. Walking on a surface is then always the same thing: step along the tangent and project back.</p>
+      <p>The sphere, torus and rounded box have exact projections. The cushion, twisted ring and blobs are distance fields: a point lands on the surface by Newton steps along the gradient, then slides until its offset is normal to it. The knots are tubes, projected from the closest point on their curve, found from a grid of candidate lists and then Newton steps on the curve's parameter. The polyhedra project from the nearest face, edge or corner of the inner solid. The gyroid falls back to the nearest of a cloud of surface points where Newton steps miss along its tunnels.</p>
+      <p>The meshes are built in the worker, the first time a shape is asked for. The sphere and box are six grids on a cube projected onto them, equal-angle on the sphere. The field blanks use surface nets, relaxed so that each vertex moves halfway to its neighbours' mean and is projected back. The knots are tubes with rotation-minimizing frames, and the twisted ring is a (u, v) grid whose last ring joins its first a third of the way round. The mesh only has to be fine enough for the silhouette and the hammer dents. A finer one would only add small triangles that the relief shader pays for in partly covered pixel blocks, so the detail stops at 110 (160 for capture).</p>
+    </div>
+  </section>
+
+  <!-- 4. Growing -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The ornament · <b>patterns/rinceau.js, kit.js</b></div>
+      <h2>Stems that curl into the space left</h2>
+      <p>The floral rinceau sets the method that most patterns follow. The main stems are flow lines: contours of a noise on the surface plus a slope, so they swirl but never cross (Flow sets how much they wander). They grow all at once, a step per round from scattered seeds in both directions, and stop when they come within a band of another line. The lines are smoothed and turned into stems, thickest in the middle, with a node every 0.05 to 0.08 of the blank's radius at Scale 1.3.</p>
+      <p>Scrolls peel off at the nodes. Each one walks the surface with its radius of curvature shrinking linearly along its length, as in a logarithmic spiral. Before every step it checks an occupancy grid of discs, one laid down at every step of everything so far. If the next step is blocked, the scroll doesn't stop; it tries curling 1.5, 2.3 and 3.5 times tighter, so it wraps into whatever space is left, after Robert Hodgin's Growth. A scroll blocked early would only be a stub, so it is taken back: its discs and primitives are rolled away. Each disc is checked at its radius plus a gap, and that gap becomes the etched ground.</p>
+      <p>Last comes a sweep over a fine lattice. Every spot still free gets the largest motif that fits, so no ground is left wider than the gap. Every element keeps a growth time, which orders the drawing.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A patch of rinceau, grown</h3>
+        <div class="controls">
+          <label>Flow <input id="gF" type="range" min="0" max="1" step="0.01" value="0.6"><output id="gFo">0.60</output></label>
+          <label>Show <select id="gShow"><option value="relief">relief</option><option value="discs">occupancy</option><option value="cells">cells</option></select></label>
+          <button id="gNew" type="button" class="ghost">New seed</button>
+          <button id="gReplay" type="button" class="ghost">Replay</button>
+        </div>
+      </div>
+      <canvas id="growCanvas" aria-label="A rectangular patch of etched copper ground. Flow lines grow across it as raised stems, scrolls peel off them and curl into the gaps, and beads and small rosettes fill what is left. Other views show the occupancy discs, or the grid of cells coloured by how many primitives each lists."></canvas>
+      <div class="readout" id="gOut"></div>
+      <p class="fig-cap">The day's own constants at Scale 1.3: band, step, stem width and gap. The noise is four times finer so a patch holds a few swirls rather than part of one. Cells shows the packing grid of the next section, 0.016 across, shaded by how many primitives each cell lists; hover a cell to see its primitives' footprints. In the day the flowers, leaves, fronds and buds are primitives of their own; here the fillers are beads and rosettes.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Two times</b><span>Each primitive carries a drawing interval (<code>ta</code>, <code>tb</code>), so a stem is scribed from base to tip, and a hammer time <code>th</code>: the first blow that lands on it.</span></div>
+      <div class="fact"><b>Arcs, not segments</b><span>Stems leave the walker as circular arcs through its start point and tangent, so a stem stays smooth however tightly it curls.</span></div>
+      <div class="fact"><b>Seeded</b><span>Every generator draws from its own mulberry32 stream, seeded by Variation, never from <code>Math.random</code>, so a Variation and its settings give the same piece on any machine.</span></div>
+    </div>
+  </section>
+
+  <!-- 5. Patterns -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The pattern books · <b>patterns/</b></div>
+      <h2>Sixteen ways to fill a surface</h2>
+      <p>Each pattern is a function from a blank and its options to a list of primitives, sharing the walker, the occupancy grid and the symmetry images. The Pattern selector shows only the sliders a pattern reads, named for what they do in it: Flow is Breaks in knotwork, Turns in the meander and Wander in the scales.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Rinceau, nouveau</b><span>Flow-line stems with scrolls, leaves, rosettes and buds. Nouveau keeps its whiplash stems far apart and carries irises, poppies and lily pads on long S-shaped stalks.</span></div>
+      <div class="fact"><b>Knotwork, arabesque, girih</b><span>Ribbons on the medial graph of a coarse mesh that the symmetry maps onto itself. Over and under alternate; the under strand dips and stops short. Girih lays Hankin's ten-point stars in framed panels.</span></div>
+      <div class="fact"><b>Scales, seigaiha, friezes</b><span>Rows along level lines, each cut back by the rims above it. The friezes are bands of egg-and-dart, Vitruvian wave and guilloche.</span></div>
+      <div class="fact"><b>Meander, strapwork, guilloché</b><span>Walkers that turn only by right angles on a lattice; Voronoi straps with a medallion in every cell; engine-turned panels whose ridges are cut in the shader.</span></div>
+      <div class="fact"><b>Paisley, feathers</b><span>Boteh teardrops laid largest first, each spine bending tighter toward a curled tip; plumes with barbs sheared to run on through the joints.</span></div>
+      <div class="fact"><b>Veins, biomech, coral</b><span>Space colonization with pipe-model radii; Giger's vertebrae and hoses; a labyrinth of ridges kept a pitch apart, forking into Ys.</span></div>
+    </div>
+  </section>
+
+  <!-- 6. Symmetry -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Symmetry · <b>kit.js, symmetryImages</b></div>
+      <h2>Grown up to the mirror</h2>
+      <p>A symmetry is a few generators, 3 × 3 reflection matrices, closed under multiplication into a group. Mirror is one plane, 2 planes two and 3 planes adds the equator. An n-fold kaleidoscope is the plane x = 0 plus one at π / n from it, which together make a group of 2n. On the rounded box, 3-fold turns about the cube's diagonal and 6-fold is its full symmetry. Shapes that have other groups list them: the knots have rotations only, the polyhedra add 5-fold and pyritohedral, and the Möbius band and the blobs have none.</p>
+      <p>The generator grows only once. Every disc it reserves in the occupancy grid is reserved again at each image, under an owner of its own, and a disc that would overlap its own image is refused. So motifs grow up to the planes without crossing them, and nothing has to be cut at a seam. At the end every primitive is copied to each image; one that lies on a mirror is its own image and is kept once. A mirrored copy has a negative determinant, so its leaves, fronds and twists swap hands and curl the other way.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A kaleidoscope, seen down its axis</h3>
+        <div class="controls">
+          <label>Symmetry <select id="yS"><option>none</option><option>mirror</option><option>2 planes</option><option>3-fold</option><option selected>4-fold</option><option>6-fold</option></select></label>
+          <button id="yGrow" type="button" class="ghost">Grow</button>
+          <button id="yClear" type="button" class="ghost">Clear</button>
+        </div>
+      </div>
+      <canvas id="symCanvas" class="grab" aria-label="A disc divided by mirror lines into wedges, with one wedge shaded as the fundamental domain. Curling motifs appear in every wedge at once, mirror images curling the other way. Drawing on the disc draws in every wedge."></canvas>
+      <div class="readout" id="yOut"></div>
+      <p class="fig-cap">Drag to draw: each stroke is copied to every image. Grow places curls with the generator's two tests: a curl must clear every disc already reserved, including the images, and must not overlap its own image. The shaded wedge is the fundamental domain as <code>inDomain</code> finds it, the points closer to a generic point than to any of its images.</p>
+    </div>
+  </section>
+
+  <!-- 7. Packing -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">For the GPU · <b>pack.js, build.worker.js</b></div>
+      <h2>Thirty-six thousand motifs, a few per pixel</h2>
+      <p>A rinceau on the sphere is about 36,000 primitives. The shader can't loop over them all, so the worker packs them with a lookup. Each primitive is five RGBA float texels in a texture 4096 wide. A uniform grid of cells 0.016 across covers the shape's bounds: 130 cells a side for the sphere, about 2.2 million cells. Each cell holds an offset and a count into a list of primitive ids. A primitive goes into every cell its bounding sphere reaches, plus a margin of 0.012. Straps and feather segments are tested against their segment, not their sphere, and big footprints skip cells the blank's distance field says no pixel can be in.</p>
+      <p>The packing makes two passes over each footprint's cells, counting and then filling, straight into typed arrays that are transferred to the page without a copy. A cell lists at most 96 primitives. The worker also sends the hammer blows, a 64-bin histogram of how much is being drawn at each moment (for the scribe's sound), the list of primitive types the piece uses, and for a new shape its mesh and, on the high tier, a 32³ signed distance field for the fumes.</p>
+    </div>
+    <div class="formula">
+      <span class="c">// one primitive, five texels (ornPrims, RGBA32F)</span><br>
+      t0 = (a.xyz, type) &nbsp;&nbsp; t1 = (b.xyz, size) &nbsp;&nbsp; t2 = (shape parameters) <br>
+      t3 = (ta, tb, th, height) &nbsp;&nbsp;<span class="c">// drawing interval, hammer time</span><br>
+      t4 = (centre.xyz, ceil(radius · 4096) + height) &nbsp;&nbsp;<span class="c">// bounding sphere, for far pixels</span><br>
+      <span class="c">// cell (ornCells, RG32UI) = (offset, count) into ornList (R32UI) of primitive ids</span>
+    </div>
+  </section>
+
+  <!-- 8. Relief -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The relief · <b>relief.js, surface()</b></div>
+      <h2>A height per pixel, a normal by differences</h2>
+      <p>The blank is drawn as a plain mesh. All the ornament is in its fragment shader: a <code>surface()</code> hook of the pipeline's material, so it gets the pipeline's shadows, AO and lighting like any other surface. Each pixel finds its cell from its object-space position and loops over the cell's list. A primitive not yet drawn is skipped. One whose bounding sphere is more than 0.025 away only adds its distance and the occlusion its height casts. The rest are evaluated by <code>ornEval</code>, which switches on the type: a half-round stem along an arc, a lobed acanthus leaf bent along an arc, a rosette of petal rings, a bead, a ribbon with its crossing, a scale cut back by its neighbours' rims, and 22 types in all.</p>
+      <p>Each returns a signed distance to its outline, a height, how far its neighbours rise over the ground (for occlusion) and a cavity term (for the patina). Within a primitive the higher part wins. Across primitives the heights join with a smooth maximum, softening by 12% of the taller one, so the pieces of a chain meet in a fillet rather than a crease. The distance takes the plain minimum, and that union's outline is where the scribed line runs.</p>
+      <p>The shader evaluates that at the pixel and at two points a fraction of a pixel along the tangents, and takes the normal from the three heights. The detail is as fine as the screen allows, close up as far away, and needs no UVs. Phones take one sample and get the slope from screen derivatives of the height instead (Mikkelsen's surface gradient). Where the relief is finer than a pixel, the normal's own derivatives widen the roughness rather than letting it sparkle; matting, pits, guilloché grooves and laminate rings fade to a matching sheen.</p>
+    </div>
+    <div class="formula">
+      <span class="c">// joining two primitives' heights: a smooth max, k = 12% of the taller</span><br>
+      k = 0.12 · max(h<sub>a</sub>, h<sub>b</sub>) &nbsp;&nbsp; m = clamp(½ + ½ (h<sub>b</sub> − h<sub>a</sub>) / k, 0, 1) &nbsp;&nbsp; h = mix(h<sub>a</sub>, h<sub>b</sub>, m) + k m (1 − m)<br>
+      <span class="c">// the normal, from the height at p and one step ε along each tangent</span><br>
+      n' = normalize(n − T (h<sub>T</sub> − h<sub>0</sub>) / ε − B (h<sub>B</sub> − h<sub>0</sub>) / ε) &nbsp;&nbsp; ε = max(0.6 · |fwidth(p)|, 0.00025)
+    </div>
+    <div class="col prose">
+      <h3>Written for one compiler</h3>
+      <p>The loops are shaped for Direct3D's HLSL compiler, which ANGLE uses on Windows. Inlined three times, once per sample, <code>ornEval</code> took minutes to compile there, so it is called once from a loop the compiler can't unroll. The cell's count comes from data, while a constant bound would be unrolled 96 times. And a program only holds the types a piece uses: each <code>#ifdef ORN_T&lt;type&gt;</code> block is compiled in only when the worker lists that type.</p>
+      <h3>The hammer</h3>
+      <p>The blows are the one thing done on the mesh. Between 24 and 96 points (by area: 63 on the sphere) are spread over the blank and ordered as a greedy nearest-neighbour tour, so the hammer works its way across. Each primitive rises at the first blow within reach. In the vertex shader each blow dents the blank with a falloff of (1 − r²/R²)², overshooting by half its depth and springing back, and the normal is bent by the same gradient. In the fragment shader a struck motif rises over 5% of the stage, overshooting about 10% before it settles.</p>
+    </div>
+  </section>
+
+  <!-- 9. Etch -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The etch · <b>relief.js, ornHeight</b></div>
+      <h2>Bitten from the walls out</h2>
+      <p>The ground is everything outside the motifs, and its depth is a function of the distance to them. The acid starts at the resist walls and spreads out across the ground as the bite goes on, faster where a noise says the acid is agitated. Where it has bitten, the profile is an isotropic etch: a steep, rounded wall with a cove at its foot, and the ground deeper in open spaces than in narrow ones. The scribed line is a fine groove along the outline, a pixel wide. Once etched it becomes a crisper chased groove at the wall's foot. Punch matting, two staggered layers of round dents, and fine pits roughen the bitten ground.</p>
+      <p>Relief and Grind act on the motifs differently. Relief scales every height. Grind lowers a flat cutting level from above the tallest motifs to just over the ground, and every crown above it is shaved off flat: fresh, polished metal with the patina cut away. Enamel uses the same cut. The powder is packed into the ground, fused into glass that sags a little over wide cells, and then a stone comes down from above until metal and glass are flush.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A section through three motifs</h3>
+        <div class="controls">
+          <label>Time <input id="pT" type="range" min="0" max="26.8" step="0.05" value="26.8"><output id="pTo">26.8 s</output></label>
+          <button id="pPlay" type="button" class="ghost">Play</button>
+          <label>Relief <input id="pR" type="range" min="0" max="2" step="0.01" value="1"><output id="pRo">1.00</output></label>
+          <label>Grind <input id="pG" type="range" min="0" max="1" step="0.01" value="0"><output id="pGo">0.00</output></label>
+          <label>Bite <input id="pB" type="range" min="0" max="2" step="0.01" value="1"><output id="pBo">1.00</output></label>
+          <label><input id="pE" type="checkbox"> Enamel</label>
+        </div>
+      </div>
+      <canvas id="profCanvas" aria-label="A cross-section of the metal, drawn to scale: two half-round stems and a bead stand over etched ground. The ground sinks from the walls outward as the bite proceeds, deeper in the open stretch on the right. The surface line is coloured by its finish: metal, the stained bite, oxide, verdigris crust in the crevices and burnished crowns."></canvas>
+      <div class="readout" id="pOut"></div>
+      <div class="legend"><span style="color:var(--metal)"><i></i>bright metal</span><span style="color:var(--patina)"><i></i>crust</span><span style="color:var(--acid)"><i></i>acid film</span><span style="color:var(--stage-ink)"><i class="dash"></i>before Grind</span><span style="color:var(--enamel)"><i></i>enamel</span></div>
+      <p class="fig-cap">The day's height function in one dimension, with its constants: walls 0.0035 wide, etch depth 0.006 times Bite, on a blank of radius 1. The section is 0.064 across, drawn to scale. The stems carry the chased line down their length that makes a stem read as two strands. Enamel switches to champlevé turquoise and its longer run, with coral hugging the metal.</p>
+    </div>
+    <div class="col prose">
+      <p>While the acid is on, the metal is seen dark through a yellow-green film, and the film reflects with a normal of its own. That normal comes from a second height that is level over the ground, rises in a meniscus up every wall, ripples slowly, and is domed by gas bubbles. The bubbles nucleate on the bitten ground in cells of a hashed lattice, cluster along the walls, are densest where the bite is fastest, grow and pop. The acid's coverage is a noise in the piece's own frame: it spreads from a few places with an irregular front, and the rinse thins it into patches that hang on longest in the crevices.</p>
+      <p>The metal stains as it bites. Copper, gold and bronze go brown, rose by the walls, then dark red-black. Silver and steel go a frosty grey.</p>
+    </div>
+  </section>
+
+  <!-- 10. Finishes -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Patina and finishes · <b>LOOKS</b></div>
+      <h2>Twenty-one metals</h2>
+      <p>The patina comes in two layers. An oxide darkens the whole piece, and a crust gathers where a workshop's would: tight along the walls, in the chased groove, in the motifs' folds (from the cavity term), and in blotches over the ground. The burnish then takes both off the crowns, highest first. Its reach is a value per metal, so copper is rubbed back far and excavated bronze only at the tips.</p>
+      <p>A metal is a table of colours and amounts: metal, oxide, crust, how dark and rough the ground goes, how far the burnish reaches, and the studio and backdrop that suit it. A few finishes need code of their own, and only those finishes compile it.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Inlaid</b><span>Parcel-gilt, damascene, shakudō and rusted iron gild or silver the motifs as the patina comes on, over a ground of another metal.</span></div>
+      <div class="fact"><b>Filled (<code>ORN_FILL</code>)</b><span>Niello, three champlevé enamels and mother-of-pearl: powder packed from scattered points, fired with a red glow that scales the bare metal, ground flush, polished. Niello's engraved lines fill black once the stone cuts the faces.</span></div>
+      <div class="fact"><b>Basse-taille (<code>ORN_CLEAR</code>, <code>ORN_GUILLOCHE</code>)</b><span>Translucent glass over an engine-turned ground. The grooves under it are lit through it, and the colour deepens with the path through the glass.</span></div>
+      <div class="fact"><b>Cloisonné (<code>ORN_CLOISON</code>)</b><span>The etch leaves only a wire round each motif's rim. The enamel fills inside (coral, whitening toward the crowns) and out (turquoise), cushioned by the modelling under it.</span></div>
+      <div class="fact"><b>Laminates (<code>ORN_LAM</code>)</b><span>Mokume-gane and Damascus: wavy layers cut down through by the relief, so the domes show rings. The etch eats the softer layer deeper, so the layers stand in relief.</span></div>
+      <div class="fact"><b>Titanium (<code>ORN_ANODIZE</code>)</b><span>Thin-film interference: straw, bronze, purple, blue and teal as the oxide thickens up the relief.</span></div>
+    </div>
+  </section>
+
+  <!-- 11. Fumes -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The fumes · <b>fumes.js</b></div>
+      <h2>Smoke that the piece stirs</h2>
+      <p>While the acid bites, vapour rises off the piece. It is a stable-fluids smoke simulation on a 48 × 64 × 48 grid around and above the piece, 3.6 piece radii across and 4.8 tall, so a cell is 0.075 of the radius. The 48 slices are tiled 8 × 6 in a 384 × 384 atlas of half floats, so each pass is one full-screen draw over every cell.</p>
+      <p>A step runs eight kinds of pass. First the obstacle: each cell gets the piece's signed distance and its surface velocity there, ω × r plus the shake's linear velocity. Then advection: each cell takes the velocity and vapour from where its air came from, and clean still air comes in from outside the box. Then the forces: a MacCormack correction sharpens the vapour (trace back, trace forward, halve the error, clamp to the cells it came from), buoyancy lifts it, and a slow draught wanders where there is vapour. The air within two and a half cells of the piece is dragged to its surface velocity. Vapour is given off where the acid covers the piece, more from spots fixed on its surface, which turn with it, and mostly off its upper side. Then the curl, vorticity confinement to put back the swirls the coarse grid smears out, the divergence, 18 Jacobi iterations of pressure warm-started from the last step, and the projection that removes the pressure gradient.</p>
+      <p>The piece is a moving solid. Its cells hold its own velocity, and the pressure is mirrored at it, so no air passes through it. Spinning or dragging the piece stirs the vapour and flings it off. In auto change, the piece now and then gets a spin impulse during the bite, so the fumes swirl.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>One slice of the smoke grid</h3>
+        <div class="controls">
+          <label>Spin <input id="fS" type="range" min="-4" max="4" step="0.05" value="0.6"><output id="fSo">0.60</output></label>
+          <label>Vorticity <input id="fV" type="range" min="0" max="10" step="0.1" value="4"><output id="fVo">4.0</output></label>
+          <label>Pressure iterations <input id="fJ" type="range" min="0" max="40" step="1" value="18"><output id="fJo">18</output></label>
+          <label>Piece <select id="fP"><option value="box">rounded box</option><option value="cross">cross</option><option value="ring">ring</option></select></label>
+          <label><input id="fA" type="checkbox" checked> Acid</label>
+          <label><input id="fFl" type="checkbox"> Flow</label>
+          <button id="fR" type="button" class="ghost">Clear</button>
+        </div>
+      </div>
+      <canvas id="smokeCanvas" class="grab" aria-label="A tall grid of smoke rising from a turning metal piece. Vapour leaves its upper side in plumes that curl as they rise and are flung off its corners as it turns; drag to spin it."></canvas>
+      <div class="readout" id="fOut"></div>
+      <p class="fig-cap">The same passes in two dimensions on a 48 × 64 grid, with the day's constants: buoyancy 4, drag 14, vorticity 4, 18 Jacobi iterations. Drag to spin the piece. With no pressure iterations the flow isn't divergence-free and the smoke drifts through the piece; with few, it leaks.</p>
+    </div>
+    <div class="col prose">
+      <h3>Drawn over the lit image</h3>
+      <p>The smoke goes in through the pipeline's composite hook, after the lit frame and before bloom. The atlas is raymarched at half resolution in 56 steps, clipped to the box and stopped at the scene's depth, so the piece hides what is behind it. The step starts are jittered per pixel and per frame. The coarse density is modulated by thin curling sheets of a warped noise, pushed along by the simulated flow, for wisps finer than the grid. Light comes from the key light, through a three-tap march toward it for the vapour's own shadow and a test against the piece's bounding ellipsoid, and from the studio's spherical harmonics. On copper and the gold alloys it is nitric acid's brown NO₂, which absorbs blue most; on the others it is a pale vapour.</p>
+      <p>Each frame is folded into the last ones, with the history clamped to the range of its 3 × 3 neighbourhood so it can't ghost. A depth-aware 3 × 3 tent then lays it over the full-size image, so the vapour stays on its side of the piece's edge. The obstacle is the blank's own distance field, baked on a 32³ grid in the worker from its closest-point projection; until it arrives the sim uses the bounding ellipsoid. The simulation runs only while there is vapour, on the high tier only, in steps of 1/75 to 1/30 s, at most three a frame.</p>
+    </div>
+  </section>
+
+  <!-- 12. Compile and swap -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">A new piece · <b>main.js</b></div>
+      <h2>Hiding the compiler</h2>
+      <p>The relief shader is large, and on Windows its first compile takes tens of seconds. Everything about changing pieces is arranged so that you rarely wait for it.</p>
+      <p><b>A program per set.</b> A material is keyed by the primitive types the piece uses and the finish defines its metal needs, and it is compiled once with <code>compileAsync</code>, off to the side, while the piece on show keeps rendering. A rinceau uses 7 of the 22 types and a meander one.</p>
+      <p><b>The blank first.</b> On first load the worker sends the mesh ahead of the ornament, and the bare blank goes up at once in a small program of its own. The process starts once the relief program is ready.</p>
+      <p><b>Grown ahead.</b> In auto change the next piece is prepared while the current one plays out. Once the panel has been left alone for 1.5 s, the next seed is picked and the randomize handler is run with it and undone, which shows what that seed would set. The piece is grown in a second worker and its program compiled, so when the change comes it is usually just put on.</p>
+      <p><b>Metal on the piece on show.</b> A new metal keeps the old finish until the new finish's program is compiled, then fades over 0.9 s. The backdrop, the studio light, the reflections and the material all cross-fade. The program switches at the middle of the fade, under a dip in the reflections, and a fade that gets there early holds just short of the middle until the program is ready.</p>
+      <p><b>The change.</b> The old piece shrinks away in 0.45 s and the studio fades to the new metal while the next is made. The next piece rises with an overshoot in 0.9 s, turning a full turn about the vertical that eases out over 2.4 s onto its designed view, and only then is it scribed. If the wait is longer than a moment, a pill says what the workshop is up to (“Arguing with a volute…”, “Explaining ornament to the graphics card…”), with a progress bar estimated from how long that pattern took last time.</p>
+    </div>
+  </section>
+
+  <!-- 13. Motion -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Motion · <b>updateSpin, updateShake, updateFraming</b></div>
+      <h2>Held, struck and shaken</h2>
+      <p>Dragging spins the piece like a trackball, as in day 9. It keeps its momentum, coasts down, and after a few seconds left alone tips back upright into a slow turn about the vertical. Suzanne doesn't turn her back; she sways about her designed view instead. While the drawing goes on the piece sways gently, more when more is being drawn. Each hammer blow knocks it back along the blow's normal on a stiff spring and swings it away on a soft one. When the acid drains, the piece is shaken off in bursts of quick jerks with hard reversals and given one quick spin.</p>
+      <p>The camera eases out by about two-thirds and lifts as the acid goes on, so the whole column of smoke is in view, and comes back once the etch is over. Whatever orbit or zoom the viewer sets becomes the base it works from. Motion blur comes from the piece's real motion: each frame the pipeline is given the piece's pose a frame ago as its shutter pose, so the blur stops the moment the piece does.</p>
+    </div>
+  </section>
+
+  <!-- 14. Sound -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Sound · <b>sound.js</b></div>
+      <h2>The workshop's noises</h2>
+      <p>Everything is cut from CC0 recordings on freesound.org. The scribe's scratch is a loop whose level follows the histogram of how much is being drawn at that moment. Each hammer blow plays one of 21 tinks. Its pitch goes with the size of the blow, its strength with the depth, and it is panned to where the blow lands on screen and duller on the far side of the piece; now and then it bounces for a soft second tap. During the etch the acid's sizzle and the fizz of its bubbles get louder and higher while it bites fastest, and a splash plays as the bath drains off. The burnish rubs. For enamel the kiln roars and the stone grinds.</p>
+      <p>Loops are started at a random point, eased in and out, and stopped once silent. They fall quiet while pieces change over, and their rate follows Speed. Twelve one-shot voices play at most, through a gentle compressor. Sound varies with the unseeded random, so it never shifts the seeded piece.</p>
+    </div>
+  </section>
+
+  <!-- 15. Cost -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Cost</div>
+      <h2>Where the time goes</h2>
+      <p>Making a piece costs more than drawing it. Growing and packing run in the worker, so the page keeps rendering, and the time shows as the wait between pieces. Measured in Node on a desktop, one run each, on the sphere at Variation 1 and Scale 1.3; the worker runs the same code.</p>
+    </div>
+    <div class="fig">
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Pattern</th><th>Primitives</th><th>Grow</th><th>Pack</th><th>Cell refs</th><th>Most in a cell</th></tr></thead>
+          <tbody>
+            <tr><td>rinceau</td><td>36,005</td><td>1.98 s</td><td>0.34 s</td><td>2.01 M</td><td>43</td></tr>
+            <tr><td>veins</td><td>22,690</td><td>1.17 s</td><td>0.18 s</td><td>1.62 M</td><td>22</td></tr>
+            <tr><td>paisley</td><td>18,088</td><td>1.00 s</td><td>0.15 s</td><td>1.00 M</td><td>35</td></tr>
+            <tr><td>biomech</td><td>16,900</td><td>0.71 s</td><td>0.15 s</td><td>1.16 M</td><td>20</td></tr>
+            <tr><td>feathers</td><td>14,642</td><td>0.58 s</td><td>0.67 s</td><td>1.80 M</td><td>42</td></tr>
+            <tr><td>girih</td><td>12,454</td><td>0.39 s</td><td>0.20 s</td><td>1.33 M</td><td>16</td></tr>
+            <tr><td>knotwork</td><td>11,375</td><td>0.22 s</td><td>0.22 s</td><td>1.94 M</td><td>15</td></tr>
+            <tr><td>coral</td><td>7,608</td><td>0.58 s</td><td>0.18 s</td><td>1.17 M</td><td>20</td></tr>
+            <tr><td>meander</td><td>4,432</td><td>0.12 s</td><td>0.60 s</td><td>1.22 M</td><td>12</td></tr>
+            <tr><td>guilloché</td><td>3,624</td><td>0.03 s</td><td>0.28 s</td><td>0.89 M</td><td>13</td></tr>
+            <tr><td>friezes</td><td>980</td><td>0.44 s</td><td>0.15 s</td><td>0.76 M</td><td>7</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="fig-cap">Long, thin primitives (feathers' segments, the meander's straps) cost more to pack: they are tested against their segment in every cell of their bounding sphere. Friezes are few primitives, each a whole period of moulding, but their bands take time to lay.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Lookup textures</b><span>The sphere's 130³ cells take 17.6 MB as RG32UI, though only about one in eight lists anything; a rinceau's 2 million references take 8 MB more and its primitives 2.9 MB. CPU copies are dropped once uploaded.</span></div>
+      <div class="fact"><b>Samples per pixel</b><span>Three relief evaluations a pixel on the high tier, one on phones (medium and low), with the slope from screen derivatives.</span></div>
+      <div class="fact"><b>Fumes per step</b><span>Twenty-five full-screen passes over the 147,456-texel atlas (18 of them Jacobi), then a 56-step march with three shadow taps at half resolution, a resolve and a composite. High tier only, and only while there is vapour.</span></div>
+      <div class="fact"><b>Adaptive scale</b><span>A safety net for slow devices: if frames stay over 40 ms for about 6 s, the render scale drops by 20%, down to half at most. It never climbs back, so the image doesn't pump between sizes. Recordings skip it.</span></div>
+    </div>
+  </section>
+
+  <!-- 16. Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>Drag to spin the piece (it keeps its momentum, then settles back to a slow upright turn). Scroll or pinch to zoom.</li>
+      <li><b>Space</b> pauses; while paused, dragging orbits the camera instead.</li>
+      <li><b>Blank</b>: Shape. <b>Ornament</b>: Pattern, Variation, Symmetry (only the groups the shape and pattern allow), Scale, and the pattern's own sliders.</li>
+      <li><b>Relief</b>: Relief, Grind, Bite, Matting. <b>Finish</b>: Metal.</li>
+      <li><b>Process</b>: Speed, Auto change, Change every (counted once a piece is finished). <b>View</b>: Spin, Studio.</li>
+      <li><b>R</b> makes a coherent new piece, <b>E</b> replays the etching, <b>M</b> or the speaker button toggles sound.</li>
+      <li><b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot.</li>
+      <li>Auto change brings a new piece once the current one has finished and stayed up for Change every seconds (10 by default); the next one is grown while you watch.</li>
+    </ul>
+  </section>
+  <footer class="col">
+    <div class="meta">
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>ornament grown in a worker</span><span>no build step</span><span>desktop and phones</span>
+      </div>
+    Day 10 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/10/">spite.github.io/codevember-2026/10</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/10">10/ of the codevember-2026 repository</a>. The piece and studio are rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>. Sounds are CC0 recordings from freesound.org, credited in the day's README.
+  </footer>
+</main>
+
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const mix = (a, b, t) => a + (b - a) * t;
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+  const hex = (h) => { const n = parseInt(h.replace("#", ""), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+  const rgb = (c) => `rgb(${c.map((v) => Math.round(clamp(v, 0, 255))).join(",")})`;
+  const mixc = (a, b, t) => a.map((v, k) => v + (b[k] - v) * t);
+
+  // A canvas sized to its CSS width at the device pixel ratio; draw() gets (ctx, width, height) in CSS pixels.
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1, W = 0, H = 0;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      W = canvas.clientWidth || 600; H = Math.round(typeof aspect === "function" ? aspect(W) : W * aspect);
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, W, H);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    new MutationObserver(() => fit(true)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return { redraw: () => fit(true), paint: () => W && draw(ctx, W, H), size: () => [W, H] };
+  }
+  const bind = (id, fn, fmt = (v) => (+v).toFixed(2)) => {
+    const el = $(id), out = $(id + "o");
+    const set = () => { if (out) out.textContent = fmt(el.value); fn(+el.value); };
+    el.addEventListener("input", set);
+    if (out) out.textContent = fmt(el.value);
+    return el;
+  };
+  // Animates while on screen: step(dt) each frame.
+  function animate(el, step) {
+    let on = false, running = true, last = 0, raf = 0;
+    const loop = (now) => {
+      raf = 0;
+      if (!on || !running) return;
+      const dt = last ? Math.min((now - last) / 1000, 1 / 20) : 1 / 60;
+      last = now;
+      step(dt);
+      raf = requestAnimationFrame(loop);
+    };
+    const kick = () => { if (on && running && !raf) { last = 0; raf = requestAnimationFrame(loop); } };
+    new IntersectionObserver(([e]) => { on = e.isIntersecting; kick(); }).observe(el);
+    return { set running(v) { running = v; kick(); }, get running() { return running; } };
+  }
+  function mulberry(seed) {
+    return () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  // Smooth value noise in 2D, 0..1.
+  function noise2(seed) {
+    const h = (i, j) => {
+      let x = (Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(seed, 1442695041)) | 0;
+      x = Math.imul(x ^ (x >>> 13), 1274126177);
+      return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+    };
+    return (x, y) => {
+      const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
+      const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+      return mix(mix(h(i, j), h(i + 1, j), u), mix(h(i, j + 1), h(i + 1, j + 1), u), v);
+    };
+  }
+
+  // The process, as in main.js.
+  const STAGES = { draw: [0.3, 6.5], hammer: [7, 11.5], etch: [12, 20], patina: [19.8, 23.3], burnish: [23.6, 26.3] };
+  const FILL_STAGES = { ...STAGES, fill: [20.3, 23.1], fire: [23.3, 26.1], patina: [23.3, 26.1], grind: [26.5, 29.9], burnish: [30.1, 32.7] };
+  const ACID = { flood: 0.2, drain: [0.66, 0.97] };
+
+  // ---------------------------------------------------------------- 0. timeline
+  {
+    const rows = [
+      { name: "Plain metals", end: 26.8, bars: [["draw", 0.3, 6.5], ["hammer", 7, 11.5], ["etch", 12, 20], ["patina", 19.8, 23.3], ["burnish", 23.6, 26.3]] },
+      { name: "Enamel, niello", end: 33.2, bars: [["draw", 0.3, 6.5], ["hammer", 7, 11.5], ["etch", 12, 20], ["fill", 20.3, 23.1], ["fire", 23.3, 26.1], ["grind", 26.5, 29.9], ["burnish", 30.1, 32.7]] },
+    ];
+    const col = { draw: "--stage-ink", hammer: "--metal", etch: "--acid", patina: "--patina", burnish: "--metal-hi", fill: "--enamel", fire: "--kiln", grind: "--section" };
+    setup($("tlCanvas"), (w) => (w < 560 ? 196 : 176), (ctx, W, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const narrow = W < 560;
+      const left = narrow ? 12 : 120, right = 14, T = 34;
+      const X = (t) => left + (t / T) * (W - left - right);
+      const rowY = narrow ? [34, 104] : [30, 92], bh = 26;
+      ctx.font = font(10.5);
+      ctx.textBaseline = "middle";
+      rows.forEach((r, k) => {
+        const y = rowY[k];
+        ctx.fillStyle = css("--ink");
+        if (narrow) { ctx.textAlign = "left"; ctx.fillText(r.name, left, y - 13); }
+        else { ctx.textAlign = "right"; ctx.font = font(11.5, 600); ctx.fillText(r.name, left - 12, y + bh / 2); ctx.font = font(10.5); }
+        const by = narrow ? y - 2 : y;
+        for (const [name, a, b] of r.bars) {
+          ctx.fillStyle = css(col[name]);
+          ctx.globalAlpha = 0.85;
+          ctx.fillRect(X(a), by, X(b) - X(a), bh);
+          ctx.globalAlpha = 1;
+          const lw = ctx.measureText(name).width;
+          if (lw + 6 < X(b) - X(a)) {
+            ctx.fillStyle = name === "draw" || name === "grind" ? css("--bg") : "#1b1410";
+            ctx.textAlign = "center";
+            ctx.fillText(name, (X(a) + X(b)) / 2, by + bh / 2 + 0.5);
+          }
+        }
+        // Done, then the hold before auto change.
+        ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(X(r.end), by - 4); ctx.lineTo(X(r.end), by + bh + 4); ctx.stroke();
+        if (k === 0) {
+          // The etch's own phases under its bar.
+          const e0 = 12, e1 = 20, f = (x) => e0 + x * (e1 - e0);
+          const marks = [["spread", f(0), f(ACID.flood)], ["bite", f(0.04), f(0.84)], ["rinse", f(ACID.drain[0]), f(ACID.drain[1])]];
+          marks.forEach(([n, a, b], i) => {
+            const yy = by + bh + 7 + i * 5;
+            ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(X(a), yy); ctx.lineTo(X(b), yy); ctx.stroke();
+          });
+          if (!narrow) {
+            ctx.fillStyle = css("--muted"); ctx.textAlign = "left";
+            ctx.fillText("spread · bite · rinse", X(20) + 6, by + bh + 12);
+          }
+        }
+      });
+      // Seconds.
+      const ay = H - 18;
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(X(0), ay); ctx.lineTo(X(T), ay); ctx.stroke();
+      ctx.fillStyle = css("--muted"); ctx.textAlign = "center";
+      for (let t = 0; t <= 30; t += 5) {
+        ctx.beginPath(); ctx.moveTo(X(t), ay); ctx.lineTo(X(t), ay + 4); ctx.stroke();
+        ctx.fillText(t + " s", X(t), ay + 11);
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------- 1. growing and packing
+  {
+    // The day's constants at Scale 1.3, in units of the blank's radius.
+    const S = 1.3, GAP = 0.0022 * S, W_LINE = 0.0048 * S, DSEP = 0.13 * S, HS = 0.008 * S, CELL = 0.016, MARGIN = 0.012;
+    const DW = 1.15;
+    const G = { flow: 0.6, seed: 3, show: "relief", T: 0, hover: -1 };
+    let piece = null, DH = 0.5;
+
+    // Discs in a grid; each goes in every cell it overlaps.
+    class Occ {
+      constructor(c) { this.c = c; this.cells = new Map(); this.d = []; }
+      range(x, r) { return [Math.floor((x - r) / this.c), Math.floor((x + r) / this.c)]; }
+      add(x, y, r, owner, s, t) {
+        const id = this.d.length;
+        this.d.push({ x, y, r, owner, s, t });
+        const [i0, i1] = this.range(x, r), [j0, j1] = this.range(y, r);
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+          const k = i * 8192 + j;
+          let b = this.cells.get(k);
+          if (!b) this.cells.set(k, (b = []));
+          b.push(id);
+        }
+      }
+      rollback(n) { for (let i = n; i < this.d.length; i++) this.d[i].r = -1e9; }
+      hit(x, y, r, owner = -1, s = 0, win = 0, o2 = -1, s2 = 0, w2 = 0) {
+        const [i0, i1] = this.range(x, r), [j0, j1] = this.range(y, r);
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+          const b = this.cells.get(i * 8192 + j);
+          if (!b) continue;
+          for (const id of b) {
+            const q = this.d[id];
+            if (q.owner === owner && Math.abs(q.s - s) < win) continue;
+            if (q.owner === o2 && Math.abs(q.s - s2) < w2) continue;
+            const rr = r + q.r;
+            if (rr <= 0) continue;
+            if ((q.x - x) ** 2 + (q.y - y) ** 2 < rr * rr) return true;
+          }
+        }
+        return false;
+      }
+      // Clearance from (x, y) to the nearest disc's edge, looking within R, and that disc's time.
+      free(x, y, R) {
+        const [i0, i1] = this.range(x, R), [j0, j1] = this.range(y, R);
+        let best = R, t = 0;
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+          const b = this.cells.get(i * 8192 + j);
+          if (!b) continue;
+          for (const id of b) {
+            const q = this.d[id];
+            if (q.r < 0) continue;
+            const f = Math.hypot(q.x - x, q.y - y) - q.r;
+            if (f < best) { best = f; t = q.t; }
+          }
+        }
+        return [best, t];
+      }
+    }
+
+    function growPiece() {
+      const rnd = mulberry(G.seed * 7919 + 13);
+      const rand = (a, b) => a + rnd() * (b - a);
+      const nz = noise2(G.seed);
+      const occ = new Occ(0.02);
+      const sep = new Occ(DSEP);
+      const stems = [], beads = [];
+      const out = (x, y, m = 0.004) => x < m || y < m || x > DW - m || y > DH - m;
+      const stats = { lines: 0, scrolls: 0, stubs: 0, beads: 0, rosettes: 0 };
+      let ownerId = 1;
+
+      // The flow: contours of a noise plus a slope (finer than the day's, to fit a patch).
+      const fs = (1.6 / S) * 4, lin = (1 - G.flow) * 2.2, sa = rand(0, Math.PI * 2), slope = [Math.cos(sa), Math.sin(sa)];
+      const field = (x, y) => (nz(x * fs + 17, y * fs + 5) * 0.65 + nz(x * fs * 2.1 + 3, y * fs * 2.1 + 41) * 0.35) * (0.4 + G.flow) + (x * slope[0] + y * slope[1]) * lin;
+      const flowDir = (x, y) => {
+        const e = 0.004, gx = (field(x + e, y) - field(x - e, y)) / (2 * e), gy = (field(x, y + e) - field(x, y - e)) / (2 * e), l = Math.hypot(gx, gy);
+        return l < 1e-3 ? null : [-gy / l, gx / l];
+      };
+
+      // Flow lines, grown a step per round from scattered seeds, both ways, kept a band apart.
+      const seeds = Math.max(8, Math.round((DW * DH) / (DSEP * DSEP) * 0.35));
+      const lines = [];
+      for (let i = 0; i < seeds; i++) lines.push({ id: i, p: [rand(0.02, DW - 0.02), rand(0.02, DH - 0.02)], delay: Math.floor(rand(0, 120)), fronts: null, started: false, dead: false });
+      for (let round = 0, active = 1, pending = 1; round < 2000 && (active || pending); round++) {
+        active = 0; pending = 0;
+        for (const L of lines) {
+          if (L.dead) continue;
+          if (!L.started) {
+            if (round < L.delay) { pending++; continue; }
+            L.started = true;
+            const d = flowDir(...L.p);
+            if (!d || sep.hit(L.p[0], L.p[1], DSEP * 0.5)) { L.dead = true; continue; }
+            sep.add(L.p[0], L.p[1], DSEP * 0.5, L.id, 0, round);
+            L.fronts = [1, -1].map((sg) => ({ sg, p: L.p.slice(), pts: [], s: 0, on: true }));
+            L.round0 = round;
+            active++;
+            continue;
+          }
+          for (const f of L.fronts) {
+            if (!f.on) continue;
+            const d = flowDir(...f.p);
+            const q = d && [f.p[0] + d[0] * f.sg * HS, f.p[1] + d[1] * f.sg * HS];
+            const s = f.s + HS;
+            if (!q || out(q[0], q[1], 0.01) || sep.hit(q[0], q[1], DSEP * 0.5, L.id, s * f.sg, DSEP * 2) || s > 4 * S) { f.on = false; continue; }
+            sep.add(q[0], q[1], DSEP * 0.5, L.id, s * f.sg, round);
+            f.p = q; f.s = s;
+            f.pts.push({ p: q, round });
+            active++;
+          }
+        }
+      }
+
+      // A stem: points with width and time, cut into primitives of three steps (the day emits arcs).
+      const addStem = (pts, kind) => { const st = { pts, kind }; stems.push(st); return st; };
+      const nodes = [], volutes = [];
+      for (const L of lines) {
+        if (!L.fronts) continue;
+        const [fw, bw] = L.fronts;
+        let path = [...bw.pts.slice().reverse(), { p: L.p.slice(), round: L.round0 }, ...fw.pts];
+        if ((path.length - 1) * HS < 0.15 * S) continue;
+        for (let it = 0; it < 4; it++) path = path.map((q, i) => (i === 0 || i === path.length - 1 ? q : { ...q, p: [(path[i - 1].p[0] + 2 * q.p[0] + path[i + 1].p[0]) / 4, (path[i - 1].p[1] + 2 * q.p[1] + path[i + 1].p[1]) / 4] }));
+        const owner = ownerId++;
+        const n = path.length;
+        const width = (i) => W_LINE * (0.6 + 0.4 * Math.sin((Math.PI * i) / (n - 1)));
+        const pts = path.map((q, i) => ({ x: q.p[0], y: q.p[1], w: width(i), t: q.round * HS * 1.2 }));
+        pts.forEach((q, i) => occ.add(q.x, q.y, q.w, owner, i * HS, q.t));
+        addStem(pts, "line");
+        stats.lines++;
+        let next = rand(0.02, 0.05) * S, side = rnd() < 0.5 ? 1 : -1;
+        for (let i = 1; i < n - 3; i++) {
+          if (i * HS < next) continue;
+          const a = pts[i - 1], b = pts[i + 1], l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+          nodes.push({ x: pts[i].x, y: pts[i].y, d: [(b.x - a.x) / l, (b.y - a.y) / l], w: pts[i].w, t: pts[i].t, owner, s: i * HS, side, r: rnd() });
+          side = -side;
+          next += rand(0.035, 0.06) * S;
+        }
+        for (const [i, sg] of [[n - 1, 1], [0, -1]]) {
+          const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)], l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+          volutes.push({ x: pts[i].x, y: pts[i].y, d: [((b.x - a.x) / l) * sg, ((b.y - a.y) / l) * sg], w: pts[i].w, t: pts[i].t, owner, s: i * HS });
+        }
+      }
+
+      // A curling stem: its radius of curvature shrinks linearly; blocked, it curls tighter into the space left.
+      function grow(it) {
+        const owner = ownerId++, n0 = occ.d.length, st0 = stems.length;
+        let x = it.x, y = it.y, dx = it.d[0], dy = it.d[1], s = 0, t = it.t, squeeze = 1, w = it.w0;
+        const pts = [{ x, y, w, t }], sub = [];
+        let nextNode = it.w0 * rand(6, 9), side = rnd() < 0.5 ? 1 : -1;
+        while (s < it.L) {
+          const f = s / it.L;
+          w = it.w0 + (it.w1 - it.w0) * f;
+          const k0 = it.sign / (it.r0 + (it.rEnd - it.r0) * f), kMax = 1 / (w * 1.7);
+          let probe = null, k = 0, h = 0;
+          for (const tighten of [1, 1.5, 2.3, 3.5]) {
+            k = Math.sign(k0) * Math.min(Math.abs(k0) * squeeze * tighten, kMax);
+            h = Math.min(Math.max(w * 0.9, 0.0025 * S), 0.25 / Math.abs(k));
+            const a = k * h;
+            const ndx = dx * Math.cos(a) - dy * Math.sin(a), ndy = dx * Math.sin(a) + dy * Math.cos(a);
+            const mdx = dx * Math.cos(a / 2) - dy * Math.sin(a / 2), mdy = dx * Math.sin(a / 2) + dy * Math.cos(a / 2);
+            const px = x + mdx * h, py = y + mdy * h;
+            if (!out(px, py) && !occ.hit(px, py, w + GAP, owner, s, w * 4, it.parent, it.parentS, s < it.w0 * 6 ? it.w0 * 10 : 0)) {
+              probe = [px, py, ndx, ndy];
+              squeeze *= tighten;
+              break;
+            }
+            if (Math.abs(k) >= kMax) break;
+          }
+          if (!probe) break;
+          [x, y, dx, dy] = probe;
+          s += h; t += h;
+          occ.add(x, y, w, owner, s, t);
+          pts.push({ x, y, w, t });
+          if (it.depth < 2 && s >= nextNode && s < it.L * 0.85) {
+            sub.push({ x, y, d: [dx, dy], w, t, s, side });
+            side = -side;
+            nextNode += w * rand(3.5, 5.5) * (1 + f * 0.5);
+          }
+        }
+        // Blocked early, it would only be a stub: take it back.
+        if (s < Math.max(it.w0 * 7, it.L * 0.4)) {
+          occ.rollback(n0);
+          stems.length = st0;
+          stats.stubs++;
+          return false;
+        }
+        addStem(pts, "scroll");
+        stats.scrolls++;
+        // The scroll's eye.
+        const er = w * 1.5;
+        if (!occ.hit(x + dx * er, y + dy * er, er + GAP * 0.5, owner, s, w * 6)) {
+          occ.add(x + dx * er, y + dy * er, er, owner, s + er, t + er);
+          beads.push({ x: x + dx * er, y: y + dy * er, r: er, t: t + er });
+        }
+        for (const b of sub) spawn(b, owner, it.depth + 1);
+        return true;
+      }
+      // Branches peel off tangentially and curl to the outside.
+      function spawn(nd, parent, depth) {
+        const sd = nd.side, nx = -nd.d[1] * sd, ny = nd.d[0] * sd, a = sd * rand(0.25, 0.5);
+        const d = [nd.d[0] * Math.cos(a) - nd.d[1] * Math.sin(a), nd.d[0] * Math.sin(a) + nd.d[1] * Math.cos(a)];
+        const w0 = nd.w * (depth === 1 ? 0.8 : 0.7), L = (depth === 1 ? rand(0.1, 0.2) : rand(0.05, 0.1)) * S;
+        grow({ x: nd.x + nx * nd.w, y: nd.y + ny * nd.w, d, w0, w1: w0 * 0.45, L, sign: sd, r0: L * rand(0.2, 0.32), rEnd: w0 * rand(1.6, 2.2), depth, t: nd.t, parent, parentS: nd.s });
+      }
+      nodes.sort((a, b) => a.r - b.r);
+      for (const nd of nodes) spawn(nd, nd.owner, 1);
+      // Volutes: each end of a line curls on into the free side.
+      for (const v of volutes) {
+        const sg = rnd() < 0.5 ? 1 : -1;
+        for (const sign of [sg, -sg]) if (grow({ x: v.x, y: v.y, d: v.d, w0: v.w, w1: v.w * 0.5, L: rand(0.08, 0.15) * S, sign, r0: rand(0.03, 0.05) * S, rEnd: v.w * 1.8, depth: 1, t: v.t, parent: v.owner, parentS: v.s })) break;
+      }
+      // Last, a sweep over a fine lattice: every spot still free gets the largest motif that fits.
+      const spots = [];
+      const step = 0.006;
+      for (let y = step / 2; y < DH; y += step) for (let x = step / 2; x < DW; x += step) {
+        const [f] = occ.free(x, y, 0.04);
+        if (f > GAP + 0.0022 * S) spots.push([f, x, y]);
+      }
+      spots.sort((a, b) => b[0] - a[0]);
+      for (const [, x, y] of spots) {
+        const [f, tn] = occ.free(x, y, 0.04);
+        const rf = Math.min(f, DW - x, DH - y, x, y);
+        if (rf < GAP + 0.0022 * S) continue;
+        const r = Math.min(rf - GAP, 0.014 * S);
+        const rosette = r >= 0.0065 * S;
+        occ.add(x, y, r, ownerId++, 0, tn + 0.03);
+        beads.push({ x, y, r, t: tn + 0.03, rosette, petals: 5 + Math.floor(rnd() * 4), rot: rnd() * 6.3 });
+        stats[rosette ? "rosettes" : "beads"]++;
+      }
+
+      // Primitives and their cells, as pack.js lays them out.
+      let tMax = 0;
+      for (const st of stems) for (const q of st.pts) tMax = Math.max(tMax, q.t);
+      for (const b of beads) tMax = Math.max(tMax, b.t);
+      const prims = [];
+      for (const st of stems) {
+        for (let i = 0; i + 1 < st.pts.length; i += 3) {
+          const a = st.pts[i], b = st.pts[Math.min(i + 3, st.pts.length - 1)];
+          prims.push({ cap: true, ax: a.x, ay: a.y, bx: b.x, by: b.y, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, r: Math.hypot(b.x - a.x, b.y - a.y) / 2 + Math.max(a.w, b.w), w: Math.max(a.w, b.w) });
+        }
+      }
+      for (const b of beads) prims.push({ cx: b.x, cy: b.y, r: b.r * 1.02 });
+      const nx = Math.ceil(DW / CELL), ny = Math.ceil(DH / CELL);
+      const cells = Array.from({ length: nx * ny }, () => []);
+      const half = CELL * 0.7071;
+      prims.forEach((p, id) => {
+        const r = p.r + MARGIN;
+        const i0 = Math.max(0, Math.floor((p.cx - r) / CELL)), i1 = Math.min(nx - 1, Math.floor((p.cx + r) / CELL));
+        const j0 = Math.max(0, Math.floor((p.cy - r) / CELL)), j1 = Math.min(ny - 1, Math.floor((p.cy + r) / CELL));
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+          const ddx = Math.max(i * CELL - p.cx, 0, p.cx - (i + 1) * CELL), ddy = Math.max(j * CELL - p.cy, 0, p.cy - (j + 1) * CELL);
+          if (ddx * ddx + ddy * ddy > r * r) continue;
+          if (p.cap) {
+            const px = (i + 0.5) * CELL - p.ax, py = (j + 0.5) * CELL - p.ay, bx = p.bx - p.ax, by = p.by - p.ay;
+            const s = clamp((px * bx + py * by) / (bx * bx + by * by || 1e-12), 0, 1);
+            if (Math.hypot(px - bx * s, py - by * s) > p.w + MARGIN + half) continue;
+          }
+          cells[i + nx * j].push(id);
+        }
+      });
+      let refs = 0, maxC = 0;
+      for (const c of cells) { refs += c.length; maxC = Math.max(maxC, c.length); }
+      return { stems, beads, tMax: tMax || 1, occ, prims, cells, nx, ny, refs, maxC, stats };
+    }
+
+    const canvas = $("growCanvas");
+    let geo = null;
+    const v = setup(canvas, (w) => clamp(w * 0.58, 260, 470), (ctx, W, H) => {
+      const sc = W / DW;
+      if (!piece || Math.abs(H / sc - DH) > 1e-6) { DH = H / sc; piece = growPiece(); readout(); }
+      geo = { sc };
+      const X = (x) => x * sc, Y = (y) => H - y * sc;
+      const metal = hex(css("--metal")), hi = hex(css("--metal-hi")), ground = css("--ground");
+      ctx.fillStyle = ground; ctx.fillRect(0, 0, W, H);
+      const T = G.T * piece.tMax;
+      const show = G.show;
+      if (show === "discs") {
+        ctx.lineWidth = 0.8;
+        for (const d of piece.occ.d) {
+          if (d.r < 0 || d.t > T) continue;
+          ctx.strokeStyle = css("--metal-hi"); ctx.globalAlpha = 0.35;
+          ctx.beginPath(); ctx.arc(X(d.x), Y(d.y), Math.max(0.5, d.r * sc), 0, 6.283); ctx.stroke();
+          ctx.globalAlpha = 0.12; ctx.strokeStyle = css("--acid");
+          ctx.beginPath(); ctx.arc(X(d.x), Y(d.y), (d.r + GAP) * sc, 0, 6.283); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+      // Raised motifs: metal, a highlight up-left, and the chased line down a stem.
+      const drawStems = (pass) => {
+        for (const st of piece.stems) {
+          const p = st.pts;
+          for (let i = 1; i < p.length; i++) {
+            if (p[i].t > T) break;
+            const a = p[i - 1], b = p[i], w = (a.w + b.w) / 2 * sc;
+            ctx.beginPath();
+            if (pass === 0) { ctx.strokeStyle = rgb(metal); ctx.lineWidth = 2 * w; ctx.moveTo(X(a.x), Y(a.y)); ctx.lineTo(X(b.x), Y(b.y)); }
+            else if (pass === 1) { ctx.strokeStyle = rgb(hi); ctx.lineWidth = Math.max(0.6, 0.7 * w); const o = 0.35 * w; ctx.moveTo(X(a.x) - o, Y(a.y) - o); ctx.lineTo(X(b.x) - o, Y(b.y) - o); }
+            else { if (w < 2.6) continue; ctx.strokeStyle = "rgba(40,18,8,0.45)"; ctx.lineWidth = 0.8; ctx.moveTo(X(a.x), Y(a.y)); ctx.lineTo(X(b.x), Y(b.y)); }
+            ctx.stroke();
+          }
+        }
+      };
+      ctx.lineCap = "round";
+      ctx.globalAlpha = show === "relief" ? 1 : 0.55;
+      drawStems(0);
+      for (const b of piece.beads) {
+        if (b.t > T) continue;
+        const x = X(b.x), y = Y(b.y), r = b.r * sc;
+        ctx.fillStyle = rgb(metal);
+        if (b.rosette) {
+          ctx.beginPath();
+          for (let k = 0; k < b.petals; k++) { const a = b.rot + (k * 6.283) / b.petals; ctx.moveTo(x, y); ctx.ellipse(x + Math.cos(a) * r * 0.55, y + Math.sin(a) * r * 0.55, r * 0.45, r * 0.24, a, 0, 6.283); }
+          ctx.fill();
+          ctx.fillStyle = rgb(hi); ctx.beginPath(); ctx.arc(x - r * 0.08, y - r * 0.08, r * 0.24, 0, 6.283); ctx.fill();
+        } else {
+          ctx.beginPath(); ctx.arc(x, y, r, 0, 6.283); ctx.fill();
+          ctx.fillStyle = rgb(hi); ctx.beginPath(); ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.38, 0, 6.283); ctx.fill();
+        }
+      }
+      drawStems(1);
+      drawStems(2);
+      ctx.globalAlpha = 1;
+      if (show === "cells") {
+        const { nx, ny, cells, maxC } = piece;
+        for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+          const c = cells[i + nx * j].length;
+          if (!c) continue;
+          ctx.fillStyle = css("--acid");
+          ctx.globalAlpha = 0.08 + 0.62 * (c / Math.max(maxC, 1));
+          ctx.fillRect(X(i * CELL) + 0.5, Y((j + 1) * CELL) + 0.5, CELL * sc - 1, CELL * sc - 1);
+        }
+        ctx.globalAlpha = 1;
+        if (G.hover >= 0) {
+          const i = G.hover % nx, j = Math.floor(G.hover / nx);
+          ctx.strokeStyle = css("--bg"); ctx.lineWidth = 2;
+          ctx.strokeRect(X(i * CELL), Y((j + 1) * CELL), CELL * sc, CELL * sc);
+          ctx.strokeStyle = css("--accent2"); ctx.lineWidth = 1.2;
+          for (const id of cells[G.hover]) {
+            const p = piece.prims[id];
+            ctx.beginPath(); ctx.arc(X(p.cx), Y(p.cy), p.r * sc, 0, 6.283); ctx.stroke();
+          }
+          ctx.setLineDash([3, 3]); ctx.globalAlpha = 0.7;
+          for (const id of cells[G.hover]) {
+            const p = piece.prims[id];
+            ctx.beginPath(); ctx.arc(X(p.cx), Y(p.cy), (p.r + MARGIN) * sc, 0, 6.283); ctx.stroke();
+          }
+          ctx.setLineDash([]); ctx.globalAlpha = 1;
+        }
+      }
+    });
+    const readout = () => {
+      const s = piece.stats;
+      const cell = G.show === "cells" && G.hover >= 0 ? `<span>This cell <b>${piece.cells[G.hover].length}</b></span>` : "";
+      $("gOut").innerHTML = `<span>Flow lines <b>${s.lines}</b></span><span>Scrolls <b>${s.scrolls}</b></span><span>Stubs taken back <b>${s.stubs}</b></span><span>Rosettes <b>${s.rosettes}</b> beads <b>${s.beads}</b></span><span>Primitives <b>${piece.prims.length}</b></span><span>Cell refs <b>${piece.refs}</b>, most <b>${piece.maxC}</b></span>${cell}`;
+    };
+    const run = animate(canvas, (dt) => {
+      if (G.T >= 1) return;
+      G.T = Math.min(1, G.T + dt / 6.2);
+      v.paint();
+    });
+    const regrow = () => { piece = null; G.T = reduce ? 1 : 0; v.redraw(); };
+    bind("gF", (x) => { G.flow = x; regrow(); });
+    $("gShow").addEventListener("change", (e) => { G.show = e.target.value; G.hover = -1; v.paint(); readout(); });
+    $("gNew").addEventListener("click", () => { G.seed++; regrow(); });
+    $("gReplay").addEventListener("click", () => { G.T = reduce ? 1 : 0; v.paint(); });
+    canvas.addEventListener("pointermove", (e) => {
+      if (G.show !== "cells" || !geo || !piece) return;
+      const r = canvas.getBoundingClientRect();
+      const x = (e.clientX - r.left) / geo.sc, y = (r.height - (e.clientY - r.top)) / geo.sc;
+      const i = Math.floor(x / CELL), j = Math.floor(y / CELL);
+      const h = i >= 0 && j >= 0 && i < piece.nx && j < piece.ny ? i + piece.nx * j : -1;
+      if (h !== G.hover) { G.hover = h; v.paint(); readout(); }
+    });
+    canvas.addEventListener("pointerleave", () => { if (G.hover >= 0) { G.hover = -1; v.paint(); readout(); } });
+    if (reduce) G.T = 1;
+    void run;
+  }
+
+  // ---------------------------------------------------------------- 2. symmetry
+  {
+    const Y = { kind: "4-fold", strokes: [], motifs: [], discs: [], rejected: 0, growing: 0, rnd: mulberry(5) };
+    const H2 = (a, b) => { const l = Math.hypot(a, b); a /= l; b /= l; return [1 - 2 * a * a, -2 * a * b, -2 * a * b, 1 - 2 * b * b]; };
+    const fold = (n) => [H2(1, 0), H2(Math.cos(Math.PI / n), Math.sin(Math.PI / n))];
+    // The generators, as kit.js has them, seen down the axis (x across, z up the screen).
+    const GENS = { none: [], mirror: [H2(1, 0)], "2 planes": [H2(1, 0), H2(0, 1)], "3-fold": fold(3), "4-fold": fold(4), "6-fold": fold(6) };
+    let images = [];
+    const mul = (a, b) => [a[0] * b[0] + a[1] * b[2], a[0] * b[1] + a[1] * b[3], a[2] * b[0] + a[3] * b[2], a[2] * b[1] + a[3] * b[3]];
+    const app = (m, p) => [m[0] * p[0] + m[1] * p[1], m[2] * p[0] + m[3] * p[1]];
+    function group() {
+      const key = (m) => m.map((v) => Math.round(v * 1e4)).join();
+      const I = [1, 0, 0, 1], seen = new Map([[key(I), I]]), q = [I];
+      while (q.length) { const m = q.pop(); for (const g of GENS[Y.kind]) { const n = mul(g, m), k = key(n); if (!seen.has(k)) { seen.set(k, n); q.push(n); } } }
+      seen.delete(key(I));
+      images = [...seen.values()];
+    }
+    const GEN = [0.3141, 0.5297];
+    const inDomain = (p) => {
+      const d0 = (p[0] - GEN[0]) ** 2 + (p[1] - GEN[1]) ** 2;
+      return images.every((m) => { const g = app(m, GEN); return (p[0] - g[0]) ** 2 + (p[1] - g[1]) ** 2 >= d0 - 1e-9; });
+    };
+    // Reserves a disc and its images; refuses one that hits a reserved disc or its own image.
+    const hit = (x, y, r) => Y.discs.some((d) => (d[0] - x) ** 2 + (d[1] - y) ** 2 < (r + d[2]) ** 2);
+    const selfHit = (x, y, r) => images.some((m) => { const q = app(m, [x, y]); return (q[0] - x) ** 2 + (q[1] - y) ** 2 < 4 * r * r; });
+    function tryCurl() {
+      const r = Y.rnd, a = r() * 6.283, rho = Math.sqrt(r()) * 0.82;
+      let x = Math.cos(a) * rho, y = Math.sin(a) * rho, d = r() * 6.283;
+      const hand = r() < 0.5 ? 1 : -1, L = 0.22 + r() * 0.2, w0 = 0.022, gap = 0.012;
+      const pts = [], disc = [];
+      let s = 0;
+      while (s < L) {
+        const f = s / L, w = w0 * (1 - 0.55 * f), k = hand / (0.16 * (1 - f) + 0.025 * f), h = 0.012;
+        d += k * h; x += Math.cos(d) * h; y += Math.sin(d) * h; s += h;
+        if (x * x + y * y > 0.92 * 0.92 || hit(x, y, w + gap) || selfHit(x, y, w + gap / 2)) break;
+        pts.push([x, y, w]); disc.push([x, y, w]);
+      }
+      if (s < L * 0.6 || pts.length < 6) { Y.rejected++; return; }
+      for (const q of disc) { Y.discs.push(q); for (const m of images) Y.discs.push([...app(m, q), q[2]]); }
+      Y.motifs.push(pts);
+    }
+    const canvas = $("symCanvas");
+    let geo = null, shade = null;
+    const v = setup(canvas, (w) => clamp(w * 0.62, 300, 460), (ctx, W, H) => {
+      const R = Math.min(W, H) / 2 - 14, cx = W / 2, cy = H / 2;
+      geo = { R, cx, cy };
+      const X = (x) => cx + x * R, Yp = (y) => cy - y * R;
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = css("--ground");
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, 6.283); ctx.fill();
+      // The fundamental domain, tested block by block.
+      if (images.length) {
+        const key = `${W}x${H}/${Y.kind}/${css("--accent2")}`;
+        if (!shade || shade.key !== key) {
+          const c = document.createElement("canvas"), b = 3;
+          c.width = Math.ceil(W / b); c.height = Math.ceil(H / b);
+          const g = c.getContext("2d"), img = g.createImageData(c.width, c.height), col = hex(css("--accent2"));
+          for (let j = 0; j < c.height; j++) for (let i = 0; i < c.width; i++) {
+            const p = [((i + 0.5) * b - cx) / R, (cy - (j + 0.5) * b) / R];
+            if (p[0] * p[0] + p[1] * p[1] > 1 || !inDomain(p)) continue;
+            const o = (i + j * c.width) * 4;
+            img.data[o] = col[0]; img.data[o + 1] = col[1]; img.data[o + 2] = col[2]; img.data[o + 3] = 60;
+          }
+          g.putImageData(img, 0, 0);
+          shade = { key, c };
+        }
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(shade.c, 0, 0, shade.c.width * 3, shade.c.height * 3);
+      }
+      // Mirror lines: each image that is a reflection fixes a line.
+      ctx.strokeStyle = css("--accent2"); ctx.lineWidth = 1.2; ctx.setLineDash([5, 4]);
+      for (const m of images) {
+        if (m[0] * m[3] - m[1] * m[2] > 0) continue;
+        const a = Math.atan2(m[2], m[0]) / 2;
+        ctx.beginPath(); ctx.moveTo(X(-Math.cos(a)), Yp(-Math.sin(a))); ctx.lineTo(X(Math.cos(a)), Yp(Math.sin(a))); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      const metal = css("--metal"), hi = css("--metal-hi");
+      const all = [[1, 0, 0, 1], ...images];
+      const drawPath = (pts, m, width) => {
+        ctx.beginPath();
+        pts.forEach((q, i) => { const p = app(m, q); i ? ctx.lineTo(X(p[0]), Yp(p[1])) : ctx.moveTo(X(p[0]), Yp(p[1])); });
+        ctx.lineWidth = width; ctx.stroke();
+      };
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      for (const pts of Y.motifs) for (const m of all) {
+        ctx.strokeStyle = metal;
+        for (let i = 1; i < pts.length; i++) drawPath([pts[i - 1], pts[i]], m, 2 * pts[i][2] * R);
+        ctx.fillStyle = metal;
+        const e = app(m, pts[pts.length - 1]);
+        ctx.beginPath(); ctx.arc(X(e[0]), Yp(e[1]), pts[pts.length - 1][2] * 1.6 * R, 0, 6.283); ctx.fill();
+        ctx.strokeStyle = hi;
+        for (let i = 1; i < pts.length; i++) drawPath([pts[i - 1], pts[i]], m, 0.6 * pts[i][2] * R);
+      }
+      for (const st of Y.strokes) for (const m of all) { ctx.strokeStyle = hi; drawPath(st, m, 3); }
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, 6.283); ctx.stroke();
+      $("yOut").innerHTML = `<span>Group order <b>${images.length + 1}</b></span><span>Mirrors <b>${images.filter((m) => m[0] * m[3] - m[1] * m[2] < 0).length}</b></span><span>Curls grown <b>${Y.motifs.length}</b>, drawn <b>${Y.motifs.length * (images.length + 1)}</b></span><span>Refused <b>${Y.rejected}</b></span>`;
+    });
+    const run = animate(canvas, () => {
+      if (Y.growing <= 0) return;
+      for (let i = 0; i < 4 && Y.growing > 0; i++, Y.growing--) tryCurl();
+      v.paint();
+    });
+    const clear = () => { Y.strokes = []; Y.motifs = []; Y.discs = []; Y.rejected = 0; Y.growing = 0; };
+    const grow = () => { Y.growing = 260; if (reduce) { while (Y.growing-- > 0) tryCurl(); } v.paint(); };
+    $("yS").addEventListener("change", (e) => { Y.kind = e.target.value; group(); clear(); shade = null; grow(); });
+    $("yGrow").addEventListener("click", grow);
+    $("yClear").addEventListener("click", () => { clear(); v.paint(); });
+    let drawing = null;
+    const at = (e) => { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left - geo.cx) / geo.R, (geo.cy - (e.clientY - r.top)) / geo.R]; };
+    canvas.addEventListener("pointerdown", (e) => { if (!geo) return; drawing = [at(e)]; Y.strokes.push(drawing); canvas.setPointerCapture(e.pointerId); });
+    canvas.addEventListener("pointermove", (e) => { if (!drawing) return; const p = at(e); if (Math.hypot(p[0], p[1]) <= 1) { drawing.push(p); v.paint(); } });
+    for (const t of ["pointerup", "pointercancel"]) canvas.addEventListener(t, () => (drawing = null));
+    group();
+    grow();
+    void run;
+  }
+
+  // ---------------------------------------------------------------- 3. the etch, in section
+  {
+    // Constants as in relief.js (reliefUniforms) and the copper look.
+    const WALL = 0.0035, LINE = 0.0006, CHASE = 0.0012, LW = 0.0007, MATTING = 0.5, REACH = 0.68;
+    const FILL_LEVEL = 0.001, FIRE_LEVEL = 0.004, SAG = 0.0015, BAND = 0.0016;
+    const SPAN = 0.064, YLO = -0.011, YHI = 0.0185;
+    const MOTIFS = [
+      { kind: "stem", c: 0.017, r: 0.0062, ta: 0.15, th: 0.3 },
+      { kind: "bead", c: 0.0288, r: 0.0034, ta: 0.55, th: 0.55 },
+      { kind: "stem", c: 0.0372, r: 0.0042, ta: 0.8, th: 0.8 },
+    ];
+    const P = { t: 26.8, relief: 1, grind: 0, bite: 1, enamel: false };
+    const hash = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+    const vnoise = (x) => { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return mix(hash(i), hash(i + 1), u); };
+    const stage = (name) => {
+      const st = (P.enamel ? FILL_STAGES : STAGES)[name];
+      if (!st) return 0;
+      return clamp((P.t - st[0]) / (st[1] - st[0]), 0, 1);
+    };
+    const raise = (th, hammer) => { const r = Math.max(clamp((hammer - th) / 0.05, 0, 1), hammer >= 1 ? 1 : 0) - 1; return 1 + 2.7 * r * r * r + 1.7 * r * r; };
+    const matting = (x) => {
+      const cs = 0.0036;
+      let h = 0;
+      for (let k = 0; k < 2; k++) {
+        const qq = x + k * cs * 0.5, c = Math.floor(qq / cs), j = hash(c + k * 41), j2 = hash(c * 3.7 + k * 9);
+        const o = (c + 0.2 + 0.6 * j) * cs, dd = Math.abs(qq - o) / (cs * (0.42 + 0.12 * j));
+        if (dd < 1) h = Math.min(h, -(1 - dd * dd) * (0.75 + 0.25 * j2));
+      }
+      return h;
+    };
+    // The surface at x: height H, and what the shading needs.
+    function profile(x) {
+      const draw = stage("draw"), hammer = stage("hammer"), etch = stage("etch");
+      let d = 1e3, top = 0, cav = 0;
+      for (const m of MOTIFS) {
+        if (draw < m.ta) continue;
+        const dist = Math.abs(x - m.c), dm = dist - m.r;
+        d = Math.min(d, dm);
+        if (dm >= 0) continue;
+        const u = clamp(dist / m.r, 0, 1), rs = raise(m.th, hammer);
+        let h, c = 0;
+        if (m.kind === "stem") {
+          const g = Math.exp(-u * u / 0.035) * smooth(2.5, 6, m.r / LW);
+          h = m.r * 0.95 * rs * Math.sqrt(1 - u * u) * (1 - 0.35 * g);
+          c = g;
+        } else { h = m.r * 0.85 * rs * Math.sqrt(1 - u * u); c = 0.3 * u * u * u; }
+        if (h > top) { top = h; cav = c; }
+      }
+      const en = 0.42 + 0.16 * vnoise(x * 90);
+      const bite = clamp((etch - 0.04) / 0.8, 0, 1);
+      const e = smooth(0, 1, clamp(bite * 2.2 - en * 0.5 - 0.7 * smooth(0, 0.012, d), 0, 1));
+      const ground = smooth(0, WALL, d), depth = 0.006 * P.bite;
+      const s = clamp(d / WALL, 0, 1);
+      const bitten = mix(ground, s * (2 - s), e) * (0.85 + 0.3 * en + 0.2 * smooth(WALL, 0.012, d)) + 0.25 * e * Math.exp(-(((d - WALL) / (WALL * 0.6)) ** 2));
+      const shave = P.grind > 0 ? 0.013 * (1 - P.grind) * P.relief + 0.0006 : 1e3;
+      const raw = d < 0 ? P.relief * top : -depth * e * bitten;
+      let H = d < 0 ? Math.min(raw, shave) : raw;
+      if (d < 1e2) H -= LINE * Math.exp(-d * d / (LW * LW)) * (1 - e);
+      const cw = Math.max(LW * 1.1, 0.0007);
+      H -= e * CHASE * Math.exp(-(((d - cw * 0.4) / cw) ** 2));
+      const ge = ground * e;
+      if (ge > 0) H += ge * MATTING * depth * 0.3 * matting(x) + ge * depth * 0.07 * (vnoise(x * 1100) - 0.5);
+      return { H, d, e, ge, top, cav, inside: d < 0 ? 1 : 0, shaved: d < 0 && raw > shave ? 1 : 0, rawTop: d < 0 ? raw : H };
+    }
+    const lin = (c) => c.map((v) => Math.pow(v, 1 / 2.2) * 255);
+    const canvas = $("profCanvas");
+    const v = setup(canvas, (w) => Math.round(clamp((w - 24) / SPAN, 0, 1e9) * (YHI - YLO)) + 26, (ctx, W, H) => {
+      const sc = (W - 24) / SPAN, x0 = 12, y0 = 10 + YHI * sc;
+      const X = (x) => x0 + x * sc, Yp = (y) => y0 - y * sc;
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const N = Math.max(300, Math.round(W * 1.5));
+      const pts = [];
+      for (let i = 0; i <= N; i++) { const x = (i / N) * SPAN; pts.push({ x, ...profile(x) }); }
+      for (let i = 0; i <= N; i++) {
+        const a = pts[Math.max(0, i - 1)], b = pts[Math.min(N, i + 1)];
+        pts[i].slope = 1 - 1 / Math.hypot(1, (b.H - a.H) / (b.x - a.x));
+      }
+      const etch = stage("etch"), patina = stage("patina"), burnish = stage("burnish");
+      const fill = stage("fill"), fire = stage("fire"), grind = stage("grind");
+      // The section of the metal.
+      ctx.fillStyle = css("--section");
+      ctx.beginPath(); ctx.moveTo(X(0), H);
+      for (const p of pts) ctx.lineTo(X(p.x), Yp(p.H));
+      ctx.lineTo(X(SPAN), H); ctx.closePath(); ctx.fill();
+      // Before Grind: the crowns it shaved.
+      if (P.grind > 0) {
+        ctx.strokeStyle = css("--stage-ink"); ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+        ctx.beginPath(); let on = false;
+        for (const p of pts) { if (p.shaved) { on ? ctx.lineTo(X(p.x), Yp(p.rawTop)) : ctx.moveTo(X(p.x), Yp(p.rawTop)); on = true; } else on = false; }
+        ctx.stroke(); ctx.setLineDash([]);
+        const sl = 0.013 * (1 - P.grind) * P.relief + 0.0006;
+        ctx.strokeStyle = css("--accent"); ctx.globalAlpha = 0.6;
+        ctx.beginPath(); ctx.moveTo(X(0), Yp(sl)); ctx.lineTo(X(SPAN), Yp(sl)); ctx.stroke(); ctx.globalAlpha = 1;
+      }
+      // Enamel: powder packed, fused, then ground flush by the stone.
+      const look = P.enamel ? { metal: [1.0, 0.7, 0.3], oxide: [0.06, 0.025, 0.012], crust: [0.02, 0.01, 0.01] } : { metal: [0.86, 0.46, 0.3], oxide: [0.07, 0.025, 0.014], crust: [0.15, 0.47, 0.39] };
+      const G = grind > 0 ? mix(FIRE_LEVEL + 0.012, FILL_LEVEL, smooth(0, 1, grind)) : 1e3;
+      if (P.enamel && fill > 0) {
+        const amtAt = (x) => clamp((fill * 1.35 - x / SPAN - 0.1 * vnoise(x * 300)) / 0.25, 0, 1);
+        const turq = lin([0.04, 0.42, 0.37]), coral = lin([0.75, 0.15, 0.07]), powder = (c) => mixc(c, [210, 210, 200], 0.45);
+        for (let i = 0; i < N; i++) {
+          const p = pts[i], amt = amtAt(p.x);
+          if (amt <= 0) continue;
+          const melt = clamp(fire * 2.4 - 0.5 * vnoise(p.x * 200) - 0.15, 0, 1);
+          const packed = mix(-0.006 * P.bite * 1.3, FIRE_LEVEL + 0.0015, amt) + 0.0005 * (vnoise(p.x * 700) - 0.5);
+          const glass = FIRE_LEVEL - SAG * smooth(0, 0.012, p.d);
+          const f = Math.min(mix(packed, glass, melt), G), m = Math.min(p.H, G);
+          if (f <= m) continue;
+          const ec = mixc(coral, turq, smooth(BAND * 0.7, BAND * 1.3, p.d));
+          ctx.fillStyle = rgb(mixc(powder(ec), ec, melt));
+          ctx.fillRect(X(p.x), Yp(f), X(pts[i + 1].x) - X(p.x) + 0.6, (f - m) * sc);
+        }
+        if (grind > 0) {
+          ctx.strokeStyle = css("--ink"); ctx.globalAlpha = 0.5; ctx.setLineDash([2, 4]);
+          ctx.beginPath(); ctx.moveTo(X(0), Yp(G)); ctx.lineTo(X(SPAN), Yp(G)); ctx.stroke();
+          ctx.setLineDash([]); ctx.globalAlpha = 1;
+        }
+      }
+      // The surface line, in the colour of its finish.
+      const nzAt = (x) => vnoise(x * 140);
+      ctx.lineWidth = 3; ctx.lineCap = "round";
+      for (let i = 0; i < N; i++) {
+        const p = pts[i], q = pts[i + 1];
+        let c = lin(look.metal).map((v) => v * (1 - (1 - 0.6) * p.ge));
+        const stain = p.ge * smooth(0, 1, p.e);
+        if (stain > 0) {
+          const bloom = Math.exp(-Math.max(p.d - WALL, 0) / (WALL * 1.2));
+          const ws = lin(mixc(mixc([0.2, 0.075, 0.035], [0.04, 0.01, 0.008], smooth(0.3, 1, p.e)), [0.24, 0.06, 0.05], bloom * 0.6));
+          c = mixc(c, ws, stain * 0.9);
+        }
+        const nz = nzAt(p.x), grow = clamp(patina * 1.5 - nz * 0.5, 0, 1);
+        const ridge = Math.min(p.top / 0.01, 1) * p.inside * (1 - p.cav) * (1 - clamp(p.slope * 2.5, 0, 1));
+        const polish = smooth(-0.2, 0.5, burnish * 1.2 - 1.2 + ridge - REACH - 0.25 * (nz - 0.5)) * p.inside;
+        const oxide = grow * mix(0.6, 1, Math.max(smooth(0, WALL, p.d), p.cav)) * (1 - polish * (1 - 0.7 * p.cav));
+        const cw = Math.max(LW * 1.1, 0.0007), chase = p.e * Math.exp(-(((p.d - cw * 0.4) / cw) ** 2));
+        const tight = p.ge * (1 - smooth(0, WALL * 0.8, p.d - WALL * 0.3));
+        const crust = grow * (P.enamel ? 0 : 1) * clamp(tight * 0.6 + chase + p.inside * clamp(p.cav * 1.2 + 0.75 * (0.75 + 0.5 * nz - 0.6 * ridge), 0, 1) * 0.5, 0, 1) * (1 - polish * (1 - 0.8 * p.cav));
+        c = mixc(c, lin(look.oxide).map((v) => v * 2.2), oxide * 0.85);
+        c = mixc(c, lin(look.crust), crust);
+        if (p.shaved || (P.enamel && p.H > G)) c = lin(look.metal);
+        if (P.enamel && fire > 0) { const heat = smooth(0, 0.3, fire) * (1 - smooth(0.5, 1, fire)); c = mixc(c, [255, 70, 20], heat * heat * 0.8); }
+        ctx.strokeStyle = rgb(c);
+        ctx.beginPath(); ctx.moveTo(X(p.x), Yp(Math.min(p.H, G))); ctx.lineTo(X(q.x), Yp(Math.min(q.H, G))); ctx.stroke();
+      }
+      // The acid film over the ground, rising in a meniscus up the walls.
+      const level = etch > 0 && etch < 1 ? Math.min(smooth(0, ACID.flood, etch), 1 - smooth(ACID.drain[0], ACID.drain[1], etch)) : 0;
+      if (level > 0.001) {
+        ctx.fillStyle = css("--acid"); ctx.globalAlpha = 0.5 * level;
+        const film = (p) => p.H + 0.0004 + 0.006 * P.bite * 0.45 * Math.exp(-Math.max(p.d, 0) / (WALL * 0.7));
+        ctx.beginPath();
+        let on = false;
+        for (const p of pts) {
+          if (p.d < 0) { if (on) { ctx.lineTo(X(p.x), Yp(p.H)); ctx.closePath(); on = false; } continue; }
+          if (!on) { ctx.moveTo(X(p.x), Yp(p.H)); on = true; }
+          ctx.lineTo(X(p.x), Yp(film(p)));
+        }
+        if (on) { ctx.lineTo(X(SPAN), Yp(pts[N].H)); ctx.closePath(); }
+        ctx.fill(); ctx.globalAlpha = 1;
+      }
+      // The blank's original surface, and a scale.
+      ctx.strokeStyle = css("--stage-ink"); ctx.lineWidth = 1; ctx.globalAlpha = 0.5; ctx.setLineDash([2, 3]);
+      ctx.beginPath(); ctx.moveTo(X(0), Yp(0)); ctx.lineTo(X(SPAN), Yp(0)); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+      ctx.fillStyle = css("--muted"); ctx.font = font(10.5); ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+      ctx.strokeStyle = css("--muted");
+      ctx.beginPath(); ctx.moveTo(X(0.0005), H - 8); ctx.lineTo(X(0.0105), H - 8); ctx.stroke();
+      ctx.fillText("0.01", X(0.0005), H - 12);
+      const st = P.enamel ? FILL_STAGES : STAGES;
+      let name = "blank";
+      for (const [k, [a, b]] of Object.entries(st)) if (P.t >= a && P.t <= b) name = k;
+      const end = P.enamel ? 33.2 : 26.8;
+      if (P.t >= end) name = "done";
+      else if (name === "blank" && P.t > 0.3) name = "between stages";
+      const mid = profile(0.055);
+      $("pOut").innerHTML = `<span>Stage <b>${name}</b></span><span>Bite in the open <b>${(mid.e * 100).toFixed(0)}%</b></span><span>Ground depth <b>${(-mid.H * 1000).toFixed(2)}</b> ‰ R</span><span>Tallest crown <b>${(Math.max(...pts.map((p) => (p.inside ? p.H : 0))) * 1000).toFixed(2)}</b> ‰ R</span>`;
+    });
+    const tIn = bind("pT", (x) => { P.t = x; v.paint(); }, (x) => `${(+x).toFixed(1)} s`);
+    bind("pR", (x) => { P.relief = x; v.paint(); });
+    bind("pG", (x) => { P.grind = x; v.paint(); });
+    bind("pB", (x) => { P.bite = x; v.paint(); });
+    $("pE").addEventListener("change", (e) => {
+      P.enamel = e.target.checked;
+      const end = P.enamel ? 33.2 : 26.8;
+      tIn.max = end;
+      if (P.t > end || P.t >= (P.enamel ? 26.8 : 33.2) - 0.01) P.t = end;
+      tIn.value = P.t; $("pTo").textContent = `${P.t.toFixed(1)} s`;
+      v.paint();
+    });
+    let playing = false;
+    const run = animate(canvas, (dt) => {
+      if (!playing) return;
+      const end = +tIn.max;
+      P.t = Math.min(end, P.t + dt * 1.6);
+      tIn.value = P.t; $("pTo").textContent = `${P.t.toFixed(1)} s`;
+      v.paint();
+      if (P.t >= end) { playing = false; $("pPlay").textContent = "Play"; }
+    });
+    $("pPlay").addEventListener("click", () => {
+      if (reduce) { P.t = +tIn.max; tIn.value = P.t; $("pTo").textContent = `${P.t.toFixed(1)} s`; v.paint(); return; }
+      if (playing) { playing = false; $("pPlay").textContent = "Play"; return; }
+      if (P.t >= +tIn.max - 0.01) P.t = 0;
+      playing = true; $("pPlay").textContent = "Pause";
+    });
+    void run;
+  }
+
+  // ---------------------------------------------------------------- 4. smoke on a grid, around a moving piece
+  {
+    const NX = 48, NY = 64, N = NX * NY, H = 0.075, LOX = -1.8, LOY = -1.3, JMAX = 40;
+    const F = { spin: 0.6, vort: 4, iters: 18, acid: true, flow: false, shape: "box" };
+    const sim = {
+      u: new Float32Array(N), v: new Float32Array(N), d: new Float32Array(N),
+      au: new Float32Array(N), av: new Float32Array(N), ad: new Float32Array(N),
+      sd: new Float32Array(N), su: new Float32Array(N), sv: new Float32Array(N),
+      w: new Float32Array(N), div: new Float32Array(N), p: new Float32Array(N), p2: new Float32Array(N),
+      theta: 0.3, omega: 0.6, time: 0, steps: 0, residual: 0,
+    };
+    const nzA = noise2(11), nzB = noise2(23), nzS = noise2(37);
+    const idx = (i, j) => i + NX * j;
+    // The piece in its own frame, as a signed distance (radius about 1).
+    const sdBox = (x, y, bx, by, r) => { const qx = Math.abs(x) - bx + r, qy = Math.abs(y) - by + r; return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r; };
+    const SHAPE = {
+      box: (x, y) => sdBox(x, y, 0.95, 0.55, 0.18),
+      cross: (x, y) => Math.min(sdBox(x, y, 0.95, 0.22, 0.12), sdBox(x, y, 0.22, 0.75, 0.12)),
+      ring: (x, y) => Math.abs(Math.hypot(x, y) - 0.72) - 0.2,
+    };
+    const sample = (a, gx, gy) => {
+      gx = clamp(gx, 0.5, NX - 0.5) - 0.5; gy = clamp(gy, 0.5, NY - 0.5) - 0.5;
+      const i = Math.min(Math.floor(gx), NX - 2), j = Math.min(Math.floor(gy), NY - 2), fx = gx - i, fy = gy - j;
+      return mix(mix(a[idx(i, j)], a[idx(i + 1, j)], fx), mix(a[idx(i, j + 1)], a[idx(i + 1, j + 1)], fx), fy);
+    };
+    function step(dt) {
+      const s = sim, om = s.omega, c = Math.cos(-s.theta), sn = Math.sin(-s.theta), sdf = SHAPE[F.shape];
+      s.theta += om * dt; s.time += dt;
+      // Obstacle: distance and surface velocity (ω × r) at every cell.
+      for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+        const k = idx(i, j), x = LOX + (i + 0.5) * H, y = LOY + (j + 0.5) * H;
+        s.sd[k] = sdf(c * x - sn * y, sn * x + c * y);
+        s.su[k] = -om * y; s.sv[k] = om * x;
+      }
+      // Advection: the value where each cell's air came from; clean air from outside.
+      for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+        const k = idx(i, j), gx = i + 0.5 - (dt * s.u[k]) / H, gy = j + 0.5 - (dt * s.v[k]) / H;
+        const outside = Math.max(-gx, gx - NX, -gy, gy - NY), keep = 1 - smooth(0, 1, outside);
+        s.au[k] = sample(s.u, gx, gy) * keep; s.av[k] = sample(s.v, gx, gy) * keep; s.ad[k] = sample(s.d, gx, gy) * keep;
+      }
+      // Forces: MacCormack on the vapour, buoyancy, a draught, the piece's drag, and vapour off the wet piece.
+      const nu = new Float32Array(N), nv = new Float32Array(N), nd = new Float32Array(N);
+      for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+        const k = idx(i, j), sd = s.sd[k];
+        if (sd < 0) { nu[k] = s.su[k]; nv[k] = s.sv[k]; nd[k] = 0; continue; }
+        const x = LOX + (i + 0.5) * H, y = LOY + (j + 0.5) * H;
+        const bx = i + 0.5 - (dt * s.u[k]) / H, by = j + 0.5 - (dt * s.v[k]) / H;
+        let d = s.ad[k];
+        if (bx > 0.5 && by > 0.5 && bx < NX - 0.5 && by < NY - 0.5) {
+          const err = s.d[k] - sample(s.ad, i + 0.5 + (dt * s.u[k]) / H, j + 0.5 + (dt * s.v[k]) / H);
+          const i0 = Math.floor(bx - 0.5), j0 = Math.floor(by - 0.5);
+          let lo = 1e9, hi = -1e9;
+          for (let q = 0; q < 4; q++) { const w = s.d[idx(clamp(i0 + (q & 1), 0, NX - 1), clamp(j0 + (q >> 1), 0, NY - 1))]; lo = Math.min(lo, w); hi = Math.max(hi, w); }
+          d = clamp(d + 0.5 * err, lo, hi);
+        }
+        let vx = s.au[k] * Math.exp(-dt * 0.15), vy = s.av[k] * Math.exp(-dt * 0.15);
+        d = Math.max(d, 0) * Math.exp(-dt * 0.3);
+        vy += dt * 4 * d / (1 + 0.6 * d);
+        const amt = dt * 3 * Math.min(d * 3, 1);
+        vx += amt * (nzA(x * 0.35 * 3, y * 0.35 * 3 - s.time * 0.25) - 0.5);
+        vy += amt * (nzB(x * 0.35 * 3 + 9, y * 0.35 * 3 - s.time * 0.25) - 0.5);
+        const shell = (1 - smooth(0, 2.5 * H, sd)) * (1 - Math.exp(-dt * 14));
+        vx = mix(vx, s.su[k], shell); vy = mix(vy, s.sv[k], shell);
+        const src = 1 - smooth(H * 0.5, H * 2.5, sd);
+        if (src > 0 && F.acid) {
+          const qx = c * x - sn * y, qy = sn * x + c * y;
+          const spot = nzS(qx * 1.6 * 2 + 31, qy * 1.6 * 2 + 31 + s.time * 0.3);
+          const gxs = s.sd[idx(Math.min(i + 1, NX - 1), j)] - s.sd[idx(Math.max(i - 1, 0), j)];
+          const gys = s.sd[idx(i, Math.min(j + 1, NY - 1))] - s.sd[idx(i, Math.max(j - 1, 0))];
+          const gl = Math.hypot(gxs, gys) || 1, nx = gxs / gl, ny = gys / gl;
+          const pattern = (0.05 + smooth(0.45, 0.75, spot) * 1.6) * (0.08 + 0.92 * smooth(-0.2, 0.7, ny));
+          const e = 3.2 * pattern * src;
+          d += dt * e;
+          vx += dt * e * (nx * 0.25 + (nzA(qx * 8, s.time * 3) - 0.5) * 1.2);
+          vy += dt * e * (ny * 0.25 + (nzB(qy * 8, s.time * 3) - 0.5) * 1.2);
+        }
+        nu[k] = vx; nv[k] = vy; nd[k] = d;
+      }
+      s.u.set(nu); s.v.set(nv); s.d.set(nd);
+      // Vorticity confinement: puts back the swirl the coarse grid smears out.
+      const vel = (a, i, j) => a[idx(clamp(i, 0, NX - 1), clamp(j, 0, NY - 1))];
+      for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) s.w[idx(i, j)] = ((vel(s.v, i + 1, j) - vel(s.v, i - 1, j)) - (vel(s.u, i, j + 1) - vel(s.u, i, j - 1))) * (0.5 / H);
+      if (F.vort > 0) for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+        const k = idx(i, j);
+        if (s.sd[k] < 0) continue;
+        const ex = Math.abs(vel(s.w, i + 1, j)) - Math.abs(vel(s.w, i - 1, j)), ey = Math.abs(vel(s.w, i, j + 1)) - Math.abs(vel(s.w, i, j - 1)), l = Math.hypot(ex, ey);
+        if (l < 1e-5) continue;
+        const f = dt * F.vort * H * (0.3 + 0.7 * Math.min(s.d[k] * 2, 1));
+        s.u[k] += f * (ey / l) * s.w[k]; s.v[k] -= f * (ex / l) * s.w[k];
+      }
+      // Divergence: neighbours inside the piece move with its surface; outside the box the flow carries on.
+      const vn = (a, sa, i, j, v0) => { if (i < 0 || j < 0 || i >= NX || j >= NY) return v0; const k = idx(i, j); return s.sd[k] < 0 ? sa[k] : a[k]; };
+      for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+        const k = idx(i, j);
+        s.div[k] = (0.5 / H) * (vn(s.u, s.su, i + 1, j, s.u[k]) - vn(s.u, s.su, i - 1, j, s.u[k]) + vn(s.v, s.sv, i, j + 1, s.v[k]) - vn(s.v, s.sv, i, j - 1, s.v[k]));
+      }
+      // Jacobi, warm started: zero outside the box (open), mirrored at the piece (no flow through it).
+      const pr = (p, i, j, p0) => (i < 0 || j < 0 || i >= NX || j >= NY ? 0 : s.sd[idx(i, j)] < 0 ? p0 : p[idx(i, j)]);
+      for (let it = 0; it < F.iters; it++) {
+        const p = s.p, q = s.p2;
+        for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+          const k = idx(i, j), p0 = p[k];
+          q[k] = (pr(p, i + 1, j, p0) + pr(p, i - 1, j, p0) + pr(p, i, j + 1, p0) + pr(p, i, j - 1, p0) - H * H * s.div[k]) / 4;
+        }
+        s.p = q; s.p2 = p;
+      }
+      // Projection.
+      let res = 0, cnt = 0;
+      for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+        const k = idx(i, j);
+        if (s.sd[k] < 0) { s.u[k] = s.su[k]; s.v[k] = s.sv[k]; s.d[k] = 0; continue; }
+        const p0 = s.p[k];
+        s.u[k] -= (pr(s.p, i + 1, j, p0) - pr(s.p, i - 1, j, p0)) * (0.5 / H);
+        s.v[k] -= (pr(s.p, i, j + 1, p0) - pr(s.p, i, j - 1, p0)) * (0.5 / H);
+      }
+      for (let j = 1; j < NY - 1; j++) for (let i = 1; i < NX - 1; i++) {
+        const k = idx(i, j);
+        if (s.sd[k] < 2 * H) continue;
+        const dv = (0.5 / H) * (s.u[k + 1] - s.u[k - 1] + s.v[k + NX] - s.v[k - NX]);
+        res += dv * dv; cnt++;
+      }
+      s.residual = Math.sqrt(res / Math.max(cnt, 1));
+      s.steps++;
+    }
+    const off = document.createElement("canvas");
+    off.width = NX; off.height = NY;
+    const octx = off.getContext("2d"), img = octx.createImageData(NX, NY);
+    const canvas = $("smokeCanvas");
+    let geo = null;
+    const v = setup(canvas, (w) => clamp(w * 0.78, 340, 560), (ctx, W, Hc) => {
+      const cs = Math.min(Hc / NY, W / NX), gw = cs * NX, gh = cs * NY, ox = (W - gw) / 2, oy = (Hc - gh) / 2;
+      geo = { ox, oy, cs, cx: ox + (-LOX / H) * cs, cy: oy + gh - (-LOY / H) * cs };
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, Hc);
+      const st = hex(css("--stage")), sm = hex(css("--smoke"));
+      for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+        const k = idx(i, j), a = 1 - Math.exp(-sim.d[k] * 1.6), o = (i + (NY - 1 - j) * NX) * 4;
+        const c = mixc(st, sm, a);
+        img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255;
+      }
+      octx.putImageData(img, 0, 0);
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(off, ox, oy, gw, gh);
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1; ctx.strokeRect(ox + 0.5, oy + 0.5, gw - 1, gh - 1);
+      // The piece, turned.
+      const X = (x) => geo.cx + (x / H) * cs, Y = (y) => geo.cy - (y / H) * cs;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(ox, oy, gw, gh); ctx.clip();
+      ctx.fillStyle = css("--metal");
+      ctx.save();
+      ctx.translate(X(0), Y(0)); ctx.rotate(-sim.theta);
+      const u = cs / H, rr = (bx, by, r) => ctx.roundRect(-bx * u, -by * u, 2 * bx * u, 2 * by * u, r * u);
+      ctx.beginPath();
+      if (F.shape === "box") rr(0.95, 0.55, 0.18);
+      else if (F.shape === "cross") { rr(0.95, 0.22, 0.12); rr(0.22, 0.75, 0.12); }
+      else { ctx.arc(0, 0, 0.92 * u, 0, 6.283); ctx.moveTo(0.52 * u, 0); ctx.arc(0, 0, 0.52 * u, 0, 6.283, true); }
+      ctx.fill("nonzero");
+      ctx.restore();
+      if (F.flow) {
+        ctx.strokeStyle = css("--accent2"); ctx.globalAlpha = 0.8; ctx.lineWidth = 1;
+        for (let j = 1; j < NY; j += 3) for (let i = 1; i < NX; i += 3) {
+          const k = idx(i, j), x = ox + (i + 0.5) * cs, y = oy + gh - (j + 0.5) * cs, ux = sim.u[k], uy = sim.v[k];
+          const l = Math.hypot(ux, uy);
+          if (l < 0.02) continue;
+          const sc = Math.min(l, 2.5) / l * cs * 1.1;
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + ux * sc, y - uy * sc); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+      ctx.restore();
+    });
+    const drag = { on: false, id: -1, a: 0, acc: 0 };
+    const angle = (e) => { const r = canvas.getBoundingClientRect(); return Math.atan2(-(e.clientY - r.top - geo.cy), e.clientX - r.left - geo.cx); };
+    let frame = 0;
+    const readout = () => {
+      let tot = 0;
+      for (let k = 0; k < N; k++) tot += sim.d[k];
+      $("fOut").innerHTML = `<span>Grid <b>48 × 64</b> (one slice of 48 × 64 × 48)</span><span>Steps <b>${sim.steps}</b></span><span>Spin <b>${sim.omega.toFixed(2)}</b> rad/s</span><span>Vapour <b>${(tot * H * H).toFixed(2)}</b></span><span>Divergence left <b>${sim.residual.toFixed(3)}</b></span>`;
+    };
+    const run = animate(canvas, (dt) => {
+      if (drag.on) { sim.omega += (drag.acc / dt - sim.omega) * (1 - Math.exp(-dt * 25)); drag.acc = 0; }
+      else sim.omega += (F.spin - sim.omega) * (1 - Math.exp(-dt * 1.2));
+      sim.omega = clamp(sim.omega, -15, 15);
+      step(1 / 60);
+      v.paint();
+      if (++frame % 10 === 0) readout();
+    });
+    canvas.addEventListener("pointerdown", (e) => { if (!geo) return; drag.on = true; drag.id = e.pointerId; drag.a = angle(e); drag.acc = 0; canvas.setPointerCapture(e.pointerId); });
+    canvas.addEventListener("pointermove", (e) => {
+      if (!drag.on || e.pointerId !== drag.id) return;
+      const a = angle(e);
+      let d = a - drag.a;
+      if (d > Math.PI) d -= 2 * Math.PI; else if (d < -Math.PI) d += 2 * Math.PI;
+      drag.acc += d; drag.a = a;
+    });
+    for (const t of ["pointerup", "pointercancel"]) canvas.addEventListener(t, (e) => { if (e.pointerId === drag.id) drag.on = false; });
+    bind("fS", (x) => { F.spin = x; });
+    bind("fV", (x) => { F.vort = x; }, (x) => (+x).toFixed(1));
+    bind("fJ", (x) => { F.iters = Math.min(JMAX, x | 0); }, (x) => String(x | 0));
+    $("fP").addEventListener("change", (e) => { F.shape = e.target.value; });
+    $("fA").addEventListener("change", (e) => { F.acid = e.target.checked; });
+    $("fFl").addEventListener("change", (e) => { F.flow = e.target.checked; v.paint(); });
+    $("fR").addEventListener("click", () => { for (const k of ["u", "v", "d", "p", "p2"]) sim[k].fill(0); v.paint(); });
+    if (reduce) { run.running = false; for (let i = 0; i < 240; i++) step(1 / 60); v.paint(); readout(); }
+  }
+})();
+</script>
+</body>
+</html>

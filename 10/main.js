@@ -854,7 +854,52 @@ function requestBuild() {
     else prefetch.taken = true;
     return;
   }
+  // Grown ahead for a recording (app.preload).
+  if (grown.has(key)) {
+    const d = grown.get(key);
+    grown.delete(key);
+    applyBuild(d).catch((err) => buildFailed(key, err));
+    return;
+  }
   worker.postMessage(buildRequest(key, params));
+}
+// Recordings: pieces grown and compiled ahead (app.preload), put on when their params come up (app.nextLook).
+const grown = new Map();
+const growing = new Map();
+let preloadWorker = null;
+async function preloadPieces(picks = []) {
+  preloadWorker ??= Object.assign(new Worker(workerUrl, { type: "module" }), { onmessage: onWorkerMessage });
+  for (const pick of picks) {
+    // The pick as the page would fit it (symmetries the shape and pattern allow).
+    const was = params.$snapshot(params.$keys);
+    let values;
+    try {
+      params.$apply({ ...was, ...pick });
+      symmetryKey = "";
+      fitSymmetry();
+      values = params.$snapshot(params.$keys);
+    } finally {
+      params.$apply(was);
+      symmetryKey = "";
+      fitSymmetry();
+    }
+    const sig = Object.fromEntries(Object.entries(values).map(([k, v]) => [k, () => v]));
+    const key = buildKey(sig);
+    if (grown.has(key)) continue;
+    const d = await new Promise((resolve) => {
+      growing.set(key, resolve);
+      preloadWorker.postMessage(buildRequest(key, sig, "preload"));
+    });
+    growing.delete(key);
+    await compileMaterial(materialFor(d.types, values.look), geometries[d.shape]);
+  }
+  while (blank || busy || built !== buildKey() || swap.phase !== "idle") await new Promise((r) => setTimeout(r, 100));
+}
+// { clear: hold }: once the piece on show is finished and held `hold` seconds, it shrinks away for good.
+let clearing = null;
+function nextPiece(pick = {}) {
+  if (pick.clear !== undefined) return void (clearing = { hold: pick.clear });
+  for (const [k, v] of Object.entries(pick)) params[k]?.set(v);
 }
 // A piece that can't be built (or compiled) is logged and given up on: the page carries on with the one on show (or,
 // on first load, clears the loader), rather than waiting for it forever.
@@ -887,6 +932,7 @@ function onWorkerMessage(e) {
     if (ACID_FX && shownShape === d.shape) fumes.setShape(fields[d.shape]);
     return;
   }
+  if (d.prefetch === "preload") return grown.set(d.id, d), growing.get(d.id)?.(d);
   if (d.prefetch) return prefetched(d);
   applyBuild(d).catch((err) => buildFailed(d.id, err));
 }
@@ -1141,6 +1187,11 @@ function readyToGo(r) {
   return awaitMaterial(r.next, geometries[r.shape]);
 }
 function updateSwap(dt) {
+  if (clearing && built && swap.phase === "idle" && clock >= processEnd() && (clearing.hold -= dt) <= 0) {
+    swap.phase = "out";
+    swap.t = 0;
+    fumes.reset();
+  }
   // A new piece asked for: shrink the one on show, from wherever it is.
   if (swap.phase !== "out" && requested !== built && requested !== failedKey && built) {
     swap.phase = "out";
@@ -1189,6 +1240,8 @@ const _right = new Vector3();
 const _upv = new Vector3();
 const _upAxis = new Vector3(0, 1, 0);
 const stir = { next: 1 };
+// A recording can ask for the stirring the kiosk does (app.stir).
+let stirAlways = false;
 const capturing = new URLSearchParams(location.search).has("capture");
 const _axis = new Vector3();
 const drag = { active: false, id: -1, x: 0, y: 0, vx: 0, vy: 0, idle: 99 };
@@ -1275,7 +1328,7 @@ function updateSpin(dt) {
     omega.lerp(_axis, 1 - Math.exp(-dt * (back > 0 ? 0.8 : 1.2)));
     // Auto mode, left alone during the etch: now and then a stir, a spin or a nudge, to swirl the fumes.
     const etchNow = stage("etch");
-    const stirring = params.auto() && !capturing && swap.phase === "idle" && etchNow > 0.06 && etchNow < ACID.drain[0] - 0.04 && drag.idle > 3;
+    const stirring = params.auto() && (!capturing || stirAlways) && swap.phase === "idle" && etchNow > 0.06 && etchNow < ACID.drain[0] - 0.04 && drag.idle > 3;
     if (stirring && (stir.next -= dt) <= 0) {
       stir.next = 1.8 + 1.6 * nativeRandom();
       const r = nativeRandom;
@@ -1298,9 +1351,9 @@ function updateSpin(dt) {
 }
 controls.minDistance = 1.25;
 controls.maxDistance = 8;
-// Render scale: drops while frames are slow, climbs back once they keep up with the display.
+// Render scale: a safety net for slow devices, dropped one step at a time only while frames stay well under 25 fps, never raised.
 const adaptive = !new URLSearchParams(location.search).has("capture") && !new URLSearchParams(location.search).has("noadapt") && pipeline.quality !== "capture";
-const view = { w: 1, h: 1, dpr: 1, scale: 1, ema: 16, last: 0, checked: 0 };
+const view = { w: 1, h: 1, dpr: 1, scale: 1, ema: 16, last: 0, checked: 0, slow: 0 };
 // The pipeline follows the canvas's drawing buffer, so the scale goes through the renderer's pixel ratio.
 const applySize = () => {
   renderer.setPixelRatio(view.dpr * view.scale);
@@ -1319,13 +1372,12 @@ function adaptScale(now) {
   view.ema += (frame - view.ema) * 0.05;
   if (now - view.checked < 1500) return;
   view.checked = now;
-  let s = view.scale;
-  if (view.ema > 26 && s > 0.5) s = Math.max(0.5, s * 0.85);
-  else if (view.ema < 18.5 && s < 1) s = Math.min(1, s * 1.1);
-  if (Math.abs(s - view.scale) > 0.02) {
-    view.scale = s;
-    applySize();
-  }
+  view.slow = view.ema > 40 ? view.slow + 1 : 0;
+  if (view.slow < 4 || view.scale <= 0.5) return;
+  view.slow = 0;
+  view.ema = 16;
+  view.scale = Math.max(0.5, view.scale * 0.8);
+  applySize();
 }
 
 function randomizePiece() {
@@ -1362,7 +1414,7 @@ await load.compile.track(pipeline.compileAsync(scene, camera), 1);
 // The fumes aren't needed until the etch: their noise and shaders are made once the piece is up.
 if (ACID_FX) setTimeout(() => fumes.prepare(renderer), 300);
 
-window.app = { canvas: renderer.domElement, params, pipeline, camera, controls, mesh, get material() { return material; }, replay, sound, soundStats, fumes, get building() { return busy || !!blank || built !== buildKey() || swap.phase !== "idle" || swap.spin < 1; }, get clock() { return clock; }, set clock(v) { clock = v; } };
+window.app = { preload: preloadPieces, nextLook: nextPiece, set stir(v) { stirAlways = v; }, canvas: renderer.domElement, params, pipeline, camera, controls, mesh, get material() { return material; }, replay, sound, soundStats, fumes, get building() { return busy || !!blank || built !== buildKey() || swap.phase !== "idle" || swap.spin < 1; }, get clock() { return clock; }, set clock(v) { clock = v; } };
 
 const stage = (name) => {
   const s = stages()[name];
@@ -1469,7 +1521,7 @@ function playSound(prevHammer, hammer, dt) {
   const burnish = stage("burnish");
   sound.setLoop("rub", burnish > 0 && burnish < 1 ? 0.5 * Math.sin(Math.PI * burnish) ** 0.5 : 0, Math.sqrt(speed));
 }
-// The acid bath's surface (world height) as it rises over the piece and drains off it, and the vapour above it.
+// The acid's cover on the piece as it spreads and rinses off, and the vapour it gives off.
 const acid = { rate: 0, prevBite: 0, fumes: 0, rinsed: true };
 // The fumes' own time: the process clock's pace, but it runs on while pieces change over, so the vapour drifts off.
 let fumeTime = 0;
@@ -1486,8 +1538,8 @@ function updateAcid(u, dt) {
   acid.rate += (rate - acid.rate) * (1 - Math.exp(-(dt || 0) * 3));
   acid.fumes = ACID_FX && swap.phase === "idle" ? level * (0.35 + 0.65 * acid.rate) : 0;
   const mc = shownLook().metal;
-  // The fumes come off the wet surface: the piece, up to the bath's level on it.
-  fumes.update(fumeTime, acid.fumes, -1.15 + 2.3 * level, mesh, Math.min(1, Math.max(0, (mc[0] - mc[2]) * 1.6)));
+  // The fumes come off where the acid lies on the piece.
+  fumes.update(fumeTime, acid.fumes, u.acidLine.value, mesh, Math.min(1, Math.max(0, (mc[0] - mc[2]) * 1.6)));
 }
 const smooth = (a, b, x) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));

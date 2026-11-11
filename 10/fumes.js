@@ -170,11 +170,34 @@ uniform float dt;
 uniform float time;
 uniform float emission;
 uniform float acidLine;
+uniform float objUnit;
 uniform float dissipation;
 uniform float buoyancy;
 uniform float drag;
 uniform float stir;
 vec4 nz(vec3 q) { return texture(tNoise, q * (4.0 / ${NOISE}.0)); }
+float hash(vec3 p) {
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
+float vnoise(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(hash(i), hash(i + vec3(1, 0, 0)), f.x), mix(hash(i + vec3(0, 1, 0)), hash(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(hash(i + vec3(0, 0, 1)), hash(i + vec3(1, 0, 1)), f.x), mix(hash(i + vec3(0, 1, 1)), hash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+// The acid's cover at o (object space), as relief.js draws it: 0..1 spreading, 1..2 rinsing off; the finest octave is
+// left at its mean, below the grid's resolution.
+float acidWet(vec3 o) {
+  if (acidLine < -1e2) return 0.0;
+  bool draining = acidLine > 1.0;
+  float cov = draining ? 2.0 - acidLine : acidLine;
+  float field = draining ? 0.55 * vnoise(o * 4.0 + 29.0) + 0.3 * vnoise(o * 13.0) + 0.075 - 0.3 * 0.5 + 0.15
+                         : 0.65 * vnoise(o * 1.7 + 11.0) + 0.35 * vnoise(o * 6.0 + 3.0);
+  return smoothstep(-0.08, 0.08, cov * 1.3 - 0.15 - field);
+}
 float sdAt(ivec3 c) { return texelFetch(tSolid, clampedPx(c), 0).w; }
 void main() {
   ivec2 px = ivec2(gl_FragCoord.xy);
@@ -221,7 +244,7 @@ void main() {
       sdAt(c + ivec3(0, 0, 1)) - sdAt(c - ivec3(0, 0, 1))) + 1e-6);
     // Most of it off the upper side: what leaves the underside clings to the surface and climbs it.
     pattern *= 0.08 + 0.92 * smoothstep(-0.2, 0.7, n.y);
-    float wet = smoothstep(acidLine + 0.15, acidLine - 0.15, p.y);
+    float wet = acidWet(q * objUnit);
     float e = emission * pattern * wet * src;
     d += dt * e;
     // Boiling off the surface: a little push outward and a stir.
@@ -642,7 +665,8 @@ export function createFumes() {
       dt: dtU,
       time: timeU,
       emission: { value: 0 },
-      acidLine: { value: 2 },
+      acidLine: { value: -1e3 },
+      objUnit: { value: 1 },
       dissipation: { value: 0.3 },
       buoyancy: { value: 4.0 },
       drag: { value: 14 },
@@ -796,7 +820,7 @@ export function createFumes() {
       shapeU.useShape.value = 1;
     },
     // time: the process clock, but running on while pieces change over (stopped while paused); strength 0..1: how
-    // fast vapour is given off; line: the acid's level on the piece (-1 its bottom, 1 its top);
+    // fast vapour is given off; line: the acid's cover, as relief.js's acidLine (0..1 spreading, 1..2 rinsing);
     // warm: how coppery the metal is (nitric acid on copper gives off brown NO2, others a pale vapour). Steps the sim
     // by the clock's advance.
     update(time, strength, line, mesh, warm) {
@@ -873,6 +897,7 @@ export function createFumes() {
       const a = sim.forces.uniforms;
       a.emission.value = run.fading > 0 ? 0 : 3.2 * strength;
       a.acidLine.value = line;
+      a.objUnit.value = R / scale;
       a.dissipation.value = 0.45 + 0.9 * Math.min(1, run.quiet / 2);
       timeU.value = time;
       run.owed = Math.min(run.owed + dt, 3 * MAX_STEP);
