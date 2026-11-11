@@ -244,6 +244,7 @@
         [7, "How Hollow Hollows"],
         [8, "How Tesseract Repeats"],
         [9, "How Membrane Squeezes"],
+        [10, "How Caustic Bites"],
       ]
         .filter(([day]) => days[day - 1].title)
         .map(([day, title]) => ({ small: `Day ${day} · ${days[day - 1].prompt}`, title, href: `./${day}/explainer.html`, thumb: `screenshots/${day}.jpg` }));
