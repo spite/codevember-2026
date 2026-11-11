@@ -3,11 +3,11 @@
 // runs at once if the browser allows it, otherwise it resumes on the first gesture.
 import { nativeRandom } from "modules/random.js";
 
-const TINKS = 6;
+const TINKS = 21;
 const LOOPS = ["scratch", "fizz", "rub", "torch", "stone", "hiss"];
-// Loops played from another's recording: the hiss is the fizz, sped up and stripped of its bubbles.
-const FROM = { hiss: "fizz" };
-const HIGHPASS = { hiss: 3500 };
+// Loops played from another's recording.
+const FROM = {};
+const HIGHPASS = {};
 const MAX_VOICES = 12;
 
 function createSound({ base = "./sounds/", onProgress } = {}) {
@@ -58,8 +58,26 @@ function createSound({ base = "./sounds/", onProgress } = {}) {
     if (!paused && ctx.state !== "running") ctx.resume();
   };
   for (const type of ["pointerdown", "touchend", "click", "keydown"]) window.addEventListener(type, gesture, { capture: true });
+  // A hidden tab stops the frames that set the loops' levels: silence it rather than leave them at their last.
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) ctx.suspend();
+    else if (!paused && (navigator.userActivation?.hasBeenActive ?? true)) ctx.resume();
+  });
 
   const live = () => on && !paused && ctx.state === "running";
+
+  function voice(buffer, at, gain, pan, rate) {
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.playbackRate.value = rate;
+    const g = ctx.createGain();
+    g.gain.value = Math.min(1, gain);
+    const p = ctx.createStereoPanner();
+    p.pan.value = Math.max(-1, Math.min(1, pan));
+    src.connect(g).connect(p).connect(master);
+    src.start(at);
+    voices.push(at + buffer.duration / rate);
+  }
 
   // A hammer blow: gain 0..1, pan -1..1, rate scales the pitch.
   function tink({ gain = 1, pan = 0, rate = 1 } = {}) {
@@ -71,7 +89,9 @@ function createSound({ base = "./sounds/", onProgress } = {}) {
     if (tinks.length > 1 && i === lastTink) i = (i + 1) % tinks.length;
     lastTink = i;
     const buffer = tinks[i];
-    const r = rate * (0.92 + nativeRandom() * 0.16);
+    // Varied: pitch and strength wander, and now and then the hammer bounces for a soft second tap.
+    const r = rate * (0.85 + nativeRandom() * 0.3);
+    gain *= 0.7 + 0.45 * nativeRandom();
     voices.push(now + buffer.duration / r);
     const src = ctx.createBufferSource();
     src.buffer = buffer;
@@ -82,6 +102,7 @@ function createSound({ base = "./sounds/", onProgress } = {}) {
     p.pan.value = Math.max(-1, Math.min(1, pan));
     src.connect(g).connect(p).connect(master);
     src.start(now);
+    if (nativeRandom() < 0.18 && voices.length < MAX_VOICES - 1) voice(tinks[Math.floor(nativeRandom() * tinks.length)], now + 0.06 + nativeRandom() * 0.05, gain * 0.3, pan, r * 1.08);
     return true;
   }
 
@@ -121,6 +142,8 @@ function createSound({ base = "./sounds/", onProgress } = {}) {
       l.level = target;
       l.quietSince = target > 0.001 ? null : ctx.currentTime;
     }
+    // A level that never rose past the threshold still counts as quiet, so its source is stopped too.
+    if (l.source && target <= 0.001 && l.quietSince === null) l.quietSince = ctx.currentTime;
     if (l.source && l.level <= 0.001 && l.quietSince !== null && ctx.currentTime - l.quietSince > 0.6) {
       l.source.stop();
       l.source.disconnect();

@@ -1,5 +1,12 @@
 // Shared by the pattern generators: primitive types, the seeded random sequence, occupancy discs, a walker on the
 // surface, surface sampling, symmetry images and hammer blows. Import-free beyond ./noise.js (runs in the worker).
+
+// A stroke or arc drawn from its later end is turned round, so it grows from a (ta) to b (tb).
+export const forward = (p) => {
+  if (p.ta > p.tb) [p.a, p.b, p.ra, p.rb, p.ta, p.tb] = [p.b, p.a, p.rb, p.ra, p.tb, p.ta];
+  return p;
+};
+
 export { createNoise } from "./noise.js";
 
 export const STROKE = 0;
@@ -26,7 +33,7 @@ export const NODULE = 31;
 export const POD = 32;
 export const SPHINCTER = 33;
 export const VERTEBRA = 34;
-export const VEIN = 0, HOSE = 1, BONE = 2;
+export const VEIN = 0, HOSE = 1, BONE = 2, SEPTA = 3;
 // More classic primitives: a unit of a classical border (egg-and-dart, bead-and-reel, running wave, guilloche) and a
 // segment of a barbed plume. Their twist (±1) is the handedness of their frame, flipped in mirror images.
 export const FRIEZE = 40;

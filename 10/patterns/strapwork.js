@@ -124,8 +124,8 @@ export function strapwork(shape, opts, kit) {
     const R = (rin - d1 - WT - GAP) * (0.8 + 0.2 * fill);
     const keep = R + GAP + WT;
     for (let m = 0, off = d1; m < 8; m++, off += step) {
-      // On a sheet open cells are common (sites round its cut edges): their fillets are cut back too.
-      const poly = shape.sparse ? cut(clip(planes, off)) : clip(planes, off);
+      // Fillets of open cells are cut back too.
+      const poly = cut(clip(planes, off));
       if (poly.length < 3) break;
       let any = false;
       for (let k = 0; k < poly.length; k++) {

@@ -4,7 +4,7 @@
 // U-turns of brain coral), turns away from what is ahead, and now and then forks into a Y. When they are all stuck,
 // every spot still a pitch clear of the ridges seeds a new pair running both ways, parallel to its nearest
 // neighbour, so the labyrinth closes up; the wider valleys left get pores. Drawing grows from a few seeds outward.
-import { TUBE, NODULE, VEIN, BONE, HOSE, rnd, rand, Occupancy, Walker, jitteredLattice, surfacePoint, createNoise } from "../kit.js";
+import { TUBE, NODULE, VEIN, BONE, SEPTA, rnd, rand, Occupancy, Walker, jitteredLattice, surfacePoint, createNoise } from "../kit.js";
 
 /*
  * opts: scale, seed, flow (how much the ridges wander), leafiness (the ridges' texture: crested, flat-topped and
@@ -24,7 +24,7 @@ export function coral(shape, opts, kit) {
   const H = P * 0.28; // step
   const KMAX = 1 / (0.56 * P); // tightest U-turn
   const WIN = 2.1 * P; // a ridge ignores itself this far back along its length
-  const style = texture < 0.34 ? BONE : texture < 0.67 ? VEIN : HOSE;
+  const style = texture < 0.34 ? BONE : texture < 0.67 ? VEIN : SEPTA;
 
   const occ = new Occupancy(P, shape.bounds);
   occ.images = images;
@@ -282,7 +282,7 @@ export function coral(shape, opts, kit) {
         b++;
       }
       const A = pts[a], B = pts[b];
-      prims.push({ type: TUBE, a: A.p, b: B.p, ra: rr(a), rb: rr(b), ribs: style === HOSE ? ribs : style === VEIN ? (2 * Math.PI) / (1.6 * P) : 0, s0, kind: style, ta: A.t, tb: B.t, h: 0.95 });
+      prims.push({ type: TUBE, a: A.p, b: B.p, ra: rr(a), rb: rr(b), ribs: style === SEPTA ? ribs * 1.6 : style === VEIN ? (2 * Math.PI) / (1.6 * P) : 0, s0, kind: style, ta: A.t, tb: B.t, h: 0.95 });
       s0 += len;
       a = b;
     }

@@ -252,8 +252,8 @@ export function arabesque(shape, opts, kit) {
       }
       const R = rf - GAP;
       occ.add(p[0], p[1], p[2], R, owner++, 0, t);
-      if (R > 0.009 * S && rnd() < rosettes) prims.push({ type: ROSETTE, a: p, b: [1, 0, 0], R, petals: 5 + Math.floor(rnd() * 4), layers: 2, seed: rnd(), kind: [DAISY, FIVE][Math.floor(rnd() * 2)], ta: t, tb: t + R * 6 });
-      else prims.push({ type: BEAD, a: p, R: R * 0.85, ta: t, tb: t + 0.01 });
+      if (R > 0.009 * S && rnd() < rosettes) prims.push({ type: ROSETTE, a: p.slice(0, 3), b: [1, 0, 0], R, petals: 5 + Math.floor(rnd() * 4), layers: 2, seed: rnd(), kind: [DAISY, FIVE][Math.floor(rnd() * 2)], ta: t, tb: t + R * 6 });
+      else prims.push({ type: BEAD, a: p.slice(0, 3), R: R * 0.85, ta: t, tb: t + 0.01 });
     }
   }
   prims.whole = !mesh.symmetric;

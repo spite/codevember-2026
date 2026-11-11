@@ -134,6 +134,9 @@ export function emitStrand(prims, occ, pts, crossings, opts) {
       tb: time(s[k1]),
       h: 1,
     });
+    // Drawn from its earlier end: a rounded strand's bulge is to the side of the chord, so it flips with it.
+    const r = prims[prims.length - 1];
+    if (r.ta > r.tb) [r.a, r.b, r.ta, r.tb, r.sag] = [r.b, r.a, r.tb, r.ta, style > 0 ? -r.sag : r.sag];
   }
   return total;
 }

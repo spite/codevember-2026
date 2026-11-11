@@ -119,11 +119,15 @@ export function levelField(shape, images, { axis, amp, nf, noise, off, K = 18, s
         else if (dot(d, prevDir) < 0) d = d.map((x) => -x);
         w.setDir(d);
         prevDir = w.d.slice();
+        const from = w.p.slice();
         w.step(H, 0);
         const r = toLevel(w.p, l);
         if (!r) break;
         w.p = [r[0], r[1], r[2]];
         w.n = [r[3], r[4], r[5]];
+        // Stalled: the level pull undoes the step, or the line winds in place.
+        if ((w.p[0] - from[0]) * d[0] + (w.p[1] - from[1]) * d[1] + (w.p[2] - from[2]) * d[2] < H * 0.25) break;
+        if (pts.length >= 32 && dist(w.p, pts[pts.length - 32]) < H * 4) break;
         if (sg > 0 && i > 8 && dist(w.p, q) < H * 1.2) {
           closed = true;
           break;

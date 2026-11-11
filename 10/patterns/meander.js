@@ -120,9 +120,10 @@ export function meander(shape, opts, kit) {
     else if (k.i === 0) {
       // Boxed in from the start: a square stud, square to the lattice.
       const nd = nodes[k.v];
-      const q = nodes[nd.nb[0]].p;
       const w = 0.26 * nd.h;
-      const e = [q[0] - nd.p[0], q[1] - nd.p[1], q[2] - nd.p[2]];
+      const n = nd.n;
+      const q = nd.nb.length ? nodes[nd.nb[0]].p : null;
+      const e = q ? [q[0] - nd.p[0], q[1] - nd.p[1], q[2] - nd.p[2]] : Math.abs(n[1]) < 0.9 ? [n[2], 0, -n[0]] : [0, -n[2], n[1]];
       prims.push({ type: FRET, a: nd.p.slice(), b: nd.p.map((x, j) => x + e[j] * 1e-4), w, ext: w, kind: FLAT, ta: k.t, tb: k.t + 1, h: (0.26 * U) / w });
     }
   }
@@ -167,8 +168,8 @@ export function meander(shape, opts, kit) {
   return prims;
 }
 
-// A square lattice over the blank, about U apart: the torus by its two angles, anything else by a cube projected
-// onto it (equal-angle on round shapes, so the lines are great circles on the sphere; each cube corner is a node
+// A square lattice over the blank, about U apart: a blank's own quad grid or surface nets, the torus by its two
+// angles, anything else by a cube projected onto it (equal-angle on round shapes, so the lines are great circles on the sphere; each cube corner is a node
 // with three neighbours).
 export function latticeGraph(shape, U) {
   const nodes = [];
@@ -224,7 +225,13 @@ export function latticeGraph(shape, U) {
       }
     });
   }
+  // Links stretched far past the spacing (rays grazing a lobe) would lay oversized straps: they are cut.
+  for (const nd of nodes) nd.nb = nd.nb.filter((u) => Math.hypot(nodes[u].p[0] - nd.p[0], nodes[u].p[1] - nd.p[1], nodes[u].p[2] - nd.p[2]) < U * 2.2);
   for (const nd of nodes) {
+    if (!nd.nb.length) {
+      nd.h = U;
+      continue;
+    }
     let s = 0;
     for (const u of nd.nb) s += Math.hypot(nodes[u].p[0] - nd.p[0], nodes[u].p[1] - nd.p[1], nodes[u].p[2] - nd.p[2]);
     nd.h = s / nd.nb.length;

@@ -6,7 +6,7 @@ export const OW = 4096;
 export const MAX_PER_CELL = 96;
 const MARGIN = 0.012;
 
-function footprint(p) {
+function footprint(p, shape) {
   if (p.type === ARC) {
     const mid = [(p.a[0] + p.b[0]) / 2, (p.a[1] + p.b[1]) / 2, (p.a[2] + p.b[2]) / 2];
     const rho = Math.hypot(p.a[0] - p.c[0], p.a[1] - p.c[1], p.a[2] - p.c[2]);
@@ -58,16 +58,23 @@ function footprint(p) {
   if (p.type === FRET) {
     // A capsule: the cells are tested against the segment itself.
     const c = [(p.a[0] + p.b[0]) / 2, (p.a[1] + p.b[1]) / 2, (p.a[2] + p.b[2]) / 2];
-    const cap = Math.max(p.ext, p.extB ?? p.ext, 0) + p.w * (1.42 + Math.max(Math.abs(p.kA ?? 0), Math.abs(p.kB ?? 0)));
+    const cap = Math.max(p.ext, p.extB ?? p.ext, 0) + p.w * (1.42 + Math.max(Math.abs(p.kA ?? 0), Math.abs(p.kB ?? 0))) + sag(shape, c);
     return [c, Math.hypot(p.b[0] - p.a[0], p.b[1] - p.a[1], p.b[2] - p.a[2]) / 2 + cap, cap];
   }
   if (p.type === FRIEZE) return [p.a, Math.hypot(p.P * 0.62, p.B) * 1.04];
   if (p.type === FEATHER) {
     const c = [(p.a[0] + p.b[0]) / 2, (p.a[1] + p.b[1]) / 2, (p.a[2] + p.b[2]) / 2];
-    const cap = p.W * 1.05;
+    const cap = p.W * 1.05 + sag(shape, c);
     return [c, Math.hypot(p.b[0] - p.a[0], p.b[1] - p.a[1], p.b[2] - p.a[2]) / 2 + cap, cap];
   }
   return [p.a, p.R * 1.02];
+}
+
+// How far a chord's midpoint lies off the surface, which its capsule must reach across.
+function sag(shape, c) {
+  if (!shape?.project) return 0;
+  const q = shape.project(c[0], c[1], c[2]);
+  return Math.hypot(q[0] - c[0], q[1] - c[1], q[2] - c[2]);
 }
 
 // Packs primitives, cells and blows into typed arrays, with the grid's layout.
@@ -154,7 +161,7 @@ export function packRelief(shape, { prims, blows }, cellSize = 0.016) {
     const w3 = p.type === RIBBON ? p.sag : p.type === FEATHER ? p.twist * (Math.round(p.Lf * 1000) + Math.min(0.499, (p.h ?? 1) - 0.5)) : p.type === GUILLOCHE ? motif(p) : p.h ?? 1;
     pd.set([p.ta, p.tb, p.th, w3], o + 12);
     // Bounding sphere, and a rough height (integer part: radius in 1/4096ths; fraction: height), for far pixels.
-    const [fc, fr] = footprint(p);
+    const [fc, fr] = footprint(p, shape);
     const H = p.type === STROKE || p.type === ARC || p.type === TUBE ? Math.max(p.ra, p.rb) * 0.95 * (p.h ?? 1) : Math.min(fr * 0.3, 0.012);
     pd.set([fc[0], fc[1], fc[2], Math.ceil(fr * 4096) + Math.min(H, 0.99)], o + 16);
   });
@@ -165,7 +172,23 @@ export function packRelief(shape, { prims, blows }, cellSize = 0.016) {
   const cells = dim[0] * dim[1] * dim[2];
   // Two passes over the cells each footprint touches: count, then fill, straight into typed arrays.
   const half = cellSize * 0.866;
-  const fps = prims.map(footprint);
+  const fps = prims.map((p) => footprint(p, shape));
+  // Cells well off the surface, which no pixel looks up (tested lazily, for large footprints only): 1 near, 2 far.
+  const near = new Uint8Array(cells);
+  // The fields are distances to within a few percent (the gyroid's a little over).
+  const reach = (half + MARGIN + 0.01) * 1.15;
+  const bdim = dim.map((d) => Math.ceil(d / 4));
+  const block = new Uint8Array(bdim[0] * bdim[1] * bdim[2]);
+  const at = (i, j, k, s) => Math.abs(shape.sdf(min[0] + (i + s) * cellSize, min[1] + (j + s) * cellSize, min[2] + (k + s) * cellSize));
+  const isNear = (ci, i, j, k) => {
+    if (!near[ci]) {
+      // Blocks of 4³ cells first.
+      const bi = (i >> 2) + bdim[0] * ((j >> 2) + bdim[1] * (k >> 2));
+      if (!block[bi]) block[bi] = at(i & ~3, j & ~3, k & ~3, 2) > reach + 4 * half ? 2 : 1;
+      near[ci] = block[bi] === 2 || at(i, j, k, 0.5) > reach ? 2 : 1;
+    }
+    return near[ci] === 1;
+  };
   function visit(id, fn) {
     const p = prims[id];
     const [c, r0, cap] = fps[id];
@@ -191,7 +214,9 @@ export function packRelief(shape, { prims, blows }, cellSize = 0.016) {
             const sd = Math.hypot(px - ab[0] * s, py - ab[1] * s, pz - ab[2] * s);
             if (sd > cap + MARGIN + half) continue;
           }
-          fn(i + dim[0] * (j + dim[1] * k));
+          const ci = i + dim[0] * (j + dim[1] * k);
+          if (r0 > cellSize * 2 && shape.sdf && !isNear(ci, i, j, k)) continue;
+          fn(ci);
         }
   }
   const counts = new Uint32Array(cells);

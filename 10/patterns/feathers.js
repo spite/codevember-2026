@@ -135,7 +135,8 @@ export function feathers(shape, opts, kit) {
     for (let k = 0; k < tries; k++) {
       const q = surfacePoint(shape);
       if (occ.hit(q[0], q[1], q[2], W * 0.5)) continue;
-      tryPlume([q[0], q[1], q[2]], W, Lf * rand(0.8, 1.2), 0.98 - level * 0.07 - rnd() * 0.05);
+      // The first laid lie on top.
+      tryPlume([q[0], q[1], q[2]], W, Lf * rand(0.8, 1.2), 0.98 - level * 0.07 - 0.12 * (k / tries) - rnd() * 0.03);
     }
   });
 

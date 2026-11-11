@@ -3,7 +3,7 @@
 // takes its normal by finite differences. The hammer blows displace the mesh in the vertex shader.
 import { DataTexture, FloatType, UnsignedIntType, RGBAFormat, RGIntegerFormat, RedIntegerFormat, NearestFilter, Vector3, Matrix3, Color } from "three";
 import { PipelineMaterial } from "modules/pipeline/PipelineMaterial.js";
-import { STROKE, LEAF, ROSETTE, BEAD, ARC, FROND, BLOSSOM, DAISY, PEONY, FIVE, CHRYS, BUD, BELL, RIBBON, SCALE, PALMETTE, FRET, ROUNDEL, FLAT, RIBBED, TUBE, NODULE, POD, SPHINCTER, VERTEBRA, VEIN, HOSE, FRIEZE, FEATHER, EGG, REEL, WAVE, GUILLOCHE, ROSE, SUNBURST, WAVES, BARLEYCORN, HOBNAIL, BLADE, BLOOM, POPPY, IRIS } from "./ornament.js";
+import { STROKE, LEAF, ROSETTE, BEAD, ARC, FROND, BLOSSOM, DAISY, PEONY, FIVE, CHRYS, BUD, BELL, RIBBON, SCALE, PALMETTE, SEPTA, FRET, ROUNDEL, FLAT, RIBBED, TUBE, NODULE, POD, SPHINCTER, VERTEBRA, VEIN, HOSE, FRIEZE, FEATHER, EGG, REEL, WAVE, GUILLOCHE, ROSE, SUNBURST, WAVES, BARLEYCORN, HOBNAIL, BLADE, BLOOM, POPPY, IRIS } from "./ornament.js";
 import { OW, MAX_PER_CELL } from "./pack.js";
 
 function texture(data, w, h, format, type, internal) {
@@ -12,6 +12,8 @@ function texture(data, w, h, format, type, internal) {
   t.minFilter = t.magFilter = NearestFilter;
   t.generateMipmaps = false;
   t.needsUpdate = true;
+  // Once on the GPU, the CPU copy isn't needed.
+  t.onUpdate = () => (t.image.data = null);
   return t;
 }
 
@@ -47,6 +49,31 @@ float ornNoise(vec3 p) {
   f = f * f * (3.0 - 2.0 * f);
   return mix(mix(mix(ornHash(i), ornHash(i + vec3(1, 0, 0)), f.x), mix(ornHash(i + vec3(0, 1, 0)), ornHash(i + vec3(1, 1, 0)), f.x), f.y),
              mix(mix(ornHash(i + vec3(0, 0, 1)), ornHash(i + vec3(1, 0, 1)), f.x), mix(ornHash(i + vec3(0, 1, 1)), ornHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+}
+`;
+
+// Laminated metal (mokume = 1: mokume-gane's copper, silver and brass; 2: Damascus' bright and dark steels): the layer
+// coordinate at q, warped like folded and forged billets, its contours cut down through by the height hs; and its
+// colour, lit by the layers.
+const lam = /* glsl */ `
+float ornLam(vec3 q, float hs) {
+  if (mokume > 1.5) return q.y * 62.0 + 20.0 * ornNoise(q * 1.9 + 2.0 * ornNoise(q * 4.3)) + 2.5 * ornNoise(q * 10.0) - hs * 260.0;
+  return q.y * 34.0 + 14.0 * ornNoise(q * 2.4 + 1.5 * ornNoise(q * 5.0)) + 1.5 * ornNoise(q * 11.0) - hs * 200.0;
+}
+vec3 ornLamColor(vec3 p, float hs, float e, float inside) {
+  float lay = ornLam(p, hs);
+  float aa = 0.08 + min(fwidth(lay), 2.0);
+  if (mokume > 1.5) {
+    // Damascus: bright nickel steel and carbon steel blackened by the etch.
+    float c = smoothstep(-aa, aa, cos(6.2832 * lay));
+    vec3 dark = mix(vec3(0.42, 0.42, 0.43), vec3(0.07, 0.07, 0.075), smoothstep(0.0, 1.0, e));
+    vec3 lamc = mix(dark, vec3(0.78, 0.78, 0.77), mix(c, 0.5, smoothstep(0.6, 2.0, fwidth(lay))));
+    // Faint on the motifs, so the ornament reads over the banding.
+    return mix(lamc, mix(vec3(0.6, 0.6, 0.59), vec3(0.8, 0.8, 0.79), c), inside * 0.7);
+  }
+  vec3 ph = cos(2.0944 * (lay - vec3(0.0, 1.0, 2.0)));
+  vec3 w = smoothstep(vec3(0.5 - aa), vec3(0.5 + aa), ph) + 0.01;
+  return (vec3(0.72, 0.31, 0.18) * w.x + vec3(0.93, 0.92, 0.88) * w.y + vec3(0.92, 0.72, 0.38) * w.z) / (w.x + w.y + w.z);
 }
 `;
 
@@ -94,6 +121,12 @@ uniform vec3 ornDim;
 uniform float ornCellSize;
 uniform mat3 ornModel;
 uniform int ornSamples;
+// One sample a pixel (phones) is compiled as such, so the three-sample loops aren't built at all.
+#ifdef ORN_SAMPLES_1
+#define ORN_NS 1
+#else
+#define ORN_NS ornSamples
+#endif
 uniform float ornFar;
 uniform float ornDraw;
 uniform float ornHammer;
@@ -181,7 +214,12 @@ void ornAccum(inout vec4 res, float d, float h, float hs, float reveal, float ca
 // Merges one element's result into the pixel's, as ornAccum would have.
 void ornMerge(inout vec4 res, vec4 r) {
   res.x = min(res.x, r.x);
-  if (r.y > res.y) res.yw = r.yw;
+  // The same smooth max as ornAccum, across elements (the pieces of a chain are separate elements).
+  float k = 0.12 * max(res.y, r.y);
+  if (res.y > 0.0 && r.y > 0.0 && k > 0.0) {
+    float m = clamp(0.5 + 0.5 * (r.y - res.y) / k, 0.0, 1.0);
+    res.yw = vec2(mix(res.y, r.y, m) + k * m * (1.0 - m), mix(res.w, r.w, m));
+  } else if (r.y > res.y) res.yw = r.yw;
   res.z = max(res.z, r.z);
 }
 
@@ -642,6 +680,9 @@ void ornEval(vec4 t0, vec4 t1, vec4 t2, vec4 t3, vec3 q, vec3 n, float lw, inout
     // Across the strand only, as if it ran on past the ends: neighbouring segments share their tangent at a joint,
     // so the profile and the incised lines run through it seamlessly.
     float across = abs(p2.y);
+    // Knot strands are closed loops of segments: each fills only its own span (its wedge), so neighbours meet on the
+    // shared normal at their joint instead of overlapping caps, whose rims printed as circles.
+    bool inSpan = abs(p2.x) <= l;
     if (strap || abs(sag) < 1e-4 * l) dist = strap ? abs(p2.y) : length(vec2(p2.x - clamp(p2.x, -l, l), p2.y));
     else {
       vec2 C = vec2(0.0, (sag * sag - l * l) / (2.0 * sag));
@@ -651,10 +692,11 @@ void ornEval(vec4 t0, vec4 t1, vec4 t2, vec4 t3, vec3 q, vec3 n, float lw, inout
       vec2 wv = p2 - C;
       float cuv = u.x * v.y - u.y * v.x;
       across = abs(length(wv) - rho);
-      if ((u.x * wv.y - u.y * wv.x) * cuv >= 0.0 && (wv.x * v.y - wv.y * v.x) * cuv >= 0.0) dist = across;
+      inSpan = (u.x * wv.y - u.y * wv.x) * cuv >= 0.0 && (wv.x * v.y - wv.y * v.x) * cuv >= 0.0;
+      if (inSpan) dist = across;
       else dist = min(length(p2 - vec2(-l, 0.0)), length(p2 - vec2(l, 0.0)));
     }
-    float d = strap ? max(dist - w, abs(p2.x) - l) : dist - w;
+    float d = strap ? max(dist - w, abs(p2.x) - l) : inSpan ? dist - w : max(dist - w, 1e-5);
     float x = clamp((strap ? dist : across) / w, 0.0, 1.0);
     float rc = t2.w;
     // Knot strands pack the crossing strand's angle in the fraction of the radius.
@@ -838,7 +880,8 @@ void ornEval(vec4 t0, vec4 t1, vec4 t2, vec4 t3, vec3 q, vec3 n, float lw, inout
       cav = 0.3 * (1.0 - clamp(s / 0.32, 0.0, 1.0));
     } else if (kind == ${RIBBED}) {
       // Chamfered flat with a half-round rib down the middle.
-      float c = 1.0 - s;
+      // Into a square end the rib runs on to a round tip instead of turning the end's corners.
+      float c = ext > 0.0 ? min(length(vec2(y, max(ox - ext + w, 0.0))) / w, 1.0) : 1.0 - s;
       h = 0.3 + 0.4 * clamp(s / 0.3, 0.0, 1.0) + (c < 0.3 ? 0.3 * sqrt(1.0 - c * c / 0.09) : 0.0);
       cav = exp(-pow((c - 0.33) / 0.06, 2.0)) * 0.8;
     } else {
@@ -949,6 +992,13 @@ void ornEval(vec4 t0, vec4 t1, vec4 t2, vec4 t3, vec3 q, vec3 n, float lw, inout
       x = clamp(dist / rr, 0.0, 1.0);
       h = sqrt(1.0 - x * x) * (1.0 - 0.3 * groove) * (0.85 + 0.15 * cos(ph * 2.0 * ORN_PI - ORN_PI));
       cav = groove * smoothstep(1.5, 4.0, rr / lw);
+    } else if (kind == ${SEPTA}) {
+      // Brain coral: a smooth rounded crest, fine grooves (septa) running down its flanks only.
+      float ph = fract(s * t2.y);
+      float flank = smoothstep(0.35, 0.85, x);
+      float groove = exp(-pow((ph - 0.5) * 7.0, 2.0)) * flank;
+      h = sqrt(1.0 - x * x) * (1.0 - 0.18 * groove);
+      cav = 0.6 * groove * smoothstep(1.5, 4.0, rr / lw);
     } else if (kind == ${VEIN}) {
       // Slightly flattened on top, with a faint pulse of swellings along it.
       float sw = 1.0 + 0.08 * sin(s * t2.y);
@@ -1261,13 +1311,14 @@ void ornEval(vec4 t0, vec4 t1, vec4 t2, vec4 t3, vec3 q, vec3 n, float lw, inout
     float lod = smoothstep(1.0, 2.5, period * 0.3 / lw);
     float ridge = sqrt(max(0.0, 1.0 - pow(2.0 * bf - 1.0, 2.0)));
     float s = clamp(ay / max(hw, 1e-6), 0.0, 1.0);
-    float h = (0.5 + 0.3 * (1.0 - s * s) + 0.14 * mix(0.6, ridge, lod)) * (0.6 + 0.4 * ornShoulder(ay - edge, 0.2 * W));
+    // Domed and falling steeply at the rim, so where vanes overlap the upper one's edge shows as a crease.
+    float h = (0.4 + 0.45 * (1.0 - s * s) + 0.14 * mix(0.6, ridge, lod)) * (0.4 + 0.6 * ornShoulder(ay - edge, 0.12 * W));
     float cav = (1.0 - ridge) * lod * 0.8 + 0.3 * s;
     if (dr < 0.0) {
-      h = 0.95 + 0.25 * sqrt(max(0.0, 1.0 - ay * ay / (rw * rw)));
+      h = 0.9 + 0.15 * sqrt(max(0.0, 1.0 - ay * ay / (rw * rw)));
       cav = 0.0;
     }
-    float hs = W * 0.42 * (0.5 + fract(abs(t3.w))) * raise * step(ox, 0.0);
+    float hs = W * 0.42 * (0.3 + 1.4 * fract(abs(t3.w))) * raise * step(ox, 0.0);
     float reveal = progress >= 1.0 ? 1.0 : step(x / Lp, progress);
     ornAccum(res, d, h * hs, hs, reveal, clamp(cav, 0.0, 1.0));
   }
@@ -1533,6 +1584,7 @@ float ornMatLod = 1.0;
 float ornLw = 0.001;
 float ornPitLod = 1.0;
 
+#ifdef ORN_GUILLOCHE
 // Engine-turned ground: wavy grooves cut around the axis.
 float ornGuiU(vec3 q) {
   float lat = atan(q.y, length(q.xz));
@@ -1543,7 +1595,9 @@ float ornGuilloche(vec3 q) {
   float f = abs(2.0 * fract(ornGuiU(q)) - 1.0);
   return mix(-0.55, -(1.0 - f * f * sqrt(f)), ornGuiLod);
 }
+#endif
 
+#ifdef ORN_FILL
 // Where enamel powder has been laid (0..1): packed from scattered points outward.
 float ornFillFront(vec3 q) {
   if (ornFill >= 1.0) return 1.0;
@@ -1566,14 +1620,12 @@ float ornFillTop(float d, vec3 q, float amt, float melt) {
   float glass = fireLevel - fillSag * smoothstep(0.0, 0.012, d);
   return mix(packed, glass, melt);
 }
+#endif
 
 // F: the top of the acid film here (its meniscus up the walls, ripples, bubbles).
-// Laminated metal (mokume = 1: mokume-gane's copper, silver and brass; 2: Damascus' bright and dark steels): the layer
-// coordinate at q, warped like folded and forged billets, its contours cut down through by the height hs.
-float ornLam(vec3 q, float hs) {
-  if (mokume > 1.5) return q.y * 62.0 + 20.0 * ornNoise(q * 1.9 + 2.0 * ornNoise(q * 4.3)) + 2.5 * ornNoise(q * 10.0) - hs * 260.0;
-  return q.y * 34.0 + 14.0 * ornNoise(q * 2.4 + 1.5 * ornNoise(q * 5.0)) + 1.5 * ornNoise(q * 11.0) - hs * 200.0;
-}
+#ifdef ORN_LAM
+${lam}
+#endif
 
 float ornHeight(vec4 res, vec3 q, float en, out float F) {
   float d = res.x;
@@ -1586,21 +1638,27 @@ float ornHeight(vec4 res, vec3 q, float en, out float F) {
   float H = d < 0.0 ? min(reliefHeight * res.y, shaveLevel) : -etchDepth * e * bitten;
   F = 0.0;
   // Cloisonné: the etch leaves only a wire round each motif's rim; its inside sinks to take the enamel.
+#ifdef ORN_CLOISON
   if (cloison > 0.0 && d < 0.0) H = mix(H, mix(-etchDepth, max(H, 0.0065 * reliefHeight), 1.0 - smoothstep(cloison * 0.6, cloison, -d)), e);
+#endif
   // The scribed outline of the drawn motifs, chased into a crisp groove at their foot once etched.
   H -= lineDepth * exp(-d * d / (ornLw * ornLw)) * (1.0 - e);
   float cw = max(ornLw * 1.1, 0.0007);
   H -= e * chaseDepth * exp(-pow((d - cw * 0.4) / cw, 2.0));
   float ge = ground * e;
   // The etch eats the softer layers of a laminate deeper (copper, the carbon steel): the layers stand in relief.
+#ifdef ORN_LAM
   if (mokume > 0.0 && e > 0.0) {
     float lay = ornLam(q, H);
     float soft = mokume > 1.5 ? 0.5 + 0.5 * cos(6.2832 * lay) : smoothstep(0.3, 0.9, cos(2.0944 * lay));
     H -= e * mix(0.45, 1.0, ground) * etchDepth * (mokume > 1.5 ? 0.3 : 0.22) * soft * ornMatLod;
   }
+#endif
   if (ge > 0.0) {
     if (ornMatLod > 0.0) H += ge * ornMatLod * matting * etchDepth * 0.3 * ornMatting(q);
+#ifdef ORN_GUILLOCHE
     if (guilloche > 0.0) H += ge * guilloche * etchDepth * 0.13 * ornGuilloche(q);
+#endif
     if (ornPitLod > 0.0) H += ge * ornPitLod * etchDepth * 0.07 * (ornNoise(q * 1100.0) - 0.5);
     float fizz = bubbles * ornWet * e * (0.25 + 2.5 * (1.0 - e)) * (0.3 + 1.5 * exp(-(d - wallWidth) / (wallWidth * 2.0)));
     if (fizz > 0.0) {
@@ -1629,7 +1687,7 @@ void surface(inout Surface s) {
   float lw = max(fp * 0.8, 0.0007);
   ornLw = lw;
   ornMatLod = 1.0 - smoothstep(0.0008, 0.0018, fp);
-  ornPitLod = 1.0 - smoothstep(0.0004, 0.0009, fp);
+  ornPitLod = 1.0 - smoothstep(0.00015, 0.0004, fp);
   float near = wallWidth * 1.5 + eps * 2.0 + lw * 3.0;
   vec3 q1 = p + T * eps;
   vec3 q2 = p + B * eps;
@@ -1642,8 +1700,8 @@ void surface(inout Surface s) {
   uvec2 oc = texelFetch(ornCells, ivec2(ci % ORN_OW, ci / ORN_OW), 0).rg;
   int count = int(oc.y);
   int off = int(oc.x);
-  for (int i = 0; i < ${MAX_PER_CELL}; i++) {
-    if (i >= count) break;
+  // count is capped at MAX_PER_CELL when packed; a constant bound makes D3D's compiler unroll the loop.
+  for (int i = 0; i < count; i++) {
     int li = off + i;
     int id = int(texelFetch(ornList, ivec2(li % ORN_OW, li / ORN_OW), 0).r);
     vec4 t3 = ornTexel(id, 3);
@@ -1667,7 +1725,7 @@ void surface(inout Surface s) {
     vec4 t1 = ornTexel(id, 1);
     vec4 t2 = ornTexel(id, 2);
     // One call in a loop the compiler can't unroll: inlined three times, the shader takes minutes to compile on D3D.
-    for (int k = 0; k < ornSamples; k++) {
+    for (int k = 0; k < ORN_NS; k++) {
       vec3 q = k == 0 ? p : k == 1 ? q1 : q2;
       vec4 r = vec4(1e3, 0.0, 0.0, 0.0);
       ornEval(t0, t1, t2, t3, q, n, lw, r);
@@ -1683,7 +1741,9 @@ void surface(inout Surface s) {
       else ornMerge(r2, r);
     }
   }
+#ifdef ORN_GUILLOCHE
   if (guilloche > 0.0) ornGuiLod = 1.0 - smoothstep(0.25, 0.6, fwidth(ornGuiU(p)));
+#endif
   float en = ornNoise(p * 3.0) * 0.6 + ornNoise(p * 9.0) * 0.4;
   ornN = n;
   vec3 wp = vWorldPosition;
@@ -1699,7 +1759,7 @@ void surface(inout Surface s) {
   } else ornWet = 0.0;
   float h0 = 0.0, h1 = 0.0, h2 = 0.0, F0 = 0.0, F1 = 0.0, F2 = 0.0;
   // As with ornEval: one call in a loop the compiler can't unroll, rather than three inlined copies.
-  for (int k = 0; k < ornSamples; k++) {
+  for (int k = 0; k < ORN_NS; k++) {
     float F;
     float h = ornHeight(k == 0 ? r0 : k == 1 ? r1 : r2, k == 0 ? p : k == 1 ? q1 : q2, en, F);
     if (k == 0) {
@@ -1739,6 +1799,7 @@ void surface(inout Surface s) {
   float stoned = 0.0;
   float thick = 0.0;
   float melt = 0.0;
+#ifdef ORN_FILL
   if (enamelOn > 0.5) {
     float g = smoothstep(0.0, 1.0, ornGrind);
     float G = ornGrind > 0.0 ? mix(fireLevel + 0.012, fillLevel, g) : 1e3;
@@ -1763,12 +1824,15 @@ void surface(inout Surface s) {
   }
   // A stone-cut face keeps a little of the modeling under it (fillKeep), as a polished inlay does.
   if (enamelOn > 0.5) nb = normalize(mix(nb, nRel, fillKeep * cut));
+#endif
   // Cushioned enamel: inside a motif the glass keeps a soft swell of the modeling under it.
+#ifdef ORN_CLOISON
   if (fillCushion > 0.0) {
     // From the motif's own modeling (cloisonné sinks the motifs before the glass goes in).
     vec3 nCush = normalize(n - (T * (r1.y - r0.y) + B * (r2.y - r0.y)) * reliefHeight * 0.5 / eps);
     nb = normalize(mix(nb, nCush, fillCushion * fillCov * step(r0.x, 0.0)));
   }
+#endif
   // The acid film over the exposed ground: level, rising in a meniscus at the walls.
   float wet = ornWet * smoothstep(-0.0002, 0.0004, r0.x);
   vec3 nFilm = wet > 0.0 ? normalize(ornModel * normalize(n - T * (F1 - F0) / eps - B * (F2 - F0) / eps)) : n;
@@ -1804,22 +1868,13 @@ void surface(inout Surface s) {
   // Motifs in their own metal (gilt, inlaid) once the patina stage lays it on; the blank and the ground in groundColor.
   float gild = inside * clamp(ornPatina * 1.6 - nz * 0.6, 0.0, 1.0);
   vec3 albedo = mix(groundColor, metalColor, gild) * mix(1.0, groundDark, ge);
+#ifdef ORN_LAM
   if (mokume > 0.0) {
     // Mokume-gane: wavy copper, silver and brass layers, cut down through by the relief and the etch.
     float hs = d < 0.0 ? min(reliefHeight * r0.y, shaveLevel) : -etchDepth * ge;
-    float lay = ornLam(p, hs);
-    float aa = 0.08 + min(fwidth(lay), 2.0);
-    if (mokume > 1.5) {
-      // Damascus: bright nickel steel and carbon steel blackened by the etch.
-      float c = smoothstep(-aa, aa, cos(6.2832 * lay));
-      vec3 dark = mix(vec3(0.42, 0.42, 0.43), vec3(0.07, 0.07, 0.075), smoothstep(0.0, 1.0, e));
-      albedo = mix(dark, vec3(0.78, 0.78, 0.77), mix(c, 0.5, smoothstep(0.6, 2.0, fwidth(lay)))) * mix(1.0, groundDark, ge);
-    } else {
-      vec3 ph = cos(2.0944 * (lay - vec3(0.0, 1.0, 2.0)));
-      vec3 w = smoothstep(vec3(0.5 - aa), vec3(0.5 + aa), ph) + 0.01;
-      albedo = (vec3(0.72, 0.31, 0.18) * w.x + vec3(0.93, 0.92, 0.88) * w.y + vec3(0.92, 0.72, 0.38) * w.z) / (w.x + w.y + w.z) * mix(1.0, groundDark, ge);
-    }
+    albedo = ornLamColor(p, hs, e, inside) * mix(1.0, groundDark, ge);
   }
+#endif
   vec3 fresh = albedo;
   float metal = 1.0;
   // Stained as it bites: warm metals go brown, rose by the walls, then dark red-black; grey ones a frosty grey.
@@ -1845,7 +1900,12 @@ void surface(inout Surface s) {
   float onMotif = inside * clamp(cav * 1.2 + motifCrust * (0.75 + 0.5 * nz - 0.6 * ridge), 0.0, 1.0);
   float crust = grow * depositAmount * clamp(tight * 0.6 + chase + blotch * ge * 0.8 * (1.0 - groundTone) + onMotif, 0.0, 1.0);
   crust *= (1.0 - polish * (1.0 - 0.8 * cav)) * (0.8 + 0.3 * nz2);
-  albedo = mix(albedo, patinaColor2 * (0.8 + 0.4 * nz2) * (mokume > 0.0 ? albedo : vec3(1.0)), oxide);
+#ifdef ORN_LAM
+  vec3 oxTint = mokume > 0.0 ? albedo : vec3(1.0);
+#else
+  vec3 oxTint = vec3(1.0);
+#endif
+  albedo = mix(albedo, patinaColor2 * (0.8 + 0.4 * nz2) * oxTint, oxide);
   metal = mix(metal, patinaMetal, oxide);
   rough = mix(rough, oxideRough, oxide);
   // The crust lies thick and deep-toned in the folds, thin and chalky over the crowns.
@@ -1857,12 +1917,14 @@ void surface(inout Surface s) {
   rough = mix(rough, polishRough, polish);
   occlusion = mix(occlusion, 1.0, crust * 0.3);
 
+#ifdef ORN_ANODIZE
   if (anodize > 0.0) {
     // Anodised titanium: thin-film interference, the oxide thicker (straw, bronze, purple, blue, teal) up the relief.
     float th = mix(0.035, 0.097, clamp((h0 + etchDepth) / (etchDepth + 0.009 * reliefHeight), 0.0, 1.0)) + 0.016 * (nz - 0.5) + 0.05 * (ornNoise(p * 1.3) - 0.5);
     vec3 film = 0.47 - 0.45 * cos(30.16 * th / vec3(0.62, 0.54, 0.46) + 2.67);
     albedo = mix(albedo, mix(vec3(0.3), pow(film, vec3(1.5)) * 1.25, 0.92), anodize * grow);
   }
+#endif
   // Shaved crowns: fresh metal, polished, the patina cut away with them.
   float shaved = inside * smoothstep(shaveLevel - 0.00015, shaveLevel, reliefHeight * r0.y);
   if (shaved > 0.0) {
@@ -1872,6 +1934,7 @@ void surface(inout Surface s) {
     occlusion = mix(occlusion, 1.0, shaved);
   }
 
+#ifdef ORN_FILL
   if (enamelOn > 0.5) {
     // Metal faces cut by the stone: fresh and satin, then polished.
     albedo = mix(albedo, fresh, cut);
@@ -1881,9 +1944,11 @@ void surface(inout Surface s) {
     // The fill: chalky powder, fused glossy in the kiln, satin from the stone, then polished.
     vec3 ec = fillBand > 0.0 ? mix(fillColor2, fillColor, smoothstep(fillBand * 0.7, fillBand * 1.3, d)) : fillColor;
     // Cloisonné cells shade to white toward the crowns of the motifs they fill.
+#ifdef ORN_CLOISON
     if (cloison > 0.0) ec = mix(ec, vec3(0.8, 0.78, 0.72), 0.6 * smoothstep(0.75, 1.4, top));
     // Deeper glass over the hollows of the modeling, thinner and lighter over its crowns.
     if (fillCushion > 0.0) ec *= mix(1.0, 0.55 + 0.75 * smoothstep(0.0, 1.2, top) - 0.35 * cav, fillCushion * inside);
+#endif
     ec *= 0.9 + 0.2 * ornNoise(p * 30.0);
     vec3 powder = mix(ec, vec3(dot(ec, vec3(0.3, 0.5, 0.2))), 0.35) * 1.3 + 0.04;
     float clear = fillClear * melt;
@@ -1914,6 +1979,7 @@ void surface(inout Surface s) {
       rough = mix(rough, fillRough, lines);
     }
     vec3 em = vec3(0.0);
+#ifdef ORN_CLEAR
     if (clear * fillCov > 0.0) {
       // Basse-taille: the engine-turned metal seen through the glass, tinted by the path through it.
       vec3 Pw = vWorldPosition;
@@ -1933,12 +1999,14 @@ void surface(inout Surface s) {
       vec3 key = lightColor * NdotL * D_GGX(clamp(dot(nU, H), 0.0, 1.0), a) * V_SmithGGXCorrelated(a, clamp(dot(nU, V), 1e-4, 1.0), NdotL);
       em += clear * fillCov * (1.0 - Ft) * (1.0 - Ft) * tr * groundColor * (rad + key) * occlusion;
     }
+#endif
     // Kiln heat: a dull red glow, brighter in the glass.
     float heat = smoothstep(0.0, 0.3, ornFire) * (1.0 - smoothstep(0.5, 1.0, ornFire));
     em += fillGlow * 1.2 * heat * heat * vec3(1.0, 0.1, 0.012) * mix(0.25, 1.0, fillCov) * (0.75 + 0.5 * nz);
     albedo *= 1.0 - 0.75 * heat;
     s.emissive = em;
   }
+#endif
 
   if (wet > 0.0) {
     // Wet: the metal seen through yellow-green acid, and the film's own sharp reflection on top (its meniscus up
@@ -1956,6 +2024,9 @@ void surface(inout Surface s) {
     s.emissive += wet * Ff * (refl * occlusion + lightColor * NdotL * D_GGX(clamp(dot(nFilm, Hl), 0.0, 1.0), a) * V_SmithGGXCorrelated(a, max(nv, 1e-4), NdotL));
   }
 
+  // Specular antialiasing: relief finer than a pixel widens the lobe instead of sparkling.
+  vec3 ndx = dFdx(s.normal), ndy = dFdy(s.normal);
+  rough = sqrt(clamp(rough * rough + min(0.5 * (dot(ndx, ndx) + dot(ndy, ndy)), 0.18), 0.0, 1.0));
   s.albedo = albedo;
   s.metalness = metal;
   s.roughness = rough;
@@ -1963,6 +2034,75 @@ void surface(inout Surface s) {
 #endif
 }
 `;
+
+const reliefUniforms = () => ({
+  ornBlows: { value: null },
+  ornBlowCount: { value: 0 },
+  dentDepth: { value: 0.012 },
+  ornPrims: { value: null },
+  ornCells: { value: null },
+  ornList: { value: null },
+  ornMin: { value: new Vector3() },
+  ornDim: { value: new Vector3() },
+  ornCellSize: { value: 0.02 },
+  ornModel: { value: new Matrix3() },
+  ornSamples: { value: 3 },
+  ornFar: { value: 0.025 },
+  ornDraw: { value: 1 },
+  ornHammer: { value: 1 },
+  ornEtch: { value: 1 },
+  ornPatina: { value: 1 },
+  ornBurnish: { value: 1 },
+  ornTime: { value: 0 },
+  reliefHeight: { value: 1 },
+  shaveLevel: { value: 1e3 },
+  etchDepth: { value: 0.006 },
+  wallWidth: { value: 0.0035 },
+  lineDepth: { value: 0.0006 },
+  chaseDepth: { value: 0.0012 },
+  motifCrust: { value: 0 },
+  groundTone: { value: 0 },
+  burnishReach: { value: 0.3 },
+  matting: { value: 1 },
+  bubbles: { value: 1 },
+  acidLine: { value: -1e3 },
+  acidRipple: { value: 0 },
+  etchStain: { value: 1 },
+  metalColor: { value: new Color() },
+  patinaColor: { value: new Color() },
+  patinaColor2: { value: new Color() },
+  patinaMetal: { value: 0 },
+  oxideRough: { value: 0.5 },
+  depositAmount: { value: 1 },
+  patinaRough: { value: 0.7 },
+  groundRough: { value: 0.45 },
+  groundDark: { value: 0.8 },
+  blankRough: { value: 0.12 },
+  polishRough: { value: 0.1 },
+  groundColor: { value: new Color() },
+  guilloche: { value: 0 },
+  mokume: { value: 0 },
+  anodize: { value: 0 },
+  fillPearl: { value: 0 },
+  cloison: { value: 0 },
+  fillCushion: { value: 0 },
+  enamelOn: { value: 0 },
+  ornFill: { value: 0 },
+  ornFire: { value: 0 },
+  ornGrind: { value: 0 },
+  fillLevel: { value: 0.001 },
+  fireLevel: { value: 0.004 },
+  fillLines: { value: 0 },
+  fillKeep: { value: 0 },
+  fillSag: { value: 0.0015 },
+  fillColor: { value: new Color() },
+  fillColor2: { value: new Color() },
+  fillBand: { value: 0 },
+  fillClear: { value: 0 },
+  fillMetal: { value: 0 },
+  fillRough: { value: 0.05 },
+  fillGlow: { value: 1 },
+});
 
 export function createReliefMaterial(relief) {
   const material = new PipelineMaterial({
@@ -1975,77 +2115,48 @@ export function createReliefMaterial(relief) {
     surface,
     // Per-pixel normals tilt past the geometric terminator: fade the key light there instead of cutting it.
     defines: { PIPELINE_SOFT_TERMINATOR: "" },
-    uniforms: {
-      ornBlows: { value: null },
-      ornBlowCount: { value: 0 },
-      dentDepth: { value: 0.012 },
-      ornPrims: { value: null },
-      ornCells: { value: null },
-      ornList: { value: null },
-      ornMin: { value: new Vector3() },
-      ornDim: { value: new Vector3() },
-      ornCellSize: { value: 0.02 },
-      ornModel: { value: new Matrix3() },
-      ornSamples: { value: 3 },
-      ornFar: { value: 0.025 },
-      ornDraw: { value: 1 },
-      ornHammer: { value: 1 },
-      ornEtch: { value: 1 },
-      ornPatina: { value: 1 },
-      ornBurnish: { value: 1 },
-      ornTime: { value: 0 },
-      reliefHeight: { value: 1 },
-      shaveLevel: { value: 1e3 },
-      etchDepth: { value: 0.006 },
-      wallWidth: { value: 0.0035 },
-      lineDepth: { value: 0.0006 },
-      chaseDepth: { value: 0.0012 },
-      motifCrust: { value: 0 },
-      groundTone: { value: 0 },
-      burnishReach: { value: 0.3 },
-      matting: { value: 1 },
-      bubbles: { value: 1 },
-      acidLine: { value: -1e3 },
-      acidRipple: { value: 0 },
-      etchStain: { value: 1 },
-      metalColor: { value: new Color() },
-      patinaColor: { value: new Color() },
-      patinaColor2: { value: new Color() },
-      patinaMetal: { value: 0 },
-      oxideRough: { value: 0.5 },
-      depositAmount: { value: 1 },
-      patinaRough: { value: 0.7 },
-      groundRough: { value: 0.45 },
-      groundDark: { value: 0.8 },
-      blankRough: { value: 0.12 },
-      polishRough: { value: 0.1 },
-      groundColor: { value: new Color() },
-      guilloche: { value: 0 },
-      mokume: { value: 0 },
-      anodize: { value: 0 },
-      fillPearl: { value: 0 },
-      cloison: { value: 0 },
-      fillCushion: { value: 0 },
-      enamelOn: { value: 0 },
-      ornFill: { value: 0 },
-      ornFire: { value: 0 },
-      ornGrind: { value: 0 },
-      fillLevel: { value: 0.001 },
-      fireLevel: { value: 0.004 },
-      fillLines: { value: 0 },
-      fillKeep: { value: 0 },
-      fillSag: { value: 0.0015 },
-      fillColor: { value: new Color() },
-      fillColor2: { value: new Color() },
-      fillBand: { value: 0 },
-      fillClear: { value: 0 },
-      fillMetal: { value: 0 },
-      fillRough: { value: 0.05 },
-      fillGlow: { value: 1 },
-    },
+    uniforms: reliefUniforms(),
   });
   if (relief) setRelief(material, relief);
   return material;
+}
+
+// The bare blank as the relief material shows it before anything is drawn, in a program that compiles at once: what
+// is on show on first load while the relief's own compiles.
+const blankPars = /* glsl */ `
+uniform mat3 ornModel;
+uniform vec3 groundColor;
+uniform float blankRough;
+uniform float mokume;
+in vec3 vBase;
+${common}
+${lam}
+`;
+const blankSurface = /* glsl */ `
+void surface(inout Surface s) {
+#ifdef PIPELINE_COLOR
+  vec3 p = vBase;
+  s.normal = normalize(ornModel * normalize(vObjectNormal));
+  s.albedo = mokume > 0.0 ? ornLamColor(p, 0.0, 0.0, 0.0) : groundColor;
+  s.metalness = 1.0;
+  s.roughness = blankRough * (0.85 + 0.3 * ornNoise(p * 60.0));
+  s.occlusion = 1.0;
+#endif
+}
+`;
+export function createBlankMaterial() {
+  return new PipelineMaterial({
+    color: 0xffffff,
+    roughness: 0.2,
+    metalness: 1,
+    vertexPars: "out vec3 vBase;",
+    vertex: "vec3 displace(vec3 p, inout vec3 n) { vBase = p; return p; }",
+    fragmentPars: blankPars,
+    surface: blankSurface,
+    defines: { PIPELINE_SOFT_TERMINATOR: "" },
+    // Every uniform of the relief material, so the look and the process state carry over to it and back.
+    uniforms: reliefUniforms(),
+  });
 }
 
 export function setRelief(material, relief) {

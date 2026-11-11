@@ -4,7 +4,7 @@
 // the nearest stem. Everything is grown by walking along the surface (step, then project back), so it works on any
 // shape.
 // Output: primitives (strokes, arcs, leaves, rosettes, beads) with a growth order, and hammer blows.
-import { STROKE, LEAF, ROSETTE, BEAD, ARC, FROND, BLOSSOM, DAISY, PEONY, FIVE, CHRYS, BUD, BELL, FAN, rnd, rand, norm, smooth, Occupancy, Walker, randomDir, surfacePoint, surfaceLattice, createNoise } from "../kit.js";
+import { STROKE, LEAF, ROSETTE, BEAD, ARC, FROND, BLOSSOM, DAISY, PEONY, FIVE, CHRYS, BUD, BELL, FAN, rnd, rand, norm, smooth, Occupancy, Walker, randomDir, surfacePoint, surfaceLattice, createNoise, forward } from "../kit.js";
 
 /*
  * opts:
@@ -60,11 +60,11 @@ export function rinceau(shape, opts, kit) {
       const side = [An[1] * Ad[2] - An[2] * Ad[1], An[2] * Ad[0] - An[0] * Ad[2], An[0] * Ad[1] - An[1] * Ad[0]];
       const ds = ab[0] * side[0] + ab[1] * side[1] + ab[2] * side[2];
       if (Math.abs(turn) < 0.03 || Math.abs(ds) < 1e-7) {
-        prims.push({ type: STROKE, a: A, b: B.slice(), ra: Aw, rb: Bw, ta: At, tb: Bt, h: 1 });
+        prims.push(forward({ type: STROKE, a: A, b: B.slice(), ra: Aw, rb: Bw, ta: At, tb: Bt, h: 1 }));
       } else {
         const rho = l2 / (2 * ds);
         const c = [A[0] + side[0] * rho, A[1] + side[1] * rho, A[2] + side[2] * rho];
-        prims.push({ type: ARC, a: A, b: B.slice(), c, ra: Aw, rb: Bw, ta: At, tb: Bt, h: 1 });
+        prims.push(forward({ type: ARC, a: A, b: B.slice(), c, ra: Aw, rb: Bw, ta: At, tb: Bt, h: 1 }));
       }
     }
     return {
@@ -234,7 +234,7 @@ export function rinceau(shape, opts, kit) {
   function tryBead(p, r, t, owner = -1, s = 0, win = 0) {
     if (occ.hit(p[0], p[1], p[2], r + GAP * 0.7, owner, s, win)) return false;
     occ.add(p[0], p[1], p[2], r, ownerId++, 0, t);
-    prims.push({ type: BEAD, a: p.slice(), R: r, ta: t, tb: t + r * 4 });
+    prims.push({ type: BEAD, a: p.slice(0, 3), R: r, ta: t, tb: t + r * 4 });
     return true;
   }
 

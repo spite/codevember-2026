@@ -1,17 +1,17 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, keysHelp, setDay, showHint, showSoundHint, loadingStep, addKey, addActionButton, onPause, isRunning } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, keysHelp, setDay, showHint, showSoundHint, loadingStep, addKey, addActionButton, onPause, isRunning, randomize, loadSeed, getSeed } from "common";
 import { GUI } from "guspira";
-import { Scene, Mesh, Vector3, BufferGeometry, BufferAttribute, Box3, Quaternion, Euler } from "three";
+import { Scene, Mesh, Vector3, BufferGeometry, BufferAttribute, Box3, Quaternion, Euler, Matrix4 } from "three";
 import { createBackdrop } from "./backdrop.js";
 import { Pipeline } from "modules/pipeline/Pipeline.js";
-import { createStudioEnvironment } from "modules/pipeline/studio.js";
+import { createStudioEnvironment, createStudioEnvironmentAsync } from "modules/pipeline/studio.js";
 import { globalUniforms } from "modules/pipeline/uniforms.js";
 import { createAutoChange } from "modules/autoChange.js";
 import { SHAPES } from "./shapes.js";
-import { buildRelief, createReliefMaterial, setRelief } from "./relief.js";
+import { buildRelief, createReliefMaterial, createBlankMaterial, setRelief } from "./relief.js";
 import { createSound } from "./sound.js";
 import { createFumes } from "./fumes.js";
 import { PATTERNS } from "./patterns/index.js";
-import { nativeRandom } from "modules/random.js";
+import { nativeRandom, setSeed } from "modules/random.js";
 
 // Each metal with its patina, and the backdrop and studio that suit it.
 const LOOKS = {
@@ -29,7 +29,7 @@ const LOOKS = {
     burnish: 0.68,
     groundDark: 0.6,
     groundRough: 0.45,
-    blankRough: 0.24,
+    blankRough: 0.17,
     polishRough: 0.2,
     background: 0x1d1a18,
     studio: { tint: 0xfff1e4, wall: 0.12, floor: 0.2 },
@@ -359,6 +359,20 @@ const LOOKS = {
   },
 };
 
+// The finish code a look needs compiled into the relief shader (the rest is left out of its program).
+function finishDefines(name) {
+  const look = LOOKS[name];
+  const f = look.fill;
+  const d = [];
+  if (f) d.push("ORN_FILL");
+  if (look.guilloche) d.push("ORN_GUILLOCHE");
+  if (f?.clear) d.push("ORN_CLEAR");
+  if (look.cloison || f?.cushion) d.push("ORN_CLOISON");
+  if (look.mokume) d.push("ORN_LAM");
+  if (look.anodize) d.push("ORN_ANODIZE");
+  return d;
+}
+
 // The process, in seconds at speed 1: [start, end] of each stage.
 const STAGES = {
   draw: [0.3, 6.5],
@@ -411,7 +425,6 @@ const defaults = {
   grind: 0,
   etch: 1,
   matting: 1,
-  aperture: 0.004,
   studio: true,
   spin: 0.06,
   speed: 1,
@@ -419,8 +432,12 @@ const defaults = {
   // Counted once the process has finished: how long a finished piece stays up.
   autoTime: 10,
 };
+// The low tier starts without the studio (as its default, so the url doesn't record it).
+if (new URLSearchParams(location.search).get("quality") === "low") defaults.studio = false;
 const params = fromDefaults(defaults);
-const load = { build: loadingStep(1), sound: loadingStep(1), compile: loadingStep(4) };
+const load = { studio: loadingStep(1), build: loadingStep(1), sound: loadingStep(1), compile: loadingStep(1) };
+// three's check of every program's info log stalls the frame a program is first used in.
+renderer.debug.checkShaderErrors = new URLSearchParams(location.search).has("debug");
 
 const pipeline = new Pipeline(renderer, {
   background: LOOKS.copper.background,
@@ -429,7 +446,8 @@ const pipeline = new Pipeline(renderer, {
   vignette: 0.35,
   grain: 0.02,
   stillSamples: 32,
-  depthOfField: { aperture: 0, maxBlur: 0.02, lensSamples: 48 },
+  // Blur from the piece's own motion (spin, drags, the hammer's jolts, the shake-off), measured each frame.
+  motionBlur: { shutter: 1 / 50, samples: 16, reusePrepass: true },
   shadow: { autoFit: true, denoise: true },
 });
 
@@ -450,7 +468,8 @@ function lookState() {
     m: {},
   };
   for (const [k, u] of Object.entries(material.uniforms)) {
-    if (g[k] === u) continue;
+    // The look's uniforms only: the piece's own (orn*, set by setRelief and each frame) must not be faded back.
+    if (g[k] === u || k.startsWith("orn")) continue;
     if (typeof u.value === "number") st.m[k] = u.value;
     else if (u.value?.isColor) st.m[k] = u.value.clone();
   }
@@ -475,7 +494,17 @@ function setLookState(a, b, x) {
 }
 function updateFade(dt) {
   if (fade.t >= 1 || !fade.to) return;
-  fade.t = Math.min(1, fade.t + dt / FADE);
+  let t = Math.min(1, fade.t + dt / FADE);
+  // A metal whose finish needs another program changes over to it at the middle, with the flags: short of it until
+  // that program is ready.
+  if (fade.material && t >= 0.5) {
+    if (!fade.material.userData.compiled) t = Math.min(t, 0.4999);
+    else {
+      if (fade.material !== material) switchMaterial(fade.material);
+      fade.material = null;
+    }
+  }
+  fade.t = t;
   const x = fade.t * fade.t * (3 - 2 * fade.t);
   setLookState(fade.from, fade.to, x);
   const g = globalUniforms;
@@ -489,7 +518,8 @@ function updateFade(dt) {
   pipeline.restartAccumulation(false);
 }
 
-function applyLook(name, instant = false, snapMaterial = false) {
+// target: the material the piece changes over to at the middle of the fade, when the finish needs another program.
+function applyLook(name, instant = false, snapMaterial = false, target = null) {
   const before = instant ? null : lookState();
   if (!instant && fade.t < 1) globalUniforms.envIntensity.value = fade.envBase;
   applyLookNow(name);
@@ -499,6 +529,7 @@ function applyLook(name, instant = false, snapMaterial = false) {
   fade.to = after;
   fade.t = 0;
   fade.snap = snapMaterial;
+  fade.material = target && target !== material ? target : null;
   fade.envBase = globalUniforms.envIntensity.value;
   // The reflections wait for the middle of the fade.
   fade.env = { envMap: globalUniforms.envMap.value };
@@ -506,18 +537,19 @@ function applyLook(name, instant = false, snapMaterial = false) {
   setLookState(before, after, 0);
 }
 let lastEnv = null;
+const studioOptions = (name) => ({
+  keyDirection: new Vector3(-0.6, 0.9, 0.5),
+  keyIntensity: 8,
+  keySize: 0.4,
+  fill: 0.35,
+  ceiling: 0.3,
+  apply: false,
+  ...LOOKS[name].studio,
+});
 function applyLookNow(name) {
   const look = LOOKS[name];
   lastEnv = globalUniforms.envMap.value;
-  studios[name] ??= createStudioEnvironment(renderer, {
-    keyDirection: new Vector3(-0.6, 0.9, 0.5),
-    keyIntensity: 9,
-    keySize: 0.5,
-    fill: 0.35,
-    ceiling: 0.3,
-    apply: false,
-    ...look.studio,
-  });
+  studios[name] ??= createStudioEnvironment(renderer, studioOptions(name));
   const s = studios[name];
   const u = globalUniforms;
   u.envMap.value = s.envMap;
@@ -568,7 +600,7 @@ function applyLookNow(name) {
   pipeline.restartAccumulation();
 }
 
-const gui = new GUI(setDay(), document.querySelector("#gui-container"));
+const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
 // Grouped by what they change: the blank, the ornament grown on it (these rebuild), the relief's shading, the metal,
 // the process, the view.
 gui.addSection("Blank");
@@ -651,17 +683,16 @@ gui.addSection("Finish");
 gui.addSelect("Metal", params.look, Object.keys(LOOKS));
 gui.addSection("Process");
 gui.addSlider("Speed", params.speed, 0.25, 3, 0.01, { randomizable: false });
-// Auto change counts from 22.5 s before the end, so a finished piece stays up for autoTime - 22.5 s.
-const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTime, gui, max: 90, ready: () => !busy && built === buildKey() && swap.phase === "idle" && clock >= processEnd() });
+// Auto change counts once the process has finished: autoTime is how long a finished piece stays up.
+const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTime, gui, max: 90, onChange: () => autoNext(), ready: () => !busy && (built === buildKey() || buildKey() === failedKey) && swap.phase === "idle" && clock >= processEnd() });
 gui.addSection("View");
-gui.addSlider("Aperture", params.aperture, 0, 0.02, 0.0005, { randomizable: false });
 gui.addSlider("Spin", params.spin, 0, 0.5, 0.01, { randomizable: false });
 gui.addCheckbox("Studio", params.studio, { randomizable: false });
 pipeline.addGUI(gui);
 gui.addSeparator();
 
 let clock = 0;
-const replay = () => ((clock = 0), autoChange.restart());
+const replay = () => ((clock = 0), fumes.reset(), autoChange.restart());
 addKey("KeyE", "replay the etching", replay);
 gui.addText(keysHelp());
 showHint("Drag to spin the piece · scroll to zoom · Space, then drag to look around · R for a new piece", "Drag to spin the piece · pause, then drag to look around · tap {randomize} for a new piece");
@@ -684,31 +715,74 @@ const soundStats = { tinks: 0, splashes: 0 };
 gui.show();
 
 const scene = new Scene();
-let material = createReliefMaterial();
 // Phones (medium and low tiers) take one relief sample a pixel and the slope from screen derivatives.
 const RELIEF_SAMPLES = pipeline.quality === "high" || pipeline.quality === "capture" ? 3 : 1;
-material.uniforms.ornSamples.value = RELIEF_SAMPLES;
+// On first load the bare blank goes up in a program that compiles at once, while the relief's own compiles.
+const blankMaterial = createBlankMaterial();
+blankMaterial.uniforms.ornSamples.value = RELIEF_SAMPLES;
+let material = blankMaterial;
 const mesh = new Mesh(undefined, material);
-// One material per set of primitive types (the shader only compiles the types a piece uses), each compiled once.
+// One material per set of primitive types and finish (the shader only compiles the types a piece uses, and the
+// finish code its metal needs), each compiled once.
 const materials = {};
 const RELIEF_TEXTURES = ["ornPrims", "ornCells", "ornList", "ornBlows"];
-function materialFor(types) {
-  const key = types.join(",");
+function materialFor(types, look) {
+  const finish = finishDefines(look);
+  const key = types.join(",") + "/" + finish.join(",");
   if (!materials[key]) {
     const m = createReliefMaterial();
-    m.defines = { ...m.defines, ...Object.fromEntries(types.map((t) => ["ORN_T" + t, ""])) };
+    m.defines = { ...m.defines, ...Object.fromEntries([...types.map((t) => "ORN_T" + t), ...finish].map((d) => [d, ""])), ...(RELIEF_SAMPLES === 1 ? { ORN_SAMPLES_1: "" } : {}) };
+    m.uniforms.ornSamples.value = RELIEF_SAMPLES;
+    m.userData.key = key;
     materials[key] = m;
   }
-  const next = materials[key];
-  // It takes over the look and the process state from the current one.
-  if (next !== material) {
-    for (const k in material.uniforms) {
-      if (globalUniforms[k] === material.uniforms[k] || RELIEF_TEXTURES.includes(k) || !next.uniforms[k]) continue;
-      const v = material.uniforms[k].value;
-      next.uniforms[k].value = v?.clone ? v.clone() : v;
-    }
+  return materials[key];
+}
+// Compiles a material off to the side (the piece on show keeps rendering meanwhile), once.
+function compileMaterial(m, geometry) {
+  if (!m.userData.compiling) {
+    const side = new Scene();
+    side.add(new Mesh(geometry, m));
+    const t0 = performance.now();
+    m.userData.compiling = pipeline.compileAsync(side, camera).then(() => {
+      m.userData.compiled = true;
+      m.userData.ms = performance.now() - t0;
+    });
   }
-  return next;
+  return m.userData.compiling;
+}
+// The material a wait is for (the making pill says the GPU is at it).
+let awaited = null;
+// Whether m is ready to go on; if not, its compile is under way and the pill counts it.
+function awaitMaterial(m, geometry) {
+  if (m === material || m.userData.compiled) return true;
+  if (awaited !== m) {
+    awaited = m;
+    making.compiling = performance.now();
+  }
+  compileMaterial(m, geometry);
+  return false;
+}
+// The piece on show changes program (a metal whose finish needs another), keeping its ornament.
+function switchMaterial(next) {
+  takeOver(next);
+  for (const k of RELIEF_TEXTURES) {
+    next.uniforms[k].value = material.uniforms[k].value;
+    material.uniforms[k].value = null;
+  }
+  material = next;
+  mesh.material = material;
+  pipeline.restartAccumulation();
+}
+// The next piece's material takes over the look and the process state from the current one, as it goes on (the look
+// may have changed while it compiled).
+function takeOver(next) {
+  if (next === material) return;
+  for (const k in material.uniforms) {
+    if (globalUniforms[k] === material.uniforms[k] || RELIEF_TEXTURES.includes(k) || !next.uniforms[k]) continue;
+    const v = material.uniforms[k].value;
+    next.uniforms[k].value = v?.clone ? v.clone() : v;
+  }
 }
 scene.add(mesh);
 // The studio: a floor and sweep under the floating piece, taking its soft shadow. Off by default on the low tier.
@@ -717,59 +791,109 @@ scene.add(backdrop.mesh);
 // Vapour off the acid, and ripples in its film: high tier only.
 const ACID_FX = pipeline.quality === "high" || pipeline.quality === "capture";
 const fumes = createFumes();
-if (ACID_FX) scene.add(fumes.mesh);
-if (pipeline.quality === "low" && !new URLSearchParams(location.search).has("studio")) params.studio.set(false);
+if (ACID_FX) {
+  // The vapour goes over the lit image.
+  pipeline.composite = (hdr, ctx) => fumes.render(renderer, hdr, ctx);
+}
 const _box = new Box3();
-const focus = { value: null };
+const shownPose = new Matrix4();
 
 const geometries = {};
-const DETAIL = pipeline.quality === "high" || pipeline.quality === "capture" ? 160 : 110;
-const ORIENT = { sphere: [0.3, 0, 0], torus: [1.0, 0, 0.25], box: [0.62, 0.785, 0], pillow: [0.42, 0.55, 0.1], knot: [1.15, 0, 0.1], twist: [0.42, 0.3, 0.22], moebius: [0.55, 0.4, 0.15], blob: [0.25, 0.6, -0.15], suzanne: [-0.37, 0.5, 0, "YXZ"], gyroid: [0.5, 0, 0.12], dodeca: [-1.0172, 0, 0, "YXZ"], icosa: [-1.0172, 0, 0, "YXZ"], lens: [0.48, 0, 0.3], knot25: [1.15, 0, 0.1] };
+// Finer meshes would only add small triangles the relief shader pays for in partly covered pixel blocks.
+const DETAIL = pipeline.quality === "capture" ? 160 : 110;
+const ORIENT = { sphere: [0.3, 0, 0], torus: [1.0, 0, 0.25], box: [0.62, 0.785, 0], pillow: [0.42, 0.55, 0.1], knot: [1.15, 0, 0.1], twist: [0.95, 0.3, 0.2], moebius: [0.55, 0.4, 0.15], blob: [0.25, 0.6, -0.15], suzanne: [-0.37, 0.5, 0, "YXZ"], gyroid: [0.5, 0, 0.12], dodeca: [-1.0172, 0, 0, "YXZ"], icosa: [-1.0172, 0, 0, "YXZ"], lens: [0.48, 0, 0.3], knot25: [1.15, 0, 0.1] };
 
 // Pieces are grown in a worker; the current one stays up until the next is ready.
-const worker = new Worker(new URL("./build.worker.js", import.meta.url), { type: "module" });
+const workerUrl = new URL("./build.worker.js", import.meta.url);
+const worker = new Worker(workerUrl, { type: "module" });
 let built = "";
 let requested = "";
 let busy = false;
 let blows = [];
 // How many motifs are being scribed at each point of the drawing, for the scratch's loudness.
 let activity = new Float32Array(64);
-let firstBuild;
-const firstBuilt = new Promise((resolve) => (firstBuild = resolve));
-const buildKey = () => [params.shape(), params.pattern(), params.scale(), params.motif(), params.symmetry(), params.flow(), params.leafiness(), params.rosettes(), params.lobes(), params.fill()].join();
+// On first load, the blank on show (its shape) while the relief's program compiles; the process waits for it.
+let blank = null;
+// The shape on show, and the fumes' obstacle field of each shape (baked in the worker).
+let shownShape = null;
+let shownTypes = [];
+// A metal change on the piece on show waiting for its finish's program.
+let lookPending = null;
+const fields = {};
+let firstShow;
+const firstShown = new Promise((resolve) => (firstShow = resolve));
+const buildKey = (p = params) => [p.shape(), p.pattern(), p.scale(), p.motif(), p.symmetry(), p.flow(), p.leafiness(), p.rosettes(), p.lobes(), p.fill()].join();
+const buildRequest = (id, p, prefetch = false) => ({
+  id,
+  prefetch,
+  shape: p.shape(),
+  mesh: geometries[p.shape()] ? 0 : DETAIL,
+  field: ACID_FX,
+  opts: {
+    seed: p.pattern(),
+    scale: p.scale(),
+    pattern: p.motif(),
+    symmetry: p.symmetry(),
+    flow: p.flow(),
+    leafiness: p.leafiness(),
+    rosettes: p.rosettes(),
+    lobes: p.lobes(),
+    fill: p.fill(),
+  },
+});
 function requestBuild() {
   const key = buildKey();
   if (busy || key === requested) return;
   requested = key;
   busy = true;
-  worker.postMessage({
-    id: key,
-    shape: params.shape(),
-    mesh: geometries[params.shape()] ? 0 : DETAIL,
-    opts: {
-      seed: params.pattern(),
-      scale: params.scale(),
-      pattern: params.motif(),
-      symmetry: params.symmetry(),
-      flow: params.flow(),
-      leafiness: params.leafiness(),
-      rosettes: params.rosettes(),
-      lobes: params.lobes(),
-      fill: params.fill(),
-    },
-  });
+  // Grown ahead (kiosk mode): straight on, or as soon as it comes.
+  if (prefetch.key === key && (prefetch.result || !prefetch.done)) {
+    const d = prefetch.result;
+    prefetch.result = null;
+    if (d) applyBuild(d).catch((err) => buildFailed(key, err));
+    else prefetch.taken = true;
+    return;
+  }
+  worker.postMessage(buildRequest(key, params));
 }
-// A failure applying a piece is logged and the page carries on, rather than leaving the loader up.
-worker.onmessage = (e) =>
-  applyBuild(e).catch((err) => {
-    console.error("build", err);
-    busy = false;
-    firstBuild();
-  });
-async function applyBuild(e) {
-  const { id, shape, packed, blows: b, activity: a, mesh: m, types, grid } = e.data;
+// A piece that can't be built (or compiled) is logged and given up on: the page carries on with the one on show (or,
+// on first load, clears the loader), rather than waiting for it forever.
+let failedKey = null;
+function buildFailed(id, err) {
+  console.error("build", id, err);
+  busy = false;
+  making.compiling = 0;
+  awaited = null;
+  failedKey = id;
+  swap.ready = null;
+  if (blank) blank.failed = true;
+  if (built && swap.phase === "out") (swap.phase = "in"), (swap.t = 0);
+  firstShow();
+}
+worker.onerror = (e) => buildFailed(requested, e.message);
+function onWorkerMessage(e) {
+  const d = e.data;
+  if (d.error) {
+    if (!d.prefetch) buildFailed(d.id, d.error);
+    else if (d.id === prefetch.key) {
+      prefetch.done = true;
+      if (prefetch.taken) buildFailed(d.id, d.error);
+    }
+    return;
+  }
+  if (d.kind === "mesh") return addMesh(d);
+  if (d.kind === "field") {
+    fields[d.shape] ??= d.field;
+    if (ACID_FX && shownShape === d.shape) fumes.setShape(fields[d.shape]);
+    return;
+  }
+  if (d.prefetch) return prefetched(d);
+  applyBuild(d).catch((err) => buildFailed(d.id, err));
+}
+worker.onmessage = onWorkerMessage;
+function addMesh({ shape, mesh: m, grid, prefetch: pre }) {
   if (grid && SHAPES[shape].adopt && !SHAPES[shape].grid) SHAPES[shape].adopt(grid);
-  if (m && !geometries[shape]) {
+  if (!geometries[shape]) {
     const g = new BufferGeometry();
     g.setAttribute("position", new BufferAttribute(m.position, 3));
     g.setAttribute("normal", new BufferAttribute(m.normal, 3));
@@ -777,6 +901,14 @@ async function applyBuild(e) {
     g.computeBoundingSphere();
     geometries[shape] = g;
   }
+  // First load: the blank goes up at once, while its ornament grows and its program compiles.
+  if (!pre && !built && !blank && shape === params.shape()) {
+    putBlank(shape);
+    firstShow();
+  }
+}
+async function applyBuild(d) {
+  const { id, shape, packed, blows: b, activity: a, types } = d;
   // A newer request supersedes this one.
   if (id !== buildKey()) {
     busy = false;
@@ -784,25 +916,69 @@ async function applyBuild(e) {
   }
   const relief = buildRelief(packed);
   console.log("ornament", shape, packed.ms.toFixed(0) + " ms", relief.stats);
-  const next = materialFor(types);
-  if (next !== material && !next.userData.compiled) {
-    // Compiled off to the side, so the current piece keeps rendering meanwhile.
-    const side = new Scene();
-    side.add(new Mesh(geometries[shape], next));
-    making.compiling = performance.now();
-    await pipeline.compileAsync(side, camera);
-    making.compiling = 0;
-    next.userData.compiled = true;
-  }
+  // Compiled for the metal it will have (updateSwap checks again, in case that changes meanwhile).
+  const next = materialFor(types, params.look());
+  if (!awaitMaterial(next, geometries[shape])) await compileMaterial(next, geometries[shape]);
   busy = false;
-  const ready = { id, shape, next, relief, b, a };
-  // The very first piece goes straight on (the page waits for it); later ones once the current has shrunk away.
-  if (!built) {
-    putOn(ready);
-    swap.phase = "in";
-    swap.t = 0;
-    omega.set(0, 0, 0);
-  } else swap.ready = ready;
+  // The first piece goes on as soon as it is ready (updateSwap), later ones once the current has shrunk away.
+  swap.ready = { id, shape, next, types, relief, b, a };
+}
+
+// Kiosk mode: while a piece plays out, the next one (what the next auto change's seed gives) is grown in a worker of its
+// own and its program compiled, so the change rarely waits.
+const prefetch = { state: "", pending: "", since: 0, seed: null, key: null, look: null, result: null, done: false, taken: false, worker: null };
+const stateKey = () => getSeed() + "|" + JSON.stringify(params.$snapshot(params.$keys));
+// What randomizing with this seed would set, without changing anything on show.
+function predict(seed) {
+  const was = { seed: getSeed(), random: Math.random, values: params.$snapshot(params.$keys) };
+  try {
+    setSeed(seed);
+    randomizePiece();
+    return params.$snapshot(params.$keys);
+  } finally {
+    params.$apply(was.values);
+    setSeed(was.seed);
+    Math.random = was.random;
+    symmetryKey = "";
+    fitSymmetry();
+  }
+}
+function updatePrefetch(now) {
+  if (!params.auto() || capturing || !built || blank || busy || built !== buildKey() || swap.phase !== "idle") return;
+  const st = stateKey();
+  if (st === prefetch.state) return;
+  // Once the panel has been left alone a moment.
+  if (st !== prefetch.pending) {
+    prefetch.pending = st;
+    prefetch.since = now;
+  }
+  if (now - prefetch.since < 1500) return;
+  const seed = Math.floor(nativeRandom() * 0xffffffff).toString(36);
+  const next = predict(seed);
+  const sig = Object.fromEntries(Object.entries(next).map(([k, v]) => [k, () => v]));
+  Object.assign(prefetch, { state: st, seed, key: buildKey(sig), look: next.look, result: null, done: false, taken: false });
+  if (!prefetch.worker) {
+    prefetch.worker = new Worker(workerUrl, { type: "module" });
+    prefetch.worker.onmessage = onWorkerMessage;
+  }
+  prefetch.worker.postMessage(buildRequest(prefetch.key, sig, true));
+}
+function prefetched(d) {
+  if (d.id !== prefetch.key) return;
+  prefetch.done = true;
+  if (prefetch.taken && requested === d.id && busy) {
+    prefetch.taken = false;
+    applyBuild(d).catch((err) => buildFailed(d.id, err));
+    return;
+  }
+  prefetch.result = d;
+  // Lowest priority: the piece on show compiled long ago.
+  compileMaterial(materialFor(d.types, prefetch.look), geometries[d.shape]).catch((err) => console.error("prefetch", err));
+}
+// An auto change takes the seed grown ahead, unless something has changed since.
+function autoNext() {
+  if (prefetch.seed && prefetch.state === stateKey()) loadSeed(prefetch.seed);
+  else randomize();
 }
 
 // Changing pieces: the current one shrinks away while the next is grown in the worker, then the next comes up
@@ -814,14 +990,13 @@ const swap = { phase: "in", t: 0, ready: null, scale: 0, spin: 1 };
 const SETTLE = 2.4;
 const easeInCubic = (x) => x * x * x;
 const easeOutBack = (x) => 1 + 2.2 * (x - 1) ** 3 + 1.2 * (x - 1) ** 2;
-function putOn({ id, shape, next, relief, b, a }) {
-  swap.spin = 0;
-  setRelief(next, relief);
-  material = next;
-  mesh.material = material;
-  blows = b;
-  activity = a;
+// Sets a new blank in its designed pose, to rise.
+function placePiece(shape) {
+  // Held by a drag, it doesn't turn in on its own.
+  swap.spin = drag.active ? 1 : 0;
   mesh.geometry = geometries[shape];
+  shownShape = shape;
+  if (ACID_FX) fumes.setShape(fields[shape] ?? null);
   const [rx, ry, rz, order = "XYZ"] = ORIENT[shape];
   qBase.setFromEuler(_euler.set(rx, ry, rz, order));
   qSpin.identity();
@@ -829,11 +1004,43 @@ function putOn({ id, shape, next, relief, b, a }) {
   mesh.quaternion.copy(qBase);
   mesh.updateMatrixWorld();
   backdrop.place(_box.setFromObject(mesh).min.y);
+  clock = 0;
+  swap.phase = "in";
+  swap.t = 0;
+  // It turns as it rises (updateSpin), landing on its designed view.
+  omega.set(0, 0, 0);
+}
+function putBlank(shape) {
+  blank = { shape };
+  material = blankMaterial;
+  mesh.material = material;
+  placePiece(shape);
+  pipeline.restartAccumulation();
+}
+// place: a new blank rising; otherwise the blank on show takes its ornament where it is.
+function putOn({ id, shape, next, types, relief, b, a }, place = true) {
+  // The material going off gives up its piece's textures (it stays cached for its program, not its data).
+  const old = material !== next ? material : null;
+  // A new piece takes its metal at once (a fade under way goes on in the studio), in the program made for it.
+  if (place) {
+    fade.material = null;
+    fade.snap = true;
+  }
+  takeOver(next);
+  setRelief(next, relief);
+  material = next;
+  mesh.material = material;
+  if (old) for (const k of RELIEF_TEXTURES) old.uniforms[k].value?.dispose(), (old.uniforms[k].value = null);
+  blows = b;
+  activity = a;
+  shownTypes = types;
+  if (place) placePiece(shape);
+  blank = null;
   built = id;
   clock = 0;
   pipeline.restartAccumulation();
   autoChange.restart();
-  firstBuild();
+  firstShow();
 }
 // What the workshop is up to while the next piece is made: a pill in the centre, with a rough progress bar (from how
 // long the last build of this pattern took) and a line that changes every couple of seconds.
@@ -891,14 +1098,23 @@ function setPillText(span, text) {
 }
 
 function updateMaking(now) {
-  const waiting = built && (busy || making.compiling || swap.ready || (swap.phase === "out" && swap.t >= 1));
+  if (awaited?.userData.compiled) {
+    awaited = null;
+    making.compiling = 0;
+  }
+  // First load: the blank waits for its ornament and program (once the loader's hint has gone); a metal changing on a
+  // piece on show waits for its finish's program.
+  const blankWait = !!blank && !blank.failed && !document.getElementById("loading");
+  const lookWait = !!lookPending && !lookPending.userData.compiled && now - making.compiling > 1000;
+  const swapWait = built && (busy || swap.ready || (swap.phase === "out" && swap.t >= 1));
+  const waiting = blankWait || lookWait || swapWait;
   if (waiting && !making.started) making.started = now;
   if (!waiting && making.started) {
     making.took[params.motif()] = now - making.started;
     making.started = 0;
   }
   // Only once it has been empty for a moment, so quick builds don't flash it.
-  const on = waiting && swap.phase === "out" && swap.t >= 1 && now - making.started > 150;
+  const on = waiting && (blankWait || lookWait || (swap.phase === "out" && swap.t >= 1)) && now - making.started > 150;
   if (on !== making.shown) {
     making.shown = on;
     making.el.classList.toggle("on", on);
@@ -919,28 +1135,36 @@ function updateMaking(now) {
   making.el.style.setProperty("--progress", p.toFixed(3));
 }
 
+// Whether a piece is ready to go on: its program, for the metal it goes on in, compiled.
+function readyToGo(r) {
+  r.next = materialFor(r.types, lookShown);
+  return awaitMaterial(r.next, geometries[r.shape]);
+}
 function updateSwap(dt) {
   // A new piece asked for: shrink the one on show, from wherever it is.
-  if (swap.phase !== "out" && requested !== built && built) {
+  if (swap.phase !== "out" && requested !== built && requested !== failedKey && built) {
     swap.phase = "out";
     swap.t = 1 - Math.cbrt(Math.min(1, Math.max(0, swap.scale)));
+    fumes.reset();
   }
   if (swap.ready && swap.ready.id !== buildKey()) swap.ready = null;
+  // The first piece goes on as soon as it is ready: onto the blank on show, where it is.
+  if (!built && swap.ready && readyToGo(swap.ready)) {
+    const r = swap.ready;
+    swap.ready = null;
+    putOn(r, !(blank && blank.shape === r.shape));
+  }
   if (swap.phase === "out") {
     swap.t = Math.min(1, swap.t + dt / SHRINK);
     swap.scale = 1 - easeInCubic(swap.t);
     // Gone: the studio fades to the new metal while the next piece is made; the material is set at once, unseen.
     if (swap.t >= 1 && params.look() !== lookShown) applyLook((lookShown = params.look()), false, true);
     if (swap.t >= 1) syncShown();
-    if (swap.t >= 1 && swap.ready) {
+    if (swap.t >= 1 && swap.ready && readyToGo(swap.ready)) {
       putOn(swap.ready);
       swap.ready = null;
-      swap.phase = "in";
-      swap.t = 0;
-      // It turns as it rises (updateSpin), landing on its designed view.
-      omega.set(0, 0, 0);
     }
-  } else if (swap.phase === "in" && built) {
+  } else if (swap.phase === "in" && (built || blank)) {
     swap.t = Math.min(1, swap.t + dt / GROW);
     swap.scale = easeOutBack(swap.t);
     if (swap.t >= 1) swap.phase = "idle";
@@ -964,6 +1188,8 @@ const _q = new Quaternion();
 const _right = new Vector3();
 const _upv = new Vector3();
 const _upAxis = new Vector3(0, 1, 0);
+const stir = { next: 1 };
+const capturing = new URLSearchParams(location.search).has("capture");
 const _axis = new Vector3();
 const drag = { active: false, id: -1, x: 0, y: 0, vx: 0, vy: 0, idle: 99 };
 const canvas = renderer.domElement;
@@ -991,6 +1217,32 @@ for (const type of ["pointerup", "pointercancel"])
   canvas.addEventListener(type, (e) => {
     if (e.pointerId === drag.id) drag.active = false;
   });
+// The camera eases out as the acid goes on, so the whole smoke column is in view for the etch, and back in
+// once the etch is over. Whatever the viewer sets (orbit, zoom) becomes the base it works from.
+const framing = { f: 1, lift: 0, user: false };
+controls.addEventListener("start", () => (framing.user = true));
+controls.addEventListener("end", () => (framing.user = false));
+const _ft = new Vector3();
+function updateFraming(dt) {
+  const st = stages();
+  const wide = swap.phase === "idle" ? smooth(st.etch[0] - 0.3, st.etch[0] + 2.2, clock) * (1 - smooth(st.etch[1] + 0.3, st.etch[1] + 3.3, clock)) : 0;
+  // While the viewer moves the camera, theirs is the framing; this picks up from there afterwards.
+  if (framing.user) return;
+  const k = 1 - Math.exp(-(dt || 0) * 1.6);
+  const f = framing.f + (1 + 0.65 * wide - framing.f) * k;
+  const lift = framing.lift + (0.45 * wide - framing.lift) * k;
+  // Back to the viewer's own framing, then out to this frame's.
+  const base = _ft.copy(controls.target);
+  base.y -= framing.lift;
+  const dir = camera.position.clone().sub(controls.target);
+  const dist = dir.length() / framing.f;
+  dir.normalize();
+  controls.target.copy(base).y += lift;
+  camera.position.copy(controls.target).addScaledVector(dir, dist * f);
+  framing.f = f;
+  framing.lift = lift;
+}
+
 function updateSpin(dt) {
   if (dt <= 0) return;
   // Rising: one full turn about the vertical, easing out onto the shape's designed view (ORIENT), not wherever a
@@ -1017,11 +1269,23 @@ function updateSpin(dt) {
     // After a drag it coasts down; the slow turn comes back once it has been left alone a while.
     drag.idle += dt;
     const back = Math.min(Math.max((drag.idle - 1.5) / 3, 0), 1);
-    _axis.set(0, params.spin() * back * back * (3 - 2 * back), 0);
+    // A face (Suzanne) doesn't turn its back: instead of the slow turn it sways about its designed view (below).
+    const faced = SHAPES[params.shape()]?.faced;
+    _axis.set(0, faced ? 0 : params.spin() * back * back * (3 - 2 * back), 0);
     omega.lerp(_axis, 1 - Math.exp(-dt * (back > 0 ? 0.8 : 1.2)));
+    // Auto mode, left alone during the etch: now and then a stir, a spin or a nudge, to swirl the fumes.
+    const etchNow = stage("etch");
+    const stirring = params.auto() && !capturing && swap.phase === "idle" && etchNow > 0.06 && etchNow < ACID.drain[0] - 0.04 && drag.idle > 3;
+    if (stirring && (stir.next -= dt) <= 0) {
+      stir.next = 1.8 + 1.6 * nativeRandom();
+      const r = nativeRandom;
+      _axis.set((r() - 0.5) * 1.2, 1, (r() - 0.5) * 1.2).normalize().multiplyScalar((r() < 0.5 ? -1 : 1) * (2.2 + 2.2 * r()));
+      omega.add(_axis);
+    }
     // And tips back upright: toward the turn about the vertical alone that it is closest to.
-    if (back > 0) {
-      _q.set(0, qSpin.y, 0, qSpin.w).normalize();
+    if (back > 0 && !stirring) {
+      if (faced) _q.setFromAxisAngle(_upAxis, Math.min(0.5, params.spin() * 6) * Math.sin(performance.now() / 1000 * 0.35));
+      else _q.set(0, qSpin.y, 0, qSpin.w).normalize();
       qSpin.slerp(_q, 1 - Math.exp(-dt * 0.6 * back));
     }
   }
@@ -1064,7 +1328,7 @@ function adaptScale(now) {
   }
 }
 
-onRandomize(() => {
+function randomizePiece() {
   gui.randomizeAll();
   params.pattern.set(1 + Math.floor(Math.random() * 9999));
   // Smaller scales multiply the motifs (and the build time): keep to the range that reads well.
@@ -1080,55 +1344,37 @@ onRandomize(() => {
   }
   fitSymmetry();
   if (Math.random() < 0.4) params.symmetry.set("none");
-});
+}
+onRandomize(randomizePiece);
 applyUrlState();
 fitSymmetry();
 
+let liveShown = "";
+requestBuild();
+studios[params.look()] = await load.studio.track(createStudioEnvironmentAsync(renderer, studioOptions(params.look())));
 applyLook(params.look(), true);
 backdrop.snap();
 lookShown = params.look();
-let liveShown = "";
-requestBuild();
-await load.build.track(firstBuilt);
+// The blank goes up as soon as its mesh comes (the relief's program compiles meanwhile, and the process waits for it).
+await load.build.track(firstShown);
 await load.sound.track(sound.loaded);
-await load.compile.track(pipeline.compileAsync(scene, camera), 4);
+await load.compile.track(pipeline.compileAsync(scene, camera), 1);
+// The fumes aren't needed until the etch: their noise and shaders are made once the piece is up.
+if (ACID_FX) setTimeout(() => fumes.prepare(renderer), 300);
 
-window.app = { canvas: renderer.domElement, params, pipeline, camera, controls, mesh, get material() { return material; }, replay, sound, soundStats, get building() { return busy || built !== buildKey() || swap.phase !== "idle" || swap.spin < 1; }, get clock() { return clock; }, set clock(v) { clock = v; } };
+window.app = { canvas: renderer.domElement, params, pipeline, camera, controls, mesh, get material() { return material; }, replay, sound, soundStats, fumes, get building() { return busy || !!blank || built !== buildKey() || swap.phase !== "idle" || swap.spin < 1; }, get clock() { return clock; }, set clock(v) { clock = v; } };
 
 const stage = (name) => {
   const s = stages()[name];
-  if (!s) return 0;
+  // A stage this look doesn't have counts as done once the process is (a finished enamel piece turning to plain metal).
+  if (!s) return clock >= processEnd() ? 1 : 0;
   const [a, b] = s;
   return Math.min(1, Math.max(0, (clock - a) / (b - a)));
 };
 
-// Focus on the surface under the screen's centre: march the shape's distance along the view axis.
-const _o = new Vector3();
-const _d = new Vector3();
-function focusDistance() {
-  const shape = SHAPES[params.shape()];
-  // A sampled blank whose grid hasn't arrived yet: focus on the target.
-  if (shape.adopt && !shape.grid) return camera.position.distanceTo(controls.target);
-  mesh.updateMatrixWorld();
-  const inv = mesh.matrixWorld.clone().invert();
-  _o.copy(camera.position).applyMatrix4(inv);
-  _d.copy(controls.target).sub(camera.position).normalize().transformDirection(inv);
-  let t = 0;
-  for (let i = 0; i < 64; i++) {
-    const x = _o.x + _d.x * t;
-    const y = _o.y + _d.y * t;
-    const z = _o.z + _d.z * t;
-    const q = shape.project(x, y, z);
-    const s = (x - q[0]) * q[3] + (y - q[1]) * q[4] + (z - q[2]) * q[5];
-    if (Math.abs(s) < 1e-4) return t;
-    t += Math.max(Math.abs(s) * 0.9, 1e-4) * Math.sign(s);
-    if (t > 20) break;
-  }
-  return camera.position.distanceTo(controls.target);
-}
-
 const _p = new Vector3();
 const _n = new Vector3();
+const _d = new Vector3();
 // The piece sways gently while it is scribed, and at each hammer blow jolts (a stiff spring) and swings (a soft one,
 // in rotation), settling between blows.
 const shake = { x: new Vector3(), v: new Vector3(), r: new Vector3(), w: new Vector3(), s: new Vector3(), sw: new Vector3(), sway: 0 };
@@ -1150,8 +1396,30 @@ function updateShake(dt, t) {
   const a = 0.035 * shake.sway;
   const rx = a * (Math.sin(t * 1.3) + 0.4 * Math.sin(t * 2.9 + 1)) + shake.r.x + shake.s.x;
   const rz = a * (Math.sin(t * 1.05 + 2) + 0.4 * Math.sin(t * 2.3 + 4)) + shake.r.z + shake.s.z;
+  // Rinsing: shaken off, brisk side-to-side swings with a tilt, dying away over the drain, and one quick spin.
+  const etch = stage("etch");
+  const off = swap.phase === "idle" && etch > ACID.drain[0] && etch < 1 ? smooth(ACID.drain[0], ACID.drain[0] + 0.03, etch) * (1 - smooth(ACID.drain[0], ACID.drain[1], etch)) : 0;
+  if (off > 0 && !shake.flicked) {
+    shake.flicked = true;
+    if (!drag.active) omega.y += (nativeRandom() < 0.5 ? -1 : 1) * 6;
+  }
+  if (etch < ACID.drain[0]) shake.flicked = false;
+  // A shake, not a sway: bursts of quick jerks with hard reversals (a squared-off wave), the burst and its strength
+  // dying away over the drain.
+  const tl = (etch - ACID.drain[0]) * (stages().etch[1] - stages().etch[0]);
+  const ph = tl * 1.15 - Math.floor(tl * 1.15);
+  const burst = off * smooth(0, 0.06, ph) * (1 - smooth(0.42, 0.55, ph));
+  // In real time, so a fast Speed doesn't push the jerks past the frame rate into jitter.
+  const jerk = (f, o) => {
+    const v = Math.sin((performance.now() / 1000) * 2 * Math.PI * f + o);
+    return Math.sign(v) * Math.abs(v) ** 0.3;
+  };
+  const jx = burst * jerk(5.6, 0), jz = burst * jerk(5.6, 1.9);
   mesh.position.copy(shake.x).y += 0.006 * shake.sway * Math.sin(t * 1.7 + 0.5);
-  _sq.setFromEuler(_euler.set(rx, 0, rz));
+  mesh.position.x += 0.065 * jx;
+  mesh.position.z += 0.025 * jz;
+  mesh.position.y += 0.012 * burst * jerk(11.2, 0.7);
+  _sq.setFromEuler(_euler.set(rx + 0.05 * jz, 0.08 * jx, rz - 0.16 * jx));
   mesh.quaternion.premultiply(_sq);
 }
 
@@ -1189,10 +1457,11 @@ function playSound(prevHammer, hammer, dt) {
   sound.setLoop("torch", fire > 0 && fire < 1 ? 0.5 * Math.sin(Math.PI * fire) ** 0.3 : 0, 1);
   const grind = stage("grind");
   sound.setLoop("stone", grind > 0 && grind < 1 ? 0.6 * Math.sin(Math.PI * grind) ** 0.4 : 0, Math.sqrt(speed));
-  // The fizz follows the bite rate, louder and brighter while it eats fastest; a soft hiss with the fumes.
+  // The acid's sizzle follows the bite and the fumes, the fizz of its bubbles under it, both brighter while it eats fastest.
   const etch = stage("etch");
-  sound.setLoop("fizz", 0.75 * acid.rate * Math.min(1, etch / ACID.flood), (0.8 + 0.35 * acid.rate) * Math.sqrt(speed));
-  sound.setLoop("hiss", 0.35 * acid.fumes, 1.6);
+  const wet = Math.min(1, etch / ACID.flood);
+  sound.setLoop("fizz", 0.45 * acid.rate * wet, (0.8 + 0.35 * acid.rate) * Math.sqrt(speed));
+  sound.setLoop("hiss", 0.5 * acid.rate * wet * (0.6 + 0.4 * Math.min(1, acid.fumes * 1.5)), (0.92 + 0.12 * acid.rate) * Math.sqrt(speed));
   // The rinse: a splash as the bath drains off.
   const rinsing = etch >= ACID.drain[0] && etch < 1;
   if (rinsing && acid.rinsed && sound.splash({ gain: 0.7 })) soundStats.splashes++;
@@ -1201,13 +1470,11 @@ function playSound(prevHammer, hammer, dt) {
   sound.setLoop("rub", burnish > 0 && burnish < 1 ? 0.5 * Math.sin(Math.PI * burnish) ** 0.5 : 0, Math.sqrt(speed));
 }
 // The acid bath's surface (world height) as it rises over the piece and drains off it, and the vapour above it.
-const _c = new Vector3();
 const acid = { rate: 0, prevBite: 0, fumes: 0, rinsed: true };
+// The fumes' own time: the process clock's pace, but it runs on while pieces change over, so the vapour drifts off.
+let fumeTime = 0;
 function updateAcid(u, dt) {
   const etch = stage("etch");
-  const g = mesh.geometry;
-  const R = (g?.boundingSphere?.radius ?? 1) * mesh.scale.x;
-  _c.copy(g?.boundingSphere?.center ?? _c.set(0, 0, 0)).applyMatrix4(mesh.matrixWorld);
   const level = Math.min(smooth(0, ACID.flood, etch), 1 - smooth(ACID.drain[0], ACID.drain[1], etch));
   // How much of the surface the acid covers: 0..1 spreading, 1..2 retreating (relief.js reads which).
   const draining = etch >= ACID.drain[0];
@@ -1219,7 +1486,8 @@ function updateAcid(u, dt) {
   acid.rate += (rate - acid.rate) * (1 - Math.exp(-(dt || 0) * 3));
   acid.fumes = ACID_FX && swap.phase === "idle" ? level * (0.35 + 0.65 * acid.rate) : 0;
   const mc = shownLook().metal;
-  fumes.update(clock, acid.fumes, _c, R, Math.min(1, Math.max(0, (mc[0] - mc[2]) * 1.6)));
+  // The fumes come off the wet surface: the piece, up to the bath's level on it.
+  fumes.update(fumeTime, acid.fumes, -1.15 + 2.3 * level, mesh, Math.min(1, Math.max(0, (mc[0] - mc[2]) * 1.6)));
 }
 const smooth = (a, b, x) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -1233,21 +1501,29 @@ render(({ dt }) => {
   requestBuild();
   // While pieces change over, a new metal waits for the old piece to be gone (updateSwap puts it on with the next).
   const swapping = built && (requested !== built || busy || swap.ready || swap.phase === "out");
-  if (params.look() !== lookShown && !swapping) {
-    // A finished piece changing metal shows the new one finished, rather than replaying its later stages.
-    const finished = clock >= (LOOKS[lookShown].fill ? FILL_END : PROCESS_END);
-    applyLook((lookShown = params.look()));
-    if (finished) {
-      clock = processEnd();
-      pipeline.restartAccumulation();
-    }
+  if (params.look() === lookShown || swapping) lookPending = null;
+  else {
+    // The piece on show keeps its metal until the new finish's program is compiled, then fades over to it.
+    const target = built ? materialFor(shownTypes, params.look()) : material;
+    if (awaitMaterial(target, mesh.geometry)) {
+      lookPending = null;
+      // A finished piece changing metal shows the new one finished, rather than replaying its later stages.
+      const finished = clock >= (LOOKS[lookShown].fill ? FILL_END : PROCESS_END);
+      applyLook((lookShown = params.look()), false, false, target);
+      if (finished) {
+        clock = processEnd();
+        pipeline.restartAccumulation();
+      }
+    } else lookPending = target;
   }
   updateSwap(dt);
   updateFade(dt || 1 / 60);
   updateMaking(performance.now());
+  updatePrefetch(performance.now());
   const before = clock;
   // The process waits while pieces change over.
-  if (swap.phase === "idle") clock = Math.min(processEnd(), clock + dt * params.speed());
+  if (swap.phase === "idle" && !blank) clock = Math.min(processEnd(), clock + dt * params.speed());
+  fumeTime += dt * params.speed();
   const u = material.uniforms;
   u.ornDraw.value = stage("draw");
   const prevHammer = u.ornHammer.value;
@@ -1278,22 +1554,23 @@ render(({ dt }) => {
   backdrop.mesh.visible = params.studio();
   backdrop.update(dt || 1 / 60);
   // Inside the studio the camera stays above the floor and within the sweep.
-  controls.maxDistance = params.studio() ? 5 : 8;
+  updateFraming(dt);
+  controls.maxDistance = (params.studio() ? 5 : 8) * framing.f;
   controls.maxPolarAngle = params.studio() ? Math.PI * 0.56 : Math.PI;
   playSound(clock > before ? prevHammer : u.ornHammer.value, u.ornHammer.value, dt);
   updateShake(dt, clock);
   mesh.updateMatrixWorld();
   u.ornModel.value.setFromMatrix4(mesh.matrixWorld);
   controls.update();
-  // Focus eases to the surface under the centre, and holds while pieces change over (with no piece there it would
-  // fall back to the orbit centre and the background's blur would jump).
-  if (swap.phase === "idle" || focus.value === null) {
-    const f = focusDistance();
-    focus.value = focus.value === null ? f : focus.value + (f - focus.value) * (1 - Math.exp(-(dt || 1 / 60) * 6));
-  }
-  pipeline.dof.focus = focus.value;
-  pipeline.dof.aperture = params.aperture();
   // The pipeline can't see the spin (the bounds don't change), nor the process; paused, nothing moves, so the still accumulates.
-  if (clock !== before || swap.phase !== "idle" || (dt > 0 && (swap.spin < 1 || omega.lengthSq() > 1e-8))) pipeline.restartAccumulation(false);
+  // Any change of the piece's pose (spin, the settle back upright, the springs of the shake), measured on the matrix
+  // itself: the pipeline can't see it, and averaging frames of different poses leaves a ghost.
+  const moved = !mesh.matrixWorld.equals(shownPose) && mesh.matrixWorld.elements.some((v, i) => Math.abs(v - shownPose.elements[i]) > 1e-6);
+  // Motion blur from the piece's real motion: its pose a frame ago as the shutter's (the pipeline's own guess, from
+  // the last motion it measured, keeps blurring a piece that has come to rest).
+  mesh.userData.shutterManual = true;
+  (mesh.userData.shutterMatrixWorld ??= new Matrix4()).copy(shownPose);
+  shownPose.copy(mesh.matrixWorld);
+  if (clock !== before || swap.phase !== "idle" || moved) pipeline.restartAccumulation(false);
   pipeline.render(scene, camera, clock);
 });

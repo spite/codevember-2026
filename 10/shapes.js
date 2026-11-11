@@ -114,7 +114,7 @@ const SHAPES = {
     },
     get area() {
       const a = 2 * (this.h - this.r);
-      return 6 * a * a + 3 * Math.PI * this.r * a + 4 * Math.PI * this.r * this.r;
+      return 6 * a * a + 6 * Math.PI * this.r * a + 4 * Math.PI * this.r * this.r;
     },
     sdf(x, y, z) {
       const c = this.h - this.r;

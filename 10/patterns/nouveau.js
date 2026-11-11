@@ -3,7 +3,7 @@
 // blades that sweep along them. What is left is filled sparingly, largest first (smaller flowers and buds on
 // stalks from the nearest stem, blades, thin tendrils), so the matted ground shows between: airy where the
 // rinceau is dense.
-import { STROKE, ARC, BEAD, BLADE, BLOOM, LANCE, PAD, POPPY, IRIS, CLOSED, rnd, rand, Occupancy, Walker, randomDir, surfacePoint, jitteredLattice, createNoise } from "../kit.js";
+import { STROKE, ARC, BEAD, BLADE, BLOOM, LANCE, PAD, POPPY, IRIS, CLOSED, rnd, rand, Occupancy, Walker, randomDir, surfacePoint, jitteredLattice, createNoise, forward } from "../kit.js";
 
 /*
  * opts: scale, seed, flow (how much the stems sway), leafiness (blades and pads), rosettes (flowers), fill (how much
@@ -38,10 +38,10 @@ export function nouveau(shape, opts, kit) {
       const l2 = dot3(ab, ab);
       const side = [An[1] * Ad[2] - An[2] * Ad[1], An[2] * Ad[0] - An[0] * Ad[2], An[0] * Ad[1] - An[1] * Ad[0]];
       const ds = dot3(ab, side);
-      if (Math.abs(turn) < 0.03 || Math.abs(ds) < 1e-7) prims.push({ type: STROKE, a: A, b: B.slice(), ra: Aw, rb: Bw, ta: At, tb: Bt, h: 1 });
+      if (Math.abs(turn) < 0.03 || Math.abs(ds) < 1e-7) prims.push(forward({ type: STROKE, a: A, b: B.slice(), ra: Aw, rb: Bw, ta: At, tb: Bt, h: 1 }));
       else {
         const rho = l2 / (2 * ds);
-        prims.push({ type: ARC, a: A, b: B.slice(), c: [A[0] + side[0] * rho, A[1] + side[1] * rho, A[2] + side[2] * rho], ra: Aw, rb: Bw, ta: At, tb: Bt, h: 1 });
+        prims.push(forward({ type: ARC, a: A, b: B.slice(), c: [A[0] + side[0] * rho, A[1] + side[1] * rho, A[2] + side[2] * rho], ra: Aw, rb: Bw, ta: At, tb: Bt, h: 1 }));
       }
     }
     return {

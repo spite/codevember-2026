@@ -231,7 +231,7 @@ export function girih(shape, opts, kit) {
       if (R <= 0.005 * S) continue;
       const t = tAt(p) + 0.35;
       occ.add(p[0], p[1], p[2], R, owner++, 0, t);
-      prims.push({ type: BEAD, a: p, R: R * 0.9, ta: t, tb: t + 0.01 });
+      prims.push({ type: BEAD, a: p.slice(0, 3), R: R * 0.9, ta: t, tb: t + 0.01 });
     }
   }
 
@@ -256,7 +256,7 @@ export function girih(shape, opts, kit) {
       const t = (occ.nearestTime(p[0], p[1], p[2], E * 3) ?? 0) + 0.2;
       const R = rf - GAP;
       occ.add(p[0], p[1], p[2], R, owner++, 0, t);
-      prims.push({ type: BEAD, a: p, R: R * 0.85, ta: t, tb: t + 0.01 });
+      prims.push({ type: BEAD, a: p.slice(0, 3), R: R * 0.85, ta: t, tb: t + 0.01 });
     }
   }
   prims.whole = !P.mesh.symmetric;

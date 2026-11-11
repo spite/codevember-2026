@@ -43,6 +43,7 @@ export function scales(shape, opts, kit, style) {
   // Scores a candidate set of positions: the half-step stagger keeps them away from the row before.
   const score = (ps) => ps.reduce((acc, p) => acc + Math.min(placed.nearest(p, (v) => v.p)[0], D), 0);
   function addScale(p, spacing, rowIndex) {
+    if (placed.nearest(p, (v) => v.p)[0] < D * 0.3) return;
     const q = shape.project(p[0], p[1], p[2]);
     const n = [q[3], q[4], q[5]];
     const [, g] = field(p, n);

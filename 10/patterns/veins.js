@@ -274,7 +274,7 @@ export function veins(shape, opts, kit) {
     if (nd.r < 0.0032 * S || second < nd.r * 0.45 || rnd() > 0.35 + knots * 0.6) return;
     const R = nd.r * rand(1.5, 2.2);
     const d = nodes[nd.children[0]].d ?? nd.d;
-    nodulePrims.push({ type: NODULE, a: nd.p.slice(), b: d.slice(), R, lumps: Math.round(rand(2, 4)), pore: rnd() < 0.25 ? rand(0.22, 0.32) : 0, seed: rnd(), kind: 0, ta: nd.t - R, tb: nd.t + R * 2, h: 1 });
+    nodulePrims.push({ type: NODULE, a: nd.p.slice(), b: d.slice(), R, lumps: Math.round(rand(2, 4)), pore: rnd() < 0.25 ? rand(0.22, 0.32) : 0, seed: rnd(), kind: 0, ta: Math.max(0, nd.t - R), tb: nd.t + R * 2, h: 1 });
     occ.add(nd.p[0], nd.p[1], nd.p[2], R, owner++, 0, nd.t);
   }
   function tip(nd) {

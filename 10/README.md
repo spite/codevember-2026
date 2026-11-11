@@ -145,8 +145,25 @@ reads well, no scales, seigaiha or guilloché under enamel, which needs ground t
   level, rising in a meniscus up every wall, rippling slowly, domed by the gas bubbles that nucleate on the bitten
   ground, clustered along the walls and densest where the bite is fastest, grow and pop. Copper, gold and bronze stain
   as they bite, brown, rose by the walls, then dark red-black; silver and steel go a frosty grey; the patina lays on
-  over that. A few dozen soft sprites of vapour rise off the piece while it bites (`fumes.js`, high tier only, as are
-  the ripples).
+  over that. Fumes rise off the piece while it bites (`fumes.js`, high tier only, as are the ripples): a vapour
+  raymarched at half resolution over the lit image, up to the scene's depth so the piece hides what is behind it, and folded into the last frames. Its density
+  is a smoke simulation (stable fluids) on a 48 × 64 × 48 grid around and above the piece, its slices tiled in a 2D
+  atlas so each pass is one full-screen draw: advection with a MacCormack correction for the vapour, buoyancy, a
+  wandering draught, vorticity confinement for the curls, and a Jacobi pressure solve that keeps the flow from passing
+  through the piece. The piece is a moving obstacle, its shape a signed distance baked from the blank's closest-point
+  projection, and the air touching it goes with its surface, so spinning or dragging it stirs and flings the vapour.
+  Vapour is given off where the acid covers it, more from spots fixed on the piece (so they turn with it) and from its
+  upper side; a fine noise carried along by the flow adds the wisps finer than the grid. Lit by the key light through
+  a short march toward it (and the piece's own shadow) and by the studio's ambient; on copper and the gold alloys it is nitric acid's brown NO₂, absorbing blue, elsewhere a pale vapour.
+- **Compiling** (`relief.js`, `main.js`): the relief shader is large, and its first compile (tens of seconds on
+  Windows' D3D) is what a new piece waits for. So each program holds only the primitive types the piece uses and the
+  finish code its metal needs (`ORN_FILL`, `ORN_GUILLOCHE`, `ORN_CLEAR`, `ORN_CLOISON`, `ORN_LAM`, `ORN_ANODIZE`), one
+  cached material per set. On first load the blank goes up at once in a small program of its own and the process starts
+  once the relief's program is ready; a change of metal on the piece on show keeps the old finish until the new one's
+  program is compiled (off to the side), then fades, switching programs at the middle of the fade. In auto change the
+  next piece is grown ahead: the seed of the next change is picked while the current piece plays, what it would set is
+  worked out (the randomize handler run and undone), and that piece is grown in a second worker and its program
+  compiled, so the change rarely waits. The fumes' obstacle field is baked in the worker with the blank's mesh.
 - **The hammer** displaces the mesh in the vertex shader: each blow dents the blank with an overshoot.
 - **Patina**: an oxide over the whole piece, a crust gathered along the walls and in patches; the burnish takes
   both off the tops, highest first.
@@ -168,20 +185,20 @@ reads well, no scales, seigaiha or guilloché under enamel, which needs ground t
   20.3–23.1, fire (with the firescale patina) 23.3–26.1, grind 26.5–29.9 and burnish 30.1–32.7, done at 33.2; auto
   change waits for the longer run.
 
-Sound: a scribe's scratch that follows how much is being drawn, a tink per hammer blow (panned, duller on the
-far side), the acid's fizz (louder and higher while it bites fastest) with a hiss under the fumes (the same recording,
-sped up and high-passed), a splash as the bath drains off, and the burnishing rub, cut from CC0 recordings on freesound.org: "tap hammer small
-piece of metal gentle hits.wav" and "bubbles in soda steady fizz.flac" by kyles, "Metal Box Impacts 3 - Doubles -
+Sound: a scribe's scratch that follows how much is being drawn, a tink per hammer blow (varied in pitch and
+strength, now and then with a soft rebound; panned, duller on the far side), the acid's sizzle and the fizz of its bubbles (louder and higher while it bites fastest), a splash as the bath drains off, and the burnishing rub, cut from CC0 recordings on freesound.org: "tap hammer small
+piece of metal gentle hits.wav" and "bubbles in soda steady fizz.flac" by kyles, "Sizzle / Acid Burn" by bottles (the acid's sizzle: a steady stretch, its
+ends crossfaded into a loop), "Metal Box Impacts 3 - Doubles -
 High Pitch.wav" by alexanderdanner, "210426 engraving scratching.wav" by TRP, "brushing shoes_mixdown" by
 hello_world+123, "Water plopping in pulling out small object.wav" by vjoe1985 (the rinse), and for the enamel the kiln's torch, "blowtorch light and run flame good detail on off2.flac" by
 kyles, and the grinding stone, "Knife Sharpen - Stone.wav" by MWsfx.
 
-Controls: drag to orbit, scroll to zoom (close-ups get depth of field, focused on the surface at the centre),
-R for a new piece, E to replay the etching, M for sound.
+Controls: drag to spin the piece, scroll to zoom, Space then drag to orbit, R for a new piece, E to replay the
+etching, M for sound. Motion blur follows the piece's own motion (spins, drags, the hammer's jolts, the shake-off).
 
 Suzanne is day 7's baked distance field (`assets/suzanne-sdf-96.bin`), with her ears and brow thickened as there,
 sampled by a cubic B-spline with its analytic gradient. The build worker builds the grid the first time she is chosen
-and hands it to the page with her mesh, for the depth of field's focus.
+and hands it to the page with her mesh.
 
 More finishes: **gunmetal** (dark glossy steel), **excavated** bronze (a heavy verdigris crust with only the crowns
 rubbed back to metal), **rusted iron** (bright silver motifs inlaid in a rusted iron ground) and **mother-of-pearl**

@@ -434,11 +434,13 @@ export const suzanne = {
   puff: 0.006,
   // Measured on the grid.
   bounds: [1.0, 0.72, 0.62],
-  area: 6.72,
+  area: 5.41,
   symmetries: { none: [], mirror: [H(1, 0, 0)] },
   // Interlace grids are cast out along rays from here, so they don't bunch into her hollows.
   radial: [0, 0, 0],
   // Interlace and panels still stretch over her ears and snout: randomize leaves these out.
+  // She keeps her face to the viewer, swaying rather than turning.
+  faced: true,
   avoid: ["knotwork", "arabesque", "girih", "guilloche"],
   grid: null,
   scale: 1,
@@ -811,11 +813,12 @@ export const icosa = (() => {
   delete base._dp;
   return Object.assign(base, {
     // As large as the dodecahedron.
-    inner: 0.75,
+    inner: 0.675,
+    rr: 0.153,
     normals: N,
     corners: V,
-    // Measured (calibrated against the dodecahedron's).
-    area: 13.0,
+    // Measured on the mesh.
+    area: 10.19,
     inside(x, y, z, cOut) {
       const h = this.inner;
       let best = -Infinity, bi = 0, out = 0;
