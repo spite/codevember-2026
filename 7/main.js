@@ -125,7 +125,7 @@ function pickShape(f) {
   return weighted(familyOf(family), (s) => SHAPE_WEIGHT[s.id] ?? 1, b).id;
 }
 
-const gui = new GUI(setDay(), document.querySelector("#gui-container"));
+const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
 // Hover text for every control: what it does, and the randomize hint guspira shows when a label has no title.
 const RND = " Click the name to randomize it.";
 const tip = (text, opts = {}) => ({ ...opts, title: text + (opts.randomizable === false ? "" : RND) });

@@ -146,7 +146,7 @@ function updateReflections() {
   tangle.meshUniforms.backdropMap.value = envs.studio.envMap;
 }
 
-const gui = new GUI(setDay(), document.querySelector("#gui-container"));
+const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
 gui.addSelect("Finish", params.finish, Object.keys(FINISHES));
 gui.addSelect("Palette", params.palette, Object.keys(PALETTES));
 gui.addSlider("Iridescence", params.film, 0, 1, 0.01);

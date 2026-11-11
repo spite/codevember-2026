@@ -60,7 +60,7 @@ const SETS = {
   night: { background: [0.012, 0.014, 0.02], vignette: 0.6, exposure: 1.1, bloom: 0.16 },
 };
 
-const gui = new GUI(setDay(), document.querySelector("#gui-container"));
+const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
 gui.addSelect("Subject", params.subject, Object.keys(SUBJECTS).filter((k) => !SUBJECTS[k].disabled));
 gui.addSelect("Shape", params.shape, Object.keys(SHAPES));
 gui.addSlider("Explosion", params.explosion, 0, 1, 0.01);

@@ -155,7 +155,7 @@ addKey("KeyM", "toggle sound", toggleSound);
 // Sounds already scheduled freeze with the animation.
 onPause((running) => sound.setPaused(!running));
 
-const gui = new GUI(setDay(), document.querySelector("#gui-container"));
+const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
 gui.addSelect("Solid", params.solid, shapeNames);
 gui.addSelect("Faces", params.variant, ["plain", "pyramids", "inverted", "mixed"]);
 gui.addSelect("Colors", params.colors, ["white", "accents", "colorful"]);

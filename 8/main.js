@@ -158,7 +158,7 @@ const studio = load.studio.track(createStudioEnvironmentAsync(renderer, {
 globalUniforms.giIntensity.value = 1;
 globalUniforms.aoIntensity.value = 1;
 
-const gui = new GUI(setDay(), document.querySelector("#gui-container"));
+const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
 const section = { shape: gui.addSection("Shape"), light: gui.addSection("Lighting"), glass: gui.addSection("Surface"), room: gui.addSection("Room"), camera: gui.addSection("Camera") };
 // Controls go in in their original order, which is the order randomize draws them in, so seeds keep their looks.
 gui.into(section.shape);

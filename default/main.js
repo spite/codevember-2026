@@ -33,7 +33,7 @@ const studio = load.studio.track(
   createStudioEnvironmentAsync(renderer, { keyDirection: new Vector3(-0.5, 1, 0.3), keyIntensity: 8, keySize: 0.6, fill: 0.4, floor: 0.3, wall: 0.5 }),
 );
 
-const gui = new GUI(setDay(), document.querySelector("#gui-container"));
+const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
 gui.addColor("Color", params.color);
 gui.addSlider("Roughness", params.roughness, 0, 1, 0.01);
 gui.addSlider("Metalness", params.metalness, 0, 1, 0.01);

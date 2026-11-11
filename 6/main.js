@@ -104,7 +104,7 @@ const studio = createStudioEnvironmentAsync(renderer, {
   tint: 0xfff6ec,
 });
 
-const gui = new GUI(setDay(), document.querySelector("#gui-container"));
+const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
 // Randomising picks a symmetric layout or a preset, never the free random one.
 const shaped = ["symmetric", ...Object.keys(PRESETS)];
 gui.addSelect("Layout", params.layout, [...shaped, "random"]).randomize = () => params.layout.set(shaped[Math.floor(Math.random() * shaped.length)]);

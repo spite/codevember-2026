@@ -96,7 +96,7 @@ const studio = createStudioEnvironmentAsync(renderer, {
   tint: 0xd2dacd,
 });
 
-const gui = new GUI(setDay(), document.querySelector("#gui-container"));
+const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
 gui.addSelect("Shape", params.shape, Object.keys(SHAPES));
 gui.addSelect("Structure", params.structure, Object.keys(STRUCTURES));
 gui.addSelect("Pattern", params.pattern, Object.keys(PATTERNS));

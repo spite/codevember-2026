@@ -72,7 +72,7 @@ const studio = load.studio.track(
 
 const look = () => LOOKS[params.look()] ?? LOOKS.ruby;
 
-const gui = new GUI(setDay(), document.querySelector("#gui-container"));
+const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
 const applyLook = (name) => {
   const l = LOOKS[name];
   params.frost.set(l.resin.frost);

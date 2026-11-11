@@ -203,7 +203,7 @@ function hitBody(x, y) {
 
 // ---------------------------------------------------------------- GUI
 
-const gui = new GUI(setDay(), document.querySelector("#gui-container"));
+const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
 gui.addSelect("Shape", params.shape, Object.keys(SHAPES));
 gui.addSelect("Finish", params.finish, Object.keys(FINISHES));
 gui.addSlider("Amount", params.amount, 0, 1, 0.01);
