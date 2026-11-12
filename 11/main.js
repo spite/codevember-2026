@@ -47,7 +47,6 @@ const defaults = {
   ...Object.fromEntries(TYPES.map((t) => [`mix_${t}`, 0.5])),
   chamfer: 1,
   wear: 0.3,
-  age: 1,
   rust: 0.6,
   grease: 0.5,
   palette: "auto",
@@ -60,6 +59,8 @@ const defaults = {
   autoTime: 20,
 };
 const params = fromDefaults(defaults);
+// Age is left out of the url: it ramps by itself on every machine, and a link shouldn't freeze it.
+params.age = signal(1);
 let pixelAngle = 0.001;
 let meshes = [];
 let axleMeshes = [];
