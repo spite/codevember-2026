@@ -148,7 +148,9 @@ void main() {
   vec3 V = isOrtho > 0.5 ? vec3(0.0, 0.0, 1.0) : normalize(-P);
 
   float screenR = radius * projInfo.y * 0.5 * halfRes.y / (isOrtho > 0.5 ? 1.0 : g.x);
-  screenR = min(screenR, maxRadiusPixels);
+  // Where the march is cut short on screen, the cut is jittered per pixel and frame, so it accumulates into a ramp.
+  float cut = ign(gl_FragCoord.xy + 5.588238 * mod(noiseFrame, 64.0) + vec2(13.0, 71.0));
+  screenR = min(screenR, maxRadiusPixels * mix(0.35, 1.0, cut));
   // Far away the march covers too few texels to resolve depth; fade to neutral.
   float fade = (1.0 - smoothstep(depthFade.x, depthFade.y, g.x)) * smoothstep(1.0, 3.0, screenR);
   if (fade <= 0.0) {
