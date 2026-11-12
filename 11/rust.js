@@ -207,7 +207,8 @@ vec3 normalNT(vec2 uv, vec2 dx, vec2 dy, float layer, float salt) {
   vec3 b = textureGrad(scanNormal, vec3(uv + sin(vec2(3.0, 7.0) * (i + 1.0)) * 7.3, layer), dx, dy).xyz;
   return mix(a, b, smoothstep(0.2, 0.8, f)) * 2.0 - 1.0;
 }
-vec3 scanNormalLayer(vec3 p, vec3 dx, vec3 dy, vec3 n, vec3 w, float layer, float strength) {
+vec3 scanNormalTri(vec3 p, vec3 n, vec3 w, float layer, float strength) {
+  vec3 dx = dFdx(p), dy = dFdy(p);
   vec3 acc = vec3(0.0);
   if (w.x > 0.0) {
     vec3 t = normalNT(p.zy, dx.zy, dy.zy, layer, 0.1);
@@ -224,14 +225,7 @@ vec3 scanNormalLayer(vec3 p, vec3 dx, vec3 dy, vec3 n, vec3 w, float layer, floa
     t.xy *= strength;
     acc += vec3(t.xy + n.xy, abs(t.z) * n.z) * w.z;
   }
-  return acc;
-}
-// k crossfades the mature scan (0) into the old one (1): an array layer index doesn't blend, it snaps.
-vec3 scanNormalTri(vec3 p, vec3 n, vec3 w, float k, float strength) {
-  vec3 dx = dFdx(p), dy = dFdy(p);
-  if (k <= 0.01) return normalize(scanNormalLayer(p, dx, dy, n, w, 0.0, strength));
-  if (k >= 0.99) return normalize(scanNormalLayer(p, dx, dy, n, w, 1.0, strength));
-  return normalize(mix(scanNormalLayer(p, dx, dy, n, w, 0.0, strength), scanNormalLayer(p, dx, dy, n, w, 1.0, strength), k));
+  return normalize(acc);
 }
 
 // Bump from a height field (Mikkelsen's surface gradient), in world space.
@@ -575,7 +569,8 @@ void surface(inout Surface s) {
 #ifdef RUST_LITE
   vec3 nRust = s.normal;
 #else
-  vec3 nScan = scanNormalTri(qs / 0.4, nl, w, mix(0.0, 1.0, smoothstep(0.5, 1.0, t)), 1.4);
+  // The mature scan's relief at every age: the old scale's is too fine and averages flat at a distance.
+  vec3 nScan = scanNormalTri(qs / 0.4, nl, w, 0.0, 1.4);
   vec3 nRust = normalize(mat3(modelMatrix) * nScan);
 #endif
   vec3 nBase = normalize(mix(s.normal, nRust, covered * (1.0 - polish) * (1.0 - g) * (1.0 - instanced)));
@@ -616,7 +611,9 @@ export function setRustPalette(material, palette, shift = 0) {
 // lite: for the lower quality tiers, without the scanned normals and old crust, and without flaking.
 export function createRustMaterial(textures, info, { lite = false } = {}) {
   return new PipelineMaterial({
-    defines: lite ? { RUST_LITE: "" } : {},
+    // The key fades over the terminator instead of cutting off: the relief tilts normals across it, and a hard cut drops
+    // the lit relief of a whole face at once as the machine turns.
+    defines: { PIPELINE_SOFT_TERMINATOR: "", ...(lite ? { RUST_LITE: "" } : {}) },
     vertexPars,
     vertex,
     varyings: { vSmooth: "vec3", vCavity: "float", vConvex: "float" },

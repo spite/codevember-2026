@@ -43,6 +43,7 @@ const TYPES = ["spur", "compound", "idler", "bevel", "worm", "ring", "planetary"
 const defaults = {
   variation: 1,
   gears: 12,
+  balance: 0.75,
   ...Object.fromEntries(TYPES.map((t) => [`mix_${t}`, 0.5])),
   chamfer: 1,
   wear: 0.3,
@@ -90,10 +91,12 @@ const pipeline = new Pipeline(renderer, {
   shadow: { autoFit: true, denoise: true },
 });
 
-const gui = new GUI(setDay(), document.querySelector("#gui-container"));
+const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
 gui.addSection("Machine");
 gui.addSlider("Variation", params.variation, 1, 9999, 1);
 gui.addSlider("Gears", params.gears, 6, 30, 1, { randomizable: false });
+// The chance a machine runs on a balance wheel instead of a pendulum.
+gui.addSlider("Balance wheel", params.balance, 0, 1, 0.01, { randomizable: false });
 gui.addSection("Mix");
 for (const t of TYPES) gui.addSlider(t[0].toUpperCase() + t.slice(1), params[`mix_${t}`], 0, 1, 0.01);
 gui.addSection("Finish");
@@ -659,7 +662,7 @@ let finished = null;
 function machineOptions() {
   // A slider at 1 forces its type into every machine (the generator's weight >= 10 rule).
   const weights = Object.fromEntries(TYPES.map((t) => [t, params[`mix_${t}`]() >= 0.99 ? 10 : params[`mix_${t}`]() * 2]));
-  return { seed: params.variation(), gears: params.gears(), weights };
+  return { seed: params.variation(), gears: params.gears(), weights, balance: params.balance() };
 }
 const finishOptions = () => ({ chamfer: params.chamfer(), erosion: { amount: params.wear(), seed: params.variation() } });
 const machineKey = () => JSON.stringify(machineOptions());
@@ -747,7 +750,7 @@ function poseAll() {
     Object.assign(lastPose, { q: s.q, anchor: s.anchor, k: kk, lifted: s.lifted });
     pipeline.restartAccumulation(false);
   }
-  const k = phase.name === "out" ? phase.t : phase.name === "in" ? 1 - phase.t : 0;
+  const k = kk;
   for (const mesh of meshes) {
     const part = mesh.userData.part;
     if (part.kind === "chain") {
@@ -902,6 +905,7 @@ window.app = {
   controls,
   phase,
   motion: motionState,
+  scene,
   sound,
   // The next machine: a seed (string), none ({ clear: true }: the studio left empty) or a random one.
   nextLook: (look) => (look?.clear ? clear() : typeof look === "string" ? loadSeed(look) : randomize()),

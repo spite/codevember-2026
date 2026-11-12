@@ -1,0 +1,1374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Rust Ticks</title>
+<meta name="description" content="How Codevember 2026 day 11, Rust, builds floating gear trains that really work: a Graham escapement or a lever and balance wheel, involute gears all driven by one coordinate, a seeded generator with convex clearance tests, stick-slip friction, and a procedural rust that grows over each machine's time on show.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* One reading column on the studio's bone grey; figures are small benches in steel and rust. */
+:root {
+  --bg: #dad4cb;
+  --panel: #e6e1d9;
+  --ink: #1b1715;
+  --muted: #5c534c;
+  --line: #bfb5ab;
+  --accent: #a5461b;
+  --accent2: #2f6573;
+  --stage: #cdc6bc;
+  --stage-ink: #6c6158;
+  --steel: #8e9094;
+  --steel-hi: #b9bbbf;
+  --steel-dark: #5d5f63;
+  --edge: #3b3d41;
+  --brass: #a8822f;
+  --rust: #b4561a;
+  --grease: #6b4a1e;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121110; --panel: #1b1918; --ink: #ebe5df; --muted: #a39990; --line: #35302c;
+    --accent: #e2804f; --accent2: #6fb0c2; --stage: #0c0b0a; --stage-ink: #8a7e75; --steel: #74777c;
+    --steel-hi: #a9acb1; --steel-dark: #4a4c50; --edge: #1e1f22; --brass: #c9a253; --rust: #d0692a; --grease: #a7773a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121110; --panel: #1b1918; --ink: #ebe5df; --muted: #a39990; --line: #35302c;
+  --accent: #e2804f; --accent2: #6fb0c2; --stage: #0c0b0a; --stage-ink: #8a7e75; --steel: #74777c;
+  --steel-hi: #a9acb1; --steel-dark: #4a4c50; --edge: #1e1f22; --brass: #c9a253; --rust: #d0692a; --grease: #a7773a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .holo { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .holo {
+    background: linear-gradient(100deg, var(--accent) 10%, var(--accent2) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; background: var(--stage); }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+
+/* Figures */
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; border-radius: 3px; background: var(--stage); }
+.fig canvas.grab { touch-action: none; cursor: grab; }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+input[type="checkbox"] { accent-color: var(--accent); }
+select {
+  font: 400 13px/1.2 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 3px; padding: 6px 8px;
+}
+button {
+  font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px;
+  padding: 9px 14px; cursor: pointer;
+}
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 12.5px/1.2 var(--mono); color: var(--muted); }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid currentColor; vertical-align: middle; margin-right: 6px; }
+.legend i.dash { border-top-style: dashed; }
+.legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: currentColor; vertical-align: middle; margin-right: 6px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+
+/* Table */
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font: 400 13.5px/1.35 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: nowrap; }
+.formula .c { color: var(--muted); }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+  th, td { padding: 8px 7px; font-size: 12.5px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 11</b> · Rust</div>
+      <h1>How Rust <span class="holo">ticks</span></h1>
+      <p class="lede">A clockwork gear train floats in a studio, ticking on its escapement while it rusts from bare steel to flaking crust. Here is how the escapement keeps time, how one angle drives every gear, how a train is grown so that nothing collides, and how the rust is painted on.</p>
+    </div>
+    <figure>
+      <img src="../screenshots/11.jpg" width="1200" height="1200" alt="A floating train of rusted steel gears, some brass, with an escape wheel and anchor at one end, over a soft bone-coloured studio floor." fetchpriority="high" decoding="async">
+      <figcaption>A rusted train on the studio sweep.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>Clockwork that really works</h2>
+      <p>Day 11's prompt was Rust. The piece is an old mechanism left to weather: a train of gears hanging in the air, run by a clock escapement, its steel going from oiled and bright to a crust that lifts and flakes. Every gear is a real involute gear that meshes with its neighbours, and every part moves because the escape wheel moves. Nothing is animated on its own.</p>
+      <p>A machine comes from its Variation and a target number of gears. A generator grows the train stage by stage from the escape wheel's arbor: spur, compound and idler stages, bevels, worms, rings, planetary sets, a Scotch yoke with a rack, helical and herringbone pairs, crossed helicals, roller chains and a bevel differential. Each new stage has to clear everything already there. The escapement is a Graham deadbeat anchor with a pendulum, or a lever that drives a balance wheel through its impulse pin.</p>
+      <p>Then the finish. The parts are chamfered and worn as meshes, and their material, a <code>surface()</code> hook on the <a href="../modules/pipeline/explainer.html">shared pipeline</a>, paints rust that grows over the machine while it is on show. Drag a gear and the train turns by hand: the anchor lifts clear and drops back in when you let go.</p>
+    </div>
+  </section>
+
+  <!-- 2. Escapement -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The escapement · <b>escapement.js</b></div>
+      <h2>Lock, impulse, drop</h2>
+      <p>An escapement lets a wound train go one tooth at a time. The escape wheel's teeth press on the anchor's two pallets. While a tooth rests on a pallet's locking face, the wheel can't move. The pendulum swings the anchor until the tooth slips off the corner onto the impulse face, and the tooth pushes the pallet aside as it slides across: that push is what keeps the pendulum going. Past the far corner the wheel is free and drops until a tooth lands on the other pallet. Each beat advances the wheel half a tooth.</p>
+      <p>The layout is solved from the tooth count N and tip radius R. The pallets span n + ½ pitches, with n = round(N / 4 − ½), so that the lines from the anchor's pivot to the middle of both working ranges are tangent to the tip circle. That puts the pivot at D = R / cos β above the wheel's centre, β being half the span. The locking faces are arcs about the pivot. That is what makes it a deadbeat: while a tooth rests on one, the anchor turns but the wheel never recoils. The impulse faces are straight cuts placed so that the tip slides across them while the anchor turns through the 2° lift and the wheel through 0.38 of a pitch. The rest of the half pitch is drop. Every contact keeps a gap of 0.002 R, so the solids touch to the eye and never in numbers.</p>
+      <p>Time drives it the other way round. The anchor angle is a cosine, ±3.5° over the pendulum's period (2 s by default, the Pendulum slider). For each beat, <code>motion()</code> finds where the tooth tip touches the impulse face at that anchor angle, solved exactly. It finds the release angle where the tip passes the far corner by bisection, then eases the drop in over 5% of a beat. A tick sounds when the tooth lands.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A Graham anchor, at its own proportions</h3>
+        <div class="controls">
+          <label>Teeth <input id="eN" type="range" min="15" max="30" step="1" value="30"><output id="eNo">30</output></label>
+          <label>Pendulum <input id="eP" type="range" min="1" max="4" step="0.01" value="2"><output id="ePo">2.00 s</output></label>
+          <label>Speed <select id="eS"><option value="1">1×</option><option value="0.25">¼×</option><option value="0.05">1/20×</option></select></label>
+          <label>View <select id="eV"><option value="whole">whole</option><option value="pallets">pallets</option></select></label>
+          <button id="ePause" type="button" class="ghost">Pause</button>
+        </div>
+      </div>
+      <canvas id="escCanvas" aria-label="An escape wheel with pointed teeth under a two-armed anchor. The anchor rocks a few degrees either way; the wheel advances half a tooth on each beat, its tooth sliding across an impulse face, dropping, and coming to rest on the other pallet's locking face. Below, a plot shows the anchor angle as a cosine and the wheel angle as a staircase, with the lock, impulse and drop phases marked."></canvas>
+      <div class="readout" id="eOut"></div>
+      <div class="legend"><span style="color:var(--accent2)"><i></i>locking faces</span><span style="color:var(--accent)"><i></i>impulse faces</span><span style="color:var(--accent)"><span class="dot"></span>working tooth tip</span><span style="color:var(--stage-ink)"><i></i>pendulum rod (behind)</span></div>
+      <p class="fig-cap">The day's own layout and motion code, run in 2D: lift 2°, lock 0.75°, amplitude 3.5°, impulse 0.38 pitch. The anchor turns only a few degrees, so the pallets view zooms in on them. The wheel's teeth lean forward 14° so that only the tips touch a pallet; spokes and hub are the wheel's own outline.</p>
+    </div>
+  </section>
+
+  <!-- 3. Balance -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The balance wheel · <b>train.js, buildLever, buildBalance</b></div>
+      <h2>A lever and a wide swing</h2>
+      <p>Some machines run on a balance wheel instead, as a watch does (the Balance wheel slider is the chance of one). The anchor stays the same Graham anchor and keeps the same timing, but its pendulum is replaced by a lever that runs out sideways from the pivot. The lever ends in a fork, and the fork's slot holds the impulse pin standing up from the balance's roller. As the anchor rocks a few degrees, the pin is carried sideways and the balance swings through a wide arc.</p>
+      <p>The geometry is solved for that arc. The pin sits r from the balance staff, and the fork's tip and the pin must share their sideways position: L sin a = −r sin b. The lever length L and the pin radius r are chosen so that the anchor's swing, with a small margin, would turn the balance 55°. At the anchor's true 3.5°, the balance swings about ±38°. The pin rides up and down the slot as it goes, so the slot is deep enough for that travel. The balance carries three spokes, eight timing screws on its rim and the roller, and it sits beside the escape wheel, its staff a little more than 1.1 R + R<sub>b</sub> from the wheel's arbor.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The fork carries the pin</h3>
+        <div class="controls">
+          <button id="bPause" type="button" class="ghost">Pause</button>
+        </div>
+      </div>
+      <canvas id="balCanvas" aria-label="An escape wheel and anchor; from the anchor's pivot a long lever runs left to a fork. The fork's slot holds a pin on a balance wheel with three spokes and timing screws. As the anchor rocks a few degrees, the balance swings back and forth through a wide arc. A plot beside it maps the anchor angle to the balance angle along an arcsine curve."></canvas>
+      <div class="readout" id="bOut"></div>
+      <p class="fig-cap">The day's proportions with the escape wheel's radius as the unit: balance radius 1.3, lever and pin offset solved as in <code>train.js</code>, b = −asin(L sin a / r). The balance has no dynamics of its own; its angle is a function of the anchor's, so it stays in step with the escapement's tick.</p>
+    </div>
+  </section>
+
+  <!-- 4. One coordinate -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">One degree of freedom · <b>train.js, main.js</b></div>
+      <h2>Everything follows q</h2>
+      <p>A gear train has one degree of freedom, so the machine has one number, q: the escape wheel's angle. Each part has a pose function <code>pose(q, anchorAngle)</code> that returns its world matrix. A part on a fixed axle turns by θ = ratio · q + phase about its own axis. When a stage meshes a new gear B with a gear A, the pairing gives B's frame, a ratio and a phase, and B's angle is mapped from A's: θ<sub>B</sub> = r · θ<sub>A</sub> + φ. Compound gears share their shaft's θ. So every shaft's ratio is the product of the pairings back to the escape wheel, and the phases keep each tooth facing a space.</p>
+      <p>Only a few parts aren't linear in q. The anchor and pendulum (or lever and balance) take the anchor angle. A Scotch yoke slides by e cos(θ − ψ), and the rack on it turns its pinion back and forth. The generator then keeps a bound on that pinion's speed rather than a ratio. Chain links are posed along their loop from the chain's travel.</p>
+    </div>
+    <div class="formula">
+      <span class="c">// a pairing places B in A's frame and maps its angle (gears.js)</span><br>
+      spur, helical: &nbsp; d = m (N<sub>A</sub> + N<sub>B</sub>) / 2 &nbsp;&nbsp; r = −N<sub>A</sub> / N<sub>B</sub> &nbsp;&nbsp; φ = wrap(dir + π + p<sub>B</sub> (dir / p<sub>A</sub> − ½), p<sub>B</sub>)<br>
+      ring, pinion inside: &nbsp; d = m (N<sub>R</sub> − N<sub>P</sub>) / 2 &nbsp;&nbsp; r = N<sub>R</sub> / N<sub>P</sub> &nbsp;&nbsp;&nbsp; worm: r = −starts / N &nbsp;&nbsp;&nbsp; bevel: r = σ N<sub>A</sub> / N<sub>B</sub><br>
+      rack: s = r<sub>pitch</sub> θ + φ &nbsp;&nbsp; planetary, ring fixed: carrier = θ<sub>sun</sub> · N<sub>S</sub> / (N<sub>S</sub> + N<sub>R</sub>)<br>
+      <span class="c">// p = 2π / N is a tooth pitch; wrap(a, p) = a − p · round(a / p)</span>
+    </div>
+    <div class="col prose">
+      <h3>Rust in the works</h3>
+      <p>The escapement says where q may go, but a rusty train doesn't simply follow. <code>stepMotion</code> ties the train to the escapement with a stiff spring (k = 900, damping 60, about critically damped) and puts static and sliding friction against it, in fixed steps of 1/240 s so a slow frame doesn't make it ring. A stuck train holds until the pull beats a threshold drawn for each stick, rust · (0.006 + 0.02 · random). Then it lurches, judders against a sliding friction of rust · 0.004, and sticks again once it has nearly stopped close to the target. It is never allowed past the escapement: a tooth can't go through a pallet. The rust here is the rust actually grown, Rust times Age, so a new machine runs clean. A creak of cogs plays as it breaks free, louder the harder it held, and a clack plays as it sticks.</p>
+      <h3>By hand</h3>
+      <p>Pressing on a gear casts a ray, and the gear's axle gives a plane through the hit point. The pointer's angle about the axle in that plane moves the drive by Δangle / ratio, so the dragged gear follows the hand and the rest of the train turns with it. While it is held, the escapement's clock stops and the anchor and its pendulum (or lever and balance) slide 6 cm along their arbors, clear of the wheel. On release the escapement takes the train back at the nearest whole tooth, and the anchor drops back in. A ratchet clicks for every tooth that passes under the hand.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A small train on one coordinate</h3>
+        <div class="controls">
+          <label>Rust <input id="tR" type="range" min="0" max="1" step="0.01" value="0.6"><output id="tRo">0.60</output></label>
+          <button id="tPause" type="button" class="ghost">Pause</button>
+        </div>
+      </div>
+      <canvas id="trainCanvas" class="grab" aria-label="A train of involute spur gears in a line: an escape wheel at the back, a pinion on its arbor driving a wheel, a compound gear on that shaft, and further gears, each labelled with its ratio to the escape wheel. They step forward together on each beat. Below, a trace shows how far the train lags the escapement, jumping and sticking when rusty."></canvas>
+      <div class="readout" id="tOut"></div>
+      <p class="fig-cap">Drag any gear to turn the train by hand. Five shafts, ratios multiplied along the chain; gears in front are drawn lighter. Each pair is placed and phased with the day's spur pairing, and the teeth are true involutes at 20° pressure angle. The trace is the lag of the train behind the escapement, using <code>stepMotion</code>'s constants. Rust 0 follows exactly.</p>
+    </div>
+  </section>
+
+  <!-- 5. Gears -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The gears · <b>gears.js</b></div>
+      <h2>Involutes, cut as a rack would cut them</h2>
+      <p>Every gear is generated from its tooth count and module, the pitch diameter per tooth. External teeth are involutes at a 20° pressure angle, with an addendum of one module and a dedendum of 1.25. Below the involute, the flank follows the trochoid a rack cutter would leave, so small pinions get their real undercut, and pointed tips are cut back to a land of 0.12 module. Each flank is thinned by 0.03 module of backlash, so meshed teeth never touch even after the rust heaves them a little. The profile is computed as a half-angle w(ρ) per radius, so the outline, the triangles of the teeth and the wear can all be laid out in polar rows.</p>
+      <p>Behind the teeth is a body: a solid disc, or a web sunk between rim and hub, spokes, or a ring of holes, picked from a seed where there is room. Pairing functions return where the second gear goes and how its angle follows, and they check that the modules match.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Spur, helical, herringbone</b><span>Helical teeth are the transverse profile twisted along the axis by tan(helix) / pitch radius; a herringbone twists one way to the middle and back. A parallel pair needs opposite hands.</span></div>
+      <div class="fact"><b>Ring and planetary</b><span>Internal teeth whose spaces are shaped like external teeth. A planetary set needs ring = sun + 2 planets and sun + ring divisible by the planet count; the ring is fixed and the carrier drives on.</span></div>
+      <div class="fact"><b>Bevel and differential</b><span>Straight teeth on a cone, spherical involutes with every point on a ray from the apex. In the differential, two spiders on the cage's cross pin roll on a held side gear, so the other turns at twice the cage.</span></div>
+      <div class="fact"><b>Worm, crossed helical</b><span>An involute worm and a wheel that is a helical gear with the worm's lead angle; a crossed pair on skew shafts whose helix angles sum to the shaft angle.</span></div>
+      <div class="fact"><b>Rack and yoke</b><span>A crank pin in a slotted yoke makes it slide back and forth; a rack on the yoke swings a pinion to and fro.</span></div>
+      <div class="fact"><b>Chain</b><span>A roller chain over two or three sprockets in one plane, its roller and pin links instanced and posed along the loop from q.</span></div>
+    </div>
+  </section>
+
+  <!-- 6. Generator -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Growing a train · <b>train.js, createMachine</b></div>
+      <h2>A stage at a time, if it clears</h2>
+      <p>The escapement comes first: an escape wheel of 15 to 30 teeth, its anchor, and a pendulum 0.36 to 0.48 long (or the lever and balance). A pinion of 8 to 12 teeth on the escape arbor drives the first wheel. Then the train grows from its last gear. Each round picks a stage type from the machine's palette of two to four types, weighted by the Mix sliders and by how often each type has been used. The stage's <code>canAttach</code> says whether it can grow from that gear, and its <code>build</code> proposes new parts, shafts and colliders. A slider at 1 forces its type into every machine the gear count leaves room for.</p>
+      <p>A proposal is kept only if every new collider clears every old one by 0.35 module, except where they are meant to touch: meshing partners, parts on the same shaft. Colliders are convex hulls: coaxial discs for gears and axles, boxes for the pendulum's swept slab, the yoke and the rack. The test is GJK, which walks the Minkowski difference toward the origin and stops as soon as the gap is proven or ruled out. The whole machine must also fit a sphere of radius 0.65 · ∛(G / 12) for G gears, so bigger trains get more room while the parts keep their size.</p>
+      <p>Speeds are steered as it grows. A shaft must turn between 0.01 and 40 times the escape wheel. A slow driver usually gets a step-up, a big wheel on a small pinion, and a fast one a step-down. When the last gear can't take any stage, the train branches from another gear. A machine whose gear count misses the target by more than ⌈G / 6⌉ is thrown away and tried again with the next attempt's stream, up to 60 times. Late attempts may fall back on plain spur stages.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Seeded and stable</b><span>Every attempt draws from its own mulberry32 stream of the Variation. The balance-or-pendulum choice has a stream of its own, so turning that slider doesn't reshuffle the rest of the layout.</span></div>
+      <div class="fact"><b>Axles</b><span>Each shaft gets an axle through all its members, a little past the outer ones; its collider is renewed whenever a stage adds a member.</span></div>
+      <div class="fact"><b>Recentred</b><span>At the end a near-minimal enclosing sphere of every collider's points is found, 400 Bădoiu–Clarkson steps from the box centre, and the machine is moved to its centre.</span></div>
+    </div>
+  </section>
+
+  <!-- 7. Wear -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Worn shapes · <b>wear.js</b></div>
+      <h2>Chamfers, eaten edges and pits, in the mesh</h2>
+      <p>The rust's colour is in the shader, but some of its damage is real geometry. Every part is a 2D outline swept along its axis: a gear's toothed loop, an anchor, a lever. Each end of the sweep gets a cap profile, rows of the outline inset toward the solid at increasing depth. Chamfer gives a flat 45° band, 0.24 module wide at full Chamfer. Wear gives a rounded band of uneven width, the convex corners rounded off with tooth tips first, chips at some sharp corners, and shallow pits stitched into the flat faces. A pit is a small crater mesh, 0.5 to 4 module across, sewn into a hole cut in the face, so the rest of the mesh keeps its triangles and stays closed.</p>
+      <p>Every effect only removes material, so worn teeth still clear. Insets are held to 40% of the local thickness, measured by a ray across the outline, so narrow tips keep their shape. The escapement's pallets and tooth tips do the work, so they wear only a little and never chip. Chamfer and Wear reshape the parts but not the layout: changing them rebuilds the meshes in place while the train keeps running.</p>
+      <p>Each mesh also gets three vertex attributes for the rust. A normal is averaged over vertices welded by position, so it is smooth across creases. A concavity value comes from how far the neighbours rise above the vertex's tangent plane, and a convexity value from how far they fall below it.</p>
+    </div>
+  </section>
+
+  <!-- 8. Rust -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The rust · <b>rust.js, corrosion.js</b></div>
+      <h2>Grown, not noise</h2>
+      <p>Rust doesn't come on as a blur. It starts at many small points, spreads in ragged fronts and leaves islands of bare steel. So the main patterns are grown offline into a tiling 64³ texture, <code>corrosion.bin</code>. Its red channel is the time at which rust reaches each cell, spreading from 260 small seeds through random costs per cell, a first-passage growth whose fronts come out ragged. Green is the same from 18 big patches, some starting late. Blue is the distance to spots of power-law sizes, for pits. Alpha is the distance to Voronoi edges, for scale cracking into plates. The arrival times are ranked, so a threshold of 0.4 covers exactly 40%.</p>
+      <p>The shader reads that field at three scales in the part's own space, so the pattern turns with the part. It hides the repeats with iq's no-tile trick: a slow noise picks one of eight offsets per area and blends the two nearest. For the mature crust and the oldest scale it reads two CC0 rust scans (ambientCG Rust007 and Rust004), triplanar in the part's space, also without tiles. Their brightness gives the pattern and the palette gives the colour.</p>
+      <p>The rust also arrives sooner in tooth roots and on faces that were up while the machine stood still, and later on flanks that run. A point rusts once Age · 1.2 − 0.08 passes its arrival time. Steel ahead of a front is already stained brown, the edge of a patch has a young bright margin with a raised lip, the crust behind it matures, and the oldest, dampest parts go to dark scale. Past Age 0.7 the last bare islands close over.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A gear face, ageing</h3>
+        <div class="controls">
+          <label>Age <input id="rA" type="range" min="0" max="1" step="0.005" value="0.62"><output id="rAo">0.62</output></label>
+          <label>Rust <input id="rR" type="range" min="0" max="1" step="0.01" value="0.8"><output id="rRo">0.80</output></label>
+          <label>Colour <select id="rP"></select></label>
+          <button id="rPlay" type="button" class="ghost">Timelapse</button>
+        </div>
+      </div>
+      <canvas id="rustCanvas" aria-label="The face of a spur gear with a sunk web, drawn per pixel. With age, brown stains spread over the grey steel, rust patches grow from many points with bright margins, darken, pit, gather grime and grease in the corners of the web, and craze into plates. Beside it a chart shows when each layer comes in as Age goes from 0 to 1."></canvas>
+      <div class="legend"><span style="color:var(--rust)"><i></i>rust (Rust × Age)</span><span style="color:var(--grease)"><i></i>grease</span><span style="color:var(--stage-ink)"><i></i>grime</span><span style="color:var(--accent2)"><i></i>edge pits</span><span style="color:var(--accent)"><i class="dash"></i>flaking</span></div>
+      <p class="fig-cap">A simplified version of the shader on a flat face, in 2D: grown fields from the same first-passage growth, the arrival rule, stain, margins, crust, pits, edge pits along the chamfer and tooth tips, flaking plates, grease and grime in the web's corners, a dark sunk web and brighter proud faces. Value noise stands in for the scans. The chart is <code>setLook</code>: everything else follows the rust with a delay.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Edges first</b><span>Each edge carries a 45° chamfer, whose normal in the part's frame is half cap, half wall, so the shader finds every edge exactly. Corrosion bites hardest there: clusters of big and small pits, each with a rust halo.</span></div>
+      <div class="fact"><b>Flaking</b><span>Old crust crazes into plates along the Voronoi cracks. The plates sit at their own heights and curl up at their edges, and in a few areas some have fallen away to show dark scale or fresher rust beneath.</span></div>
+      <div class="fact"><b>Running surfaces</b><span>Where teeth mesh, a contact band either side of the pitch circle is burnished back toward steel, with sliding marks across the tooth. On abandoned machines the band survives as a smoother stripe under thin rust, and old gears spall along the pitch line.</span></div>
+      <div class="fact"><b>Grease and grime</b><span>Grease is amber and glossy when fresh, near-black and gritty when old. It is packed in roots, round the hub and smeared up the running flanks. Grime fills crevices up to a ragged line, more with the Grime slider.</span></div>
+      <div class="fact"><b>Runs</b><span>Thin dark streaks run down the sides from what was up before the machine started turning: each part keeps the up direction of its first pose.</span></div>
+      <div class="fact"><b>Real swelling</b><span>The vertex shader puffs the crust out about 0.2 mm in lumps and eats convex edges back by about a millimetre along the smooth normal, keeping the mesh closed and staying under the backlash.</span></div>
+    </div>
+  </section>
+
+  <!-- 9. Story -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">A life per machine · <b>main.js, rustInfo, setLook</b></div>
+      <h2>Every machine has a story</h2>
+      <p>The seed also says how the machine has lived, from still in use, oiled and polished where it runs, to abandoned for decades. In half the machines 10 to 30% of the gears are brass, which doesn't rust in patches but tarnishes all over and grows verdigris in its crevices. Six in ten machines use the mixed palette, patches of ochre, red-orange, grey-teal and dark brown over the base, and the rest take one of the seven palettes at random. A quarter of the parts take a second palette, as another batch of steel would, and each part's age strays a little from the machine's.</p>
+      <p>Age is the timelapse. With auto change on, each machine starts as bare steel and ages to the panel's settings over its time on show, eased, finishing two seconds before the next change (20 s by default). T plays the same over 14 s. Age scales every weathering setting, but they don't all come at once. The rust leads, grease comes in over the first half, grime from Age 0.15, edge pits from 0.3, and flaking from 0.45: a crust has to form before it can flake.</p>
+    </div>
+  </section>
+
+  <!-- 10. Framing -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Framing · <b>view.js, bestView, fitDistance</b></div>
+      <h2>Finding its best side</h2>
+      <p>A gear train seen edge-on is a pile of lines, and seen dead face-on it is flat. So for each new machine, <code>bestView</code> scores 144 directions, 24 azimuths by 6 elevations from 14° below to 52° above. For each, it splats a subsample of every part's vertices into a 64 × 64 orthographic depth buffer and counts how many cells each part owns. A part counts by the square root of its share against the most any direction shows of it, so a view that shows every part a little beats one that shows a few parts fully.</p>
+      <p>That visibility tempers the main term: the gears' discs. Each gear's disc counts by its area times c<sup>0.8</sup> (1 − c²)<sup>0.25</sup>, c being the cosine between the view and its axle. That peaks about 38° off the axle, a three-quarter view where the face reads large and the teeth and thickness show too. A small bonus goes to views from above, as one looks at a machine on a bench.</p>
+      <p>The camera doesn't move to that direction; the machine does. The camera holds the best view's elevation, turned about 69° round from the studio's key light so the light rakes across the parts. The machine turns slowly on its spot, at 0.08 rad/s, timed so its best side faces the camera halfway through its show. Each frame, <code>fitDistance</code> finds how far back the camera must be for every vertex to fit, and the camera eases toward it, with the pendulum's points included at both ends of its swing. A slow roll of ±4° over 23 s keeps it from looking like a turntable. Orbiting by hand frees the camera.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Scoring directions, from above</h3>
+        <div class="controls">
+          <button id="vNew" type="button" class="ghost">New machine</button>
+        </div>
+      </div>
+      <canvas id="viewCanvas" aria-label="Top view of a few gears drawn as thick bars across their axles. Around them a polar curve shows the score of every viewing direction, with the best one marked by an arrow. Moving the pointer over the canvas picks a direction; a strip below shows which part owns each cell of that view's depth buffer. An inset plots the disc term against the angle off the axle, peaking at 38 degrees."></canvas>
+      <div class="readout" id="vOut"></div>
+      <p class="fig-cap">The same score in one dimension fewer: gears seen from above are bars, the depth buffer is a row of 64 cells, and the 48 candidates are azimuths only. Point at the ring to see what a direction sees.</p>
+    </div>
+  </section>
+
+  <!-- 11. Changing -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">A new machine · <b>main.js, away, stagger</b></div>
+      <h2>Taken apart and put back</h2>
+      <p>A machine is never swapped in place. On a change, the old one keeps its own look and studio until it is gone. A lever throws, and each part slides off its axle along the axle's direction, then drifts away along a random direction and tumbles, the drift growing with the square of time. Parts start in a staggered order, each over three quarters of the 1.3 s, and dissolve as they go, a screen-door threshold in every pass, so their shadows and depth fade with them. Each one leaves with a clank pitched by its size, some dragging a chain rattle.</p>
+      <p>Then the next machine is generated and arrives along the same paths in reverse over 1.8 s. Its parts settle onto their axles in a staggered order with a clink, the big ones with a clank, and the last one with a latch. Once everything has landed, the auto change count starts over.</p>
+      <p>A new studio cross-fades over 1.2 s: the spherical harmonics, the key light's direction and colour, and the background ease together, and the reflections swap halfway. Seven studios are each baked once, on first use. The backdrop is a seamless bowl, lowered to a few centimetres under the machine's lowest point so the soft shadow reads. Pausing averages frames into a still, and anything that moves a part restarts it.</p>
+    </div>
+  </section>
+
+  <!-- 12. Sound -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Sound · <b>sound.js</b></div>
+      <h2>Tic, tac and creak</h2>
+      <p>Thirty-four one-shots in ten sets, cut from CC0 recordings on freesound.org. The escapement plays a tick each time a tooth lands, tic and tac a little apart in pitch. The gear whose teeth pass fastest, short of a blur, clicks softly once per tooth. An old machine now and then creaks as it settles, and rust breaking free creaks louder the harder it held. A hand on a gear latches on and ratchets once per tooth. Taking machines apart and putting them together plays levers, clanks, chains, clinks and a latch, each timed to its part and panned to where it is.</p>
+      <p>The rustier the machine, the duller the sound: once there is some rust, a lowpass closes from about 11 kHz toward 3 kHz as it grows. Each play picks a variant (never the same one twice in a row), with its pitch and pan varied by the unseeded random, so the sound never shifts the seeded machine. Twenty-four voices play at most, through a gentle compressor.</p>
+    </div>
+  </section>
+
+  <!-- 13. Cost -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Cost</div>
+      <h2>Where the time goes</h2>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Overdraw</b><span>Gears overlap a lot. The rust shader reads the prepass depth first, and fragments hidden behind another part get the base rust colour and skip the rest.</span></div>
+      <div class="fact"><b>Lite rust</b><span>On the medium and low tiers (phones), the material leaves out the scanned normals, the old-scale scan and the flaking.</span></div>
+      <div class="fact"><b>Pixel budget</b><span>Big screens render at most 3.7 million pixels (2.2 million on medium and low), scaled down from the device's pixel ratio. Captures skip the budget.</span></div>
+      <div class="fact"><b>Building</b><span>Generating a machine, meshing its worn parts and scoring 144 views runs in the page between two machines. The colliders' points are cached, and gear meshes are built once per set of arguments.</span></div>
+    </div>
+  </section>
+
+  <!-- 14. Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>Drag a gear to turn the train by hand; drag elsewhere to orbit, scroll or pinch to zoom.</li>
+      <li><b>Machine</b>: Variation, Gears (6 to 30), Balance wheel (the chance of a lever and balance instead of a pendulum).</li>
+      <li><b>Mix</b>: a weight per stage type, from spur to differential; 0 leaves a type out, 1 puts it in every machine.</li>
+      <li><b>Finish</b>: Chamfer, Wear, Age, Rust, Rust colour, Grease, Edge pitting, Flaking, Grime, and Pendulum (the period, for the balance too).</li>
+      <li><b>Studio</b>, Auto change and Change every (20 s by default; the machine ages over that time).</li>
+      <li><b>R</b> makes a new machine, <b>T</b> plays the ageing timelapse, <b>M</b> or the speaker button toggles sound.</li>
+      <li><b>Space</b> pauses, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot.</li>
+    </ul>
+  </section>
+  <footer class="col">
+    <div class="meta">
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>one degree of freedom</span><span>no build step</span><span>desktop and phones</span>
+      </div>
+    Day 11 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/11/">spite.github.io/codevember-2026/11</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/11">11/ of the codevember-2026 repository</a>. The machines and studio are rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>. Rust scans are CC0 from ambientCG and Poly Haven; sounds are CC0 recordings from freesound.org.
+  </footer>
+</main>
+
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const mix = (a, b, t) => a + (b - a) * t;
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+  const hex = (h) => { const n = typeof h === "number" ? h : parseInt(h.replace("#", ""), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+
+  // A canvas sized to its CSS width at the device pixel ratio; draw() gets (ctx, width, height) in CSS pixels.
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1, W = 0, H = 0;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      W = canvas.clientWidth || 600; H = Math.round(typeof aspect === "function" ? aspect(W) : W * aspect);
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, W, H);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    new MutationObserver(() => fit(true)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return { redraw: () => fit(true), paint: () => W && draw(ctx, W, H), size: () => [W, H] };
+  }
+  const bind = (id, fn, fmt = (v) => (+v).toFixed(2)) => {
+    const el = $(id), out = $(id + "o");
+    const set = () => { if (out) out.textContent = fmt(el.value); fn(+el.value); };
+    el.addEventListener("input", set);
+    if (out) out.textContent = fmt(el.value);
+    return el;
+  };
+  // Animates while on screen: step(dt) each frame.
+  function animate(el, step) {
+    let on = false, running = true, last = 0, raf = 0;
+    const loop = (now) => {
+      raf = 0;
+      if (!on || !running) return;
+      const dt = last ? Math.min((now - last) / 1000, 1 / 20) : 1 / 60;
+      last = now;
+      step(dt);
+      raf = requestAnimationFrame(loop);
+    };
+    const kick = () => { if (on && running && !raf) { last = 0; raf = requestAnimationFrame(loop); } };
+    new IntersectionObserver(([e]) => { on = e.isIntersecting; kick(); }).observe(el);
+    return { set running(v) { running = v; kick(); }, get running() { return running; } };
+  }
+  function mulberry(seed) {
+    return () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  // Smooth value noise in 2D, 0..1.
+  function noise2(seed) {
+    const h = (i, j) => {
+      let x = (Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(seed, 1442695041)) | 0;
+      x = Math.imul(x ^ (x >>> 13), 1274126177);
+      return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+    };
+    return (x, y) => {
+      const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
+      const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+      return mix(mix(h(i, j), h(i + 1, j), u), mix(h(i, j + 1), h(i + 1, j + 1), u), v);
+    };
+  }
+  const pauseButton = (id, run) => {
+    const b = $(id);
+    b.addEventListener("click", () => { run.running = !run.running; b.textContent = run.running ? "Pause" : "Play"; });
+    if (reduce) { run.running = false; b.textContent = "Play"; }
+  };
+
+  // ---------------------------------------------------------------- escapement.js, in 2D
+  const TAU = Math.PI * 2, DEG = Math.PI / 180;
+  const polar = (r, a) => [r * Math.cos(a), r * Math.sin(a)];
+  const rot = ([x, y], a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1];
+  const len = (a) => Math.hypot(a[0], a[1]);
+  const wrapPi = (a) => a - TAU * Math.round(a / TAU);
+  const scl = (a, s) => [a[0] * s, a[1] * s];
+
+  const layouts = new Map();
+  function escLayout(teeth, radius = 1) {
+    const key = teeth + ":" + radius;
+    if (layouts.has(key)) return layouts.get(key);
+    const lift = 2 * DEG, lock = 0.75 * DEG, A = 3.5 * DEG, impulse = 0.38, clearance = 0.002;
+    const N = teeth, R = radius, p = TAU / N, eps = clearance * R;
+    const n = Math.max(1, Math.round(N / 4 - 0.5)), span = (n + 0.5) * p, beta = span / 2, D = R / Math.cos(beta);
+    const P = [0, D], dImp = impulse * p;
+    const gE = Math.PI / 2 - beta - dImp / 2, gX = gE + span;
+    const a0 = -(lift - lock) / 2, b0 = (lift - lock) / 2;
+    const tip = (g) => polar(R, g);
+    const along = (v, d) => scl(v, (len(v) + d) / len(v));
+    const lE = sub(tip(gE), P), lX = sub(tip(gX), P);
+    const psiE = Math.atan2(lE[1], lE[0]), psiX = Math.atan2(lX[1], lX[0]);
+    const entry = { name: "entry", lockWheel: gE, c1: rot(along(lE, -eps), -a0), c2: rot(along(sub(tip(gE + dImp), P), -eps), -(a0 + lift)) };
+    const exit = { name: "exit", lockWheel: gX, c1: rot(along(lX, eps), -b0), c2: rot(along(sub(tip(gX + dImp), P), eps), -(b0 - lift)) };
+    for (const pl of [entry, exit]) {
+      pl.r1 = len(pl.c1); pl.r2 = len(pl.c2);
+      pl.psi1 = Math.atan2(pl.c1[1], pl.c1[0]); pl.psi2 = Math.atan2(pl.c2[1], pl.c2[0]);
+    }
+    const armAngle = (0.55 * (entry.r1 - entry.r2)) / entry.r1 + 4 * DEG, margin = 2.5 * DEG;
+    entry.top = psiE + A + margin + armAngle; entry.armLow = entry.top - armAngle;
+    exit.top = psiX - A - margin - armAngle; exit.armLow = exit.top + armAngle;
+    entry.inside = polar((entry.r1 + entry.r2) / 2, (entry.psi1 + entry.top) / 2);
+    exit.inside = polar((exit.r1 + exit.r2) / 2, (exit.psi1 + exit.top) / 2);
+    const reach = (pl, a) => R - len([P[0] + rot(pl.c2, a)[0], P[1] + rot(pl.c2, a)[1]]);
+    const dip = Math.max(reach(entry, -A), reach(exit, A));
+    const L = {
+      teeth: N, radius: R, pitch: p, span, beta, distance: D, lift, lock, amplitude: A, impulse: dImp, clearance: eps,
+      unlockEntry: a0, unlockExit: b0, entry, exit, toothHeight: Math.max(0.12 * R, dip + 0.05 * R), wheelLock: ((gE % p) + p) % p,
+    };
+    L.hubRadius = Math.min(0.2 * R, 0.55 * (D - R));
+    for (const pl of [entry, exit]) {
+      const sign = pl === entry ? 1 : -1, lo = pl === entry ? a0 - lift : -A, hi = pl === entry ? A : b0 + lift;
+      let a = lo, b = hi;
+      for (let i = 0; i < 80; i++) {
+        const m = (a + b) / 2, u = impulseContact(L, pl, m).u;
+        if ((u < 1) === (sign > 0)) a = m; else b = m;
+      }
+      pl.release = (a + b) / 2;
+      pl.releaseOffset = impulseContact(L, pl, pl.release).offset;
+    }
+    layouts.set(key, L);
+    return L;
+  }
+  function impulseContact(L, pl, a) {
+    const P = [0, L.distance], R = L.radius;
+    const q1 = [P[0] + rot(pl.c1, a)[0], P[1] + rot(pl.c1, a)[1]], q2 = [P[0] + rot(pl.c2, a)[0], P[1] + rot(pl.c2, a)[1]];
+    const e = sub(q2, q1), el = len(e);
+    let nrm = [e[1] / el, -e[0] / el];
+    const ins = rot(pl.inside, a);
+    if (dot(nrm, sub([P[0] + ins[0], P[1] + ins[1]], q1)) > 0) nrm = [-nrm[0], -nrm[1]];
+    const c = (L.clearance + dot(nrm, q1)) / R, tn = Math.atan2(nrm[1], nrm[0]), ac = Math.acos(clamp(c, -1, 1));
+    const target = pl.lockWheel + L.impulse / 2;
+    const g = [tn + ac, tn - ac].reduce((best, x) => (Math.abs(wrapPi(x - target)) < Math.abs(wrapPi(best - target)) ? x : best));
+    const t = polar(R, g);
+    return { offset: wrapPi(g - pl.lockWheel), u: dot(sub(t, q1), e) / (el * el) };
+  }
+  function cornerContact(L, pl, a) {
+    const R = L.radius, eps = L.clearance, c = rot(pl.c1, a), q = [c[0], L.distance + c[1]], ql = len(q);
+    const phi = Math.atan2(q[1], q[0]), ac = Math.acos(clamp((R * R + ql * ql - eps * eps) / (2 * R * ql), -1, 1));
+    const g = [phi + ac, phi - ac].reduce((best, x) => (Math.abs(wrapPi(x - pl.lockWheel)) < Math.abs(wrapPi(best - pl.lockWheel)) ? x : best));
+    return wrapPi(g - pl.lockWheel);
+  }
+  // Escapement state at `time`: wheel (cumulative), anchor angle, beat, pallet, phase, and the wheel offset in this beat.
+  function motion(time, period, L, dropTime = 0.05) {
+    const A = L.amplitude, half = period / 2;
+    const beat = Math.floor(time / half), s = time - beat * half, odd = beat & 1, th = (Math.PI * s) / half;
+    const anchor = odd ? A * Math.cos(th) : -A * Math.cos(th);
+    const pl = odd ? L.exit : L.entry;
+    const sRel = (Math.acos(odd ? pl.release / A : -pl.release / A) / Math.PI) * half;
+    const tau = dropTime * half, sLand = sRel + tau, base = L.wheelLock + (beat * L.pitch) / 2;
+    let off, phase;
+    if (s < sRel) {
+      const ic = impulseContact(L, pl, anchor), unlocked = odd ? anchor < L.unlockExit : anchor > L.unlockEntry;
+      off = Math.max(0, unlocked && ic.u < 0 ? cornerContact(L, pl, anchor) : ic.offset);
+      phase = off > 0 ? "impulse" : "lock";
+    } else if (s < sLand) {
+      const u = (s - sRel) / tau;
+      off = pl.releaseOffset + (L.pitch / 2 - pl.releaseOffset) * u * u;
+      phase = "drop";
+    } else {
+      off = L.pitch / 2;
+      phase = "lock";
+    }
+    return { wheel: base + off, anchor, beat, pallet: pl.name, phase, offset: off, landed: s >= sLand };
+  }
+
+  function arc(r, a0, a1, step = 0.5 * DEG, cx = 0, cy = 0) {
+    const k = Math.max(1, Math.ceil(Math.abs(a1 - a0) / step)), out = [];
+    for (let i = 0; i <= k; i++) { const a = a0 + ((a1 - a0) * i) / k; out.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); }
+    return out;
+  }
+  const circle = (r, n = 48, cx = 0, cy = 0) => Array.from({ length: n }, (_, k) => [cx + r * Math.cos((TAU * k) / n), cy + r * Math.sin((TAU * k) / n)]);
+
+  function escapeWheelOutline(L, spokes = 5) {
+    const teeth = L.teeth, R = L.radius, p = L.pitch, h = L.toothHeight, Rr = R - h, lean = 14 * DEG;
+    const front = (h * Math.tan(lean)) / Rr, back = front + 0.3 * p;
+    const outer = [];
+    for (let k = 0; k < teeth; k++) {
+      const c = k * p;
+      for (let i = 0; i < 4; i++) { const s = i / 4; outer.push(polar(Rr + h * s, c - back * (1 - s) ** 1.25)); }
+      outer.push(polar(R, c));
+      for (let i = 1; i <= 3; i++) { const s = i / 3; outer.push(polar(R - h * s, c - front * s)); }
+      const r0 = c - front, r1 = c + p - back, m = 4;
+      for (let i = 1; i < m; i++) outer.push(polar(Rr, r0 + ((r1 - r0) * i) / m));
+    }
+    const holes = [];
+    const rim = Rr - Math.max(0.1 * R, 0.6 * h), hub = Math.max(0.2 * R, 0.13 * R), sw = 0.07 * R;
+    for (let s = 0; s < spokes; s++) {
+      const c0 = (TAU * s) / spokes + p / 2, c1 = (TAU * (s + 1)) / spokes + p / 2;
+      const ha = (r) => Math.asin(Math.min(1, sw / 2 / r));
+      holes.push([...arc(rim, c0 + ha(rim), c1 - ha(rim), 3 * DEG), ...arc(hub, c1 - ha(hub), c0 + ha(hub), 3 * DEG)]);
+    }
+    holes.push(circle(0.05 * R));
+    return { outer, holes };
+  }
+  function anchorOutline(L) {
+    const E = L.entry, X = L.exit, rh = L.hubRadius, step = 0.25 * DEG, kappa = 14 * DEG;
+    let topX = X.top;
+    while (topX < E.top) topX += TAU;
+    let lowE = E.armLow;
+    while (lowE < X.armLow) lowE += TAU;
+    const outer = [
+      ...arc(E.r1, E.psi1, E.top, step),
+      ...arc(rh, E.top + kappa, topX - kappa, 3 * DEG),
+      ...arc(X.r2, X.top, X.psi2, step),
+      ...arc(X.r1, X.psi1, X.armLow, step),
+      ...arc(rh, X.armLow + kappa, lowE - kappa, 3 * DEG),
+      ...arc(E.r2, E.armLow, E.psi2, step),
+    ];
+    return { outer, holes: [circle(0.05 * L.radius, 24)] };
+  }
+  // A closed polygon into the current path, through map(point) -> canvas point.
+  function poly(ctx, pts, map) {
+    pts.forEach((p, i) => { const [x, y] = map(p); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+    ctx.closePath();
+  }
+  function line(ctx, a, b) { ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+  function solid(ctx, loops, map, fill, stroke = css("--edge"), width = 1) {
+    ctx.beginPath();
+    for (const l of loops) poly(ctx, l, map);
+    ctx.fillStyle = fill; ctx.fill("evenodd");
+    ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.lineJoin = "round"; ctx.stroke();
+  }
+  // The working faces of both pallets, the active one bold.
+  function palletFaces(ctx, L, active, map) {
+    for (const pl of [L.entry, L.exit]) {
+      const on = active === pl, lockArc = pl === L.entry ? arc(pl.r1, pl.psi1, pl.top, 0.25 * DEG) : arc(pl.r1, pl.psi1, pl.armLow, 0.25 * DEG);
+      ctx.globalAlpha = on ? 1 : 0.55;
+      ctx.lineWidth = on ? 3.5 : 1.6; ctx.lineCap = "round";
+      ctx.strokeStyle = css("--accent2");
+      ctx.beginPath(); lockArc.forEach((p, i) => { const [x, y] = map(p); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+      ctx.strokeStyle = css("--accent");
+      line(ctx, map(pl.c1), map(pl.c2));
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------------------------------------------------------------- 1. Graham escapement
+  {
+    const E = { teeth: 30, period: 2, speed: 1, view: "whole", t: 0.3 };
+    let L = escLayout(E.teeth), W = escapeWheelOutline(L), A = anchorOutline(L);
+    const rebuild = () => { L = escLayout(E.teeth); W = escapeWheelOutline(L); A = anchorOutline(L); };
+    const STRIP = 96;
+    const canvas = $("escCanvas");
+    const v = setup(canvas, (w) => Math.round((w < 560 ? w * 1.0 : Math.min(w * 0.5, 470)) + STRIP), (ctx, Wd, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, Wd, H);
+      const Hm = H - STRIP, R = L.radius, D = L.distance, P = [0, D];
+      const st = motion(E.t, E.period, L);
+      let box;
+      if (E.view === "whole") box = [-1.3 * R, -1.15 * R, 1.3 * R, D + 0.42 * R];
+      else {
+        const pts = [L.entry.c1, L.entry.c2, L.exit.c1, L.exit.c2].map((c) => [c[0], c[1] + D]);
+        box = [Math.min(...pts.map((p) => p[0])), Math.min(...pts.map((p) => p[1])), Math.max(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[1]))];
+        const pad = 0.16 * R;
+        box = [box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad];
+      }
+      const s = Math.min(Wd / (box[2] - box[0]), Hm / (box[3] - box[1])) * 0.94;
+      const ox = Wd / 2 - (s * (box[0] + box[2])) / 2, oy = Hm / 2 + (s * (box[1] + box[3])) / 2;
+      const X = ([x, y]) => [ox + s * x, oy - s * y];
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, Wd, Hm); ctx.clip();
+      // Pendulum rod and hub, behind.
+      const down = rot([0, -1], st.anchor);
+      ctx.strokeStyle = css("--stage-ink"); ctx.globalAlpha = 0.5; ctx.lineCap = "round";
+      ctx.lineWidth = Math.max(3, 0.08 * R * s);
+      line(ctx, X(P), X([P[0] + down[0] * 12 * R, P[1] + down[1] * 12 * R]));
+      ctx.globalAlpha = 1;
+      const wmap = (p) => X(rot(p, st.wheel));
+      solid(ctx, [W.outer, ...W.holes], wmap, css("--steel"));
+      const amap = (p) => { const q = rot(p, st.anchor); return X([q[0] + P[0], q[1] + P[1]]); };
+      solid(ctx, [A.outer, ...A.holes], amap, css("--steel-hi"));
+      const active = st.phase === "drop" ? null : st.landed ? (st.pallet === "entry" ? L.exit : L.entry) : st.pallet === "entry" ? L.entry : L.exit;
+      palletFaces(ctx, L, active, amap);
+      if (active) {
+        const g = st.landed ? active.lockWheel : active.lockWheel + st.offset;
+        const [x, y] = X(polar(R, g));
+        ctx.fillStyle = css("--accent"); ctx.beginPath(); ctx.arc(x, y, 4.5, 0, TAU); ctx.fill();
+      }
+      // Pivot.
+      const [px, py] = X(P);
+      ctx.fillStyle = css("--edge"); ctx.beginPath(); ctx.arc(px, py, 3, 0, TAU); ctx.fill();
+      if (E.view === "whole") {
+        ctx.font = font(11); ctx.fillStyle = css("--muted"); ctx.textBaseline = "middle";
+        const lab = (t, p, align) => { const [x, y] = X(p); ctx.textAlign = align; ctx.fillText(t, x, y); };
+        lab("entry pallet", [rot(L.entry.c1, st.anchor)[0] + 0.12 * R, D + rot(L.entry.c1, st.anchor)[1] + 0.1 * R], "left");
+        lab("exit pallet", [rot(L.exit.c1, st.anchor)[0] - 0.12 * R, D + rot(L.exit.c1, st.anchor)[1] + 0.1 * R], "right");
+        lab("escape wheel", [-1.25 * R, -1.02 * R], "left");
+        lab("pendulum, behind", [0.08 * R, -1.02 * R], "left");
+      }
+      ctx.restore();
+
+      // The two curves over two full swings, with the phases marked.
+      const T = 2 * E.period, t0 = Math.floor(E.t / T) * T, left = 92, right = 12, n = 260;
+      const XT = (t) => left + ((t - t0) / T) * (Wd - left - right);
+      const w0 = motion(t0, E.period, L).wheel;
+      const y0 = Hm + 10, tH = 30, gap = 8;
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
+      line(ctx, [left, y0 + tH / 2], [Wd - right, y0 + tH / 2]);
+      ctx.font = font(10.5); ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillStyle = css("--muted");
+      ctx.fillText("anchor ±3.5°", 8, y0 + tH / 2);
+      ctx.fillText("wheel, teeth", 8, y0 + tH + gap + tH / 2);
+      ctx.fillText("phase", 8, y0 + 2 * tH + 2 * gap + 3);
+      const pc = { lock: css("--accent2"), impulse: css("--accent"), drop: css("--ink") };
+      let prev = null;
+      const ys = [], yw = [];
+      for (let i = 0; i <= n; i++) {
+        const t = t0 + (T * i) / n, m = motion(t, E.period, L), x = XT(t);
+        ys.push([x, y0 + tH / 2 - (m.anchor / L.amplitude) * (tH / 2 - 2)]);
+        yw.push([x, y0 + 2 * tH + gap - ((m.wheel - w0) / L.pitch / 2) * tH]);
+        if (prev) {
+          ctx.fillStyle = pc[m.phase]; ctx.globalAlpha = m.phase === "drop" ? 0.9 : 0.55;
+          ctx.fillRect(prev, y0 + 2 * tH + 2 * gap, x - prev + 0.6, 6);
+        }
+        prev = x;
+      }
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 1.6;
+      for (const [pts, col] of [[ys, css("--steel-dark")], [yw, css("--ink")]]) {
+        ctx.strokeStyle = col; ctx.beginPath();
+        pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+        ctx.stroke();
+      }
+      ctx.strokeStyle = css("--accent"); ctx.lineWidth = 1.5;
+      line(ctx, [XT(E.t), y0 - 4], [XT(E.t), y0 + 2 * tH + 2 * gap + 8]);
+    });
+    let frame = 0;
+    const readout = () => {
+      const st = motion(E.t, E.period, L);
+      const what = st.phase === "drop" ? "drop, wheel free" : st.phase === "impulse" ? `impulse on the ${st.pallet} pallet` : `locked on the ${st.landed ? (st.pallet === "entry" ? "exit" : "entry") : st.pallet} pallet`;
+      $("eOut").innerHTML = `<span>beat <b>${st.beat}</b></span><span><b>${what}</b></span><span>anchor <b>${(st.anchor / DEG).toFixed(2)}°</b></span><span>wheel <b>${(st.wheel / L.pitch).toFixed(2)}</b> teeth</span><span>a beat is <b>${(E.period / 2).toFixed(2)} s</b></span>`;
+    };
+    const run = animate(canvas, (dt) => { E.t += dt * E.speed; v.paint(); if (++frame % 4 === 0) readout(); });
+    pauseButton("ePause", run);
+    bind("eN", (x) => { E.teeth = x; rebuild(); v.paint(); readout(); }, (x) => String(x | 0));
+    bind("eP", (x) => { E.t *= x / E.period; E.period = x; v.paint(); readout(); }, (x) => (+x).toFixed(2) + " s");
+    $("eS").addEventListener("change", (e) => { E.speed = +e.target.value; });
+    $("eV").addEventListener("change", (e) => { E.view = e.target.value; v.paint(); });
+    readout();
+  }
+
+  // ---------------------------------------------------------------- 2. lever and balance
+  {
+    const L = escLayout(30, 1), W = escapeWheelOutline(L), A = anchorOutline(L), D = L.distance, P = [0, D];
+    // train.js, the lever escapement's proportions (units of the escape wheel's radius; m and pLen typical).
+    const m = 0.15, pLen = 3.6, amp = L.amplitude + 0.02, Rb = 1.3, rimW = 0.15 * Rb;
+    const k55 = Math.sin(amp) / Math.sin(55 * DEG), reach = 1.1 + Rb;
+    const Lv = Math.sqrt(Math.max(reach * reach - D * D, (0.6 * reach) ** 2)) / (1 - k55), rr = Lv * k55;
+    const pinR = Math.max(0.16 * rr, 0.25 * m), rodW = 0.03 * pLen, hub = 0.048 * pLen;
+    const slot = 1.12 * pinR, depth = 0.5 * rr + 1.5 * pinR;
+    const swingOf = (a) => -Math.asin(clamp((Lv * Math.sin(a)) / rr, -1, 1));
+    const levRot = -Math.PI / 2;
+    const Bc = [P[0] + rot([0, -(Lv + rr)], levRot)[0], P[1] + rot([0, -(Lv + rr)], levRot)[1]];
+    const hw = rodW / 2, yAttach = -Math.sqrt(hub * hub - hw * hw), ar = Math.atan2(yAttach, hw);
+    const pw = Math.max(0.6 * hw, 0.9 * slot), xo = slot + pw, top = -Lv + depth, bottom = -Lv - depth;
+    const lever = [...arc(hub, ar, Math.PI - ar, 4 * DEG).slice(0, -1), [-hw, yAttach], [-hw, top + pw], [-xo, top], [-xo, bottom], [-slot, bottom], [-slot, top], [slot, top], [slot, bottom], [xo, bottom], [xo, top], [hw, top + pw]];
+    lever[0] = [hw, yAttach];
+    const spokes = [];
+    const ri = Rb - rimW, sw = 0.7 * rimW, hubB = 0.3;
+    for (let i = 0; i < 3; i++) {
+      const a0 = Math.PI / 2 + (TAU * i) / 3, a1 = a0 + TAU / 3;
+      const so = Math.asin(sw / 2 / ri), sh = Math.asin(Math.min(0.95, sw / 2 / hubB));
+      spokes.push([...arc(ri, a0 + so, a1 - so, 3 * DEG), ...arc(hubB, a1 - sh, a0 + sh, -3 * DEG)]);
+    }
+    const st = { t: 0.2 };
+    const canvas = $("balCanvas");
+    const v = setup(canvas, (w) => Math.round(w < 560 ? w * 1.25 : Math.min(w * 0.46, 460)), (ctx, Wd, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, Wd, H);
+      const narrow = Wd < 560;
+      const mw = narrow ? Wd : Wd * 0.66, mh = narrow ? H * 0.72 : H;
+      const box = [Bc[0] - Rb - 0.15, -1.15, 1.2, Math.max(D + 0.35, Bc[1] + Rb + 0.15)];
+      const s = Math.min(mw / (box[2] - box[0]), mh / (box[3] - box[1])) * 0.94;
+      const ox = mw / 2 - (s * (box[0] + box[2])) / 2, oy = mh / 2 + (s * (box[1] + box[3])) / 2;
+      const X = ([x, y]) => [ox + s * x, oy - s * y];
+      const mo = motion(st.t, 2, L), a = mo.anchor, b = swingOf(a);
+      const bmap = (p) => { const q = rot(p, b + levRot); return X([Bc[0] + q[0], Bc[1] + q[1]]); };
+      // Balance: rim and spokes, timing screws.
+      solid(ctx, [circle(Rb, 96), ...spokes, circle(0.08, 20)], bmap, css("--brass"));
+      ctx.fillStyle = css("--steel-hi");
+      for (let i = 0; i < 8; i++) {
+        const [x, y] = bmap(polar(Rb - rimW / 2, (TAU * (i + 0.5)) / 8));
+        ctx.beginPath(); ctx.arc(x, y, Math.max(2, 0.32 * rimW * s), 0, TAU); ctx.fill();
+      }
+      const wmap = (p) => X(rot(p, mo.wheel));
+      solid(ctx, [W.outer, ...W.holes], wmap, css("--steel"));
+      const amap = (p) => { const q = rot(p, a); return X([q[0] + P[0], q[1] + P[1]]); };
+      solid(ctx, [A.outer, ...A.holes], amap, css("--steel-hi"));
+      const lmap = (p) => { const q = rot(p, a + levRot); return X([q[0] + P[0], q[1] + P[1]]); };
+      solid(ctx, [lever], lmap, css("--steel-dark"));
+      // Roller and impulse pin, in front.
+      solid(ctx, [circle(rr + 2.2 * pinR, 40)], bmap, css("--steel"));
+      const [px, py] = bmap([0, rr]);
+      ctx.fillStyle = css("--accent"); ctx.beginPath(); ctx.arc(px, py, Math.max(3, pinR * s), 0, TAU); ctx.fill();
+      const [cx, cy] = X(P);
+      ctx.fillStyle = css("--edge"); ctx.beginPath(); ctx.arc(cx, cy, 3, 0, TAU); ctx.fill();
+
+      // The map from anchor angle to balance angle.
+      const gx = narrow ? 44 : mw + 40, gy = narrow ? mh + 12 : 40, gw = narrow ? Wd - 64 : Wd - mw - 60, gh = narrow ? H - mh - 40 : H - 96;
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
+      ctx.strokeRect(gx, gy, gw, gh);
+      line(ctx, [gx, gy + gh / 2], [gx + gw, gy + gh / 2]);
+      line(ctx, [gx + gw / 2, gy], [gx + gw / 2, gy + gh]);
+      const A0 = L.amplitude, B0 = 45 * DEG;
+      const G = (aa, bb) => [gx + gw / 2 + (aa / A0) * (gw / 2), gy + gh / 2 - (bb / B0) * (gh / 2)];
+      ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1.8; ctx.beginPath();
+      for (let i = 0; i <= 80; i++) { const aa = -A0 + (2 * A0 * i) / 80, [x, y] = G(aa, swingOf(aa)); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.stroke();
+      const [qx, qy] = G(a, b);
+      ctx.fillStyle = css("--accent"); ctx.beginPath(); ctx.arc(qx, qy, 4.5, 0, TAU); ctx.fill();
+      ctx.font = font(10.5); ctx.fillStyle = css("--muted"); ctx.textBaseline = "top"; ctx.textAlign = "center";
+      ctx.fillText("anchor −3.5° … +3.5°", gx + gw / 2, gy + gh + 6);
+      ctx.save(); ctx.translate(gx - 12, gy + gh / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "bottom";
+      ctx.fillText("balance ±45°", 0, 0); ctx.restore();
+    });
+    let frame = 0;
+    const readout = () => {
+      const a = motion(st.t, 2, L).anchor, b = swingOf(a);
+      $("bOut").innerHTML = `<span>anchor <b>${(a / DEG).toFixed(2)}°</b></span><span>balance <b>${(b / DEG).toFixed(1)}°</b></span><span>balance swing <b>±${(-swingOf(L.amplitude) / DEG).toFixed(1)}°</b></span><span>lever <b>${Lv.toFixed(2)}</b>, pin offset <b>${rr.toFixed(3)}</b> wheel radii</span>`;
+    };
+    const run = animate(canvas, (dt) => { st.t += dt; v.paint(); if (++frame % 4 === 0) readout(); });
+    pauseButton("bPause", run);
+    readout();
+  }
+
+  // ---------------------------------------------------------------- involute outlines
+  function gearOutline(N, m = 1) {
+    const alpha = 20 * DEG, r = (N * m) / 2, rb = r * Math.cos(alpha), ra = r + m, rf = r - 1.25 * m, pitch = TAU / N;
+    const inv = (x) => Math.tan(x) - x;
+    const psi = ((Math.PI / 2 - 2 * 0.03) * m) / (2 * r);
+    const w = (rho) => psi + inv(alpha) - inv(Math.acos(Math.min(1, rb / Math.max(rho, rb))));
+    const r0 = Math.max(rf, rb), rhos = rf < rb ? [rf] : [];
+    for (let k = 0; k <= 8; k++) rhos.push(r0 + ((ra - r0) * k) / 8);
+    const pts = [];
+    for (let k = 0; k < N; k++) {
+      const c = k * pitch;
+      for (const rho of rhos) pts.push(polar(rho, c - w(rho)));
+      for (let i = rhos.length - 1; i >= 0; i--) pts.push(polar(rhos[i], c + w(rhos[i])));
+      const a0 = c + w(rf), a1 = c + pitch - w(rf);
+      for (let i = 1; i < 4; i++) pts.push(polar(rf, a0 + ((a1 - a0) * i) / 4));
+    }
+    return { pts, N, r, ra, rf, rb, w, pitch };
+  }
+
+  // ---------------------------------------------------------------- 3. one coordinate, stick-slip, by hand
+  {
+    const LE = escLayout(15, 9), WE = escapeWheelOutline(LE, 4);
+    const defs = [
+      { escape: true, shaft: 0, layer: 0 },
+      { N: 12, shaft: 0, layer: 1 },
+      { N: 24, layer: 1, from: 1, dir: -15 * DEG },
+      { N: 20, shaft: 1, layer: 2 },
+      { N: 8, layer: 2, from: 3, dir: 75 * DEG },
+      { N: 16, layer: 2, from: 4, dir: 20 * DEG },
+      { N: 9, layer: 2, from: 5, dir: -50 * DEG },
+    ];
+    const shafts = [{ c: [0, 0], ratio: 1, phase: 0 }], gears = [];
+    for (const d of defs) {
+      let sh;
+      if (d.from === undefined) sh = shafts[d.shaft];
+      else {
+        const A = gears[d.from], dist = (A.N + d.N) / 2, pA = TAU / A.N, pB = TAU / d.N;
+        const r = -A.N / d.N, a = d.dir + Math.PI - pB * (-(d.dir / pA) + 0.5), ph = a - pB * Math.round(a / pB);
+        sh = { c: [A.sh.c[0] + dist * Math.cos(d.dir), A.sh.c[1] + dist * Math.sin(d.dir)], ratio: r * A.sh.ratio, phase: r * A.sh.phase + ph };
+        shafts.push(sh);
+      }
+      const g = d.escape ? { escape: true, N: 15, ra: 9, outline: WE } : gearOutline(d.N);
+      gears.push({ ...g, sh, layer: d.layer });
+    }
+    const M = { time: 0, q: motion(0, 2, LE).wheel, v: 0, stuck: true, threshold: 0, offset: 0, dragging: false, dragTarget: 0, lifted: 0, rust: 0.6 };
+    const fr = mulberry(99);
+    const newThreshold = (rust) => rust * (0.006 + 0.02 * fr());
+    M.threshold = newThreshold(M.rust);
+    const hist = [];
+    let target = M.q;
+    function step(dt) {
+      if (!M.dragging && M.lifted <= 0) M.time += dt;
+      const esc = motion(M.time, 2, LE);
+      target = M.dragging ? M.dragTarget : esc.wheel + M.offset;
+      const rust = M.rust;
+      if (rust < 0.05) { M.q = target; M.v = 0; M.stuck = true; }
+      else {
+        const n = Math.ceil(dt / (1 / 240));
+        for (let i = 0; i < n; i++) {
+          const h = dt / n, pull = target - M.q;
+          if (M.stuck) { if (Math.abs(pull) > M.threshold) M.stuck = false; else continue; }
+          const kinetic = rust * 0.004 * Math.sign(M.v || pull);
+          M.v += (900 * (pull - kinetic) - 60 * M.v) * h;
+          M.q += M.v * h;
+          if (!M.dragging && M.q > target) { M.q = target; M.v = 0; }
+          if (Math.abs(M.v) < 0.02 && Math.abs(target - M.q) < M.threshold * 0.5) { M.stuck = true; M.v = 0; M.threshold = newThreshold(rust); }
+        }
+      }
+      if (M.dragging) M.lifted = Math.min(1, M.lifted + dt * 5);
+      else if (M.lifted > 0) {
+        M.offset = Math.round((M.q - esc.wheel) / LE.pitch) * LE.pitch;
+        M.lifted = Math.max(0, M.lifted - dt * 2.5);
+      }
+      hist.push(target - M.q);
+      if (hist.length > 480) hist.shift();
+    }
+    const STRIP = 64, box = [-10, -18, 47, 23];
+    let view = null;
+    const canvas = $("trainCanvas");
+    const v = setup(canvas, (w) => Math.round(w * ((box[3] - box[1]) / (box[2] - box[0])) * 0.94 + STRIP + 10), (ctx, Wd, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, Wd, H);
+      const Hm = H - STRIP;
+      const s = Math.min(Wd / (box[2] - box[0]), Hm / (box[3] - box[1])) * 0.96;
+      const ox = Wd / 2 - (s * (box[0] + box[2])) / 2, oy = Hm / 2 + (s * (box[1] + box[3])) / 2;
+      const X = ([x, y]) => [ox + s * x, oy - s * y];
+      view = { s, ox, oy };
+      const fills = [css("--steel-dark"), css("--steel"), css("--steel-hi")];
+      for (const layer of [0, 1, 2]) for (const g of gears) {
+        if (g.layer !== layer) continue;
+        const th = g.sh.ratio * M.q + g.sh.phase, c = g.sh.c;
+        const map = (p) => { const q = rot(p, th); return X([q[0] + c[0], q[1] + c[1]]); };
+        if (g.escape) solid(ctx, [g.outline.outer, ...g.outline.holes], map, fills[layer]);
+        else {
+          const bore = Math.min(0.2 * g.rf, 1.2);
+          solid(ctx, [g.pts, circle(bore, 24)], map, fills[layer]);
+          if (g.N >= 16) {
+            ctx.strokeStyle = css("--edge"); ctx.globalAlpha = 0.35; ctx.lineWidth = 1;
+            for (const r of [g.rf - 1.2, bore + 1.6]) { const [x, y] = X(c); ctx.beginPath(); ctx.arc(x, y, r * s, 0, TAU); ctx.stroke(); }
+            ctx.globalAlpha = 1;
+          }
+        }
+      }
+      ctx.font = font(10.5, 600); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      shafts.forEach((sh, i) => {
+        const [x, y] = X(sh.c), t = (i === 0 ? "q × 1" : "× " + (sh.ratio > 0 ? "" : "−") + Math.abs(sh.ratio).toFixed(3).replace(/\.?0+$/, ""));
+        const w = ctx.measureText(t).width + 10;
+        ctx.fillStyle = css("--panel"); ctx.globalAlpha = 0.9; ctx.fillRect(x - w / 2, y - 9, w, 18); ctx.globalAlpha = 1;
+        ctx.fillStyle = css("--ink"); ctx.fillText(t, x, y);
+      });
+      // Lag of the train behind the escapement.
+      const y0 = Hm + 6, h = STRIP - 10, left = 92, right = 12, range = 1.6 * DEG;
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
+      line(ctx, [left, y0 + h / 2], [Wd - right, y0 + h / 2]);
+      ctx.font = font(10.5); ctx.textAlign = "left"; ctx.fillStyle = css("--muted");
+      ctx.fillText("lag ±1.6°", 8, y0 + h / 2);
+      ctx.strokeStyle = css("--accent"); ctx.lineWidth = 1.6; ctx.beginPath();
+      hist.forEach((lag, i) => {
+        const x = left + (i / 479) * (Wd - left - right), y = y0 + h / 2 - clamp(lag / range, -1, 1) * (h / 2 - 2);
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      });
+      ctx.stroke();
+    });
+    let frame = 0;
+    const readout = () => {
+      const st = M.dragging ? "turned by hand, anchor lifted" : M.lifted > 0 ? "anchor dropping back in" : M.rust < 0.05 ? "following exactly" : M.stuck ? "stuck" : "slipping";
+      $("tOut").innerHTML = `<span>q <b>${(M.q / DEG).toFixed(1)}°</b></span><span><b>${st}</b></span><span>threshold <b>${(M.threshold / DEG).toFixed(2)}°</b></span>`;
+    };
+    const run = animate(canvas, (dt) => { step(dt); v.paint(); if (++frame % 6 === 0) readout(); });
+    pauseButton("tPause", run);
+    bind("tR", (x) => { M.rust = x; M.threshold = newThreshold(x); });
+    // Dragging a gear: the pointer's angle about its centre, divided by the gear's ratio.
+    const drag = { g: null, last: 0 };
+    const world = (e) => {
+      const r = canvas.getBoundingClientRect();
+      return [(e.clientX - r.left - view.ox) / view.s, -(e.clientY - r.top - view.oy) / view.s];
+    };
+    canvas.addEventListener("pointerdown", (e) => {
+      if (!view) return;
+      const p = world(e);
+      const hit = [...gears].sort((a, b) => b.layer - a.layer).find((g) => Math.hypot(p[0] - g.sh.c[0], p[1] - g.sh.c[1]) < g.ra);
+      if (!hit) return;
+      drag.g = hit; drag.id = e.pointerId;
+      drag.last = Math.atan2(p[1] - hit.sh.c[1], p[0] - hit.sh.c[0]);
+      M.dragging = true; M.dragTarget = M.q;
+      canvas.setPointerCapture(e.pointerId);
+      canvas.style.cursor = "grabbing";
+      run.running = true; $("tPause").textContent = "Pause";
+    });
+    canvas.addEventListener("pointermove", (e) => {
+      if (!drag.g || e.pointerId !== drag.id) return;
+      const p = world(e), a = Math.atan2(p[1] - drag.g.sh.c[1], p[0] - drag.g.sh.c[0]);
+      let d = a - drag.last;
+      d -= Math.round(d / TAU) * TAU;
+      drag.last = a;
+      M.dragTarget += d / drag.g.sh.ratio;
+    });
+    for (const t of ["pointerup", "pointercancel"]) canvas.addEventListener(t, (e) => {
+      if (e.pointerId !== drag.id) return;
+      drag.g = null; M.dragging = false; canvas.style.cursor = "";
+    });
+    readout();
+  }
+
+  // ---------------------------------------------------------------- 4. rust
+  {
+    // rust.js palettes (sRGB): young, mature, old, alt, mix.
+    const PALETTES = {
+      mixed: [0xb4561a, 0x76381a, 0x3a1c10, 0x9c481d, 1], orange: [0xbc5c16, 0x7e3c16, 0x2c140a, 0x8a3412, 0],
+      red: [0x9c481d, 0x7a3415, 0x4c200f, 0x672e20, 0], ochre: [0xc18d35, 0x986436, 0x5a3418, 0xac7839, 0],
+      black: [0x8d4822, 0x3a302c, 0x13120c, 0x51434b, 0], purple: [0x8b5544, 0x664c4b, 0x451d1a, 0x782d23, 0],
+      green: [0x8e532f, 0x6b6655, 0x464035, 0x4f6b5e, 0],
+    };
+    const lin = (c) => hex(c).map((v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+    const toS = (v) => 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(Math.max(v, 0), 1 / 2.4) - 0.055);
+    const mixv = (a, b, t) => [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)];
+    const mulv = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+
+    // corrosion.js in 2D: first-passage growth from seeds through random costs, ranked to 0..1; spots; Voronoi cracks.
+    const GN = 96, rand = mulberry(911);
+    function growth(seeds, roughness) {
+      const n = GN * GN, cost = new Float32Array(n), time = new Float32Array(n).fill(Infinity);
+      for (let i = 0; i < n; i++) cost[i] = -Math.log(1 - rand() * 0.999) * roughness + (1 - roughness);
+      const ht = [], hi = [];
+      const push = (t, i) => {
+        let k = ht.length; ht.push(t); hi.push(i);
+        while (k > 0) { const p = (k - 1) >> 1; if (ht[p] <= t) break; ht[k] = ht[p]; hi[k] = hi[p]; k = p; }
+        ht[k] = t; hi[k] = i;
+      };
+      const pop = () => {
+        const tt = ht[0], top = hi[0], lt = ht.pop(), li = hi.pop();
+        if (ht.length) {
+          let k = 0;
+          for (;;) { let c = 2 * k + 1; if (c >= ht.length) break; if (c + 1 < ht.length && ht[c + 1] < ht[c]) c++; if (ht[c] >= lt) break; ht[k] = ht[c]; hi[k] = hi[c]; k = c; }
+          ht[k] = lt; hi[k] = li;
+        }
+        return [tt, top];
+      };
+      for (const [x, y, delay] of seeds) { const i = x + y * GN; if (delay < time[i]) { time[i] = delay; push(delay, i); } }
+      while (ht.length) {
+        const [t, i] = pop();
+        if (t > time[i]) continue;
+        const x = i % GN, y = (i / GN) | 0;
+        for (const j of [((x + 1) % GN) + y * GN, ((x + GN - 1) % GN) + y * GN, x + ((y + 1) % GN) * GN, x + ((y + GN - 1) % GN) * GN]) {
+          const tj = t + 0.5 * (cost[i] + cost[j]);
+          if (tj < time[j]) { time[j] = tj; push(tj, j); }
+        }
+      }
+      const order = Array.from(time.keys()).sort((a, b) => time[a] - time[b]), out = new Float32Array(n);
+      order.forEach((idx, k) => (out[idx] = k / (n - 1)));
+      return out;
+    }
+    const seedsOf = (count, maxDelay) => Array.from({ length: count }, () => [Math.floor(rand() * GN), Math.floor(rand() * GN), rand() ** 2 * maxDelay]);
+    const fine = growth(seedsOf(60, 30), 0.85), coarse = growth(seedsOf(7, 60), 0.9);
+    const pd = (a, b) => { const d = Math.abs(a - b); return Math.min(d, GN - d); };
+    const spots = Array.from({ length: 70 }, () => [rand() * GN, rand() * GN, 1 + 6 * rand() ** 3]);
+    const cracks = Array.from({ length: 40 }, () => [rand() * GN, rand() * GN, rand()]);
+    const fSpot = new Float32Array(GN * GN), fCrack = new Float32Array(GN * GN), fCell = new Float32Array(GN * GN);
+    for (let y = 0; y < GN; y++) for (let x = 0; x < GN; x++) {
+      let sp = Infinity, f1 = Infinity, f2 = Infinity, cell = 0;
+      for (const [sx, sy, r] of spots) sp = Math.min(sp, Math.hypot(pd(x, sx), pd(y, sy)) / r);
+      for (const [cx, cy, val] of cracks) { const d = Math.hypot(pd(x, cx), pd(y, cy)); if (d < f1) { f2 = f1; f1 = d; cell = val; } else if (d < f2) f2 = d; }
+      const i = x + y * GN;
+      fSpot[i] = Math.min(1, sp / 2); fCrack[i] = Math.min(1, (f2 - f1) / 6); fCell[i] = cell;
+    }
+    // Bilinear, periodic; x, y in tiles.
+    const sample = (f, x, y) => {
+      x = (x * GN) % GN; y = (y * GN) % GN; if (x < 0) x += GN; if (y < 0) y += GN;
+      const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j, i1 = (i + 1) % GN, j1 = (j + 1) % GN;
+      return mix(mix(f[i + j * GN], f[i1 + j * GN], fx), mix(f[i + j1 * GN], f[i1 + j1 * GN], fx), fy);
+    };
+    const nearest = (f, x, y) => { x = ((Math.floor(x * GN) % GN) + GN) % GN; y = ((Math.floor(y * GN) % GN) + GN) % GN; return f[x + y * GN]; };
+    const nA = noise2(3), nB = noise2(7), nC = noise2(11), nD = noise2(19);
+
+    // The gear (module 1): 14 teeth, a web sunk between hub and rim.
+    const G = gearOutline(14), bore = 0.9, rHub = 2.4, rRim = G.rf - 1.2, MOD = 0.017;
+    const R = { age: 0.62, rust: 0.8, palette: "mixed", grease: 0.5, grime: 0.75, edgePits: 0.6, flaking: 0.5 };
+    const late = (a, k) => clamp((a - k) / (1 - k), 0, 1);
+    let img = null, imgSize = 0, dirty = true;
+    function render(S) {
+      const a = R.age, age = clamp(R.rust * a, 0, 1), pal = PALETTES[R.palette];
+      const young0 = lin(pal[0]), matureB = lin(pal[1]), oldC = lin(pal[2]), alt = lin(pal[3]), rustMix = pal[4];
+      const ep = R.edgePits * late(a, 0.3), flaking = R.flaking * late(a, 0.45), grime = R.grime * late(a, 0.15), grease = R.grease * Math.min(1, a * 2);
+      const ext = G.ra + 0.6, H = new Float32Array(S * S), C = new Float32Array(S * S * 3), A = new Uint8Array(S * S);
+      for (let py = 0; py < S; py++) for (let px = 0; px < S; px++) {
+        const x = ((px + 0.5) / S) * 2 * ext - ext, y = ext - ((py + 0.5) / S) * 2 * ext, r = Math.hypot(x, y);
+        if (r > G.ra || r < bore) continue;
+        const ang = Math.atan2(y, x), k = Math.round(ang / G.pitch), da = Math.abs(ang - k * G.pitch);
+        const inTooth = r > G.rf && da <= G.w(r);
+        if (r > G.rf && !inTooth) continue;
+        const o = py * S + px;
+        A[o] = 1;
+        // Distance to the outline, for the chamfer band.
+        let dEdge = r - bore;
+        if (inTooth) dEdge = Math.min(dEdge, (G.w(r) - da) * r, G.ra - r);
+        else if (da > G.w(G.rf)) dEdge = Math.min(dEdge, G.rf - r);
+        const bevel = dEdge < 0.24 ? 1 : 0;
+        const qx = x * MOD + 0.37, qy = y * MOD + 0.61;
+        const c1r = sample(fine, qx * 2.3, qy * 2.3), c1g = sample(coarse, qx * 2.3, qy * 2.3), c1b = sample(fSpot, qx * 2.3, qy * 2.3);
+        const c2r = sample(fine, qy * 6.1 + 0.37, -qx * 6.1), c2g = sample(coarse, qy * 6.1 + 0.37, -qx * 6.1), c2b = sample(fSpot, qy * 6.1 + 0.37, -qx * 6.1);
+        const c3r = sample(fine, qx * 15 + 0.71, qy * 15), c3g = sample(coarse, -qy * 15, qx * 15 + 0.7), c3b = sample(fSpot, qx * 15, qy * 15 + 0.2);
+        const n1 = nA(qx * 900, qy * 900), mid = nB(qx * 58, qy * 58), mid2 = nC(qx * 58 + 9, qy * 58), g1 = nD(qx * 450, qy * 450), big = nC(qx * 29, qy * 29 + 5);
+        const grain = nA(px * 0.9 + 77, py * 0.9);
+        const root = (1 - smooth(G.rf, G.rf + 0.6, r)) * (r > G.rf - 0.3 ? 1 : 0) * 0.2;
+        let arrive = Math.min(c1r * 0.8 + c2r * 0.2, c1g * 1.05 + 0.05) + (c3r - 0.5) * 0.08 - 0.18 * root;
+        const rusting = age * 1.2 - 0.08 - arrive + smooth(0.65, 0.95, age) * 0.6;
+        const covered = smooth(-0.01, 0.01, rusting), t = clamp(rusting / 0.5, 0, 1);
+        let base = mixv([0.17, 0.17, 0.18], [0.27, 0.25, 0.23], c2g * 0.7 + n1 * 0.3);
+        const stain = smooth(-0.12, 0, rusting) * (1 - covered);
+        base = mixv(base, [base[0] * 1.25 + 0.03, base[1] * 0.85 + 0.01, base[2] * 0.6], stain * 0.8);
+        let matureC = mixv(matureB, alt, smooth(0.35, 0.75, c1g * 0.7 + mid * 0.3));
+        if (rustMix > 0) {
+          matureC = mixv(matureC, [0.42, 0.06, 0.012], smooth(0.45, 0.68, big * 0.7 + c2r * 0.3) * rustMix);
+          matureC = mixv(matureC, [0.5, 0.26, 0.04], smooth(0.45, 0.65, mid * 0.6 + c1b * 0.4) * rustMix);
+          matureC = mixv(matureC, [0.045, 0.02, 0.01], smooth(0.55, 0.75, mid2 * 0.6 + c1g * 0.4) * rustMix * 0.7);
+        }
+        const mature = mulv(matureC, (0.8 + 0.4 * c2g) * (0.85 + 0.3 * c1g));
+        const old = mulv(oldC, 0.7 + 0.6 * c2g), young = mulv(young0, 0.75 + 0.35 * c3b);
+        let rust = mixv(young, mature, smooth(0, 0.35, t));
+        rust = mixv(rust, old, smooth(0.5, 1, t) * (0.4 + 0.6 * root) * (0.5 + 0.5 * c1g));
+        rust = mixv(rust, mulv(young0, 1.1), smooth(0.64, 0.7, grain) * 0.6 * smooth(0, 0.3, t));
+        let col = mixv(base, rust, covered);
+        // Crust height: thickness, granules, blisters and the lip at the front.
+        const granules = (g1 - 0.5) * 0.9 + (grain - 0.5) * 1.1;
+        const blisters = smooth(0.55, 0.75, c1g * 0.7 + g1 * 0.5) * smooth(0.3, 0.9, t);
+        const lip = smooth(-0.01, 0.02, rusting) * (1 - smooth(0.02, 0.08, rusting));
+        let h = covered * (0.35 + 0.65 * t + granules * (0.4 + 0.6 * t) + blisters * 0.8) + lip * 0.5;
+        col = mulv(col, 1 + covered * clamp(granules * (0.4 + 0.6 * t) + blisters * 0.8, -1, 1) * 0.28);
+        // Pits.
+        const pitR = Math.min(c2b, c1b * 1.6);
+        const pit = covered * smooth(0.15, 0.7, age) * (1 - smooth(0.1, 0.19, pitR));
+        const rim = covered * smooth(0.15, 0.7, age) * smooth(0.15, 0.21, pitR) * (1 - smooth(0.24, 0.32, pitR));
+        col = mixv(col, [0.03, 0.015, 0.01], pit * 0.85);
+        col = mulv(col, 1 + rim * 0.12);
+        h += -pit * 1.6 + rim * 0.4;
+        // Edge pits along the chamfer band and the tooth tips.
+        const tipEdge = smooth(G.ra - (0.6 + 0.8 * ep), G.ra - 0.15, r) * 0.7;
+        const edgeZone = Math.max(bevel, tipEdge);
+        const edgeAge = mix(smooth(0.1, 0.6, age), 1, 0.5 * ep) * edgeZone * (ep > 0.001 ? 1 : 0);
+        const pf = Math.min(sample(fSpot, qx * 11 + 0.91, qy * 11), sample(fSpot, qy * 27 + 0.43, qx * 27) * 1.15);
+        const ePit = edgeAge * (1 - smooth(0.16 + 0.32 * ep, 0.24 + 0.36 * ep, pf));
+        const eHalo = edgeAge * (1 - smooth(0.26 + 0.38 * ep, 0.4 + 0.45 * ep, pf)) * (1 - ePit);
+        col = mixv(col, mixv([0.3, 0.11, 0.03], rust, 0.5), eHalo * 0.6);
+        col = mixv(col, [0.025, 0.012, 0.008], ePit * 0.9);
+        h += -ePit * (1.5 + 2 * ep) + eHalo * 0.35;
+        // Flaking plates along the cracks.
+        const fx = qx * 11 + 0.37, fy = qy * 11;
+        const crackD = sample(fCrack, fx, fy), cellV = nearest(fCell, fx, fy);
+        const flk = flaking * covered * smooth(0.15, 0.6, age);
+        const crack = flk * (1 - smooth(0.025, 0.06, crackD)) * smooth(0.3, 0.6, mid + 0.3 * flaking);
+        const area = smooth(0.55, 0.7, mid2 * 0.7 + c1g * 0.3 + 0.15 * flaking);
+        const gone = flk * area * (cellV > 0.6 ? 1 : 0) * smooth(0.06, 0.12, crackD);
+        const curl = flk * (1 - smooth(0.08, 0.3, crackD)) * (1 - gone);
+        const under = (cellV * 13.7) % 1 > 0.5 ? mulv(young, 0.75) : mulv(old, 0.7);
+        col = mulv(col, mix(1, 0.92 + 0.16 * ((cellV * 7.31) % 1), flk));
+        col = mixv(col, under, gone);
+        col = mulv(col, 1 + curl * 0.12);
+        col = mixv(col, [0.02, 0.012, 0.008], crack * 0.85);
+        h += flk * cellV * 0.5 + curl * 0.8 - crack * 1.6 - gone * 1.4;
+        // Sunk web: dark scale with orange flecks; proud faces brighter.
+        const sunk = r > rHub && r < rRim ? 1 : 0;
+        if (sunk) {
+          const scaleC = mulv(mixv([0.035, 0.037, 0.042], oldC, 0.35), 0.75 + 0.5 * c2g);
+          const webC = mixv(scaleC, mulv(young0, 0.9 + 0.3 * n1), clamp(smooth(0.66, 0.72, g1 * 0.6 + c3b * 0.4) + 0.4 * smooth(0.66, 0.8, mid), 0, 1));
+          col = mixv(col, webC, covered * smooth(0.35, 0.8, age) * 0.85);
+        } else col = mixv(col, [young0[0] * 1.2, young0[1] * 0.85, young0[2] * 0.45], smooth(0.35, 0.65, mid2 * 0.6 + c1g * 0.4) * covered * 0.6);
+        // Crevices: the web's corners at rim and hub.
+        const reachG = mix(0.7, 1.3, R.grime);
+        const crevice = sunk ? clamp(Math.exp(-Math.max(rRim - r, 0) / (0.22 * reachG)) + Math.exp(-Math.max(r - rHub, 0) / (0.22 * reachG)), 0, 1) : 0;
+        const hubRing = smooth(bore, bore + 0.2, r) * (1 - smooth(bore + 1.2, bore + 3, r));
+        let g = grease * clamp(Math.max(crevice * 0.9, hubRing * 0.8), 0, 1) * smooth(0.25, 0.45, mid * 0.6 + c2g * 0.4);
+        const greaseC = mixv([0.075, 0.035, 0.008], [0.018, 0.012, 0.008], smooth(0.2, 0.8, age + 0.3 * (n1 - 0.5)));
+        col = mixv(col, greaseC, g);
+        h = mix(h, 0.6 + (mid2 - 0.5) * 3, g);
+        col = mulv(col, mix(1, 0.4, smooth(0.05, 0.9, crevice) * covered * smooth(0.3, 0.9, age)));
+        const fillLine = mix(0.75, 0.25, R.grime) + 0.45 * (0.5 - smooth(0.25, 0.75, mid2 * 0.6 + c1b * 0.4)) + 0.25 * (c2r - 0.5) + 0.12 * (g1 - 0.5);
+        const dirt = (grime > 0.001 ? 1 : 0) * smooth(fillLine - 0.05, fillLine + 0.05, crevice) * smooth(0.15, 0.3, c2g + 0.1 * grime) * Math.min(1, grime * 3);
+        col = mixv(col, mixv(mixv([0.05, 0.036, 0.025], [0.1, 0.078, 0.055], smooth(0.3, 0.7, c2b)), [col[0] * 0.32, col[1] * 0.27, col[2] * 0.24], covered * 0.85), dirt);
+        h = mix(h, 0.8 + (g1 - 0.5) * 1.2, dirt);
+        // Bare steel and grease shine a little.
+        const shine = (1 - covered) * (1 - dirt) * 0.35 + g * 0.2;
+        H[o] = h;
+        C[3 * o] = col[0] * (1 + shine); C[3 * o + 1] = col[1] * (1 + shine); C[3 * o + 2] = col[2] * (1 + shine);
+      }
+      const data = new ImageData(S, S);
+      const bump = (2.2 * S) / 260;
+      for (let py = 0; py < S; py++) for (let px = 0; px < S; px++) {
+        const o = py * S + px;
+        if (!A[o]) continue;
+        const hx = A[o + 1] ? H[o + 1] - H[o] : 0, hy = py + 1 < S && A[o + S] ? H[o + S] - H[o] : 0;
+        const sh = clamp(1.25 + bump * (-hx * 0.7 + hy * 0.7) * 0.18, 0.55, 1.8);
+        for (let c = 0; c < 3; c++) data.data[4 * o + c] = clamp(toS(C[3 * o + c] * sh), 0, 255);
+        data.data[4 * o + 3] = 255;
+      }
+      return data;
+    }
+    const off = document.createElement("canvas");
+    const canvas = $("rustCanvas");
+    const v = setup(canvas, (w) => Math.round(w < 560 ? w + 190 : Math.min(w * 0.5, 440)), (ctx, Wd, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, Wd, H);
+      const narrow = Wd < 560;
+      const gs = narrow ? Math.min(Wd, H - 190) - 16 : H - 24;
+      const gx = narrow ? (Wd - gs) / 2 : 12, gy = narrow ? 8 : 12;
+      const S = Math.round(Math.min(280, gs * Math.min(1.5, devicePixelRatio || 1)));
+      if (dirty || S !== imgSize) { img = render(S); imgSize = S; off.width = off.height = S; off.getContext("2d").putImageData(img, 0, 0); dirty = false; }
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(off, gx, gy, gs, gs);
+      // setLook's ramps over Age.
+      const cx = narrow ? 44 : gx + gs + 44, cy = narrow ? gy + gs + 20 : 26, cw = narrow ? Wd - 60 : Wd - cx - 18, ch = narrow ? 130 : H - 70;
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1; ctx.strokeRect(cx, cy, cw, ch);
+      const P = (x, y) => [cx + x * cw, cy + ch - y * ch];
+      const curves = [
+        [(x) => clamp(R.rust * x, 0, 1), css("--rust"), []],
+        [(x) => R.grease * Math.min(1, 2 * x), css("--grease"), []],
+        [(x) => R.grime * late(x, 0.15), css("--stage-ink"), []],
+        [(x) => R.edgePits * late(x, 0.3), css("--accent2"), []],
+        [(x) => R.flaking * late(x, 0.45), css("--accent"), [5, 4]],
+      ];
+      for (const [f, col, dash] of curves) {
+        ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash(dash); ctx.beginPath();
+        for (let i = 0; i <= 60; i++) { const [x, y] = P(i / 60, f(i / 60)); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      const [ax] = P(R.age, 0);
+      ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1.2; line(ctx, [ax, cy], [ax, cy + ch]);
+      ctx.font = font(10.5); ctx.fillStyle = css("--muted"); ctx.textAlign = "center"; ctx.textBaseline = "top";
+      ctx.fillText("Age 0", cx, cy + ch + 6); ctx.fillText("1", cx + cw, cy + ch + 6);
+      ctx.save(); ctx.translate(cx - 10, cy + ch / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "bottom"; ctx.fillText("strength", 0, 0); ctx.restore();
+    });
+    const sel = $("rP");
+    for (const k of Object.keys(PALETTES)) sel.add(new Option(k, k));
+    sel.addEventListener("change", () => { R.palette = sel.value; dirty = true; v.paint(); });
+    const ageEl = bind("rA", (x) => { R.age = x; dirty = true; v.paint(); });
+    bind("rR", (x) => { R.rust = x; dirty = true; v.paint(); });
+    // The T key's timelapse: 14 s, smoothstepped.
+    const lapse = { t: 1 };
+    const run = animate(canvas, (dt) => {
+      if (lapse.t >= 1) return;
+      lapse.t = Math.min(1, lapse.t + dt / 14);
+      R.age = lapse.t * lapse.t * (3 - 2 * lapse.t);
+      ageEl.value = R.age; $("rAo").textContent = R.age.toFixed(2);
+      dirty = true; v.paint();
+    });
+    $("rPlay").addEventListener("click", () => { lapse.t = 0; run.running = true; });
+  }
+
+  // ---------------------------------------------------------------- 5. view scoring
+  {
+    const NB = 64, NDIR = 48;
+    let parts = [], scores = [], best = 0, pick = -1, seed = 4;
+    const cols = ["--accent", "--accent2", "--brass", "--steel-dark", "--rust", "--grease", "--stage-ink", "--steel"];
+    function build() {
+      const r = mulberry(seed * 7919 + 3), base = r() * Math.PI;
+      parts = [];
+      for (let tries = 0; parts.length < 7 && tries < 400; tries++) {
+        const ax = base + (r() < 0.7 ? 0 : Math.PI / 2) + (r() - 0.5) * 0.1;
+        const rad = 0.1 + 0.2 * r(), th = 0.06 + 0.05 * r(), c = [(r() * 2 - 1) * 0.62, (r() * 2 - 1) * 0.62];
+        const a = [Math.cos(ax), Math.sin(ax)], t = [-a[1], a[0]];
+        const corners = [-1, 1].flatMap((i) => [-1, 1].map((j) => [c[0] + i * rad * t[0] + j * th * a[0], c[1] + i * rad * t[1] + j * th * a[1]]));
+        if (Math.max(...corners.map(len)) > 0.92) continue;
+        // Keep parts apart: a sampled distance test on their bars.
+        const pts = [];
+        for (let i = 0; i <= 24; i++) for (let j = 0; j <= 2; j++) pts.push([c[0] + (i / 12 - 1) * rad * t[0] + (j - 1) * th * a[0], c[1] + (i / 12 - 1) * rad * t[1] + (j - 1) * th * a[1]]);
+        if (parts.some((p) => p.pts.some((q) => pts.some((s) => Math.hypot(q[0] - s[0], q[1] - s[1]) < 0.05)))) continue;
+        parts.push({ c, a, t, rad, th, pts });
+      }
+      scores = [];
+      const seen = [];
+      for (let k = 0; k < NDIR; k++) {
+        const phi = (TAU * k) / NDIR, d = [Math.cos(phi), Math.sin(phi)], u = [-d[1], d[0]];
+        const depth = new Float32Array(NB).fill(-Infinity), owner = new Int32Array(NB).fill(-1);
+        parts.forEach((p, i) => {
+          for (const q of p.pts) {
+            const px = Math.floor((dot(q, u) * 0.5 + 0.5) * NB), z = dot(q, d);
+            if (px >= 0 && px < NB && z > depth[px]) { depth[px] = z; owner[px] = i; }
+          }
+        });
+        const s = new Float32Array(parts.length);
+        for (const o of owner) if (o >= 0) s[o]++;
+        seen.push({ phi, d, s, owner });
+      }
+      const most = parts.map((_, i) => Math.max(...seen.map((c) => c.s[i])));
+      for (const c of seen) {
+        let disc = 0, discMax = 0, vis = 0;
+        parts.forEach((p, i) => {
+          const cs = Math.abs(dot(p.a, c.d)), area = Math.PI * p.rad * p.rad;
+          disc += area * Math.pow(cs, 0.8) * Math.pow(1 - cs * cs, 0.25);
+          discMax += area * 0.6;
+          if (most[i] > 0) vis += Math.sqrt(c.s[i] / most[i]);
+        });
+        scores.push({ ...c, disc: disc / discMax, vis: vis / parts.length, score: (disc / discMax) * (0.5 + (0.5 * vis) / parts.length) });
+      }
+      best = scores.reduce((b, c, i) => (c.score > scores[b].score ? i : b), 0);
+      pick = best;
+    }
+    build();
+    const canvas = $("viewCanvas");
+    let geo = null;
+    const v = setup(canvas, (w) => Math.round(w < 560 ? w + 60 : Math.min(w * 0.56, 500)), (ctx, Wd, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, Wd, H);
+      const stripH = 34, size = Math.min(Wd, H - stripH - 10), cx = Wd < 560 ? Wd / 2 : size / 2 + 20, cy = (H - stripH - 10) / 2;
+      const s = size * 0.235, ring = 1.15, band = 0.7;
+      const X = ([x, y]) => [cx + s * x, cy - s * y];
+      geo = { cx, cy, s };
+      const maxS = Math.max(...scores.map((c) => c.score));
+      // The score of every direction, as a polar curve round the machine.
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, ring * s, 0, TAU); ctx.stroke();
+      ctx.beginPath();
+      scores.forEach((c, i) => { const [x, y] = X(scl(c.d, ring + band * (c.score / maxS))); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+      ctx.closePath();
+      ctx.fillStyle = css("--accent"); ctx.globalAlpha = 0.14; ctx.fill(); ctx.globalAlpha = 1;
+      ctx.strokeStyle = css("--accent"); ctx.lineWidth = 1.6; ctx.stroke();
+      // Parts as bars across their axles, with the axles.
+      parts.forEach((p, i) => {
+        ctx.strokeStyle = css("--muted"); ctx.globalAlpha = 0.5; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+        line(ctx, X([p.c[0] - p.a[0] * 0.25, p.c[1] - p.a[1] * 0.25]), X([p.c[0] + p.a[0] * 0.25, p.c[1] + p.a[1] * 0.25]));
+        ctx.setLineDash([]); ctx.globalAlpha = 1;
+        const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([i, j]) => [p.c[0] + i * p.rad * p.t[0] + j * p.th * p.a[0], p.c[1] + i * p.rad * p.t[1] + j * p.th * p.a[1]]);
+        solid(ctx, [corners], X, css(cols[i % cols.length]));
+      });
+      const arrow = (k, col, w) => {
+        const d = scores[k].d, [x0, y0] = X(scl(d, 0.95)), [x1, y1] = X(scl(d, ring + band + 0.25));
+        ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = w; line(ctx, [x0, y0], [x1, y1]);
+        ctx.beginPath(); ctx.arc(x1, y1, w + 2.5, 0, TAU); ctx.fill();
+      };
+      if (pick !== best) arrow(pick, css("--ink"), 1.5);
+      arrow(best, css("--accent"), 2.5);
+      // What the picked direction sees: the owner of each cell.
+      const sy = H - stripH, sw = Wd - 32, cell = sw / NB;
+      ctx.font = font(10.5); ctx.fillStyle = css("--muted"); ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+      ctx.fillText(pick === best ? "the best view's depth buffer" : "this view's depth buffer", 16, sy - 3);
+      scores[pick].owner.forEach((o, i) => {
+        ctx.fillStyle = o < 0 ? css("--panel") : css(cols[o % cols.length]);
+        ctx.fillRect(16 + i * cell, sy + 2, cell + 0.5, stripH - 12);
+      });
+      // Inset: the disc term against the angle off the axle.
+      if (Wd >= 560) {
+        const ix = cx + size / 2 + 40, iw = Wd - ix - 24, ih = Math.min(150, H * 0.36), iy = 30;
+        ctx.strokeStyle = css("--line"); ctx.lineWidth = 1; ctx.strokeRect(ix, iy, iw, ih);
+        const f = (deg) => { const c = Math.cos(deg * DEG); return Math.pow(c, 0.8) * Math.pow(1 - c * c, 0.25); };
+        const fm = f(38.3);
+        ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1.8; ctx.beginPath();
+        for (let i = 0; i <= 90; i++) { const x = ix + (i / 90) * iw, y = iy + ih - (f(i) / fm) * (ih - 10); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+        ctx.stroke();
+        const px = ix + (38.3 / 90) * iw;
+        ctx.strokeStyle = css("--accent"); line(ctx, [px, iy], [px, iy + ih]);
+        ctx.fillStyle = css("--muted"); ctx.textBaseline = "top"; ctx.textAlign = "left";
+        ctx.fillText("disc term, c^0.8 (1 − c²)^0.25", ix, iy + ih + 6);
+        ctx.fillText("0° (face-on) … 90° off the axle", ix, iy + ih + 22);
+        ctx.fillStyle = css("--accent"); ctx.fillText("38°", px + 4, iy + 4);
+      }
+    });
+    const readout = () => {
+      const c = scores[pick];
+      $("vOut").innerHTML = `<span>direction <b>${Math.round(c.phi / DEG)}°</b>${pick === best ? " (best)" : ""}</span><span>disc term <b>${c.disc.toFixed(2)}</b></span><span>visibility <b>${c.vis.toFixed(2)}</b></span><span>score <b>${c.score.toFixed(3)}</b> of <b>${scores[best].score.toFixed(3)}</b></span>`;
+    };
+    canvas.addEventListener("pointermove", (e) => {
+      if (!geo) return;
+      const r = canvas.getBoundingClientRect(), x = e.clientX - r.left - geo.cx, y = -(e.clientY - r.top - geo.cy);
+      if (Math.hypot(x, y) < geo.s * 0.6) return;
+      const k = ((Math.round(Math.atan2(y, x) / (TAU / NDIR)) % NDIR) + NDIR) % NDIR;
+      if (k !== pick) { pick = k; v.paint(); readout(); }
+    });
+    canvas.addEventListener("pointerleave", () => { pick = best; v.paint(); readout(); });
+    $("vNew").addEventListener("click", () => { seed++; build(); v.paint(); readout(); });
+    readout();
+  }
+})();
+</script>
+</body>
+</html>

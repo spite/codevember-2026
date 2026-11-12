@@ -699,7 +699,7 @@ const STAGE = Object.fromEntries(STAGE_TYPES.map((s) => [s.type, s]));
  *   builders' default). erosion: amount 0..1 (true = 1) or { amount, seed }. Both reshape the parts only: the layout is the
  *   same for any finish, and the worn geometry is built when build.result is first read.
  */
-export function createMachine({ seed = 1, size, gears, weights, chamfer = 0, erosion = 0 } = {}) {
+export function createMachine({ seed = 1, size, gears, weights, balance = 0, chamfer = 0, erosion = 0 } = {}) {
   const gN = gears === undefined ? NaN : Number(gears);
   const G0 = Number.isFinite(gN) ? Math.max(6, Math.min(30, Math.round(gN))) : null;
   const room = size ?? (G0 ? 0.65 * Math.cbrt(G0 / 12) : 0.65);
@@ -708,14 +708,16 @@ export function createMachine({ seed = 1, size, gears, weights, chamfer = 0, ero
   for (const [k, v] of Object.entries(weights ?? {})) if (k in w) w[k] = Math.max(0, Number(v) || 0);
   const custom = weights != null;
   if (custom && !Object.values(w).some((v) => v > 0)) for (const k of ["spur", "compound", "idler"]) w[k] = STAGE_WEIGHTS[k];
+  // Balance wheel or pendulum, from its own stream so the rest of the layout's draws stay as they were.
+  const useBalance = mulberry32((Math.imul(seed | 0, 0x2c1b3c6d) ^ 0x5bd1e995) >>> 0)() < balance;
   for (let attempt = 0; attempt < 60; attempt++) {
-    const mc = tryMachine(seed, attempt, room, scale, G0, w, custom);
+    const mc = tryMachine(seed, attempt, room, scale, G0, w, custom, useBalance);
     if (mc) return finish(mc, chamfer, erosion);
   }
   throw new Error(`createMachine: no machine for seed ${seed}`);
 }
 
-function tryMachine(seed, attempt, size, k, G0, weights, custom = false) {
+function tryMachine(seed, attempt, size, k, G0, weights, custom = false, useBalance = false) {
   const W = { ...weights };
   const rng = mulberry32((Math.imul(seed | 0, 0x9e3779b1) ^ Math.imul(attempt + 1, 0x85ebca6b)) >>> 0);
   const rand = (a, b) => a + (b - a) * rng();
@@ -943,31 +945,66 @@ function tryMachine(seed, attempt, size, k, G0, weights, custom = false) {
   shafts.push(esc);
   const escWheel = {
     id: "escape", kind: "escapeWheel", shaft: esc, group: esc.id, meshesWith: [], draggable: true,
-    build: { fn: "buildEscapeWheel", module: "escapement.js", args: { teeth: Ne, radius: Re, width: wE, bore: ra } },
+    build: { fn: "buildEscapeWheel", module: "escapement.js", args: { teeth: Ne, radius: Re, width: wE, bore: ra }, result: E.buildEscapeWheel({ teeth: Ne, radius: Re, width: wE, bore: ra }) },
     motion: rotating(new Matrix4(), esc.theta, esc.lin),
   };
   esc.members = [{ part: escWheel, z0: -wE / 2, z1: wE / 2, axle: true, m0: 0.6 * m, m1: AXLE_END }];
   const amp = layout.amplitude + 0.02;
   const anchor = {
     id: "anchor", kind: "anchor", shaft: null, group: "anchor", meshesWith: ["escape"], draggable: false,
-    build: { fn: "buildAnchor", module: "escapement.js", args: { teeth: Ne, radius: Re, bore: raA } },
-    motion: { local: (q, a = 0) => fPivot.clone().multiply(rotZ(a)), lin: null, frame: fPivot, swing: true },
-  };
-  const pendulum = {
-    id: "pendulum", kind: "pendulum", shaft: null, group: "anchor", meshesWith: [], draggable: false,
-    build: { fn: "buildPendulum", module: "escapement.js", args: pendArgs },
+    build: { fn: "buildAnchor", module: "escapement.js", args: { teeth: Ne, radius: Re, bore: raA }, result: anchorGeo },
     motion: { local: (q, a = 0) => fPivot.clone().multiply(rotZ(a)), lin: null, frame: fPivot, swing: true },
   };
   escWheel.meshesWith.push("anchor");
-  parts.push(escWheel, anchor, pendulum);
+  parts.push(escWheel, anchor);
   const ptz = pendGeo0.bobThickness;
   const anchorAxle = { origin: [...pivot], dir: [0, 0, 1], from: pz - ptz / 2 - 0.5 * m, to: wA / 2 + AXLE_END, radius: raA };
   colliders.push(
     { shape: hullShape(new Matrix4(), [[-wE / 2, Re * 1.01], [wE / 2, Re * 1.01]]), tags: ["p:escape", `g:${esc.id}`], ignore: ["p:anchor"] },
     { shape: hullShape(fPivot, [[-wA / 2, anchorR], [wA / 2, anchorR]]), tags: ["p:anchor", "g:anchor"], ignore: ["p:escape"] },
     { shape: hullShape(fPivot, [[anchorAxle.from, raA], [anchorAxle.to, raA]]), tags: ["a:anchor", "g:anchor"], ignore: [] },
-    { shape: boxShape(fPivot, [0, -(pLen + bobR - pendGeo0.hubRadius) / 2, pz], [pLen * Math.sin(amp) + bobR * 1.02, (pLen + bobR + pendGeo0.hubRadius) / 2 * 1.01, ptz / 2 * 1.02]), tags: ["p:pendulum", "g:anchor"], ignore: [] },
   );
+  let balanceAxle = null;
+  if (!useBalance) {
+    parts.push({
+      id: "pendulum", kind: "pendulum", shaft: null, group: "anchor", meshesWith: [], draggable: false,
+      build: { fn: "buildPendulum", module: "escapement.js", args: pendArgs, result: E.buildPendulum(pendArgs) },
+      motion: { local: (q, a = 0) => fPivot.clone().multiply(rotZ(a)), lin: null, frame: fPivot, swing: true },
+    });
+    colliders.push({ shape: boxShape(fPivot, [0, -(pLen + bobR - pendGeo0.hubRadius) / 2, pz], [pLen * Math.sin(amp) + bobR * 1.02, (pLen + bobR + pendGeo0.hubRadius) / 2 * 1.01, ptz / 2 * 1.02]), tags: ["p:pendulum", "g:anchor"], ignore: [] });
+  } else {
+    // A lever escapement: the anchor's lever ends in a fork round the balance's impulse pin, so the balance swings
+    // through a wide arc (pin offset rr from its staff: lever tip L sin a = -rr sin b) while the anchor rocks a little.
+    // The lever runs out sideways from the pivot (side by the tooth count), so the balance sits beside the escape
+    // wheel, its staff Re + Rb and a little more from the wheel's arbor.
+    const Rb = 1.3 * Re, rimW = 0.15 * Rb, tb = 0.1 * Rb, k55 = Math.sin(amp) / Math.sin(55 * DEG);
+    const reach = 1.1 * Re + Rb, L = Math.sqrt(Math.max(reach * reach - pivot[1] * pivot[1], (0.6 * reach) ** 2)) / (1 - k55);
+    const fLev = fPivot.clone().multiply(rotZ(Ne % 2 ? Math.PI / 2 : -Math.PI / 2));
+    const rr = L * k55, pinR = Math.max(0.16 * rr, 0.25 * m), rodW = 0.03 * pLen, rodT = 0.4 * rodW;
+    const zb = pz - rodT / 2 - 1.5 * m - tb / 2, zr = pz - rodT / 2 - 0.6 * m;
+    const fBal = fLev.clone().multiply(new Matrix4().makeTranslation(0, -(L + rr), 0));
+    const lev0 = fLev.clone().premultiply(fPivot.clone().invert());
+    const leverArgs = { length: L, rodWidth: rodW, thickness: rodT, hubRadius: pendArgs.hubRadius, bore: raA, slot: 1.12 * pinR, depth: 0.5 * rr + 1.5 * pinR, z: pz };
+    const balArgs = { radius: Rb, rim: rimW, thickness: tb, hubRadius: 2.2 * ra, bore: ra, rollerZ: zr, pinZ: pz + rodT / 2 + 0.3 * m, pinOffset: rr, pinRadius: pinR, z: zb };
+    const swingOf = (a) => -Math.asin(Math.max(-1, Math.min(1, (L * Math.sin(a)) / rr)));
+    parts.push(
+      {
+        id: "lever", kind: "lever", shaft: null, group: "anchor", meshesWith: [], draggable: false,
+        build: { fn: "buildLever", module: "escapement.js", args: leverArgs, result: E.buildLever(leverArgs) },
+        motion: { local: (q, a = 0) => fPivot.clone().multiply(rotZ(a)).multiply(lev0), lin: null, frame: fLev, swing: true },
+      },
+      {
+        id: "balance", kind: "balance", shaft: null, group: "balance", meshesWith: [], draggable: false,
+        build: { fn: "buildBalance", module: "escapement.js", args: balArgs, result: E.buildBalance(balArgs) },
+        motion: { local: (q, a = 0) => fBal.clone().multiply(rotZ(swingOf(a))), lin: null, frame: fBal, swing: true },
+      },
+    );
+    balanceAxle = { origin: col(fBal, 3), dir: [0, 0, 1], from: zb - tb / 2 - AXLE_END, to: pz + rodT / 2, radius: ra };
+    colliders.push(
+      { shape: boxShape(fLev, [0, -(L + rr) / 2, pz], [L * Math.sin(amp) + 2.5 * pinR + rodW, (L + rr) / 2 * 1.05, rodT / 2 * 1.02]), tags: ["p:lever", "g:anchor"], ignore: [] },
+      { shape: hullShape(fBal, [[zb - tb / 2 - AXLE_END, Rb * 1.02], [zr + 0.3 * tb, Rb * 1.02]]), tags: ["p:balance", "g:balance"], ignore: ["p:lever"] },
+    );
+  }
   const ac0 = axleCollider(esc, esc.members);
   colliders.push(ac0);
 
@@ -1050,13 +1087,15 @@ function tryMachine(seed, attempt, size, k, G0, weights, custom = false) {
   }
   const anchorAx = { ...anchorAxle, origin: shiftArr(anchorAxle.origin), shaft: "anchor" };
   axles.push(anchorAx);
+  const balanceAx = balanceAxle && { ...balanceAxle, origin: shiftArr(balanceAxle.origin), shaft: "balance" };
+  if (balanceAx) axles.push(balanceAx);
 
   const out = parts.map((p) => {
     const local = p.motion.local;
     const pose = (q, a = 0) => SHIFT.clone().multiply(local(q, a));
     const part = {
       id: p.id, kind: p.kind, build: p.build, group: p.group, meshesWith: [...new Set(p.meshesWith)], draggable: p.draggable,
-      axle: p.shaft ? axleOf.get(p.shaft.id) ?? null : p.group === "anchor" ? anchorAx : null,
+      axle: p.shaft ? axleOf.get(p.shaft.id) ?? null : p.group === "anchor" ? anchorAx : p.group === "balance" ? balanceAx : null,
       pose,
       dPose(q, point, a = 0, h = 1e-4) {
         const P = Array.isArray(point) ? new Vector3(...point) : point.clone();

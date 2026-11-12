@@ -361,6 +361,52 @@ export function buildPendulum({ length = 0.6, bobRadius, bobThickness, rodWidth,
   return info(mesh, { kind: "pendulum", length, bobRadius, bobThickness, rodWidth, thickness, hubRadius, z });
 }
 
+/**
+ * Lever for a balance, in the anchor frame: a hub on the anchor arbor and a flat rod down -y to a fork whose slot holds
+ * the balance's roller pin at (0, -length), all in the plane z = `z`. slot: the slot's half width; depth: how far the pin
+ * may ride up and down it.
+ */
+export function buildLever({ length, rodWidth, thickness, hubRadius, bore, slot, depth, z = 0, chamfer, erosion, seed } = {}) {
+  const mesh = new Mesh(), hw = rodWidth / 2, yAttach = -Math.sqrt(hubRadius ** 2 - hw ** 2), ar = Math.atan2(yAttach, hw);
+  const wear = wearOptions({ chamfer, erosion }, thickness / 2.5, seed ?? 983, ESCAPEMENT_WEAR);
+  // The fork: two prongs either side of the slot, reaching `depth` past the pin both ways.
+  const pw = Math.max(0.6 * hw, 0.9 * slot), xo = slot + pw, top = -length + depth, bottom = -length - depth;
+  const steps = wear.active ? Math.max(1, Math.round((yAttach - top) / rodWidth)) : 1, side = (x, a, b) => Array.from({ length: steps }, (_, i) => [x, a + ((b - a) * i) / steps]);
+  const outer = [...arc(hubRadius, ar, Math.PI - ar, 4 * DEG).slice(0, -1), ...side(-hw, yAttach, top + pw), [-hw, top + pw], [-xo, top], [-xo, bottom], [-slot, bottom], [-slot, top], [slot, top], [slot, bottom], [xo, bottom], [xo, top], ...side(hw, top + pw, yAttach)];
+  outer[0] = [hw, yAttach];
+  extrudeWorn(mesh, ccw(outer), bore > 0 ? [cw(circle(bore, 32))] : [], z - thickness / 2, z + thickness / 2, wear);
+  return info(mesh, { kind: "lever", length, rodWidth, thickness, hubRadius, z });
+}
+
+/**
+ * Balance wheel in its own frame (origin on its staff, axis +z): a rim on three spokes in the plane z = `z`, timing
+ * screws on the rim's face, and a roller at `rollerZ` carrying the impulse pin at (0, pinOffset) up to `pinZ`.
+ */
+export function buildBalance({ radius, rim, thickness, spokes = 3, hubRadius, bore, rollerZ, pinZ, pinOffset, pinRadius, screws = 8, z = 0, chamfer, erosion, seed } = {}) {
+  const mesh = new Mesh(), ri = radius - rim, sw = 0.7 * rim;
+  const wear = wearOptions({ chamfer, erosion }, thickness / 2.5, seed ?? 991, ESCAPEMENT_WEAR);
+  const holes = [];
+  for (let i = 0; i < spokes; i++) {
+    const a0 = Math.PI / 2 + (TAU * i) / spokes, a1 = a0 + TAU / spokes;
+    const so = Math.asin(sw / 2 / ri), sh = Math.asin(Math.min(0.95, sw / 2 / hubRadius));
+    holes.push(cw([...arc(ri, a0 + so, a1 - so, 3 * DEG), ...arc(hubRadius, a1 - sh, a0 + sh, 3 * DEG)]));
+  }
+  extrudeWorn(mesh, ccw(circle(radius, 96)), [...holes, cw(circle(bore, 24))], z - thickness / 2, z + thickness / 2, wear);
+  // Timing screws: domed heads on the rim's front face.
+  const hr = 0.32 * rim, hh = 0.5 * hr;
+  for (let i = 0; i < screws; i++) {
+    const a = (TAU * (i + 0.5)) / screws, cx = (radius - rim / 2) * Math.cos(a), cy = (radius - rim / 2) * Math.sin(a);
+    lathe(mesh, [[0, hh, 0, 1], [0.6 * hr, 0.8 * hh, 0.5, 0.86], [hr, 0.3 * hh, 0.9, 0.4], null, [hr, 0.3 * hh, 1, 0], [hr, -0.01 * hh, 1, 0]], { cx, cy, cz: z + thickness / 2, segments: 14 });
+  }
+  // Roller: a disc on the staff, and the impulse pin standing from it toward the lever.
+  const rr = pinOffset + 2.2 * pinRadius, rt = 0.6 * thickness, dir = Math.sign(pinZ - rollerZ) || 1;
+  lathe(mesh, [[0, rt / 2, 0, 1], [rr, rt / 2, 0, 1], null, [rr, rt / 2, 1, 0], [rr, -rt / 2, 1, 0], null, [rr, -rt / 2, 0, -1], [0, -rt / 2, 0, -1]], { cz: rollerZ, segments: 32 });
+  const pl = Math.abs(pinZ - rollerZ) + 0.5 * pinRadius;
+  const pin = dir > 0 ? [[0, pl, 0, 1], [pinRadius, pl, 0, 1], null, [pinRadius, pl, 1, 0], [pinRadius, 0, 1, 0]] : [[pinRadius, 0, 1, 0], [pinRadius, -pl, 1, 0], null, [pinRadius, -pl, 0, -1], [0, -pl, 0, -1]];
+  lathe(mesh, pin, { cy: pinOffset, cz: rollerZ, segments: 12 });
+  return info(mesh, { kind: "balance", radius, outerRadius: radius, rim, thickness, z });
+}
+
 /** A pendulum plane behind the wheel and anchor (both of these widths), with `gap` between. */
 export function escapementPendulumZ({ wheelWidth, anchorWidth, pendulumThickness, gap }) {
   return -(Math.max(wheelWidth, anchorWidth) / 2 + gap + pendulumThickness / 2);
