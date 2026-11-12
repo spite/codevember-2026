@@ -55,6 +55,7 @@ const defaults = {
   grime: 0.75,
   studio: "bone",
   period: 2,
+  speed: 1,
   auto: true,
   autoTime: 20,
 };
@@ -111,6 +112,8 @@ gui.addSlider("Edge pitting", params.edgePits, 0, 1, 0.01);
 gui.addSlider("Flaking", params.flaking, 0, 1, 0.01);
 gui.addSlider("Grime", params.grime, 0, 1, 0.01);
 gui.addSlider("Pendulum", params.period, 1, 4, 0.01, { randomizable: false });
+// How fast the escapement runs: scales the train's clock, not the pendulum's length.
+gui.addSlider("Speed", params.speed, 0.25, 4, 0.01, { randomizable: false });
 gui.addSection("Studio");
 gui.addSelect("Studio", params.studio, Object.keys(STUDIOS));
 const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTime, gui, ready: () => phase.name === "run" });
@@ -576,7 +579,7 @@ function stepMotion(dt) {
   const s = motionState;
   // Stickiness follows the rust actually grown, so a new machine runs clean.
   const rust = params.rust() * params.age();
-  if (!s.dragging && s.lifted <= 0) s.time += dt;
+  if (!s.dragging && s.lifted <= 0) s.time += dt * params.speed();
   const esc = escapement(s.time);
   s.anchor = esc.anchor;
   if (esc.tick) {

@@ -19,7 +19,8 @@ light studio.
 - R: a new machine, finish and studio. T: a timelapse of the ageing. M or the speaker button: sound.
 - Space pauses, F fullscreen, Tab hides the UI, P a screenshot.
 - The panel sets the gear count, the mix of gear types, the chance of a balance wheel over a pendulum, chamfer and
-  wear, and the weathering: age, rust and its colours, grease, edge pitting, flaking and grime.
+  wear, the weathering (age, rust and its colours, grease, edge pitting, flaking and grime), the pendulum's period
+  and the speed the escapement runs at.
 - Left alone, it changes machine every 20 s, ageing each one over that time.
 
 ## Notes
