@@ -3,7 +3,7 @@
 // on the first gesture. Variation uses nativeRandom, so the seeded layout never shifts.
 import { nativeRandom } from "modules/random.js";
 
-const SETS = { tick: 5, cog: 5, ratchet: 4, clink: 4, clack: 2, latch: 3, clank: 6, chain: 4, creak: 2, lever: 1 };
+const SETS = { tick: 5, cog: 5, ratchet: 4, clink: 4, clack: 2, latch: 3, clank: 5, chain: 4, creak: 1, lever: 1 };
 // Closest two plays of the same set may start, in seconds.
 const SPACING = { tick: 0.04, cog: 0.06, ratchet: 0.025, clink: 0.03, clack: 0.04, latch: 0.05, clank: 0.07, chain: 0.12, creak: 0.5, lever: 0.1 };
 const MAX_VOICES = 24;
@@ -38,6 +38,7 @@ export function createSound({ base = new URL("./sounds/", import.meta.url).href,
       try {
         const buf = await ctx.decodeAudioData((await f.data).slice(0));
         (buffers[f.name] ??= []).push(buf);
+        f.decoded = true;
       } catch {}
     }
   }
@@ -57,22 +58,34 @@ export function createSound({ base = new URL("./sounds/", import.meta.url).href,
     return list[i];
   }
 
+  // logger({ name, variant, delay, gain, pan, rate, lowpass }) sees every sound as it would play, even while the
+  // context waits for a gesture: recordings mix the log offline.
+  let logger = null;
   function play(name, { gain = 1, pan = 0, delay = 0, rate = 1, lowpass = 0 } = {}) {
-    if (!ctx || ctx.state !== "running" || !on || gain < 0.01) return;
-    const at = ctx.currentTime + Math.max(0, delay);
+    if (!ctx || !on || gain < 0.01) return;
+    const running = ctx.state === "running";
+    if (!running && !logger) return;
+    delay = Math.max(0, delay);
+    const now = performance.now() / 1000, at = now + delay;
     if (at - (lastAt[name] ?? -1) < SPACING[name]) return;
-    voices = voices.filter((v) => v > ctx.currentTime);
+    voices = voices.filter((v) => v > now);
     if (voices.length >= MAX_VOICES) return;
     const buf = pick(name);
     if (!buf) return;
     lastAt[name] = at;
+    rate *= 0.94 + 0.12 * nativeRandom();
+    gain *= 0.85 + 0.3 * nativeRandom();
+    pan = Math.max(-1, Math.min(1, pan));
+    voices.push(at + buf.duration / rate);
+    logger?.({ name, variant: buffers[name].indexOf(buf), delay, gain, pan, rate, lowpass });
+    if (!running) return;
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    src.playbackRate.value = rate * (0.94 + 0.12 * nativeRandom());
+    src.playbackRate.value = rate;
     const g = ctx.createGain();
-    g.gain.value = gain * (0.85 + 0.3 * nativeRandom());
+    g.gain.value = gain;
     const p = ctx.createStereoPanner();
-    p.pan.value = Math.max(-1, Math.min(1, pan));
+    p.pan.value = pan;
     let node = src.connect(g);
     // Rust dulls the sound: the crust damps the ring of the metal.
     if (lowpass > 0) {
@@ -82,8 +95,7 @@ export function createSound({ base = new URL("./sounds/", import.meta.url).href,
       node = node.connect(f);
     }
     node.connect(p).connect(master);
-    src.start(at);
-    voices.push(at + buf.duration / src.playbackRate.value);
+    src.start(ctx.currentTime + delay);
   }
 
   // A looping sound whose level and pitch follow the caller (set(gain, rate) every frame).
@@ -112,6 +124,11 @@ export function createSound({ base = new URL("./sounds/", import.meta.url).href,
   return {
     play,
     loop,
+    setLogger(fn) {
+      logger = fn;
+    },
+    // The sample files, per set in variant order, for an offline mix.
+    files: () => Object.fromEntries(Object.keys(buffers).map((name) => [name, files.filter((f) => f.name === name && f.decoded).map((f) => `${base}${f.name}-${f.i}.mp3`)])),
     get running() {
       return !!ctx && ctx.state === "running";
     },

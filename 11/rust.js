@@ -207,8 +207,7 @@ vec3 normalNT(vec2 uv, vec2 dx, vec2 dy, float layer, float salt) {
   vec3 b = textureGrad(scanNormal, vec3(uv + sin(vec2(3.0, 7.0) * (i + 1.0)) * 7.3, layer), dx, dy).xyz;
   return mix(a, b, smoothstep(0.2, 0.8, f)) * 2.0 - 1.0;
 }
-vec3 scanNormalTri(vec3 p, vec3 n, vec3 w, float layer, float strength) {
-  vec3 dx = dFdx(p), dy = dFdy(p);
+vec3 scanNormalLayer(vec3 p, vec3 dx, vec3 dy, vec3 n, vec3 w, float layer, float strength) {
   vec3 acc = vec3(0.0);
   if (w.x > 0.0) {
     vec3 t = normalNT(p.zy, dx.zy, dy.zy, layer, 0.1);
@@ -225,7 +224,14 @@ vec3 scanNormalTri(vec3 p, vec3 n, vec3 w, float layer, float strength) {
     t.xy *= strength;
     acc += vec3(t.xy + n.xy, abs(t.z) * n.z) * w.z;
   }
-  return normalize(acc);
+  return acc;
+}
+// k crossfades the mature scan (0) into the old one (1): an array layer index doesn't blend, it snaps.
+vec3 scanNormalTri(vec3 p, vec3 n, vec3 w, float k, float strength) {
+  vec3 dx = dFdx(p), dy = dFdy(p);
+  if (k <= 0.01) return normalize(scanNormalLayer(p, dx, dy, n, w, 0.0, strength));
+  if (k >= 0.99) return normalize(scanNormalLayer(p, dx, dy, n, w, 1.0, strength));
+  return normalize(mix(scanNormalLayer(p, dx, dy, n, w, 0.0, strength), scanNormalLayer(p, dx, dy, n, w, 1.0, strength), k));
 }
 
 // Bump from a height field (Mikkelsen's surface gradient), in world space.

@@ -1,4 +1,4 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, keysHelp, setDay, showHint, loadingStep, fetchWithProgress, addKey, addActionButton, onPause, showSoundHint } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, loadSeed, randomize, keysHelp, setDay, showHint, loadingStep, fetchWithProgress, addKey, addActionButton, onPause, showSoundHint } from "common";
 import { GUI, signal } from "guspira";
 import { Scene, Mesh, InstancedMesh, Group, Vector3, Vector2, Matrix4, Quaternion, BufferGeometry, BufferAttribute, CylinderGeometry, BoxGeometry, Raycaster, Plane, Color } from "three";
 import { Pipeline } from "modules/pipeline/Pipeline.js";
@@ -627,6 +627,15 @@ function stepMotion(dt) {
 // ——— Changing machines: parts slide off their axles and drift away; the new ones fly in and seat ———
 
 const phase = { name: "empty", t: 0 };
+// The machine leaves without a new one (recordings end on the empty studio).
+let clearing = false;
+function clear() {
+  if (!machine || phase.name !== "run") return;
+  clearing = true;
+  phase.name = "out";
+  phase.t = 0;
+  transitionSounds("out");
+}
 const DURATION = { out: 1.3, in: 1.8 };
 const frame = { radius: 0.65, t: 0, free: false, dir: null, points: null, target: new Vector3(), distance: 3, turn: 0 };
 // The camera's direction: at the best view's elevation, turned some 70 degrees round from the key light so the light
@@ -638,6 +647,8 @@ function cameraDirection(best) {
   return new Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
 }
 
+// The automatic camera's roll: amplitude (radians) and period (seconds) of a slow lean either way.
+const ROLL = { amount: 0.07, period: 23 };
 const ORBIT_SPEED = 0.08; // radians per second
 const _yAxis = new Vector3(0, 1, 0);
 let shown = null;
@@ -656,7 +667,8 @@ const finishKey = () => JSON.stringify(finishOptions());
 
 function begin() {
   shown = machineKey();
-  if (machine) {
+  clearing = false;
+  if (machine && phase.name !== "empty") {
     phase.name = "out";
     phase.t = 0;
     transitionSounds("out");
@@ -730,7 +742,7 @@ function stagger(k, delay) {
 const lastPose = { q: NaN, anchor: NaN, k: NaN, lifted: NaN };
 function poseAll() {
   const s = motionState;
-  const kk = phase.name === "out" ? phase.t : phase.name === "in" ? 1 - phase.t : 0;
+  const kk = phase.name === "out" ? phase.t : phase.name === "in" ? 1 - phase.t : phase.name === "empty" ? 1 : 0;
   if (s.q !== lastPose.q || s.anchor !== lastPose.anchor || kk !== lastPose.k || s.lifted !== lastPose.lifted) {
     Object.assign(lastPose, { q: s.q, anchor: s.anchor, k: kk, lifted: s.lifted });
     pipeline.restartAccumulation(false);
@@ -775,7 +787,10 @@ function update(dt) {
   }
   if (phase.name === "out") {
     phase.t = Math.min(1, phase.t + dt / DURATION.out);
-    if (phase.t >= 1) install();
+    if (phase.t >= 1) {
+      if (clearing) phase.name = "empty";
+      else install();
+    }
   } else if (phase.name === "in") {
     phase.t = Math.min(1, phase.t + dt / DURATION.in);
     if (phase.t >= 1) {
@@ -789,7 +804,7 @@ function update(dt) {
     const k = Math.min(1, ramp.t / Math.max(1, params.autoTime() - 2));
     params.age.set(k * k * (3 - 2 * k));
   }
-  if (machine && phase.name !== "out") stepMotion(dt);
+  if (machine && phase.name !== "out" && phase.name !== "empty") stepMotion(dt);
   if (machine) poseAll();
 }
 
@@ -887,6 +902,16 @@ window.app = {
   controls,
   phase,
   motion: motionState,
+  sound,
+  // The next machine: a seed (string), none ({ clear: true }: the studio left empty) or a random one.
+  nextLook: (look) => (look?.clear ? clear() : typeof look === "string" ? loadSeed(look) : randomize()),
+  // Replays the current machine's arrival, for recordings that open on it.
+  arrive: () => {
+    phase.name = "in";
+    phase.t = 0;
+    frame.t = 0;
+    transitionSounds("in");
+  },
   // The direction that shows most of the current machine (unit vector from its centre).
   bestView: () => machine && bestView(machine, motionState.q, motionState.anchor),
   get machine() {
@@ -948,5 +973,9 @@ render(({ time, dt }) => {
   updateStudioFade(dt || 1 / 60);
   backdrop.update(dt || 1 / 60);
   controls.update();
+  // Roll on top of the orbit controls' upright view, eased out while the camera is free.
+  frame.roll = (frame.roll ?? 0) + ((frame.free || drag.mesh ? 0 : 1) - (frame.roll ?? 0)) * Math.min(1, (dt || 0) * 2);
+  frame.rollT = (frame.rollT ?? 0) + (dt || 0);
+  if (frame.dir) camera.rotateZ(frame.roll * ROLL.amount * Math.sin((frame.rollT / ROLL.period) * Math.PI * 2));
   pipeline.render(scene, camera, time);
 });
