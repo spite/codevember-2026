@@ -414,4 +414,4 @@ vec3 evalSH(vec3 n) {
 }
 `;
 
-export { createStudioEnvironment, createStudioEnvironmentAsync, loadHDREnvironment, computeSH, dominantDirection, shGLSL };
+export { createStudioEnvironment, createStudioEnvironmentAsync, applyEnvironment, loadHDREnvironment, computeSH, dominantDirection, shGLSL };
