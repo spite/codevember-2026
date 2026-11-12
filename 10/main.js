@@ -1,4 +1,4 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, keysHelp, setDay, showHint, showSoundHint, loadingStep, addKey, addActionButton, onPause, isRunning, randomize, loadSeed, getSeed } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, keysHelp, setDay, showHint, showSoundHint, loadingStep, addKey, addActionButton, addActionLink, onPause, isRunning, randomize, loadSeed, getSeed } from "common";
 import { GUI } from "guspira";
 import { Scene, Mesh, Vector3, BufferGeometry, BufferAttribute, Box3, Quaternion, Euler, Matrix4 } from "three";
 import { createBackdrop } from "./backdrop.js";
@@ -700,6 +700,7 @@ showHint("Drag to spin the piece · scroll to zoom · Space, then drag to look a
 
 const sound = createSound({ onProgress: load.sound.set });
 const soundButton = addActionButton("../assets/sound.svg", "Sound", () => toggleSound());
+addActionLink("../assets/gallery.svg", "Gallery: The Etcher's Pattern Book", "gallery/");
 function toggleSound() {
   sound.setEnabled(!sound.enabled);
   soundButton.querySelector("img").src = `../assets/${sound.enabled ? "sound" : "sound-off"}.svg`;

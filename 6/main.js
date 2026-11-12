@@ -1,4 +1,4 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, randomize, keysHelp, setDay, addKey, getSeed, applyUrlState, addActionButton, onPause, showHint, showSoundHint, loadingStep } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, randomize, keysHelp, setDay, addKey, getSeed, applyUrlState, addActionButton, addActionLink, onPause, showHint, showSoundHint, loadingStep } from "common";
 import { GUI } from "guspira";
 import { createAutoChange } from "modules/autoChange.js";
 import { Scene, Mesh, Group, InstancedMesh, InstancedBufferAttribute, BufferGeometry, BufferAttribute, SphereGeometry, Matrix4, Vector2, Vector3, Color, Raycaster, Sphere, DynamicDrawUsage } from "three";
@@ -129,6 +129,7 @@ pipeline.addGUI(gui);
 gui.addSeparator();
 const sound = createMachineSound({ onProgress: load.sound.set });
 const soundButton = addActionButton("../assets/sound.svg", "Sound", () => toggleSound());
+addActionLink("../assets/gallery.svg", "Gallery: The Orrery Collection", "gallery/");
 function toggleSound() {
   sound.setEnabled(!sound.enabled);
   soundButton.querySelector("img").src = `../assets/${sound.enabled ? "sound" : "sound-off"}.svg`;

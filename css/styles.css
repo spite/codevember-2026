@@ -15,6 +15,24 @@
   }
 }
 
+/* On narrow screens the gallery link is just its icon; the name stays for screen readers. */
+@media (max-width: 950px) {
+  #info a.home {
+    width: var(--header-size);
+    padding: 0;
+    justify-content: center;
+
+    span {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+}
+
 html,
 body {
   height: 100%;
@@ -142,6 +160,12 @@ canvas {
 
 .paused #pause-button {
   background-color: #4a4a4a;
+}
+
+/* Hidden by fitNav() in common.js when the header gets too narrow. */
+#info.no-arrows a:not(.home),
+#info.no-home a.home {
+  display: none;
 }
 
 /* The gallery link, with the previous and next published days as buttons either side. */
