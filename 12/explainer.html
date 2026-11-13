@@ -292,6 +292,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <h2>A white cyc, and the form turns instead of the camera</h2>
       <p>The default look is a pale, high-key studio: a big softbox key from the camera's side and a bright surround, as bright as the backdrop it's seen against (a white cyc), so the shaded side of a white coat is still lit. Some of it is deliberately unphysical. The backdrop is lifted above 1 in linear light so that after AgX it reads as paper white, not grey. Ambient occlusion runs at half strength with a short reach and an edge-preserving blur, because a white coat fills its own crevices with light and they should darken each overlap, not go dirty. The key's highlight comes from the environment's softbox only, not twice. And the shadows use a light 0.07 wide (as the tangent of its angular radius), smaller than the softbox, because a light that big would wash out every shadow a feather casts. A dark look exists too: a near-black set raked from the side. Each studio is baked once, and the other one in the background, so switching never waits.</p>
       <p>The camera never moves round the form. If it did, you could orbit to the unlit side and see a grey lump. Dragging turns the form itself, about the camera's up and right axes, with a little momentum when you let go, and it spins slowly about the vertical (Spin). The camera only zooms. Every new form is framed from its bounding radius (centre line, tube and feathers) so the whole of it fits with a margin on any screen shape, and through a morph the camera follows the radius as it changes.</p>
+      <p>The light studio comes in seven colours (Backdrop colour): white, blush, peach, butter, sage, mist and lavender. A colour sets the backdrop, and the whole studio is tinted 60% of the way toward it, so the coat's shaded side picks it up while its lit side stays white. All seven are baked in the background after load. Randomizing picks one; through a morph the backdrop cross-fades over the whole morph and the studio's light swaps halfway, and when shrinking, nothing changes until the old form is gone.</p>
       <p>The backdrop isn't part of the lit scene: it is a huge inward-facing sphere behind everything, the background colour lit a little above the form and falling off toward the edges like a studio sweep (Backdrop sets how much).</p>
     </div>
   </section>
@@ -301,8 +302,8 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">A living coat · <b>main.js, updateLife</b></div>
       <h2>Breathing, rousing, parting</h2>
-      <p>The tube's girth swells and settles slowly: breathing. Every few seconds the plumage rouses. A rouse starts at a random point on the form and runs one way round it, or spreads both ways. Feathers puff up as its front reaches them (by up to about 35°) and swing side to side, strongly, with neighbours nearly together, then settle behind it. Rouses come irregularly: usually several seconds apart, but a third of the time another follows within a second.</p>
-      <p>The pointer is a ray into the form. Feathers near it lift and quiver, more the faster it moves. Now and then a swipe runs along the form like a hand brushing it, stirring the whole cross-section as it passes. Gusts of wind come from a direction: the windward side is pressed flat, the lee side lifts and flutters, everything leans downwind, and the flutter runs across the form with the gust. Pausing stops only the spin; the coat keeps answering.</p>
+      <p>The tube's girth swells and settles slowly: breathing. Every few seconds the plumage rouses. A rouse starts at a random point on the form and runs one way round it, or spreads both ways. Feathers puff up as its front reaches them (by up to about 35°) and swing side to side, strongly, with neighbours nearly together, then settle behind it. Rouses come irregularly: usually several seconds apart, but a third of the time another follows within a second. Running one way round a loop, the wave would leave a step where it started, puffed just past the origin and untouched just before it, so the origin's puff tapers off over the 5% of the loop upstream of it.</p>
+      <p>The pointer is a ray into the form. Feathers near it lift and quiver, more the faster it moves. Now and then a swipe runs along the form like a hand brushing it, stirring the whole cross-section as it passes. Gusts of wind come from in front, 35–45° off the view direction and more often from the sides than from above or below, so the plumage blows away from the viewer at a slant: the windward side is pressed flat, the lee side lifts and flutters, everything leans downwind, and the flutter runs across the form with the gust. Pausing stops only the spin; the coat keeps answering.</p>
     </div>
     <div class="fig">
       <div class="fig-head"><h3>A rouse running round a ring</h3>
@@ -317,7 +318,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="facts">
       <div class="fact"><b>Rouse</b><span>Strength 0.75–1. The front crosses the form in 0.18–0.3 s (twice as long both ways, 40% of the time). From 0.3 s the body shakes side to side at 6–8 Hz, fading, and the swing runs a whole number of cycles round a loop, so there's no seam. It settles over the last 0.5 s of 1.2–1.6 s. Next one: 35% of the time within 0.35–1.15 s, otherwise 2 to 20 s later.</span></div>
       <div class="fact"><b>Swipe</b><span>A band a tenth of the form wide runs along 25–60% of it in 0.45–0.8 s, either way, stirring the tube all the way round as it passes. Every 5 to 19 s.</span></div>
-      <div class="fact"><b>Gust</b><span>From a direction of its own, mostly level: swells over 0.8–2 s and fades over 1.5–4 s, every 8 to 30 s. The wind is in the world, so as the form turns it is carried into the form's own frame. It is heard from the side it comes from.</span></div>
+      <div class="fact"><b>Gust</b><span>From in front, 35–45° off the view direction: swells over 0.8–2 s and fades over 1.5–4 s, every 8 to 30 s. The wind is in the world, so as the form turns it is carried into the form's own frame. It is heard from the side it comes from.</span></div>
       <div class="fact"><b>Pointer and breath</b><span>Pointer movement adds to a stir that decays over half a second; feathers near the ray lift and quiver, and it's only heard when the ray passes close to the form. Breathing scales the tube's girth, and the ruffle pattern itself swells by ±8% slowly in place.</span></div>
       <div class="fact"><b>Motion vectors</b><span>The vertex shader runs a second time in the prepass for the previous frame's pose (last frame's breath, centre line and spin), so every one of these motions has true velocity, and the temporal pass follows feathers instead of smearing them.</span></div>
     </div>
@@ -357,6 +358,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="eyebrow">How many feathers · <b>main.js, rebuild, featherBudget, meter</b></div>
       <h2>Sized to cover, capped by the device</h2>
       <p>The coat always covers the form, whatever the count. A form gets Density feathers per unit of its skin's area, but never more than Max feathers. The count then sets the feathers' size. A Poisson disc with spacing s keeps about one root per 1.81 s² (measured), and the spacing is a fixed fraction of the feather length l (0.22 for the coat, 0.28 · 0.7 for the under-layer), so N feathers of length l cover area / (1.81 · s² · l²). Solved for l, a smaller budget gives longer feathers rather than bald patches. Past twice the tube's radius a feather would stick out like a spine, so the length stops there and the roots spread out instead. Feather length and width on the panel are multipliers applied live in the shader on top of that, so changing them never rebuilds the coat.</p>
+      <p>Length and Width variation vary each feather on top of that, by a smooth noise over the form: along it (round a circle, so a loop has no seam) and round the tube, at Variation scale. Low scales give broad swells of longer or wider feathers, high ones scruffy tufts. It is applied in the shader too, and the skin's clearance under each feather scales with its new length, so the stack still holds.</p>
       <p>The last cap is the device's own. The Performance section times the GPU every half second, with <code>EXT_disjoint_timer_query_webgl2</code> where the browser has it, and works out how many feathers would fit in a 60 fps frame: the feathers drawn × 16.7 ms / the frame's GPU time. It assumes the whole frame scales with the feathers, which is optimistic, since some of a frame (shadows of the backdrop, bloom, the final pass) doesn't. A running mean of those estimates caps the next form, never below 2000.</p>
       <p>Not every half second counts. It skips the first 3 s (shader compiles), any window with fewer than 10 frames (a hidden tab, a stall), and anything during a transition. Without timer queries only the time between frames is known, and that can't go below the screen's refresh, so a fast device can't show its headroom: there, only windows slower than 60 fps count, and they can only lower the cap. Until there is any measurement, the high tier has no cap and lower tiers stop at 6000. Capture quality, for recordings, is never capped.</p>
     </div>
@@ -419,8 +421,8 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <ul class="keys col">
       <li>Drag to turn the form, scroll or pinch to zoom; move close to stir the feathers (touch on phones).</li>
       <li><b>Shape</b>: torus, torus knot (windings and loops) or a classic knot, its size and thickness.</li>
-      <li><b>Feathers</b>: palette, pattern and its amount, Density and Max feathers, length, width, under-layer, ruffle, curl, angle, lean, internal shadow, see-through, gradient and its repeats.</li>
-      <li><b>Light</b>: the studio, backdrop falloff, shadow mode, spin and the transition (morph, or shrink and grow).</li>
+      <li><b>Feathers</b>: palette, pattern and its amount, Density and Max feathers, length, width, length and width variation and their scale, under-layer, ruffle, curl, angle, lean, internal shadow, see-through, gradient and its repeats.</li>
+      <li><b>Light</b>: the studio, backdrop colour and falloff, shadow mode, spin and the transition (morph, or shrink and grow).</li>
       <li><b>R</b> makes a new form, <b>M</b> or the speaker button toggles sound; it changes by itself every 10 s.</li>
       <li><b>O</b> rouses the plumage, <b>S</b> runs a swipe along it, <b>W</b> sends a gust of wind, <b>C</b> makes a bird call.</li>
       <li><b>Space</b> stops the spin, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot.</li>
@@ -871,7 +873,11 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       let x = fract((u - origin) * dirn);
       if ($("rM").value === "both") x = Math.min(x, 1 - x) * 2;
       const behind = front - x;
-      return env * (behind < 0 ? Math.exp(-(behind * behind) / 0.0016) : Math.exp(-behind / 0.6));
+      const at = (b) => (b < 0 ? Math.exp(-(b * b) / 0.0016) : Math.exp(-b / 0.6));
+      let s = at(behind);
+      // One way round: the origin's puff tapers off upstream, so it doesn't step where it starts.
+      if ($("rM").value !== "both") s = Math.max(s, at(front) * Math.exp(-((1 - x) ** 2) / 0.0025));
+      return env * s;
     };
     const view = setup(canvas, (W) => Math.min(420, W * 0.55), (ctx, W, H) => {
       ctx.clearRect(0, 0, W, H);
