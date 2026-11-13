@@ -645,19 +645,12 @@ function createFeathers({ color = new Color(1.0, 0.985, 0.955), alphaToCoverage 
   });
   const skin = new Mesh(undefined, skinMaterial);
 
-  // feathers: [{ p, n, d, l, hs, r (skin's radius across), pal (0..1 along the form), under }]; skinGeometry: the form.
+  // skinGeometry: the form.
   // width: vane width over the standard (ASPECT of the length).
-  function build(feathers, skinGeometry, size, width = 1) {
-    const n = feathers.length;
-    const roots = new Float32Array(n * 4), norms = new Float32Array(n * 4), dirs = new Float32Array(n * 4);
-    const skins = new Float32Array(n * 4), shapes = new Float32Array(n * 4);
-    feathers.forEach((fe, i) => {
-      roots.set([fe.p.x, fe.p.y, fe.p.z, fe.l], i * 4);
-      norms.set([fe.n.x, fe.n.y, fe.n.z, fe.r], i * 4);
-      dirs.set([fe.d.x, fe.d.y, fe.d.z, fe.pal], i * 4);
-      skins.set(fe.hs, i * 4);
-      shapes.set([fe.l * ASPECT * width * (fe.width ?? 1) * (fe.under ? 1.3 : 1) * (0.95 + 0.1 * fe.rand) * PLANE_WIDTH, fe.under ? 1 : 0, fe.seed, 0], i * 4);
-    });
+  // packed: { n, roots, norms, dirs, skins, shapes } from the layout worker (shapes' x before the vane's aspect).
+  function build(packed, skinGeometry, size, width = 1) {
+    const { n, roots, norms, dirs, skins, shapes } = packed;
+    for (let i = 0; i < n; i++) shapes[i * 4] *= ASPECT * width * PLANE_WIDTH;
     // three caches the instance limit of the first attributes it binds; a larger rebuild would be clipped to it.
     delete geometry._maxInstanceCount;
     geometry.setAttribute("aRoot", new InstancedBufferAttribute(roots, 4));

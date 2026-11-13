@@ -510,6 +510,11 @@ class Pipeline {
     return still;
   }
 
+  // This frame moves in a way the pipeline cannot see (e.g. uniforms while paused): render it live (TAA), not as a still.
+  markMoving() {
+    this._moving = true;
+  }
+
   // Restarts the lens average, for changes the pipeline cannot see (uniforms, materials).
   // fade: false for motion it cannot see (an object the day draws itself), which would ghost if faded.
   restartAccumulation(fade = true) {
@@ -784,7 +789,8 @@ class Pipeline {
       const samples = Math.max(1, Math.round(this.samples));
       const dof = this.dof && this.dofEnabled && this.dof.active && camera.isPerspectiveCamera && debug === "none" ? this.dof : null;
       const settle = !dof && this.stillSamples > 0 && this.dof && camera.isPerspectiveCamera && debug === "none" && samples === 1;
-      const still = dof || settle ? this._isStill(camera, time) : false;
+      const still = (dof || settle ? this._isStill(camera, time) : false) && !this._moving;
+      this._moving = false;
       if (!still) this.lensCount = 0;
       if (!still) (this._settleShown = null), (this._settleFade = false);
       const lensPath = still && ((dof && this.lensSamples > 0) || settle);

@@ -1,7 +1,8 @@
 // A tube around a line: a closed torus knot (or a plain torus) of constant radius, or an open line traced through a
 // curl-noise field, rounded off at both tips. Feathers spread over it: roots by area with no two closer than a
 // fraction of their length (Poisson disc), each pointing along the line.
-import { Vector3, Quaternion, BufferGeometry, BufferAttribute } from "three";
+// Relative, so the layout worker (no importmap) can load it too.
+import { Vector3, Quaternion, BufferGeometry, BufferAttribute } from "../third_party/three.core.js";
 
 const TAU = Math.PI * 2;
 

@@ -6,7 +6,7 @@ import { createStudioEnvironmentAsync, applyEnvironment } from "modules/pipeline
 import { createAutoChange } from "modules/autoChange.js";
 import { globalUniforms } from "modules/pipeline/uniforms.js";
 import { seededRandom, nativeRandom } from "modules/random.js";
-import { KNOT_CURVES, knotLine, centreLine, frameAt, straightLine, clearance, tubeArea, tubeGeometry, spreadFeathers } from "./tube.js";
+import { KNOT_CURVES, knotLine, centreLine, frameAt, straightLine, clearance, tubeArea, tubeGeometry } from "./tube.js";
 import { DS, Swimmer, Spine, curlSteer } from "./motion.js";
 import { createFeathers, createSpine } from "./feathers.js";
 import { createSound } from "./sound.js";
@@ -74,23 +74,23 @@ const defaults = {
   ringRadius: 2.2,
   knotSize: 2.6,
   thickness: 0.45,
-  palette: "pheasant",
+  palette: "white",
   pattern: "mixed",
-  patternAmount: 1,
-  featherLength: 1,
-  featherWidth: 1,
+  patternAmount: 0.56,
+  featherLength: 1.43,
+  featherWidth: 1.27,
   density: 350,
-  feathers: 20000,
+  feathers: 9000,
   underLayer: false,
   underShade: 1,
-  internalShadow: 0.6,
+  internalShadow: 0.56,
   gradientAmount: 0,
   gradientRepeat: 1,
-  ruffle: 0.5,
-  curl: 0.6,
-  angle: 1,
+  ruffle: 0,
+  curl: 1.5,
+  angle: 1.89,
   lean: 0,
-  seeThrough: 0.3,
+  seeThrough: 1,
   spin: 0.05,
   look: "light",
   shadows: "stochastic",
@@ -98,9 +98,10 @@ const defaults = {
   shadowLight: 0.6,
   auto: true,
   autoTime: 10,
+  transition: "morph",
 };
 const params = fromDefaults(defaults);
-const load = { studio: loadingStep(1), compile: loadingStep(4) };
+const load = { layout: loadingStep(1), studio: loadingStep(1), compile: loadingStep(4) };
 
 // Temporal antialiasing (one jittered sample per pixel, resolved over frames) instead of MSAA, so the stochastic
 // transparency and shadows average out in motion too; ?taa=0 goes back to MSAA for comparison.
@@ -137,9 +138,12 @@ gui.addSection("Form");
 const SHAPES = [["torus", "torus"], ["knot", "torus knot"], ...Object.keys(KNOT_CURVES).map((k) => [k, k])];
 // The centre line of a closed shape, size: its ring radius or knot size.
 const lineFor = (shape, size, p, q, n) => (shape === "torus" ? centreLine(1, 0, size, n) : shape === "knot" ? centreLine(p, q, size, n) : knotLine(shape, size, n));
+// Never the shape already on show.
 gui.addSelect("Shape", params.shape, SHAPES).randomize = () => {
-  const r = Math.random();
-  params.shape.set(r < 0.1 ? "torus" : r < 0.35 ? "knot" : r < 0.55 ? "trefoil" : r < 0.7 ? "figure-eight" : r < 0.8 ? "saddle" : r < 0.9 ? "crown" : "star");
+  const weights = { torus: 0.1, knot: 0.25, trefoil: 0.2, "figure-eight": 0.15, saddle: 0.1, crown: 0.1, star: 0.1 };
+  delete weights[params.shape()];
+  let r = Math.random() * Object.values(weights).reduce((a, b) => a + b);
+  for (const [k, w] of Object.entries(weights)) if ((r -= w) < 0) return params.shape.set(k);
 };
 // Windings round the axis and through the hole; equal or sharing a factor gives a link, not a knot.
 // Randomized toward full, chunky forms: knots with few crossings, sized up so the tube can be thick, and as thick as
@@ -189,31 +193,30 @@ gui.addSelect("Pattern", params.pattern, PATTERNS).randomize = () => {
   params.pattern.set(white() ? pick(["plain", "plain", "gradient"]) : pick(["gradient", "gradient", "gradient", "barred", "barred", "mottled", "mixed"]));
 };
 gui.addSlider("Pattern amount", params.patternAmount, 0, 1, 0.01).randomize = () => {
-  // Busy patterns (mixed, mottled) gentler, so the coat doesn't turn chaotic; tips and bars stronger.
-  const busy = ["mixed", "mottled"].includes(params.pattern());
-  params.patternAmount.set(Math.round((white() ? 0.3 * Math.random() : busy ? 0.3 + 0.25 * Math.random() : 0.6 + 0.3 * Math.random()) * 100) / 100);
+  // Colours stay very subtle (the gradient carries them); white takes more, as it barely shows.
+  params.patternAmount.set(Math.round((white() ? 0.4 + 0.2 * Math.random() : 0.08 * Math.random()) * 100) / 100);
 }
 // How many feathers: Density per unit of the form's area, up to Max feathers; they are sized to cover the form, then
 // stretched by length and width (roots stay put).
 gui.addSlider("Density", params.density, 20, 600, 1, { randomizable: false });
 gui.addSlider("Max feathers", params.feathers, 2000, 40000, 500, { randomizable: false });
-gui.addSlider("Feather length", params.featherLength, 0.5, 2, 0.01).randomize = () => params.featherLength.set(Math.round((0.9 + 0.4 * Math.random()) * 100) / 100);
-gui.addSlider("Feather width", params.featherWidth, 0.5, 2, 0.01).randomize = () => params.featherWidth.set(Math.round((1.2 + 0.8 * Math.random()) * 100) / 100);
+gui.addSlider("Feather length", params.featherLength, 0.5, 2, 0.01).randomize = () => params.featherLength.set(Math.round((1.35 + 0.15 * Math.random()) * 100) / 100);
+gui.addSlider("Feather width", params.featherWidth, 0.5, 2, 0.01).randomize = () => params.featherWidth.set(Math.round((1.2 + 0.15 * Math.random()) * 100) / 100);
 // Short, wide, flat feathers under the coat, so its gaps show feathers rather than skin.
 gui.addCheckbox("Under-layer", params.underLayer, { randomizable: false });
 gui.addSlider("Under-layer shade", params.underShade, 0, 1, 0.01, { randomizable: false, visibleWhen: () => params.underLayer() });
-// Randomized within calmer ranges than the sliders allow.
-gui.addSlider("Ruffle", params.ruffle, 0, 1.5, 0.01).randomize = () => params.ruffle.set(Math.round((0.6 + 0.5 * Math.random()) * 100) / 100);
-gui.addSlider("Curl", params.curl, 0, 1.5, 0.01);
-gui.addSlider("Angle", params.angle, 0.3, 3, 0.01).randomize = () => params.angle.set(Math.round((1.1 + 0.4 * Math.random()) * 100) / 100);
-gui.addSlider("Lean", params.lean, -1, 1, 0.01).randomize = () => params.lean.set(Math.round((Math.random() - 0.5) * 80) / 100);
+// Randomized close to the default look: barely ruffled, curled and lifted, lying straight.
+gui.addSlider("Ruffle", params.ruffle, 0, 1.5, 0.01).randomize = () => params.ruffle.set(Math.round(0.15 * Math.random() * 100) / 100);
+gui.addSlider("Curl", params.curl, 0, 1.5, 0.01).randomize = () => params.curl.set(Math.round((1.3 + 0.2 * Math.random()) * 100) / 100);
+gui.addSlider("Angle", params.angle, 0.3, 3, 0.01).randomize = () => params.angle.set(Math.round((1.85 + 0.4 * Math.random()) * 100) / 100);
+gui.addSlider("Lean", params.lean, -1, 1, 0.01).randomize = () => params.lean.set(Math.round((Math.random() - 0.5) * 10) / 100);
 // How much a feather lets you see through it: barb gaps, thin margins and down (stochastic transparency).
 // How much each feather's base, covered by the ones in front, darkens.
 gui.addSlider("Internal shadow", params.internalShadow, 0, 1, 0.01, { randomizable: false });
 gui.addSlider("See-through", params.seeThrough, 0, 1, 0.01, { randomizable: false });
 // Along the form the palette's body colour shifts toward its dark one: round a torus or knot (whole cycles), head
 // to tail on a curl (and back, repeated).
-gui.addSlider("Gradient", params.gradientAmount, 0, 1, 0.01).randomize = () => params.gradientAmount.set(Math.round((white() ? 0 : 0.35 + 0.4 * Math.random()) * 100) / 100);
+gui.addSlider("Gradient", params.gradientAmount, 0, 1, 0.01).randomize = () => params.gradientAmount.set(Math.round((white() ? 0 : 0.35 + 0.15 * Math.random()) * 100) / 100);
 gui.addSlider("Repeat", params.gradientRepeat, 1, 8, 1).randomize = () => params.gradientRepeat.set(1 + Math.floor(Math.random() * 2));
 gui.addSection("Light");
 gui.addSegmented("Look", params.look, Object.keys(LOOKS), { randomizable: false });
@@ -223,6 +226,8 @@ gui.addSegmented("Shadows", params.shadows, ["opaque", "translucent", "stochasti
 // The light one layer of feathers passes on to what's under it (translucent and stochastic shadows).
 gui.addSlider("Shadow light", params.shadowLight, 0, 0.9, 0.01, { randomizable: false, visibleWhen: () => params.shadows() !== "opaque" });
 gui.addSlider("Spin", params.spin, 0, 0.5, 0.01, { randomizable: false });
+// How a new variation comes in: the form morphs into it, or shrinks away and the new one grows.
+gui.addSegmented("Transition", params.transition, ["morph", "shrink"], { randomizable: false });
 // Performance: frames per second, the time the GPU spends on a frame (when the browser can measure it; otherwise the
 // time between frames, which can't go below the screen's refresh), feathers drawn, and about how many this device
 // could draw at 60 fps (feather cost scaled to the frame budget; optimistic, as some of a frame doesn't scale).
@@ -249,8 +254,10 @@ function toggleSound() {
   soundButton.querySelector("img").src = `../assets/${sound.enabled ? "sound" : "sound-off"}.svg`;
 }
 addKey("KeyM", "toggle sound", toggleSound);
-onPause((running) => sound.setPaused(!running));
-const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTime, gui, ready: () => !morph && !change });
+// Pausing stops only the spin (and auto change): the plumage keeps breathing, rousing and answering the pointer.
+let paused = false;
+onPause((running) => (paused = !running));
+const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTime, gui, ready: () => !morph && !change && !building() });
 pipeline.addGUI(gui);
 gui.addSeparator();
 gui.addText(keysHelp());
@@ -298,9 +305,25 @@ let morph = null;
 // Roots a Poisson disc keeps, per square of its spacing (measured).
 const DENSITY = 1.81;
 
-// The form and its feathers. preview: the bare form only (while a slider is being dragged).
-// direct: into the shown set at once (no morph).
-function rebuild(preview = false, direct = false) {
+// The feathers are laid out in a worker; the latest request wins.
+const layoutWorker = new Worker(new URL("./layout.worker.js", import.meta.url), { type: "module" });
+const layoutJobs = new Map();
+let layoutId = 0;
+layoutWorker.onmessage = ({ data }) => {
+  for (const [id, done] of layoutJobs) if (id < data.id) layoutJobs.delete(id), done(null);
+  layoutJobs.get(data.id)?.(data);
+  layoutJobs.delete(data.id);
+};
+const layout = (job) => new Promise((done) => {
+  const id = ++layoutId;
+  layoutJobs.set(id, done);
+  layoutWorker.postMessage({ id, ...job });
+});
+const building = () => layoutJobs.size > 0;
+
+// The form and its feathers; resolves true once it's on (false if a later rebuild took over). preview: the bare form
+// only (while a slider is being dragged), at once. direct: into the shown set (no morph).
+async function rebuild(preview = false, direct = false) {
   const shape = params.shape();
   let mover = null;
   let line, r;
@@ -328,10 +351,7 @@ function rebuild(preview = false, direct = false) {
   }
   // Laid out on the tube straightened, then bent onto the line in the shaders: into the shown set, or (morphing) the
   // other one.
-  if (morph) finishMorph();
   const next = { line, r, mover, shape: new Vector4(line.length, r, line.closed ? 1 : 0, line.taper ?? 0) };
-  const into = preview || !form || direct ? cur : 1 - cur;
-  const feathers = sets[into];
   const flat = straightLine(line);
   const skin = tubeGeometry(flat, r);
   // Feather length from the budget: a Poisson disc keeps about one root per DENSITY * spacing^2 of skin, so with
@@ -350,29 +370,24 @@ function rebuild(preview = false, direct = false) {
   // Laid out at length 1; Feather length and width are applied live in the shader.
   const stretch = 1;
   if (preview) {
-    feathers.build([], skin, length * stretch);
+    if (morph) finishMorph();
+    sets[cur].build(EMPTY, skin, length * stretch);
     show(next);
-    return;
+    return true;
   }
-  const random = seededRandom(`feathers-${getSeed()}`);
-  // The coat, and under it (optionally) a layer of short, wide feathers lying flat; the coat is rooted over it.
-  const list = spreadFeathers(flat, r, { random, length, spacing: top, stretch });
-  if (under) {
-    for (const fe of spreadFeathers(flat, r, { random, length: 0.7 * length, spacing: 0.28 * spread, sweep: 0.3, stretch })) list.push(Object.assign(fe, { under: true }));
-  }
+  const packed = await layout({ flat, r, length, top, spread, under, seed: `feathers-${getSeed()}` });
+  if (!packed) return false;
+  if (morph) finishMorph();
+  const into = !form || direct ? cur : 1 - cur;
+  const feathers = sets[into];
   feathers.uniforms.gradientClosed.value = line.closed ? 1 : 0;
-  feathers.uniforms.underLift.value = params.underLayer() ? 0.03 * length * stretch : 0;
-  for (const fe of list) {
-    fe.r = r;
-    // Round a closed form; on a curl from the head (the palette's colour) to the tail (white).
-    fe.pal = ((fe.u % 1) + 1) % 1;
-    fe.seed = random();
-    fe.rand = random();
-  }
-  feathers.build(list, skin, length);
+  feathers.uniforms.underLift.value = under ? 0.03 * length * stretch : 0;
+  feathers.build(packed, skin, length);
   if (into === cur) show(next);
   else startMorph(next);
+  return true;
 }
+const EMPTY = { n: 0, roots: new Float32Array(0), norms: new Float32Array(0), dirs: new Float32Array(0), skins: new Float32Array(0), shapes: new Float32Array(0) };
 // Shows a form at once (no morph).
 function show(next) {
   form = next;
@@ -522,11 +537,24 @@ let backgroundFrom = null;
 // geometry is built, and its look is held) until it's gone.
 const LOOK_KEYS = ["palette", "pattern", "patternAmount", "ruffle", "curl", "angle", "lean", "gradientAmount", "gradientRepeat", "underShade", "seeThrough", "featherLength", "featherWidth", "internalShadow"];
 const lookNow = () => Object.fromEntries(LOOK_KEYS.map((k) => [k, params[k]()]));
-onRandomize(() => {
-  const held = form ? lookNow() : null;
-  gui.randomizeAll();
-  if (form) change ??= { stage: "shrink", t: 0, held };
-});
+let pendingHeld = null;
+// A new variation: set applies its values; the form then morphs into it or shrinks away (see Transition).
+function vary(set) {
+  const held = pendingHeld ?? (form ? lookNow() : null);
+  set();
+  if (!form) return;
+  if (params.transition() === "morph" && !change) {
+    // The new form is laid out while the old one stays on in its own look; then one morphs (and blends) into the other.
+    built = signature();
+    builtShape = shapeSignature();
+    pendingHeld = held;
+    rebuild().then((ok) => {
+      if (ok && morph) morph.held = held;
+      if (ok) pendingHeld = null;
+    });
+  } else change ??= { stage: "shrink", t: 0, held };
+}
+onRandomize(() => vary(() => gui.randomizeAll()));
 const ease = (x) => {
   const t = Math.min(Math.max(x, 0), 1);
   return t * t * (3 - 2 * t);
@@ -542,13 +570,17 @@ function runChange(dt) {
     group.scale.setScalar(Math.max(0.03, k));
     if (change.t < timing.shrink) return;
     group.visible = false;
-    rebuild(false, true);
     built = signature();
     builtShape = shapeSignature();
-    fitPending = true;
-    built = signature();
-    backgroundFrom = pipeline.background.clone();
-    change = { stage: "background", t: 0 };
+    change = { stage: "build", t: 0 };
+    rebuild(false, true).then((ok) => {
+      if (!ok || change?.stage !== "build") return;
+      fitPending = true;
+      backgroundFrom = pipeline.background.clone();
+      change = { stage: "background", t: 0 };
+    });
+  } else if (change.stage === "build") {
+    // Hidden until the new form is laid out.
   } else if (change.stage === "background") {
     const look = LOOKS[params.look()];
     _bg.set(look.background).multiplyScalar(look.backgroundGain);
@@ -568,7 +600,7 @@ function runChange(dt) {
 }
 const _bg = new Color();
 applyUrlState();
-rebuild();
+await load.layout.track(rebuild());
 builtShape = shapeSignature();
 let built = signature();
 
@@ -649,12 +681,12 @@ window.app = {
   get feathers() {
     return sets[cur];
   },
-  // For recordings: a given look ({ param: value }) through the usual shrink, rebuild and grow.
+  // For recordings: a given look ({ param: value }), brought in as randomizing would (see Transition).
   nextLook(look) {
     if (!look) return randomize();
-    const held = lookNow();
-    for (const [k, v] of Object.entries(look)) params[k]?.set(v);
-    change = { stage: "shrink", t: 0, held };
+    vary(() => {
+      for (const [k, v] of Object.entries(look)) params[k]?.set(v);
+    });
   },
   // The first look grows in from nothing.
   bounce() {
@@ -833,20 +865,33 @@ const meter = (() => {
   };
 })();
 
-let shownPalette = "";
+const shownPalette = ["", ""];
+const smooth = (t) => t * t * (3 - 2 * t);
+function blendLook(a, b, old, t) {
+  const out = {};
+  for (const k of LOOK_KEYS) out[k] = typeof a[k] === "number" && k !== "gradientRepeat" ? a[k] + (b[k] - a[k]) * t : old ? a[k] : b[k];
+  return out;
+}
+const _palA = new Color(), _palB = new Color();
+const blendPalette = (a, b, t) => PALETTES[a].map((c, i) => new Color().lerpColors(_palA.set(c), _palB.set(PALETTES[b][i]), t));
 let previewing = false;
 let pointerHeld = false;
-let stillKey = null;
+let stillKey = null, movingKey = null;
 addEventListener("pointerdown", () => (pointerHeld = true), true);
 for (const e of ["pointerup", "pointercancel"]) addEventListener(e, () => (pointerHeld = false), true);
 // Recordings can slow the whole piece down (timeScale < 1): the clock everything runs on.
-let sceneTime = 0, realDt = 0;
+let sceneTime = 0, realDt = 0, lastNow = 0;
 render(({ time, dt }) => {
-  realDt = dt;
-  dt *= window.app?.timeScale ?? 1;
+  // While paused the base's dt is 0: the frame's own interval keeps everything but the spin going.
+  const now = performance.now();
+  const measured = lastNow ? Math.min(0.1, (now - lastNow) / 1000) : 0;
+  lastNow = now;
+  const spinDt = dt * (window.app?.timeScale ?? 1);
+  autoChange.update(spinDt);
+  realDt = paused ? measured : dt;
+  dt = realDt * (window.app?.timeScale ?? 1);
   sceneTime += dt;
   time = sceneTime;
-  autoChange.update(dt);
   // While a pointer is held (dragging a slider) the form is rebuilt bare; feathered on release.
   if (fitPending) {
     frame(fitPending !== "resize");
@@ -856,23 +901,25 @@ render(({ time, dt }) => {
   // Changes from the panel apply at once (a new shape is reframed); only randomizing plays the shrink and grow.
   else if (signature() !== built) {
     previewing = pointerHeld;
-    rebuild(previewing);
+    const reshaped = shapeSignature() !== builtShape;
+    rebuild(previewing, true).then((ok) => ok && reshaped && frame(false));
     built = signature();
-    if (shapeSignature() !== builtShape) {
-      builtShape = shapeSignature();
-      frame(false);
-    }
+    builtShape = shapeSignature();
   } else if (previewing && !pointerHeld) {
     previewing = false;
-    rebuild();
+    rebuild(false, true);
   }
   updateLook();
   backdrop.material.uniforms.falloff.value = params.backdrop();
   const shadowMode = params.shadows();
   // While the old form shrinks away it keeps its own look.
-  const look = change?.stage === "shrink" && change.held ? change.held : lookNow();
-  for (const set of sets) {
+  const shown = change?.stage === "shrink" && change.held ? change.held : pendingHeld ?? lookNow();
+  for (const [i, set] of sets.entries()) {
     const u = set.uniforms;
+    // While morphing, both forms blend from the old look to the new; a pattern's kind and repeat stay each form's own.
+    const look = morph?.held ? blendLook(morph.held, shown, i === cur, smooth(morph.t)) : shown;
+    if (morph?.held) set.setPalette(blendPalette(morph.held.palette, shown.palette, smooth(morph.t))), (shownPalette[i] = "");
+    else if (shownPalette[i] !== look.palette) set.setPalette(PALETTES[(shownPalette[i] = look.palette)]);
     u.ruffle.value = look.ruffle;
     u.featherCurl.value = look.curl;
     u.featherAngle.value = look.angle;
@@ -889,10 +936,6 @@ render(({ time, dt }) => {
     u.featherWidthScale.value = look.featherWidth;
     u.stochasticShadow.value = shadowMode === "stochastic" ? 1 : 0;
   }
-  if (shownPalette !== look.palette) {
-    shownPalette = look.palette;
-    for (const set of sets) set.setPalette(PALETTES[shownPalette]);
-  }
   // Feather shadows: opaque cutouts; translucent by the depth gap to the blockers; or a screen door averaged over
   // a wide disc.
   globalUniforms.shadowLayerT.value = params.shadowLight();
@@ -901,9 +944,7 @@ render(({ time, dt }) => {
   // One layer of the coat is about a feather's lift.
   globalUniforms.shadowLayerSpacing.value = 0.02 * (sets[cur].uniforms.featherScale.value / 0.36);
   // Spin about the vertical, plus the drag's momentum once let go.
-  group.quaternion.premultiply(_qa.setFromAxisAngle(_up.set(0, 1, 0), dt * params.spin()));
-  // Paused, it stops where it's let go.
-  if (!turn.active && dt === 0) turn.vx = turn.vy = 0;
+  group.quaternion.premultiply(_qa.setFromAxisAngle(_up.set(0, 1, 0), spinDt * params.spin()));
   if (!turn.active && Math.abs(turn.vx) + Math.abs(turn.vy) > 1e-5) {
     const f = Math.exp(-dt * 3);
     turn.vx *= f;
@@ -923,17 +964,19 @@ render(({ time, dt }) => {
     }
   }
   if (morph || (swimming.length && params.speed() > 0)) updateSpine(true);
+  // The camera follows the form's size through a morph.
+  if (morph) frame(false);
   if (morph?.t >= 1) finishMorph();
   controls.update();
   const still = [signature(), params.ruffle(), params.curl(), params.palette(), params.shadows(), params.shadowLight(), params.angle(), params.lean(), params.seeThrough(), params.look(), params.backdrop(), params.pattern(), params.patternAmount(), params.underShade(), params.gradientAmount(), params.gradientRepeat(), params.featherLength(), params.featherWidth(), params.internalShadow()].join();
-  // Everything else that moves the image (the form turned, transitions, rousing, breathing, the pointer stirring), so a
-  // paused still restarts instead of smearing.
+  // Everything else that moves the image (the form turned, transitions, rousing, breathing, the pointer stirring): while
+  // paused, those frames render live instead of into the still average, which would smear.
   const u0 = sets[cur].uniforms;
   const moving = [group.quaternion.toArray().map((v) => v.toFixed(5)).join(), group.scale.x.toFixed(4), group.visible, change?.stage ?? "", change?.t.toFixed(3) ?? "", morph?.t.toFixed(3) ?? "", u0.breath.value.x.toFixed(5), u0.rouse.value.toFixed(4), u0.gust.value.toFixed(4), u0.rouseFront.value.toFixed(4), u0.pointerStir.value.toFixed(4), u0.pointerStir.value > 0 ? u0.pointerOrigin.value.toArray().map((v) => v.toFixed(3)).join() : "", u0.swipe.value.toArray().map((v) => v.toFixed(4)).join()].join("|");
-  if (still + moving !== stillKey) {
-    stillKey = still + moving;
-    pipeline.restartAccumulation(false);
-  }
+  if (still !== stillKey) pipeline.restartAccumulation(false);
+  if (moving !== movingKey) pipeline.markMoving();
+  stillKey = still;
+  movingKey = moving;
   meter.begin();
   pipeline.render(scene, camera, time);
   meter.end(dt > 0);
