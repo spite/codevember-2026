@@ -227,12 +227,20 @@ gui.addSlider("Spin", params.spin, 0, 0.5, 0.01, { randomizable: false });
 // time between frames, which can't go below the screen's refresh), feathers drawn, and about how many this device
 // could draw at 60 fps (feather cost scaled to the frame budget; optimistic, as some of a frame doesn't scale).
 gui.addSection("Performance", { open: false });
-const stats = { fps: signal(0), ms: signal("–"), feathers: signal(0), budget: signal("–") };
+const stats = { fps: signal(0), ms: signal("–"), feathers: signal(0), budget: signal("–"), next: signal("–") };
 gui.addMonitor("FPS", stats.fps);
 gui.addMonitor("Frame", stats.ms);
 gui.addMonitor("Feathers drawn", stats.feathers);
 gui.addMonitor("At 60 fps", stats.budget);
+gui.addMonitor("Next build", stats.next);
 gui.endSection();
+// The running average of the 60 fps estimate caps the next build; until there is one, the tier's cap (none under capture).
+const perf = { sum: 0, n: 0 };
+function featherBudget() {
+  if (pipeline.quality === "capture") return Infinity;
+  if (perf.n) return Math.max(2000, perf.sum / perf.n);
+  return pipeline.quality === "high" ? Infinity : 6000;
+}
 // Sound: breathing and the rustle of the plumage, synthesized.
 const sound = createSound();
 const soundButton = addActionButton("../assets/sound.svg", "Sound", () => toggleSound());
@@ -333,7 +341,7 @@ function rebuild(preview = false, direct = false) {
   const per = 1 / 0.22 ** 2 * (under ? 1 : (0.22 / 0.17) ** 2) + (under ? 1 / (0.28 * 0.7) ** 2 : 0);
   const area = tubeArea(line, r);
   // Phones and low-end devices draw fewer feathers (larger, so the form stays covered).
-  const count = Math.min(params.density() * area, params.feathers(), pipeline.quality === "high" || pipeline.quality === "capture" ? Infinity : 6000);
+  const count = Math.min(params.density() * area, params.feathers(), featherBudget());
   const ideal = Math.sqrt((per * area) / (DENSITY * count));
   const length = Math.min(ideal, 2 * r);
   const spread = ideal / length;
@@ -779,6 +787,7 @@ const meter = (() => {
   const ext = gl.getExtension("EXT_disjoint_timer_query_webgl2");
   const pending = [];
   let gpuSum = 0, gpuN = 0, frames = 0, since = performance.now(), last = since, intervalSum = 0;
+  const started = since;
   return {
     begin() {
       if (!ext || pending.length > 4) return;
@@ -811,7 +820,13 @@ const meter = (() => {
       stats.fps.set(Math.round((frames * 1000) / (now - since)));
       stats.ms.set(`${ms.toFixed(1)} ms${gpuN ? " GPU" : ""}`);
       stats.feathers.set(drawn);
-      stats.budget.set(gpuN && drawn ? `~${Math.round((drawn * 16.7) / ms / 1000)}k feathers` : "–");
+      // Without GPU timing, frame intervals only say something once they're longer than the screen's refresh.
+      // Stalled windows (a hidden tab, a compile) say nothing about the steady cost.
+      const estimate = drawn && frames >= 10 && (gpuN || (!ext && ms > 18)) ? (drawn * 16.7) / ms : 0;
+      if (estimate && !change && now - started > 3000) (perf.sum += estimate), perf.n++;
+      stats.budget.set(perf.n ? `~${(perf.sum / perf.n / 1000).toFixed(1)}k avg` : "–");
+      const cap = featherBudget();
+      stats.next.set(Number.isFinite(cap) ? `≤ ${Math.round(cap)} feathers` : "no cap");
       gpuSum = gpuN = frames = intervalSum = 0;
       since = now;
     },
@@ -838,12 +853,15 @@ render(({ time, dt }) => {
     fitPending = false;
   }
   if (change) runChange(dt);
-  // A different shape (type, windings, size, or seed) goes through the same shrink, rebuild and grow as randomizing.
-  else if (form && shapeSignature() !== builtShape) change = { stage: "shrink", t: 0, held: lookNow() };
+  // Changes from the panel apply at once (a new shape is reframed); only randomizing plays the shrink and grow.
   else if (signature() !== built) {
     previewing = pointerHeld;
     rebuild(previewing);
     built = signature();
+    if (shapeSignature() !== builtShape) {
+      builtShape = shapeSignature();
+      frame(false);
+    }
   } else if (previewing && !pointerHeld) {
     previewing = false;
     rebuild();
