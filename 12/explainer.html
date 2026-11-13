@@ -1,0 +1,1018 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Feather Fluffs</title>
+<meta name="description" content="How Codevember 2026 day 12, Feather, covers tori and torus knots in feathers: a layout on the straightened tube, a procedural vane, feathers that stack without crossing, stochastic transparency, a rouse that runs round the form, morphing between forms, and a synthesized rustle.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* One reading column on the studio's pale grey; figures are small benches of feathers. */
+:root {
+  --bg: #e9e7e3;
+  --panel: #f2f0ec;
+  --ink: #1a1918;
+  --muted: #5d5954;
+  --line: #cdc8c1;
+  --accent: #b5543c;
+  --accent2: #3f6c8f;
+  --stage: #e0ddd8;
+  --stage-ink: #8a847d;
+  --skin: #d7cfc4;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121211; --panel: #1b1a19; --ink: #ece9e4; --muted: #a39e97; --line: #34312e;
+    --accent: #e48a70; --accent2: #7fb0d6; --stage: #0c0c0b; --stage-ink: #8a847d; --skin: #4a443e;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121211; --panel: #1b1a19; --ink: #ece9e4; --muted: #a39e97; --line: #34312e;
+  --accent: #e48a70; --accent2: #7fb0d6; --stage: #0c0c0b; --stage-ink: #8a847d; --skin: #4a443e;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .holo { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .holo {
+    background: linear-gradient(100deg, var(--accent) 10%, var(--accent2) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; background: var(--stage); }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+
+/* Figures */
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; border-radius: 3px; background: var(--stage); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+input[type="checkbox"] { accent-color: var(--accent); }
+select {
+  font: 400 13px/1.2 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 3px; padding: 6px 8px;
+}
+button {
+  font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px;
+  padding: 9px 14px; cursor: pointer;
+}
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 12.5px/1.2 var(--mono); color: var(--muted); }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid currentColor; vertical-align: middle; margin-right: 6px; }
+.legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: currentColor; vertical-align: middle; margin-right: 6px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: nowrap; }
+.formula .c { color: var(--muted); }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 12</b> · Feather</div>
+      <h1>How Feather <span class="holo">fluffs</span></h1>
+      <p class="lede">A torus knot floats in a pale studio, covered in thousands of feathers that breathe, rouse and part under the pointer. Here is how the feathers are laid out, how each one is drawn and stacked, how light gets through them, and how one plumage turns into the next.</p>
+    </div>
+    <figure>
+      <img src="../screenshots/12.jpg" width="1080" height="1080" alt="A white torus knot covered in soft, layered feathers, floating over a pale grey studio backdrop." fetchpriority="high" decoding="async">
+      <figcaption>A torus knot in white plumage.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>A plumage with no bird</h2>
+      <p>Day 12's prompt was Feather. Rather than a bird, the piece puts a plumage on abstract forms: a torus, a (p, q) torus knot, or one of the classic knots (trefoil, figure-eight, saddle, crown, star). Every one is a tube around a closed centre line. Thousands of feathers are rooted on it, overlapping like a real coat. The coat is alive: it breathes, now and then it rouses, a wave running round the whole form the way a bird shakes itself out, and it parts where the pointer passes.</p>
+      <p>Each feather is a single card, but its vane, barbs, rachis and down are drawn per pixel, and light passes through it as it does through real white keratin. The forms render with the <a href="../modules/pipeline/explainer.html">shared pipeline</a>, which grew an opt-in temporal pass for this day. The sound is synthesized: there isn't a single sample in it.</p>
+    </div>
+  </section>
+
+  <!-- 1b. Forms -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The forms · <b>tube.js, centreLine, knotLine, clearance</b></div>
+      <h2>Closed lines, as thick as they allow</h2>
+      <p>Every form starts as a closed centre line. A (p, q) torus knot winds p times round the axis and q times through the hole, on a torus of radius R; q = 0 is a plain ring. The classic knots are written as curves over t (the trefoil, the figure-eight, a ring with a saddle's double wave or a crown's triple one, and a star that loops out five times) and scaled so their furthest point is R from the centre. Each line is resampled to points evenly spaced by arc length, so feathers spread evenly, and gets tangents and normals carried along it without twisting. On a closed line the transported normal doesn't come back to where it started, so the leftover angle is spread round the loop until it closes.</p>
+      <p>The tube can only be so thick before it runs into itself where the knot passes close. <code>clearance</code> finds the closest the line comes to another stretch of itself, across its own normal planes (so neighbours along the line don't count), and the tube's radius never goes past 0.38 of it, leaving room for the coat. Randomizing aims for full, chunky forms: knots with few crossings, sized up so the tube can be thick, a knot's tube about a seventh of its size and a ring's about a quarter of its radius. It never picks the shape already on show.</p>
+    </div>
+  </section>
+
+  <!-- 2. Layout -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Laying out the coat · <b>tube.js, spreadFeathers</b></div>
+      <h2>On the tube, straightened</h2>
+      <p>Feathers are never placed on the knot itself. The tube is straightened: x runs along the centre line, y and z round it, a plain cylinder of the same length and radius. Roots are spread over that cylinder with a Poisson disc. Candidates are thrown on a fine grid, each cell getting as many as its area deserves, shuffled, and kept only if no kept root is closer than the spacing. On a closed form the distance wraps round the end, so the seam where the loop closes never shows.</p>
+      <p>Neighbours side by side would lie at the same height and their vanes would meet edge to edge. So each feather picks one of five levels that its neighbours across haven't taken, and its root moves forward along the tube by 4.5% of its length per level. Overlapping vanes are always staggered. Last, the skin's height under each feather is measured at a quarter, a half, three quarters and the whole of its length, for the vertex shader to clear.</p>
+      <p>The whole layout of 10–20 thousand feathers takes most of a second, so it runs in a worker. The form on show keeps animating until the new layout arrives as packed arrays.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A Poisson disc on a closed strip</h3>
+        <div class="controls">
+          <label>Spacing <input id="lS" type="range" min="0.05" max="0.14" step="0.005" value="0.085"><output id="lSo">0.085</output></label>
+          <label><input id="lL" type="checkbox" checked> Levels</label>
+          <button id="lNew" type="button" class="ghost">New layout</button>
+        </div>
+      </div>
+      <canvas id="layCanvas" aria-label="A long strip, the tube unrolled: the horizontal axis runs along the form and wraps from right edge to left, the vertical axis round the tube. Dots mark feather roots spaced evenly at random, each with a short stroke pointing along the form. With levels on, each root is coloured by its level, and neighbours side by side always differ."></canvas>
+      <div class="readout" id="lOut"></div>
+      <p class="fig-cap">The strip is the tube cut open along its length and unrolled; it wraps both ways, as a torus does. Strokes are the feathers' directions along the form, each with a little sweep of its own.</p>
+    </div>
+  </section>
+
+  <!-- 3. One feather -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">One feather · <b>feathers.js, featherSurface</b></div>
+      <h2>A card, cut per pixel</h2>
+      <p>A feather is a quad a little wider than its vane. The fragment shader works in the feather's own frame, y from base to tip and x from the rachis to the edge, and decides what covers each pixel. The outline is a rounded sine, slightly different per feather. Barbs leave the rachis leaning toward the tip and curve further near the edge. They clump in groups of about seven, whose ends make the edge ragged, and at some group boundaries the vane splits in a V. The rachis tapers to the tip and is bare at the base. Under the vane, the base is down: wider than the vane, with loose wavy fibres.</p>
+      <p>Each detail turns itself off as it gets smaller than a few pixels. Barb relief and splits fade out as the barbs go sub-pixel, because below that they alias into sparkle and holes. The edge of the vane is one pixel of soft coverage; the temporal pass's sub-pixel jitter (below) turns it into a smooth outline.</p>
+      <p>The colour is the feather's own pattern over the palette's four colours (a pale downy base, the body, dark markings and an accent): plain, a gradient to the tip, bars, a streak along the rachis, or mottling. Markings follow the barbs, so bars bend into chevrons toward the tip.</p>
+      <p>On top of a feather's own pattern runs a gradient along the form: from the palette's colour toward white, a whole number of cycles round a closed form (Repeat), so a loop never shows a seam. Gradient sets how much it replaces the plain body colour. Randomizing keeps colour subtle: on a coloured palette the gradient carries it and the pattern barely shows, while white stays plain or nearly so. The skin under the coat takes the feathers' own base colour, so gaps fade into the plumage.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The vane, drawn the way the shader draws it</h3>
+        <div class="controls">
+          <label>Pattern <select id="vP"><option>plain</option><option>gradient</option><option selected>barred</option><option>streaked</option><option>mottled</option></select></label>
+          <label>Palette <select id="vC"></select></label>
+          <button id="vNew" type="button" class="ghost">New feather</button>
+        </div>
+      </div>
+      <canvas id="vaneCanvas" aria-label="Three feathers side by side, drawn per pixel: a pale downy base with loose fibres, a tapering rachis, barbs leaning toward the tip in ragged groups, a V-shaped split in the vane, and a pattern of bars, streaks or speckles following the barbs."></canvas>
+      <p class="fig-cap">The shader's outline, barb, clump, split, down and rachis rules, run per pixel on a 2D canvas, without lighting. The real feather is also curved, cupped and twisted in the vertex shader.</p>
+    </div>
+  </section>
+
+  <!-- 4. Stacking -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Lying down · <b>feathers.js, displace</b></div>
+      <h2>One curve, so they never cross</h2>
+      <p>Thousands of overlapping cards would cut through each other if each were pitched on its own. Instead every feather follows the same rule for how high it must be d along its length: h(d) = m · (0.006 + 0.09 d + 0.025 (1 − e<sup>−d / 0.07</sup>)), a quick lift off the root, then a gentle rise. Because the curve only increases and is the same for everyone, where two feathers overlap the one rooted first is always on top. The order of the stack is the order of the roots.</p>
+      <p>In the shader a feather is a rigid, curved card, so it can't follow the curve exactly: it is pitched just enough to clear the curve plus the skin falling away under it (the heights measured in the layout) at four points along it, then bent along an arc so its tip comes back down onto the coat, like a real rachis that rises steeply and then lies down. The factor m is Angle times a ruffle pattern: a fixed noise a couple of feathers across that depends only on the point of the skin, so every feather stacked there is lifted alike and the order holds. Curl bends each feather by its own amount, cups it across, and twists it a little.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A row of feathers from the side</h3>
+        <div class="controls">
+          <label>Angle <input id="sA" type="range" min="0.3" max="3" step="0.01" value="1.9"><output id="sAo">1.90</output></label>
+          <label><input id="sC" type="checkbox" checked> Shared curve</label>
+        </div>
+      </div>
+      <canvas id="stackCanvas" aria-label="A side view of a curved skin with a row of feathers rooted along it, each rising off the skin along the same curve, stacked so each lies over the one rooted after it. With the shared curve turned off, each feather gets its own pitch and some cut through their neighbours, marked in red."></canvas>
+      <div class="readout" id="sOut"></div>
+      <p class="fig-cap">Each feather here follows the shared curve exactly, from its root over the skin. Turn the curve off and each takes its own pitch: crossings are marked where a feather dips under the one rooted after it. With the curve, Angle can go anywhere and none cross.</p>
+    </div>
+  </section>
+
+  <!-- 5. Bending -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Onto the knot · <b>feathers.js, toSpine</b></div>
+      <h2>Bent in the vertex shader</h2>
+      <p>The feathers, laid out and stacked on the straight tube, are bent onto the real centre line in the vertex shader. The line is written each frame into a float texture of 2049 samples: position, tangent and normal. A point at x along the straight tube reads the line at u = x / length, and its y and z become offsets along the normal and binormal there. The normal is carried along the line by parallel transport, so the coat doesn't twist round the tube.</p>
+      <p>Because only the line lives on the GPU, a form can change without touching the feathers' buffers: breathing scales the tube's girth, and a morph moves the line itself.</p>
+    </div>
+  </section>
+
+  <!-- 6. Shading -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Shading a feather · <b>feathers.js, surface()</b></div>
+      <h2>Mostly air</h2>
+      <p>A white feather isn't white paint. It is keratin (refractive index about 1.56) full of air: it scatters nearly everything and absorbs very little. So the shader splits light into what the vane reflects and what it passes on, and keeps the two summing to about 0.95. A dense vane reflects about 62% and passes about 30%. Thin tips, margins and loose fibres pass more and reflect less, and the foam-filled rachis reflects most and passes only 15%. How thin a pixel is comes from the vane itself: its distance to the edge, how close it is to the tip, and whether the barbs there have come apart into fibres.</p>
+      <p>Transmitted light is tinted warmer the thicker the sheet it went through, and the feather's pigment absorbs it too, so a backlit coloured feather looks deeper than a lit one. What a feather passes on depends on what is behind it: on the top side that's the body and the feathers below, open only where a lifted tip clears them. Seen from underneath it's the coat, which returns most of what it gets. Where vanes stack, the light the lower ones send back up through a feather brightens it: a stack reflects about 0.75 where one vane reflects 0.62.</p>
+      <p>Then the details that make it read as feathers rather than paper. The cortex is smooth, so the highlight is an anisotropic lobe, tight along the barbs and wide across them: a satin streak. Barbs and rachis are cylinders, so their normals turn away from their axes and the barbs catch light in fine lines. The down gets a soft sheen instead. All of it fades as it shrinks below a pixel, and roughness grows with how much the normal varies across the pixel, so nothing sparkles.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Reflected and transmitted, front to back</h3>
+        <div class="controls">
+          <label>Light <input id="tL" type="range" min="0" max="1" step="0.01" value="0.25"><output id="tLo">front</output></label>
+          <label>Palette <select id="tC"></select></label>
+        </div>
+      </div>
+      <canvas id="transCanvas" aria-label="A feather drawn per pixel, lit by a light that moves from in front of it to behind it. Lit from the front it shows its colour and barb texture; as the light goes behind it, the dense middle darkens while the thin edges, tip and down glow warm, and the rachis stays dark. A small diagram shows where the light is."></canvas>
+      <p class="fig-cap">The shader's split, in 2D: albedo × R toward the front, tint<sup>thickness</sup> × pigment × T toward the back, with R and T from the same thin/thick map (0.62 and 0.30 for a dense vane, more passed at the edges, 0.15 through the rachis). No specular or environment here.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Fibres at the silhouette</b><span>Edge-on, a vane isn't a sheet but a row of round barbs, lit from whichever side the eye is on (a Kajiya-Kay-like term blended in at grazing angles). A flat sheet edge-on to the key goes grey; this keeps outlines bright.</span></div>
+      <div class="fact"><b>Glowing outlines</b><span>At the silhouette a tip has only open studio behind it, so it passes the background's light through. Outlines glow faintly instead of turning into a dark rim.</span></div>
+      <div class="fact"><b>Buried bases</b><span>The base of each vane lies under the feathers in front, so it gets less of everything: albedo, transmission and occlusion drop toward the root. Internal shadow scales it, and it fades at grazing angles, where the base isn't hidden.</span></div>
+      <div class="fact"><b>The under-layer</b><span>Optionally, short wide feathers lie flat under the coat, opaque and a little darker, so what shows through gaps is more feathers rather than skin.</span></div>
+    </div>
+  </section>
+
+  <!-- 7. Stochastic -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Stochastic rendering · <b>feathers.js, Pipeline temporal, taa.js</b></div>
+      <h2>Noisy every frame, right on average</h2>
+      <p>A coat is a dozen layers of half-transparent feathers in no fixed order. Sorting thousands of overlapping cards every frame is slow and still wrong where they intersect, so nothing is blended. Instead each feather is either there or not, per pixel, at random. A pixel of vane is dropped with the chance that it lets light through (its openness, from See-through: more at the thin edges and down, none on the rachis, never more than 60%), drawn from interleaved gradient noise shifted every frame and offset per feather. Whatever is behind shows through the hole, fully shaded. Over frames, stacked feathers multiply exactly as blended layers would, and order never matters.</p>
+      <p>Shadows use the same idea, with a twist. In the shadow pass a feather blocks the key at a fraction of points equal to the light it doesn't pass on (Shadow light sets how much a layer passes). Those points are pinned to the feather rather than redrawn each frame, so shadows don't crawl, and every shadow lookup averages over a disc at least 7 texels wide. Through one layer the shadow is partial; through three it is the product of three.</p>
+      <p>The noise is resolved by a temporal pass added to the pipeline for this day. Every frame the camera is jittered by a sub-pixel offset from a Halton (2, 3) sequence over 16 frames, and the frame is blended into a history: the history is reprojected with the prepass's velocity (taken from the nearest surface in the pixel's neighbourhood, so edges move with what's in front), resampled with a Catmull-Rom filter so it doesn't blur, and clipped in YCoCg to the current 3×3 neighbourhood's mean ± 1.25σ so stale colours can't ghost. Each frame contributes 10%, more where things move fast. The jitter also anti-aliases, so MSAA is off and the main pass draws straight over the prepass's depth, which saves most of its overdraw. When nothing moves, up to 32 frames are averaged into a clean still.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Three translucent feathers, one frame at a time</h3>
+        <div class="controls">
+          <label>Openness <input id="xO" type="range" min="0" max="0.6" step="0.01" value="0.45"><output id="xOo">0.45</output></label>
+          <label>Resolve <select id="xM"><option value="taa">temporal (10% a frame)</option><option value="mean">still average</option></select></label>
+          <button id="xPlay" type="button" class="ghost">Pause</button>
+          <button id="xReset" type="button" class="ghost">Restart</button>
+        </div>
+      </div>
+      <canvas id="stochCanvas" aria-label="Three panels. Left: a single frame of three overlapping feather shapes, each pixel either fully one feather or showing through to the next, a speckled mess. Middle: the same averaged over frames, smoothing into soft translucent layers. Right: the exact blend of the three layers for comparison. A readout gives the frame count and the error against the exact blend."></canvas>
+      <div class="readout" id="xOut"></div>
+      <p class="fig-cap">Each pixel walks the layers front to back and stops at the first one it keeps (chance 1 − openness), or shows the backdrop. No layer knows about the others, yet the average converges to front-to-back blending. The temporal average settles near the exact image and keeps a little noise (it forgets old frames); the still average keeps converging.</p>
+    </div>
+  </section>
+
+  <!-- 6c. Studio -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Studio and framing · <b>main.js, LOOKS, frame, rotateForm</b></div>
+      <h2>A white cyc, and the form turns instead of the camera</h2>
+      <p>The default look is a pale, high-key studio: a big softbox key from the camera's side and a bright surround, as bright as the backdrop it's seen against (a white cyc), so the shaded side of a white coat is still lit. Some of it is deliberately unphysical. The backdrop is lifted above 1 in linear light so that after AgX it reads as paper white, not grey. Ambient occlusion runs at half strength with a short reach and an edge-preserving blur, because a white coat fills its own crevices with light and they should darken each overlap, not go dirty. The key's highlight comes from the environment's softbox only, not twice. And the shadows use a light 0.07 wide (as the tangent of its angular radius), smaller than the softbox, because a light that big would wash out every shadow a feather casts. A dark look exists too: a near-black set raked from the side. Each studio is baked once, and the other one in the background, so switching never waits.</p>
+      <p>The camera never moves round the form. If it did, you could orbit to the unlit side and see a grey lump. Dragging turns the form itself, about the camera's up and right axes, with a little momentum when you let go, and it spins slowly about the vertical (Spin). The camera only zooms. Every new form is framed from its bounding radius (centre line, tube and feathers) so the whole of it fits with a margin on any screen shape, and through a morph the camera follows the radius as it changes.</p>
+      <p>The backdrop isn't part of the lit scene: it is a huge inward-facing sphere behind everything, the background colour lit a little above the form and falling off toward the edges like a studio sweep (Backdrop sets how much).</p>
+    </div>
+  </section>
+
+  <!-- 7. Life -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">A living coat · <b>main.js, updateLife</b></div>
+      <h2>Breathing, rousing, parting</h2>
+      <p>The tube's girth swells and settles slowly: breathing. Every few seconds the plumage rouses. A rouse starts at a random point on the form and runs one way round it, or spreads both ways. Feathers puff up as its front reaches them (by up to about 35°) and swing side to side, strongly, with neighbours nearly together, then settle behind it. Rouses come irregularly: usually several seconds apart, but a third of the time another follows within a second.</p>
+      <p>The pointer is a ray into the form. Feathers near it lift and quiver, more the faster it moves. Now and then a swipe runs along the form like a hand brushing it, stirring the whole cross-section as it passes. Gusts of wind come from a direction: the windward side is pressed flat, the lee side lifts and flutters, everything leans downwind, and the flutter runs across the form with the gust. Pausing stops only the spin; the coat keeps answering.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A rouse running round a ring</h3>
+        <div class="controls">
+          <label>Spread <select id="rM"><option value="one">one way</option><option value="both">both ways</option></select></label>
+          <button id="rGo" type="button">Rouse</button>
+        </div>
+      </div>
+      <canvas id="rouseCanvas" aria-label="A ring of feathers seen from above, each drawn as a short stroke along the ring. When a rouse starts, a front runs round the ring from a random point: strokes ahead of it lie flat, strokes at the front stand up and swing side to side, and behind it they settle back. A plot below shows the lift against position along the ring."></canvas>
+      <p class="fig-cap">The day's front and settle rule: a narrow Gaussian ahead of the front, an exponential settle behind it, times the rouse's envelope, with each feather swinging at its own phase.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Rouse</b><span>Strength 0.75–1. The front crosses the form in 0.18–0.3 s (twice as long both ways, 40% of the time). From 0.3 s the body shakes side to side at 6–8 Hz, fading, and the swing runs a whole number of cycles round a loop, so there's no seam. It settles over the last 0.5 s of 1.2–1.6 s. Next one: 35% of the time within 0.35–1.15 s, otherwise 2 to 20 s later.</span></div>
+      <div class="fact"><b>Swipe</b><span>A band a tenth of the form wide runs along 25–60% of it in 0.45–0.8 s, either way, stirring the tube all the way round as it passes. Every 5 to 19 s.</span></div>
+      <div class="fact"><b>Gust</b><span>From a direction of its own, mostly level: swells over 0.8–2 s and fades over 1.5–4 s, every 8 to 30 s. The wind is in the world, so as the form turns it is carried into the form's own frame. It is heard from the side it comes from.</span></div>
+      <div class="fact"><b>Pointer and breath</b><span>Pointer movement adds to a stir that decays over half a second; feathers near the ray lift and quiver, and it's only heard when the ray passes close to the form. Breathing scales the tube's girth, and the ruffle pattern itself swells by ±8% slowly in place.</span></div>
+      <div class="fact"><b>Motion vectors</b><span>The vertex shader runs a second time in the prepass for the previous frame's pose (last frame's breath, centre line and spin), so every one of these motions has true velocity, and the temporal pass follows feathers instead of smearing them.</span></div>
+    </div>
+  </section>
+
+  <!-- 8. Morph -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Changing form · <b>main.js, startMorph</b></div>
+      <h2>One knot into another</h2>
+      <p>Randomizing morphs the form into the next. There are two feather sets: the one on show, and one the new layout is built into. Both are bent onto the same centre line, which is blended between the old line and the new, along with the tube's radius. Meanwhile the old feathers shrink away one by one and the new ones grow in. The look blends with it: the palette's colours and every number (ruffle, angle, length, gradient...) ease across, while a pattern's kind stays with its own set.</p>
+      <p>Two closed loops can be lined up any way round. Blending point u of one with point u of the other would swirl the coat round the tube, so before a morph the new line is turned and maybe reversed to match: 128 offsets times two directions, scored by the summed squared distance between 64 matched points, and the cheapest wins. Randomizing never picks the shape on show, and the Transition setting can switch back to shrinking away, waiting for the form to be gone, and growing the new one.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Lining up two loops, then blending</h3>
+        <div class="controls">
+          <label>Morph <input id="mT" type="range" min="0" max="1" step="0.005" value="0.5"><output id="mTo">0.50</output></label>
+          <label>To <select id="mTo2"><option value="trefoil">trefoil</option><option value="k35">torus knot 3-5</option><option value="fig8">figure-eight</option></select></label>
+          <label><input id="mA" type="checkbox" checked> Line up</label>
+          <button id="mPlay" type="button" class="ghost">Play</button>
+        </div>
+      </div>
+      <canvas id="morphCanvas" aria-label="Two closed curves seen from the front, a circle and a knot, with matching points joined by thin lines. A third curve between them is the blend at the slider's position. With line-up off, the joins cross the whole figure; with it on, they are short."></canvas>
+      <div class="readout" id="mOut"></div>
+      <p class="fig-cap">Front projections of the day's centre lines. The thin lines join the points that blend into each other; line-up picks the offset and direction that make them shortest.</p>
+    </div>
+    <div class="col prose">
+      <h3>Never a mixed state</h3>
+      <p>Randomizing draws the new values at once, but nothing on show may take them early: the form on show keeps reading a held copy of its own look until it's gone or the morph has begun. With Transition set to shrink, the order is strict. The form shrinks away in its old look (holding its size, then going quickly, so little empty space follows). Only once it's gone is the new form built, out of sight. Then the background fades to its own colour, and the new form grows in already feathered, coming up quickly and settling into its size. If the layout isn't back from the worker yet, it simply waits hidden. A form that would scale to nothing is hidden instead, since a zero-size matrix breaks the lighting.</p>
+      <p>Changes from the panel are different: they apply at once, with no animation, and a new shape is reframed. While a slider is held down, the form is rebuilt bare at every step for a fast preview, and the feathers come back on release. Auto change, which randomizes every 10 s when left alone, waits while a morph runs or a layout is still in the worker.</p>
+    </div>
+  </section>
+
+  <!-- 9. Count -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">How many feathers · <b>main.js, rebuild, featherBudget, meter</b></div>
+      <h2>Sized to cover, capped by the device</h2>
+      <p>The coat always covers the form, whatever the count. A form gets Density feathers per unit of its skin's area, but never more than Max feathers. The count then sets the feathers' size. A Poisson disc with spacing s keeps about one root per 1.81 s² (measured), and the spacing is a fixed fraction of the feather length l (0.22 for the coat, 0.28 · 0.7 for the under-layer), so N feathers of length l cover area / (1.81 · s² · l²). Solved for l, a smaller budget gives longer feathers rather than bald patches. Past twice the tube's radius a feather would stick out like a spine, so the length stops there and the roots spread out instead. Feather length and width on the panel are multipliers applied live in the shader on top of that, so changing them never rebuilds the coat.</p>
+      <p>The last cap is the device's own. The Performance section times the GPU every half second, with <code>EXT_disjoint_timer_query_webgl2</code> where the browser has it, and works out how many feathers would fit in a 60 fps frame: the feathers drawn × 16.7 ms / the frame's GPU time. It assumes the whole frame scales with the feathers, which is optimistic, since some of a frame (shadows of the backdrop, bloom, the final pass) doesn't. A running mean of those estimates caps the next form, never below 2000.</p>
+      <p>Not every half second counts. It skips the first 3 s (shader compiles), any window with fewer than 10 frames (a hidden tab, a stall), and anything during a transition. Without timer queries only the time between frames is known, and that can't go below the screen's refresh, so a fast device can't show its headroom: there, only windows slower than 60 fps count, and they can only lower the cap. Until there is any measurement, the high tier has no cap and lower tiers stop at 6000. Capture quality, for recordings, is never capped.</p>
+    </div>
+    <div class="formula">
+      count = min(Density · area, Max feathers, budget) &nbsp;&nbsp;&nbsp; l = min(√(per · area / (1.81 · count)), 2r)<br>
+      <span class="c">// per: roots per l² of skin for the coat (and under-layer); budget: running mean, floored at 2000</span><br>
+      estimate = drawn · 16.7 ms / GPU ms per frame &nbsp;&nbsp;&nbsp; <span class="c">// every 0.5 s, if ≥ 10 frames, not in a transition, after the first 3 s</span>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Count, size and the device's cap</h3>
+        <div class="controls">
+          <label>Density <input id="cD" type="range" min="20" max="600" step="1" value="350"><output id="cDo">350</output></label>
+          <label>Max feathers <input id="cM" type="range" min="2000" max="40000" step="500" value="9000"><output id="cMo">9000</output></label>
+          <label>GPU <select id="cG"><option value="fast">fast desktop</option><option value="laptop" selected>laptop</option><option value="phone">phone</option></select></label>
+          <button id="cRun" type="button" class="ghost">Measure again</button>
+        </div>
+      </div>
+      <canvas id="countCanvas" aria-label="Left: a plot of feather count against the form's skin area: a line rising with Density until it flattens at Max feathers or at the measured budget, whichever is lower, with dots for a torus, a trefoil and a torus knot 3-5. A second line shows the feather length falling as the count rises. Right: a strip of half-second estimates from a simulated GPU, with stalled and transition windows greyed out and the running mean drawn across."></canvas>
+      <div class="readout" id="cOut"></div>
+      <p class="fig-cap">The day's sizing with the coat and under-layer on, a tube radius of 0.45, and simulated GPU timings (each device draws a feather at its own cost, with a fixed cost for the rest of the frame, noise, a few stalls and a transition). The grey estimates are the ones the meter throws away.</p>
+    </div>
+  </section>
+
+  <!-- 10. Sound -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Sound · <b>sound.js, rustle</b></div>
+      <h2>Brrrrt</h2>
+      <p>Recorded feather sounds mostly turned out to be wind, pillows or paper. The rustle is built sample by sample instead, from what makes it: barbs and vanes brushing past each other. A burst is hundreds of tiny contacts, each half a millisecond to a few milliseconds of decaying, slightly smoothed noise, with log-normal loudness so it crackles softly without sharp outliers. For a rouse the contacts bunch tightly on a flutter of 22–30 Hz with silence between: the dry "brrrrt" of a bird shaking out, fading as the shake dies down. The pointer gives shorter, looser bursts on no rhythm.</p>
+      <p>Under it, a faint breath, wind that swells with each gust through a drifting band, and now and then a distant bird: one to five short whistled chirps, each a quick glide in pitch. Each rouse plays its own shake, even one that starts before the last has settled, as two independent bursts, one per side, so it's wide. A swipe is a quick brush as long as it runs. Everything plays through a generated stereo room so it sounds big rather than close and dry. Variation comes from the unseeded random, so the sound never shifts the seeded layout. The audio context is created on load and starts on the first gesture if the browser holds it back.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A rouse and a stir, as waveforms</h3>
+        <div class="controls">
+          <button id="aNew" type="button" class="ghost">New burst</button>
+          <button id="aPlay" type="button" class="ghost">Play rouse</button>
+        </div>
+      </div>
+      <canvas id="audioCanvas" aria-label="Two waveforms. Above, a rouse: tight bursts of crackle on a fast rhythm with silence between, fading out. Below, a pointer stir: a short, loose cloud of contacts with no rhythm."></canvas>
+      <p class="fig-cap">The day's contact model with its rouse and stir settings, before the filters and the room.</p>
+    </div>
+  </section>
+
+  <!-- 10b. Pause and recording -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Pause and recording · <b>main.js, Pipeline markMoving</b></div>
+      <h2>Stills that don't smear</h2>
+      <p>Space stops the spin and the auto change, nothing else: the coat keeps breathing, rousing and answering the pointer. When nothing at all moves, the pipeline averages up to 32 frames into a still (every frame a fresh draw of the stochastic transparency and jitter), which is what makes paused screenshots so clean. But that average only knows the camera and time, not a feather stirred by a uniform. So the day keeps a key of everything that moves the image (the form's rotation, a transition, the rouse, breath, gust, swipe, the pointer's stir and where it points), and on any change it calls <code>markMoving()</code>, a small opt-in added to the pipeline: that frame renders live through the temporal pass rather than into the still. Changes to the look from the panel restart the still instead.</p>
+      <p>The video is recorded with CCapture on a virtual clock, every frame averaged from several sub-frames for motion blur. A <code>timeScale</code> slows the whole piece (feathers, spin and transitions) for the recording, while the sound keeps real time. The sound is rendered offline on the recording's clock into a WAV and muxed in afterwards, so it lines up to the frame without anything being played.</p>
+    </div>
+  </section>
+
+  <!-- 11. Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>Drag to turn the form, scroll or pinch to zoom; move close to stir the feathers (touch on phones).</li>
+      <li><b>Shape</b>: torus, torus knot (windings and loops) or a classic knot, its size and thickness.</li>
+      <li><b>Feathers</b>: palette, pattern and its amount, Density and Max feathers, length, width, under-layer, ruffle, curl, angle, lean, internal shadow, see-through, gradient and its repeats.</li>
+      <li><b>Light</b>: the studio, backdrop falloff, shadow mode, spin and the transition (morph, or shrink and grow).</li>
+      <li><b>R</b> makes a new form, <b>M</b> or the speaker button toggles sound; it changes by itself every 10 s.</li>
+      <li><b>Space</b> stops the spin, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot.</li>
+    </ul>
+  </section>
+  <footer class="col">
+    <div class="meta">
+      <span><b>three.js</b> r187</span><span>WebGL2</span><span>stochastic transparency</span><span>no samples</span><span>no build step</span>
+    </div>
+    Day 12 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/12/">spite.github.io/codevember-2026/12</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/12">12/ of the codevember-2026 repository</a>. The forms and studio are rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>. The sound is synthesized with Web Audio.
+  </footer>
+</main>
+
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const mix = (a, b, t) => a + (b - a) * t;
+  const fract = (x) => x - Math.floor(x);
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+  const hex = (h) => { const n = parseInt(h.replace("#", ""), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+  function mulberry(a) {
+    return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  const fhash = (x) => fract(Math.sin(x * 127.1 + 311.7) * 43758.5453);
+  const vnoise = (x) => { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return mix(fhash(i), fhash(i + 1), u); };
+
+  // A canvas sized to its CSS width at the device pixel ratio; draw() gets (ctx, width, height) in CSS pixels.
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1, W = 0, H = 0;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      W = canvas.clientWidth || 600; H = Math.round(typeof aspect === "function" ? aspect(W) : W * aspect);
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, W, H);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    new MutationObserver(() => fit(true)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return { redraw: () => fit(true), size: () => [W, H] };
+  }
+  // Runs step(dt) while the canvas is on screen.
+  function animate(canvas, step) {
+    let on = false, last = 0;
+    new IntersectionObserver(([e]) => { on = e.isIntersecting; if (on) { last = performance.now(); requestAnimationFrame(loop); } }).observe(canvas);
+    function loop(now) {
+      if (!on) return;
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      step(dt);
+      requestAnimationFrame(loop);
+    }
+  }
+  const bind = (id, out, fmt, fn) => { const el = $(id); const o = $(out); const upd = () => { if (o) o.textContent = fmt(+el.value); fn(); }; el.addEventListener("input", upd); upd(); return el; };
+
+  const PALETTES = {
+    white: ["#ffffff", "#ffffff", "#dcdad6", "#ffffff"], pheasant: ["#efe4d2", "#c98a3e", "#2a1d14", "#e8b35a"],
+    owl: ["#efe8dc", "#b9a083", "#3c2e24", "#f1e5cf"], dove: ["#eeece9", "#a8a5a2", "#3e3c3b", "#dad7d3"],
+    jay: ["#e9eef3", "#a8a29c", "#1e2b3f", "#5584bd"], flamingo: ["#ffe9e2", "#f2a094", "#5a2e2a", "#f8c8bc"],
+    golden: ["#fff4d9", "#dca553", "#6c4220", "#f2d59e"], ink: ["#f6f6f4", "#c8c8c6", "#121212", "#f6f6f4"],
+    snowy: ["#ffffff", "#f5f2ed", "#6e5848", "#dccbb6"],
+  };
+
+  /* ---------- Layout: Poisson disc on a wrapping strip, with levels ---------- */
+  {
+    const canvas = $("layCanvas");
+    let seed = 7, pts = [];
+    const ASPECT = 0.32;
+    function build() {
+      const s = +$("lS").value, rnd = mulberry(seed);
+      const Lx = 1 / ASPECT, Ly = 1;
+      const cand = [];
+      const n = Math.round((Lx * Ly) / (s * s) * 4);
+      for (let i = 0; i < n; i++) cand.push([rnd() * Lx, rnd() * Ly]);
+      const kept = [];
+      const cell = s, CX = Math.max(3, Math.floor(Lx / cell)), CY = Math.max(3, Math.floor(Ly / cell));
+      const grid = new Map(), key = (i, j) => (((i % CX) + CX) % CX) * 1000 + (((j % CY) + CY) % CY);
+      const d2 = (a, b) => { let dx = a[0] - b[0], dy = a[1] - b[1]; dx -= Lx * Math.round(dx / Lx); dy -= Ly * Math.round(dy / Ly); return dx * dx + dy * dy; };
+      for (const c of cand) {
+        const gi = Math.floor(c[0] / (Lx / CX)), gj = Math.floor(c[1] / (Ly / CY));
+        let ok = true;
+        for (let a = -1; a <= 1 && ok; a++) for (let b = -1; b <= 1 && ok; b++) for (const g of grid.get(key(gi + a, gj + b)) ?? []) if (d2(g, c) < s * s) { ok = false; break; }
+        if (!ok) continue;
+        kept.push(c);
+        const k = key(gi, gj); (grid.get(k) ?? grid.set(k, []).get(k)).push(c);
+      }
+      // Levels: free among neighbours side by side (close across, near along).
+      const L = 0.6 * s / 0.085 * 0.085 * 3;
+      for (const f of kept) {
+        f.sweep = (rnd() - 0.5) * 0.24;
+        const taken = new Set();
+        for (const g of kept) {
+          if (g === f || g.level === undefined) continue;
+          let dx = g[0] - f[0], dy = g[1] - f[1]; dx -= Lx * Math.round(dx / Lx); dy -= Ly * Math.round(dy / Ly);
+          if (Math.abs(dx) < 0.35 * L && Math.abs(dy) < 0.45 * L) taken.add(g.level);
+        }
+        const free = [0, 1, 2, 3, 4].filter((v) => !taken.has(v));
+        f.level = free.length ? free[Math.floor(rnd() * free.length)] : Math.floor(rnd() * 5);
+      }
+      pts = kept;
+      $("lOut").innerHTML = `<span>roots <b>${kept.length}</b></span><span>candidates <b>${cand.length}</b></span><span>kept <b>${Math.round((kept.length / cand.length) * 100)}%</b></span>`;
+    }
+    const view = setup(canvas, ASPECT, (ctx, W, H) => {
+      ctx.clearRect(0, 0, W, H);
+      const s = +$("lS").value, levels = $("lL").checked;
+      const cols = [css("--accent"), css("--accent2"), "#8f7a3a", "#6c8f5a", "#8a5f8f"];
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();
+      const len = s * H * 1.4;
+      for (const p of pts) {
+        const x = p[0] * H, y = p[1] * H;
+        const col = levels ? cols[p.level] : css("--ink");
+        ctx.strokeStyle = col; ctx.fillStyle = col; ctx.globalAlpha = 0.8; ctx.lineWidth = 1.4;
+        for (const ox of [-W, 0, W]) {
+          ctx.beginPath(); ctx.moveTo(x + ox, y); ctx.lineTo(x + ox + Math.cos(p.sweep) * len, y + Math.sin(p.sweep) * len); ctx.stroke();
+          ctx.beginPath(); ctx.arc(x + ox, y, 2.2, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = css("--muted"); ctx.font = font(11);
+      ctx.fillText("along the form →  (wraps)", 8, H - 8);
+    });
+    $("lS").addEventListener("input", () => { $("lSo").textContent = (+$("lS").value).toFixed(3); build(); view.redraw(); });
+    $("lL").addEventListener("change", view.redraw);
+    $("lNew").addEventListener("click", () => { seed++; build(); view.redraw(); });
+    build(); view.redraw();
+  }
+
+  /* ---------- One feather: the vane, per pixel ---------- */
+  // x across (-1.3..1.3, in vane half widths), y base 0 .. tip 1; pal as RGB arrays. Null where nothing covers.
+  const stripe = (q, duty) => (fract(q) < duty ? 1 : 0);
+  function featherPixel(x, y, seed, pattern, c) {
+    const len = 1, halfW = 0.21, barbCount = 60;
+    const lean = 1.1 * (0.9 + 0.4 * fhash(seed + 1.7));
+    const spacing = len / barbCount;
+    const kind = ["plain", "gradient", "barred", "streaked", "mottled"].indexOf(pattern);
+    const ax = Math.abs(x), side = x < 0 ? -1 : 1;
+    let q = (y * len - ax * halfW * lean * (1 + 0.5 * ax)) / spacing;
+    q += side * 0.37 + 0.6 * vnoise(y * 4 + seed * 50 + side * 13);
+    const barb = Math.floor(q);
+    const g = q / 7 + fhash(seed) * 7, gi = Math.floor(g);
+    const clump = mix(fhash(gi + seed * 3.1), fhash(gi + 1 + seed * 3.1), smooth(0.8, 1, fract(g)));
+    const t = clamp((y - 0.03) / 0.97, 0, 1);
+    let w = Math.pow(Math.sin(Math.PI * Math.pow(t, 0.7 + 0.25 * fhash(seed + 3.3))), 0.55);
+    w *= 1 - 0.12 * clump * smooth(0.4, 1, t);
+    w *= 1 - 0.08 * fhash(barb + seed);
+    let vane = ax < w ? 1 : 0;
+    const edge = smooth(0.88, 1, ax / Math.max(w, 1e-3));
+    if (edge > 0.5 && stripe(q, 0.62) === 0) vane = 0;
+    const bi = Math.floor(g + 0.5), boundary = Math.abs(g - bi) * 7, gh = fhash(bi + seed * 3.1);
+    const splitDepth = gh > 0.72 ? 0.25 + 0.6 * fhash(bi + seed) : 0;
+    if (splitDepth > 0 && boundary < 1 + 1.5 * ax / Math.max(w, 1e-3) && ax > w * (1 - splitDepth)) vane = 0;
+    const downEnd = 0.3, down = 1 - smooth(downEnd - 0.08, downEnd + 0.04, y);
+    const qd = q * 0.5 + 0.35 * Math.sin(ax * 9 + seed * 40);
+    const wDown = (0.55 + 0.7 * smooth(0, downEnd, y)) * (1 - 0.25 * fhash(Math.floor(q * 0.5) + seed));
+    let fib = ax < wDown ? 1 : 0;
+    if (fib && ax / wDown > 0.6 && stripe(qd, 0.4) === 0) fib = 0;
+    let cover = down > 0.5 ? fib : vane;
+    if (y < 0.02) cover = 0;
+    const rw = len * 0.02 * (1 - 0.8 * y) / halfW;
+    const rc = ax < rw && y < 0.96 ? 1 : 0;
+    if (!cover && !rc) return null;
+    let col = c[0].map((v, i) => mix(v, c[1][i], smooth(0.15, 0.45, y)));
+    const e = ax / Math.max(w, 1e-3);
+    let dark = 0, acc = 0;
+    if (kind === 1) dark = 0.75 * smooth(0.35, 1, y) * (side > 0 ? 1 : 0.85);
+    if (kind === 2) { const b = y * 9 - e * 0.5 * y * 3 + vnoise(seed * 30 + y * 3) * 0.6; dark = y > 0.3 && fract(b) < 0.45 ? 0.85 : 0; acc = y > 0.3 && fract(b) >= 0.45 ? 0.4 : 0; }
+    if (kind === 3) { dark = y > 0.25 && e < 0.15 + 0.45 * y ? 0.85 : 0; acc = e > 0.85 ? 0.6 : 0; }
+    if (kind === 4) dark = y > 0.3 && fhash(Math.floor(q * 0.7) * 3.1 + Math.floor(e * 6) * 7.7 + seed) > 0.72 - 0.25 * y ? 0.8 : 0;
+    if (down > 0.5) dark = acc = 0;
+    col = col.map((v, i) => mix(mix(v, c[3][i], acc), c[2][i], dark));
+    if (rc) col = col.map((v, i) => mix(c[0][i], c[2][i], 0.35 * y));
+    const shade = rc ? 1 : 0.9 + 0.1 * Math.sin(q * Math.PI * 2) * (down > 0.5 ? 0 : 1);
+    const thin = Math.max(smooth(0.6, 1, e), smooth(0.7, 1, y), edge, down);
+    return { col: col.map((v) => v * shade), thin, rc, down };
+  }
+  {
+    const canvas = $("vaneCanvas");
+    const sel = $("vC");
+    for (const k of Object.keys(PALETTES)) sel.add(new Option(k, k, k === "pheasant", k === "pheasant"));
+    let seeds = [0.31, 0.57, 0.83];
+    const view = setup(canvas, (W) => Math.min(520, W * 0.62), (ctx, W, H) => {
+      const PW = canvas.width, PH = canvas.height;
+      const img = ctx.createImageData(PW, PH);
+      const pal = PALETTES[$("vC").value].map(hex), pattern = $("vP").value;
+      const fh = Math.round(PH * 0.9), fw = Math.round(fh * 0.42 * 1.3), y0 = Math.round(PH * 0.05);
+      seeds.forEach((seed, n) => {
+        const x0 = Math.max(0, Math.round(PW * (n + 0.5) / 3 - fw / 2));
+        for (let py = 0; py < fh; py++) for (let px = 0; px < fw; px++) {
+          const f = featherPixel(((px / fw) * 2 - 1) * 1.3, 1 - py / fh, seed, pattern, pal);
+          if (!f) continue;
+          const k = ((y0 + py) * PW + (x0 + px)) * 4;
+          img.data[k] = f.col[0]; img.data[k + 1] = f.col[1]; img.data[k + 2] = f.col[2]; img.data[k + 3] = 255;
+        }
+      });
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, PW, PH);
+      const tmp = document.createElement("canvas"); tmp.width = PW; tmp.height = PH; tmp.getContext("2d").putImageData(img, 0, 0);
+      ctx.drawImage(tmp, 0, 0); ctx.restore();
+    });
+    $("vP").addEventListener("change", view.redraw);
+    $("vC").addEventListener("change", view.redraw);
+    $("vNew").addEventListener("click", () => { seeds = seeds.map(() => Math.random()); view.redraw(); });
+  }
+
+  /* ---------- Stacking: one shared lift curve ---------- */
+  {
+    const canvas = $("stackCanvas");
+    const LIFT = 0.006, SLOPE = 0.09, HUG = 0.025, HUG_LENGTH = 0.07;
+    const lift = (d) => LIFT + SLOPE * d + HUG * (1 - Math.exp(-d / HUG_LENGTH));
+    const rnd = mulberry(3);
+    const own = Array.from({ length: 40 }, () => rnd());
+    const view = setup(canvas, (W) => Math.max(220, W * 0.36), (ctx, W, H) => {
+      ctx.clearRect(0, 0, W, H);
+      const m = +$("sA").value, shared = $("sC").checked;
+      const R = 3.2, L = 0.5, n = 24, span = 1.7, EX = 3;
+      const sc = W / (span + L + 0.3), ox = 0.15 * sc, oy = H * 0.72;
+      // The skin, an arc seen from the side; heights above it are exaggerated EX times.
+      const skin = (x) => -((x - (span + L) / 2) ** 2) / (2 * R);
+      const P = (x, h) => [ox + x * sc, oy - (skin(x) + EX * h) * sc];
+      ctx.strokeStyle = css("--skin"); ctx.lineWidth = 6; ctx.beginPath();
+      for (let i = 0; i <= 80; i++) { const x = -0.1 + (span + L + 0.2) * i / 80; const [a, b] = P(x, 0); i ? ctx.lineTo(a, b) : ctx.moveTo(a, b); }
+      ctx.stroke();
+      // Height of feather i above the skin at x (d along it): the shared curve, or its own straight pitch.
+      const height = (i, d) => (shared ? m * lift(d) : LIFT + d * Math.tan(0.03 + 0.25 * own[i] * m / 2));
+      const roots = Array.from({ length: n }, (_, i) => (i / (n - 1)) * span);
+      let crossings = 0;
+      const marks = [];
+      for (let i = 0; i < n - 1; i++) {
+        for (let k = 1; k <= 40; k++) {
+          const x = roots[i + 1] + (roots[i] + L - roots[i + 1]) * (k / 40);
+          if (x <= roots[i + 1] || x >= roots[i] + L) continue;
+          if (height(i, x - roots[i]) < height(i + 1, x - roots[i + 1]) - 1e-4) { crossings++; marks.push([x, height(i, x - roots[i])]); break; }
+        }
+      }
+      for (let i = n - 1; i >= 0; i--) {
+        ctx.strokeStyle = i % 2 ? css("--ink") : css("--accent2");
+        ctx.globalAlpha = 0.9; ctx.lineWidth = 2; ctx.beginPath();
+        for (let k = 0; k <= 30; k++) { const d = (L * k) / 30; const [a, b] = P(roots[i] + d, height(i, d)); k ? ctx.lineTo(a, b) : ctx.moveTo(a, b); }
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1; ctx.fillStyle = "#d33";
+      for (const [x, h] of marks) { const [a, b] = P(x, h); ctx.beginPath(); ctx.arc(a, b, 4, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = css("--muted"); ctx.font = font(11); ctx.fillText(`heights ×${EX}`, 8, H - 8);
+      $("sOut").innerHTML = `<span>feathers <b>${n}</b></span><span>crossings <b>${crossings}</b></span>`;
+    });
+    bind("sA", "sAo", (v) => v.toFixed(2), () => view.redraw());
+    $("sC").addEventListener("change", view.redraw);
+  }
+
+  /* ---------- Reflected and transmitted ---------- */
+  {
+    const canvas = $("transCanvas");
+    const sel = $("tC");
+    for (const k of Object.keys(PALETTES)) sel.add(new Option(k, k, k === "golden", k === "golden"));
+    const tint = [1.0, 0.86, 0.68];
+    const view = setup(canvas, (W) => Math.min(460, W * 0.5), (ctx, W, H) => {
+      const PW = canvas.width, PH = canvas.height;
+      const img = ctx.createImageData(PW, PH);
+      const bg = hex(css("--stage").startsWith("#") ? css("--stage") : "#e0ddd8");
+      for (let i = 0; i < PW * PH; i++) { img.data[i * 4] = bg[0]; img.data[i * 4 + 1] = bg[1]; img.data[i * 4 + 2] = bg[2]; img.data[i * 4 + 3] = 255; }
+      const l = +$("tL").value;
+      const front = Math.cos(l * Math.PI), wR = Math.max(0, front), wT = Math.max(0, -front);
+      const pal = PALETTES[$("tC").value].map(hex);
+      const fh = Math.round(PH * 0.9), fw = Math.round(fh * 0.42 * 1.3), x0 = Math.round(PW * 0.42 - fw / 2), y0 = Math.round(PH * 0.05);
+      for (let py = 0; py < fh; py++) for (let px = 0; px < fw; px++) {
+        const f = featherPixel(((px / fw) * 2 - 1) * 1.3, 1 - py / fh, 0.57, "gradient", pal);
+        if (!f) continue;
+        const R = f.rc ? 0.8 : mix(0.62, 0.45, f.thin), T = f.rc ? 0.15 : mix(0.3, 0.5, f.thin);
+        const thick = 1 - f.thin;
+        const col = [0, 1, 2].map((i) => {
+          const refl = (f.col[i] / 255) * R / 0.62 * (0.25 + 0.75 * wR);
+          const trans = Math.pow(tint[i], mix(0.6, 1.6, thick)) * (f.col[i] / 255) * T / 0.3 * wT * 1.15;
+          return clamp(refl * (0.35 + 0.65 * wR) + trans + 0.06, 0, 1) * 255;
+        });
+        const k = ((y0 + py) * PW + (x0 + px)) * 4;
+        img.data[k] = col[0]; img.data[k + 1] = col[1]; img.data[k + 2] = col[2];
+      }
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+      const tmp = document.createElement("canvas"); tmp.width = PW; tmp.height = PH; tmp.getContext("2d").putImageData(img, 0, 0);
+      ctx.drawImage(tmp, 0, 0); ctx.restore();
+      // Where the light is: a side view, eye on the left, feather in the middle.
+      const cx = W * 0.8, cy = H / 2, r = Math.min(W * 0.12, H * 0.3);
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = css("--ink"); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx, cy - r * 0.6); ctx.lineTo(cx, cy + r * 0.6); ctx.stroke();
+      const a = Math.PI - l * Math.PI;
+      ctx.fillStyle = css("--accent"); ctx.beginPath(); ctx.arc(cx + Math.cos(a) * r, cy - Math.sin(a) * r * 0.9, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = css("--muted"); ctx.font = font(11);
+      ctx.fillText("eye ←", cx - r - 40, cy + 4); ctx.fillText("light", cx + Math.cos(a) * r - 12, cy - Math.sin(a) * r * 0.9 - 12);
+      $("tLo").textContent = l < 0.35 ? "front" : l < 0.65 ? "side" : "behind";
+    });
+    $("tL").addEventListener("input", view.redraw);
+    $("tC").addEventListener("change", view.redraw);
+  }
+
+  /* ---------- Stochastic transparency, converging ---------- */
+  {
+    const canvas = $("stochCanvas");
+    const G = 96;
+    const layers = [
+      { cx: 0.42, cy: 0.42, a: -0.5, col: [214, 122, 92] },
+      { cx: 0.56, cy: 0.5, a: 0.35, col: [92, 140, 190] },
+      { cx: 0.46, cy: 0.62, a: 1.2, col: [236, 214, 160] },
+    ];
+    const inside = (L, x, y) => {
+      const dx = x - L.cx, dy = y - L.cy, c = Math.cos(L.a), s = Math.sin(L.a);
+      const u = dx * c + dy * s, v = -dx * s + dy * c;
+      return (u / 0.3) ** 2 + (v / 0.11) ** 2 < 1;
+    };
+    const bg = [40, 38, 36];
+    const cover = Array.from({ length: G * G }, (_, i) => layers.map((L) => inside(L, ((i % G) + 0.5) / G, (Math.floor(i / G) + 0.5) / G)));
+    let acc = new Float32Array(G * G * 3), frames = 0, playing = !reduce, cur = new Uint8ClampedArray(G * G * 3), rnd = mulberry(5);
+    const exact = () => {
+      const o = +$("xO").value, out = new Float32Array(G * G * 3);
+      for (let i = 0; i < G * G; i++) {
+        let t = 1; const c = [0, 0, 0];
+        layers.forEach((L, k) => { if (!cover[i][k]) return; const keep = 1 - o; for (let j = 0; j < 3; j++) c[j] += t * keep * L.col[j]; t *= o; });
+        for (let j = 0; j < 3; j++) out[i * 3 + j] = c[j] + t * bg[j];
+      }
+      return out;
+    };
+    let ref = exact();
+    function step() {
+      const o = +$("xO").value, mode = $("xM").value;
+      frames++;
+      const w = mode === "taa" ? Math.max(0.1, 1 / frames) : 1 / frames;
+      for (let i = 0; i < G * G; i++) {
+        let c = bg;
+        for (let k = 0; k < layers.length; k++) if (cover[i][k] && rnd() >= o) { c = layers[k].col; break; }
+        for (let j = 0; j < 3; j++) { cur[i * 3 + j] = c[j]; acc[i * 3 + j] += (c[j] - acc[i * 3 + j]) * w; }
+      }
+    }
+    const view = setup(canvas, (W) => Math.min(300, W / 3 + 30), (ctx, W, H) => {
+      ctx.clearRect(0, 0, W, H);
+      const size = Math.min((W - 32) / 3, H - 30), y = 4;
+      const panel = (data, x, label) => {
+        const tmp = document.createElement("canvas"); tmp.width = G; tmp.height = G;
+        const t = tmp.getContext("2d"), im = t.createImageData(G, G);
+        for (let i = 0; i < G * G; i++) { im.data[i * 4] = data[i * 3]; im.data[i * 4 + 1] = data[i * 3 + 1]; im.data[i * 4 + 2] = data[i * 3 + 2]; im.data[i * 4 + 3] = 255; }
+        t.putImageData(im, 0, 0);
+        ctx.imageSmoothingEnabled = false; ctx.drawImage(tmp, x, y, size, size);
+        ctx.fillStyle = css("--muted"); ctx.font = font(11); ctx.fillText(label, x, y + size + 16);
+      };
+      panel(cur, 0, "one frame");
+      panel(acc, size + 16, `${$("xM").value === "taa" ? "temporal" : "still average"} · ${frames} frames`);
+      panel(ref, 2 * (size + 16), "exact blend");
+      let e = 0; for (let i = 0; i < acc.length; i++) e += (acc[i] - ref[i]) ** 2;
+      $("xOut").innerHTML = `<span>frames <b>${frames}</b></span><span>error vs exact <b>${Math.sqrt(e / acc.length).toFixed(1)}</b> / 255</span>`;
+    });
+    const restart = () => { acc = new Float32Array(G * G * 3); frames = 0; rnd = mulberry(5); ref = exact(); step(); view.redraw(); };
+    bind("xO", "xOo", (v) => v.toFixed(2), restart);
+    $("xM").addEventListener("change", restart);
+    $("xReset").addEventListener("click", restart);
+    $("xPlay").addEventListener("click", () => { playing = !playing; $("xPlay").textContent = playing ? "Pause" : "Play"; });
+    $("xPlay").textContent = playing ? "Pause" : "Play";
+    let since = 0;
+    animate(canvas, (dt) => { if (!playing || frames >= 600) return; since += dt; if (since < 1 / 20) return; since = 0; step(); view.redraw(); });
+  }
+
+  /* ---------- Count, size and the budget ---------- */
+  {
+    const canvas = $("countCanvas");
+    const PER = 1 / 0.22 ** 2 + 1 / (0.28 * 0.7) ** 2, DENS = 1.81, r = 0.45;
+    const shapes = [["torus", 2 * Math.PI * 1.9 * 2 * Math.PI * r], ["trefoil", 2 * Math.PI * r * 13], ["knot 3-5", 2 * Math.PI * r * 22]];
+    const gpus = { fast: [0.00045, 2.2], laptop: [0.0011, 3.5], phone: [0.0032, 6] };
+    let samples = [], seed = 1;
+    function measure() {
+      const rnd = mulberry(seed++), [perF, fixed] = gpus[$("cG").value], drawn = 12000;
+      samples = [];
+      for (let k = 0; k < 40; k++) {
+        const t = k * 0.5;
+        const ms = (drawn * perF + fixed) * (0.92 + 0.16 * rnd());
+        const stall = rnd() < 0.08, early = t < 3, trans = k >= 22 && k < 26;
+        const frames = stall ? 4 : Math.round(500 / Math.max(ms, 16.7));
+        const est = (drawn * 16.7) / (stall ? ms * 4 : trans ? ms * 0.6 : ms);
+        samples.push({ est, ok: !early && !stall && !trans && frames >= 10 });
+      }
+    }
+    const budget = () => { const ok = samples.filter((s) => s.ok); return ok.length ? Math.max(2000, ok.reduce((a, s) => a + s.est, 0) / ok.length) : Infinity; };
+    const view = setup(canvas, (W) => Math.max(260, Math.min(360, W * 0.4)), (ctx, W, H) => {
+      ctx.clearRect(0, 0, W, H);
+      const D = +$("cD").value, M = +$("cM").value, B = budget();
+      const narrow = W < 640;
+      const pw = narrow ? W - 50 : W * 0.55 - 50, ph = narrow ? H * 0.5 - 40 : H - 50, px = 44, py = 14;
+      const maxA = 110, maxN = 40000;
+      const X = (a) => px + (a / maxA) * pw, Y = (n) => py + ph - (n / maxN) * ph;
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1; ctx.strokeRect(px, py, pw, ph);
+      ctx.fillStyle = css("--muted"); ctx.font = font(10);
+      ctx.fillText("feathers", 2, py + 8); ctx.fillText("skin area →", px + pw - 70, py + ph + 14);
+      for (const n of [10000, 20000, 30000]) { ctx.fillText(`${n / 1000}k`, 14, Y(n) + 3); }
+      const count = (a) => Math.min(D * a, M, B);
+      const len = (a) => Math.min(Math.sqrt((PER * a) / (DENS * count(a))), 2 * r);
+      // Caps.
+      ctx.setLineDash([4, 4]); ctx.strokeStyle = css("--stage-ink");
+      ctx.beginPath(); ctx.moveTo(px, Y(M)); ctx.lineTo(px + pw, Y(M)); ctx.stroke();
+      if (Number.isFinite(B)) { ctx.strokeStyle = css("--accent2"); ctx.beginPath(); ctx.moveTo(px, Y(Math.min(B, maxN))); ctx.lineTo(px + pw, Y(Math.min(B, maxN))); ctx.stroke(); }
+      ctx.setLineDash([]);
+      ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2; ctx.beginPath();
+      for (let i = 0; i <= 200; i++) { const a = 1 + (maxA - 1) * i / 200; i ? ctx.lineTo(X(a), Y(count(a))) : ctx.moveTo(X(a), Y(count(a))); }
+      ctx.stroke();
+      // Length, on its own scale (0 .. 2r).
+      ctx.strokeStyle = css("--ink"); ctx.globalAlpha = 0.5; ctx.lineWidth = 1.5; ctx.beginPath();
+      for (let i = 0; i <= 200; i++) { const a = 1 + (maxA - 1) * i / 200, yy = py + ph - (len(a) / (2 * r)) * ph; i ? ctx.lineTo(X(a), yy) : ctx.moveTo(X(a), yy); }
+      ctx.stroke(); ctx.globalAlpha = 1;
+      shapes.forEach(([name, a], i) => {
+        ctx.fillStyle = css("--accent"); ctx.beginPath(); ctx.arc(X(a), Y(count(a)), 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = css("--ink"); ctx.font = font(10); ctx.fillText(name, X(a) - 20, Y(count(a)) - 8 - 13 * (i % 2));
+      });
+      ctx.fillStyle = css("--muted"); ctx.font = font(10);
+      ctx.fillText("— count", px + 6, py + ph - 20); ctx.fillText("— feather length (0 to 2r)", px + 6, py + ph - 8);
+      // Estimates strip.
+      const sx = narrow ? 44 : W * 0.6, sw = narrow ? W - 50 : W * 0.38, sy = narrow ? H * 0.5 + 10 : 14, sh = narrow ? H * 0.5 - 40 : H - 50;
+      ctx.strokeStyle = css("--line"); ctx.strokeRect(sx, sy, sw, sh);
+      const maxE = Math.max(...samples.map((s) => s.est)) * 1.1;
+      samples.forEach((s, k) => {
+        const x = sx + ((k + 0.5) / samples.length) * sw, yy = sy + sh - (s.est / maxE) * sh;
+        ctx.fillStyle = s.ok ? css("--accent2") : css("--line");
+        ctx.beginPath(); ctx.arc(x, yy, 3, 0, Math.PI * 2); ctx.fill();
+      });
+      if (Number.isFinite(B)) { const yy = sy + sh - (B / maxE) * sh; ctx.strokeStyle = css("--accent2"); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(sx, yy); ctx.lineTo(sx + sw, yy); ctx.stroke(); }
+      ctx.fillStyle = css("--muted"); ctx.font = font(10);
+      ctx.fillText("estimates every 0.5 s → running mean", sx + 4, sy + 12);
+      const used = shapes.map(([n, a]) => `${n} <b>${Math.round(count(a))}</b>`).join("</span><span>");
+      $("cOut").innerHTML = `<span>budget <b>${Number.isFinite(B) ? Math.round(B) : "none"}</b></span><span>${used}</span>`;
+    });
+    bind("cD", "cDo", (v) => v, () => view.redraw());
+    bind("cM", "cMo", (v) => v, () => view.redraw());
+    $("cG").addEventListener("change", () => { measure(); view.redraw(); });
+    $("cRun").addEventListener("click", () => { measure(); view.redraw(); });
+    measure(); view.redraw();
+  }
+
+  /* ---------- A rouse running round a ring ---------- */
+  {
+    const canvas = $("rouseCanvas");
+    const N = 140;
+    const ph = Array.from({ length: N }, (_, i) => fract(Math.sin(i * 53.1) * 4375.5) * Math.PI * 2);
+    let t = 99, origin = 0, dirn = 1, time = 0, length = 1.4;
+    const stirAt = (u) => {
+      if (t >= length) return 0;
+      const settle = clamp((length - t) / 0.5, 0, 1), env = settle * settle * (3 - 2 * settle);
+      const front = (t / length) * 1.3;
+      let x = fract((u - origin) * dirn);
+      if ($("rM").value === "both") x = Math.min(x, 1 - x) * 2;
+      const behind = front - x;
+      return env * (behind < 0 ? Math.exp(-(behind * behind) / 0.0016) : Math.exp(-behind / 0.6));
+    };
+    const view = setup(canvas, (W) => Math.min(420, W * 0.55), (ctx, W, H) => {
+      ctx.clearRect(0, 0, W, H);
+      const cx = W * 0.3, cy = H / 2, r = Math.min(W * 0.22, H * 0.36);
+      ctx.strokeStyle = css("--skin"); ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineWidth = 1.6;
+      for (let i = 0; i < N; i++) {
+        const u = i / N, a = u * Math.PI * 2, s = stirAt(u);
+        const swing = s * 0.9 * Math.sin(time * 38 / 6 + Math.PI * 2 * 6 * u + 0.6 * ph[i]);
+        const len = 16 + 22 * s;
+        const tx = -Math.sin(a), ty = Math.cos(a), nx = Math.cos(a), ny = Math.sin(a);
+        const dirx = tx + nx * s * 0.8 + nx * swing * 0.3, diry = ty + ny * s * 0.8 + ny * swing * 0.3;
+        const dl = Math.hypot(dirx, diry);
+        const x0 = cx + nx * (r + 7), y0 = cy + ny * (r + 7);
+        ctx.strokeStyle = s > 0.05 ? css("--accent") : css("--ink");
+        ctx.globalAlpha = 0.5 + 0.5 * s;
+        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + (dirx / dl) * len, y0 + (diry / dl) * len); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      // Plot: lift along the ring.
+      const px = W * 0.58, pw = W * 0.38, py = H * 0.2, ph2 = H * 0.6;
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1; ctx.strokeRect(px, py, pw, ph2);
+      ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2; ctx.beginPath();
+      for (let i = 0; i <= 200; i++) { const u = i / 200, s = stirAt(u); const X = px + u * pw, Y = py + ph2 - s * ph2 * 0.9; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
+      ctx.stroke();
+      ctx.fillStyle = css("--muted"); ctx.font = font(11);
+      ctx.fillText("lift", px, py - 6); ctx.fillText("position along the form (u)", px, py + ph2 + 16);
+    });
+    $("rGo").addEventListener("click", () => { t = 0; origin = Math.random(); dirn = Math.random() < 0.5 ? 1 : -1; length = 1.2 + 0.4 * Math.random(); });
+    $("rM").addEventListener("change", view.redraw);
+    animate(canvas, (dt) => {
+      time += dt; t += dt;
+      if (!reduce && t > length + 2.5) { t = 0; origin = Math.random(); dirn = Math.random() < 0.5 ? 1 : -1; length = 1.2 + 0.4 * Math.random(); }
+      view.redraw();
+    });
+  }
+
+  /* ---------- Morph: lining up two loops ---------- */
+  {
+    const canvas = $("morphCanvas");
+    const M = 256;
+    const circle = Array.from({ length: M }, (_, i) => { const a = (i / M) * Math.PI * 2; return [Math.cos(a) * 1.1, Math.sin(a) * 1.1, 0]; });
+    const torusKnot = (p, q, s) => Array.from({ length: M }, (_, i) => { const t = (i / M) * Math.PI * 2; const r = 0.62 + 0.32 * Math.cos(q * t); return [r * Math.cos(p * t) * s, r * Math.sin(p * t) * s, 0.32 * Math.sin(q * t)]; });
+    const fig8 = Array.from({ length: M }, (_, i) => { const t = (i / M) * Math.PI * 2; return [(2 + Math.cos(2 * t)) * Math.cos(3 * t) * 0.36, (2 + Math.cos(2 * t)) * Math.sin(3 * t) * 0.36, Math.sin(4 * t) * 0.3]; });
+    const targets = { trefoil: torusKnot(2, 3, 1.15), k35: torusKnot(3, 5, 1.15), fig8 };
+    // Rotate the source so it isn't trivially aligned.
+    const from = circle.map((_, i) => circle[(i + 97) % M]);
+    let offset = 0, dir = 1, costRaw = 0, costBest = 0;
+    function align() {
+      const to = targets[$("mTo2").value];
+      const cost = (o, d) => { let c = 0; for (let i = 0; i < 64; i++) { const u = i / 64; const a = from[Math.floor(u * M) % M]; const j = ((Math.floor((d > 0 ? u - o / 128 : o / 128 - u) * M) % M) + M) % M; const b = to[j]; c += (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2; } return c; };
+      let best = Infinity;
+      for (const d of [1, -1]) for (let o = 0; o < 128; o++) { const c = cost(o, d); if (c < best) (best = c), (offset = o / 128), (dir = d); }
+      costRaw = cost(0, 1); costBest = best;
+    }
+    let playing = false;
+    const view = setup(canvas, (W) => Math.min(460, W * 0.55), (ctx, W, H) => {
+      ctx.clearRect(0, 0, W, H);
+      const to = targets[$("mTo2").value], t = +$("mT").value, aligned = $("mA").checked;
+      const o = aligned ? offset : 0, d = aligned ? dir : 1;
+      const s = Math.min(W, H) * 0.36, cx = W / 2, cy = H / 2;
+      const P = (p) => [cx + p[0] * s, cy - p[1] * s];
+      const pair = (i) => { const u = i / M; const j = ((Math.floor((d > 0 ? u - o : o - u) * M) % M) + M) % M; return [from[i], to[j]]; };
+      ctx.lineWidth = 1; ctx.strokeStyle = css("--line");
+      for (let i = 0; i < M; i += 8) { const [a, b] = pair(i); const A = P(a), B = P(b); ctx.beginPath(); ctx.moveTo(...A); ctx.lineTo(...B); ctx.stroke(); }
+      const curve = (pts, col, w) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); pts.forEach((p, i) => { const [x, y] = P(p); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); ctx.stroke(); };
+      curve(from, css("--stage-ink"), 1.5);
+      curve(to, css("--accent2"), 1.5);
+      const e = t * t * (3 - 2 * t);
+      curve(Array.from({ length: M }, (_, i) => { const [a, b] = pair(i); return [mix(a[0], b[0], e), mix(a[1], b[1], e), 0]; }), css("--accent"), 3);
+      $("mOut").innerHTML = `<span>offset <b>${(o).toFixed(3)}</b></span><span>direction <b>${d > 0 ? "same" : "reversed"}</b></span><span>cost <b>${(aligned ? costBest : costRaw).toFixed(1)}</b> (unaligned ${costRaw.toFixed(1)})</span>`;
+    });
+    bind("mT", "mTo", (v) => v.toFixed(2), () => view.redraw());
+    $("mTo2").addEventListener("change", () => { align(); view.redraw(); });
+    $("mA").addEventListener("change", view.redraw);
+    $("mPlay").addEventListener("click", () => { playing = !playing; $("mPlay").textContent = playing ? "Pause" : "Play"; });
+    let ping = 1;
+    animate(canvas, (dt) => {
+      if (!playing) return;
+      const el = $("mT"); let v = +el.value + (ping * dt) / 2.4;
+      if (v >= 1 || v <= 0) { ping = -ping; v = clamp(v, 0, 1); }
+      el.value = v; $("mTo").textContent = v.toFixed(2); view.redraw();
+    });
+    align(); view.redraw();
+  }
+
+  /* ---------- Sound: the contact model ---------- */
+  {
+    const canvas = $("audioCanvas");
+    const SR = 22050;
+    function rustle({ duration, flutter = 0, density = 1200, attack = 0.04, release = 0.3, decay = 0, gaps = false, smooth: sm = 0.5 }, rnd) {
+      const n = Math.ceil(duration * SR), out = new Float32Array(n);
+      const count = Math.round(density * duration), fl = flutter * (0.9 + 0.2 * rnd());
+      for (let c = 0; c < count; c++) {
+        let t = rnd() * duration;
+        if (fl > 0) { const cycle = Math.floor(t * fl), spread = gaps ? 0.05 + 0.04 * rnd() : 0.18 + 0.12 * rnd(); t = (cycle + 0.5 + (rnd() - 0.5) * spread * 2) / fl; if (t < 0 || t >= duration) continue; }
+        const env = Math.min(1, t / attack) * Math.min(1, (duration - t) / release) * Math.exp(-decay * t);
+        if (env <= 0) continue;
+        const a = env * Math.exp(0.55 * (rnd() + rnd() + rnd() - 1.5)) * 0.08;
+        const len = Math.floor(SR * (0.0005 + 0.004 * rnd())), i0 = Math.floor(t * SR), fall = Math.exp(-5 / Math.max(len, 1));
+        let k = a, v = 0; const g = (1 / Math.sqrt((1 - sm) / (1 + sm))) * 0.6;
+        for (let i = 0; i < len && i0 + i < n; i++) { v = sm * v + (1 - sm) * (rnd() * 2 - 1); out[i0 + i] += k * v * g; k *= fall; }
+      }
+      return out;
+    }
+    let seed = 11, rouse, stir;
+    const make = () => {
+      const rnd = mulberry(seed);
+      rouse = rustle({ duration: 1.1, flutter: 26, density: 2600, gaps: true, decay: 1.6, smooth: 0.55 }, rnd);
+      stir = rustle({ duration: 0.45, density: 900, attack: 0.08, release: 0.25, smooth: 0.65 }, rnd);
+    };
+    const view = setup(canvas, (W) => Math.min(300, W * 0.4), (ctx, W, H) => {
+      ctx.clearRect(0, 0, W, H);
+      const lane = (buf, y0, h, label, total) => {
+        ctx.strokeStyle = css("--line"); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, y0 + h / 2); ctx.lineTo(W, y0 + h / 2); ctx.stroke();
+        const w = W * (buf.length / SR) / total;
+        let peak = 1e-6; for (const v of buf) peak = Math.max(peak, Math.abs(v));
+        ctx.strokeStyle = css("--accent"); ctx.beginPath();
+        const step = buf.length / w;
+        for (let x = 0; x < w; x++) {
+          let lo = 0, hi = 0; for (let i = Math.floor(x * step); i < Math.floor((x + 1) * step); i++) { lo = Math.min(lo, buf[i]); hi = Math.max(hi, buf[i]); }
+          ctx.moveTo(x + 0.5, y0 + h / 2 - (hi / peak) * h * 0.45); ctx.lineTo(x + 0.5, y0 + h / 2 - (lo / peak) * h * 0.45);
+        }
+        ctx.stroke();
+        ctx.fillStyle = css("--muted"); ctx.font = font(11); ctx.fillText(label, 6, y0 + 14);
+      };
+      lane(rouse, 0, H * 0.6, "rouse · 26 Hz flutter, gaps, fading", 1.15);
+      lane(stir, H * 0.62, H * 0.38, "pointer stir · no rhythm", 1.15);
+    });
+    $("aNew").addEventListener("click", () => { seed++; make(); view.redraw(); });
+    let actx = null;
+    $("aPlay").addEventListener("click", () => {
+      actx ??= new AudioContext();
+      const b = actx.createBuffer(1, rouse.length, SR); b.copyToChannel(rouse, 0);
+      const src = actx.createBufferSource(); src.buffer = b;
+      const hp = actx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 250;
+      const lp = actx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3000;
+      const g = actx.createGain(); g.gain.value = 2.5;
+      src.connect(hp).connect(lp).connect(g).connect(actx.destination); src.start();
+    });
+    make(); view.redraw();
+  }
+})();
+</script>
+</body>
+</html>
