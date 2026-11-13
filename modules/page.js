@@ -18,7 +18,10 @@
 .eyebrow a:hover { color: var(--ink, currentColor); text-decoration: underline; }
 .eyebrow a::before { content: ""; display: inline-block; margin-right: 0.55em; vertical-align: 0.02em; border-style: solid; border-width: 0.36em 0.5em 0.36em 0; border-color: transparent currentColor transparent transparent; transition: transform 0.2s ease; }
 .eyebrow a:hover::before { transform: translateX(-3px); }
-footer > .meta { margin-bottom: 12px; }`;
+footer > .meta { margin-bottom: 12px; }
+.hero .live { display: inline-flex; align-self: flex-start; align-items: center; gap: 9px; padding: 12px 16px; border-radius: 3px; font: 600 13px/1 var(--mono, monospace); letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none; color: var(--bg, #fff); background: var(--accent, var(--candy, var(--ink, #000))); transition: background 0.2s ease; }
+.hero .live:hover, .hero .live:focus-visible { background: var(--ink, #000); }
+.hero .live:focus-visible { outline: 2px solid var(--accent, var(--candy, currentColor)); outline-offset: 2px; }`;
   const style = document.createElement("style");
   style.textContent = css;
   document.head.append(style);

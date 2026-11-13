@@ -477,15 +477,17 @@ function addActionButton(icon, title, fn) {
   return btn;
 }
 
-// Drops the nav's prev/next buttons, then its home button, while it would run into the header buttons.
+// While the nav would run into the header buttons, it gives way one step at a time: the explainer link
+// shrinks to its icon, then prev/next go, then the explainer link, then the home button.
+const NAV_STEPS = ["compact", "no-arrows", "no-explainer", "no-home"];
 function fitNav() {
   const info = document.querySelector("#info");
   if (!info) return;
-  info.classList.remove("no-arrows", "no-home");
+  info.classList.remove(...NAV_STEPS);
   const buttons = [...document.querySelectorAll("#main-gui > .button")].map((b) => b.getBoundingClientRect()).filter((r) => r.width);
   if (!buttons.length) return;
   const limit = Math.min(...buttons.map((r) => r.left)) - 6;
-  for (const cls of ["no-arrows", "no-home"]) {
+  for (const cls of NAV_STEPS) {
     if (info.getBoundingClientRect().right <= limit) return;
     info.classList.add(cls);
   }
@@ -544,12 +546,15 @@ function setDay(day = getDay()) {
   const arrow = (d) =>
     `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="${d}" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
   const grid = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="currentColor"><rect x="2.5" y="2.5" width="4.75" height="4.75" rx="0.75"/><rect x="8.75" y="2.5" width="4.75" height="4.75" rx="0.75"/><rect x="2.5" y="8.75" width="4.75" height="4.75" rx="0.75"/><rect x="8.75" y="8.75" width="4.75" height="4.75" rx="0.75"/></svg>`;
+  const book = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M8 4.2C6.8 3.3 5.2 2.9 2.8 2.9v9.3c2.4 0 4 .4 5.2 1.3 1.2-.9 2.8-1.3 5.2-1.3V2.9c-2.4 0-4 .4-5.2 1.3zM8 4.2v9.3"/></svg>`;
   const prev = days.find((d) => d.day === day - 1);
   const next = days.find((d) => d.day === day + 1);
   info.innerHTML = [
     prev?.title ? link(`../${prev.day}/`, `${arrow("M11 3.5v9L4.5 8z")}<span>${prev.day}</span>`, `Previous: ${prev.day}. ${prev.title}`) : "",
     `<a class="home" href="../">${grid}<span>[vibe-]Codevember ${year}</span></a>`,
     next?.title ? link(`../${next.day}/`, `<span>${next.day}</span>${arrow("M5 3.5v9L11.5 8z")}`, `Next: ${next.day}. ${next.title}`) : "",
+    // Published days have an explainer.
+    entry?.title ? `<a class="explainer" href="explainer.html" title="How ${entry.prompt} works">${book}<span>How it works</span></a>` : "",
   ].join("");
   document.body.append(info);
   queueFitNav();
