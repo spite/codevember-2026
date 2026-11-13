@@ -168,6 +168,17 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </figure>
   </header>
 
+  <!-- The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>A solid skin that opens up</h2>
+      <p>Day 7's prompt was Hollow. A solid sculpture floats above a studio floor as a smooth skin. Dimples appear on it, break through and widen into a lattice of rounded Voronoi struts. Then a warm light inside glows through the thin walls and throws the pattern of its holes across the floor.</p>
+      <p>The solid is a thick trefoil knot, Suzanne, a sphere, an egg, a torus, a rounded cube, a Platonic solid, a capsule or a blend of two. With Light on pointer, the light inside follows the mouse.</p>
+      <p>Everything is geometry on a surface mesh, like perforating a mesh in MeshLab: there is no 3D field at run time. The cells are Poisson-disc samples over the surface, each hole is cut from the distance to its cell's border, and the struts get rounded fillets. The glow is light traced from the inside out, dimmed by the wall it crosses and let through the holes onto the room.</p>
+    </div>
+  </section>
+
   <!-- 1. The surface -->
   <section>
     <div class="col prose">
@@ -296,32 +307,6 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <p>A new sculpture takes a second or two to prepare, which is too slow to follow a slider. So while the Shape and Hollowing settings change, a third worker sketches the result. A coarse mesh of the shape (cached per shape) is celled with the mesher's rules, simplified, and the rims of the holes it will open are traced as glowing outlines. The outlines are drawn on the sculpture's own skin when only the cells change, or on the coarse mesh of a new shape.</p>
       <p>The outlines are screen-space quads of a fixed width in pixels with a soft additive halo, offset to the outer face of the wall. The sculpture is built and hollowed 1.2 s after the last change.</p>
       <p>A new shape shrinks the old one away. The backdrop then fades to the new palette, the new material goes on, and the new shape grows in with a little overshoot. The light, the view and the tumble carry on across the swap. In kiosk mode this happens by itself every 20 seconds once the sculpture has finished hollowing.</p>
-    </div>
-  </section>
-
-  <!-- 8. Cost -->
-  <section>
-    <div class="col prose">
-      <div class="eyebrow">Cost</div>
-      <h2>Where the time goes</h2>
-      <p>The meshing runs in workers, so it never blocks a frame. On the main thread, a frame is mostly the shared pipeline. Measured headlessly with seed 7: desktop at the high tier, and a phone tier (iPhone user agent, pixel ratio 2, medium).</p>
-    </div>
-    <div class="fig">
-      <div class="scroll">
-        <table>
-          <thead><tr><th>Step</th><th>Desktop</th><th>Phone tier</th></tr></thead>
-          <tbody>
-            <tr><td>Pipeline, CPU per frame</td><td>1.7 ms</td><td>1.9 ms</td></tr>
-            <tr><td>Glow cube, CPU per redraw</td><td>0.41 ms</td><td>0.14 ms</td></tr>
-            <tr><td>Light way (A*), per plan</td><td>0.23 ms</td><td>0.18 ms</td></tr>
-            <tr><td>One cut of the surface (worker)</td><td>64–123 ms</td><td>27–66 ms</td></tr>
-            <tr><td>New shape, until it hollows</td><td>0.9–2.0 s</td><td>0.4–1.3 s</td></tr>
-            <tr><td>Sketch of a Cells change</td><td>0.58 s</td><td>0.33 s</td></tr>
-            <tr><td>JS heap</td><td>79 MB</td><td>42 MB</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="fig-cap">The phone tier cuts faster because its mesh is coarser. Its glow cube is 256² rather than 512², and is only redrawn when a new mesh lands or the light moves.</p>
     </div>
   </section>
 

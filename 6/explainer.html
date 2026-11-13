@@ -168,6 +168,17 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </figure>
   </header>
 
+  <!-- The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>A sphere that is a machine</h2>
+      <p>Day 6's prompt was Orrery. An engraved metal sphere whose surface is a working mechanism: channels run round it along great and small circles, a turntable sits at every crossing, and carriages carry coloured beads from crossing to crossing in clockwork ticks. The beads sort themselves onto the circles of their colour, orbit together for a while, then scramble.</p>
+      <p>Turntables, dials and plates pop out on their rods, on their own or when clicked, showing their gears and a well with a sun and planet train underneath. Press R and the machine flies apart and reassembles into a new layout, in one of 22 finishes. Every layout is rendered in <a href="gallery/">the Orrery Collection</a>.</p>
+      <p>The layout is a set of circles on a sphere, and every plate between them is a distance field meshed into a bevelled tile. The engraving is drawn in the fragment shader from distance fields, the machine runs on a 1.4-second clock, and the <a href="../modules/pipeline/explainer.html">shared pipeline</a> renders it with motion blur and a supersampled still once it holds.</p>
+    </div>
+  </section>
+
   <!-- 1 -->
 <!-- 1. The layout -->
   <section>
@@ -511,17 +522,15 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
   </section>
 
   <!-- 8 -->
-<!-- 8. Finishes, studio and performance -->
+<!-- 8. Finishes and the studio -->
   <section>
     <div class="col prose">
       <div class="eyebrow">Finishes and the studio · <b>materials.js</b> · <b>main.js</b></div>
-      <h2>Finishes, studio and performance</h2>
+      <h2>Finishes and the studio</h2>
       <p>A finish is one entry in <code>FINISHES</code>, and there are 22 of them. Each sets the plate colour and roughness, the inlay that fills the engraving (colour, metalness, roughness), the turntable colour and roughness, and the carriage colour. Optional keys cover the rest: <code>gear</code> for the gears inside the core (the plate colour otherwise), <code>plateMetal: 0</code> for the three enamels (black, white and lapis), and <code>partInlay</code> for the engraving on dials and turntables. On black enamel, lapis, white enamel and ruthenium that fill is the plate's own colour, so the dials and turntables carry the plate's colour in their engraving, champlevé style. The beads come in four sets of four colours: enamel (roughness 0.18), jewel (0.05), metal (0.14, fully metallic) and stone (0.5). A new finish is applied to the materials in place, with no rebuild; if a new shape is already on its way, it waits and arrives with the new parts.</p>
       <p>The studio is the shared pipeline's: a key light from (−0.55, 0.8, 0.45) at intensity 16 and size 0.55, a cool fill at 0.32, floor 0.22, wall 0.3, ceiling 0.2, all tinted warm. Shadows are PCSS, fitted to the scene and denoised. AO runs at intensity 1 with a minimum of 0.04, GI at 1.2, and one analytic sphere occluder of radius 1 at the centre darkens the floor under the machine. The frame ends at exposure 1.1 with bloom 0.04, vignette 0.3 and grain 0.025. AO and GI start to fade at the camera's distance to the target plus 2.4 (plus 4.5 while parts are flying) and are gone 1.6 further on, so the far floor and the wall skip the trace.</p>
       <p>Motion blur uses a 1/60 s shutter, 24 samples and a maximum of 0.03 of the screen, and it is switched off on the low and medium tiers, so it runs on high and capture. The prepass already holds every part's motion over the last frame, so the blur reuses that velocity instead of rendering the scene again, as long as the camera is still and the spin moves the front of the sphere less than 0.4 px a frame.</p>
-      <p>The <b>Quality</b> setting, in the Rendering section, picks the budget: auto, high, medium or low. The tier is fixed when the pipeline is built, so a new choice reloads the page with <code>?quality=</code>, keeping the seed and settings in the url. On auto, a desktop gets high and a phone, picked by user agent or a coarse pointer, gets medium; a phone that reports 4 GB of memory or less, or 4 cores or fewer, starts on low. Medium has no blur, a 96 × 48 core instead of 128 × 64, 48 rim samples per turntable instead of 64, plates with 0.72 and dials with 0.7 of the samples, no supersampling, and a drawing buffer of at most 2.6 megapixels. Low goes further: the pipeline's low tier (no MSAA, FXAA instead, a 1024 shadow map), 4 GI steps instead of 8, no bloom, no guilloche, a 64 × 32 core, 40 turntable rim samples, plates and dials at 0.55, and at most 1 megapixel.</p>
       <p>Once nothing moves, the frame settles into a supersampled still. That needs the machine paused (or Speed and Spin both at 0), the camera where it was last frame, and no drag or zoom under way, for 0.4 s. The shared <code>detailScale</code> uniform then drops to 0.25, so the engraving's pixel-size estimates (the groove's <code>fwidth</code>, the milled-edge fade, the specular antialiasing kernel and the motif's pixel size) act as if the pixels were a quarter of the size. The guilloche's line coverage still filters over the whole pixel. The pipeline averages jittered frames into one, 64 on high, 16 on medium and 8 on low, reusing the depth-of-field lens accumulator with zero aperture, and then stops rendering the scene: only bloom and the final pass run. If something restarts it while settled, it cross-fades from the image on screen over the first 24 samples. For this the day passes the pipeline a clock that only runs while something moves, and uploads instance matrices only when they change, because the pipeline reads an upload as motion. Temporal antialiasing was tried for the same job and dropped.</p>
-      <p>Most of the speed comes from not drawing what can't be seen. While a plate or turntable is seated, <code>displace()</code> returns the origin for its gears, so their triangles have no area and the rasteriser drops them in every pass. The gear builder shares vertices round each ring. Plate rims get <code>reach · 420</code> samples, clamped to 72–150, with a turn weight of 0.06 that keeps the rounded corners dense. The core draws after the parts, so the depth test rejects most of it. The shaders compile while the first layout builds, and a rebuild finds and builds the next layout in steps of about 6 ms a frame (it stops at the first step that ends past the deadline) while the old one flies apart.</p>
     </div>
 
     <div class="fig">
@@ -537,62 +546,23 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <p class="fig-cap">Each swatch is drawn from that finish's entry in <code>FINISHES</code>: the plate in its plate colour, with a border rule, a rosette and channel graduations in the inlay colour; the channel and the turntable's well in the core's black; the turntable in its colour with a ring engraved in <code>partInlay</code> (or the inlay); and beads from the chosen set on carriages. Click a swatch, or pick it from the menu, to read its values. Simplified: the colours are the hex values as written, shaded with a flat 2D gradient whose highlight narrows with lower roughness. The real ones are lit by the studio and pass through AgX.</p>
     </div>
 
-    <div class="fig">
-      <div class="order">
-        <div class="order-col">
-          <h3>Orrery's own work, each frame</h3>
-          <div class="pass own"><span>Machine tick<small>machine.js: turntables turn, then beads with room move one edge</small></span><span class="chips"><span class="chip">CPU</span></span></div>
-          <div class="pass own"><span>Instances<small>turntables, counter gears, wells and their gear trains, carriages, beads; matrices upload only when they change, fades only while fading</small></span><span class="chips"><span class="chip">128 + 80</span></span></div>
-          <div class="pass own"><span>Plate state<small>lift, turn, dial angle, dial lift and fade per plate; last frame kept for velocity</small></span><span class="chips"><span class="chip read">128 × 3 texels</span></span></div>
-          <div class="pass own"><span>Rebuild step<small>layout search, plate fields, merge</small></span><span class="chips"><span class="chip">~6 ms, if rebuilding</span></span></div>
-          <div class="pass own"><span>Motif atlas<small>distance-field motifs for the engraving</small></span><span class="chips"><span class="chip">per layout</span></span></div>
-        </div>
-        <div class="order-col">
-          <h3>The shared pipeline around it</h3>
-          <div class="pass"><span>Shadow map<small>PCSS, auto-fit, denoised</small></span><span class="chips"><span class="chip read">pipeline</span></span></div>
-          <div class="pass"><span>Prepass<small>normals, velocity, depth; displace() runs twice</small></span><span class="chips"><span class="chip read">pipeline</span></span></div>
-          <div class="pass"><span>GTAO + SSIL<small>half resolution, faded past the machine</small></span><span class="chips"><span class="chip read">pipeline</span></span></div>
-          <div class="pass"><span>Colour pass<small>engraving and motifs drawn in the plate shader</small></span><span class="chips"><span class="chip read">MSAA</span></span></div>
-          <div class="pass"><span>Motion blur<small>reuses the prepass velocity when it can</small></span><span class="chips"><span class="chip read">24, high and capture</span></span></div>
-          <div class="pass"><span>Settled still<small>jittered frames averaged in the lens accumulator, then the passes above stop</small></span><span class="chips"><span class="chip read">64 / 16 / 8</span></span></div>
-          <div class="pass"><span>Bloom, AgX, vignette, grain<small>exposure 1.1; bloom off on low</small></span><span class="chips"><span class="chip read">final</span></span></div>
-        </div>
-      </div>
-    </div>
+      <figure class="still">
+      <img src="explainer/finishes.jpg" alt="Six finishes on the same orrery: frosted gilt, blued steel, rhodium, verdigris, rose gold and pewter." width="1200" height="800" loading="lazy" decoding="async">
+      <figcaption>Frosted gilt, blued steel, rhodium, verdigris, rose gold, pewter.</figcaption>
+    </figure>
+    <figure class="still">
+      <img src="explainer/finishes-more.jpg" alt="Ten more finishes on the same orrery: rhodium and blued, brass and blued, steel and rose gold, gilt and rhodium, ruthenium, niello, blackened steel, ormolu, lapis and white enamel." width="1200" height="480" loading="lazy" decoding="async">
+      <figcaption>Rhodium and blued, brass and blued, steel and rose gold, gilt and rhodium, ruthenium; niello, blackened steel, ormolu, lapis, white enamel.</figcaption>
+    </figure>
+</section>
 
-    <div class="scroll">
-      <table>
-        <thead><tr><th>Budget</th><th>High (desktop)</th><th>Medium (phone)</th><th>Low (weak phone)</th></tr></thead>
-        <tbody>
-          <tr><td>Pipeline tier</td><td>4× MSAA, 2048 shadow map</td><td>2× MSAA, 2048 shadow map</td><td>no MSAA, FXAA, 1024 shadow map</td></tr>
-          <tr><td>GI</td><td>2 slices, 8 steps</td><td>1 slice, 8 steps</td><td>1 slice, 4 steps</td></tr>
-          <tr><td>Motion blur</td><td>24 samples, 1/60 s</td><td>off</td><td>off</td></tr>
-          <tr><td>Bloom</td><td>0.04</td><td>0.04</td><td>off</td></tr>
-          <tr><td>Guilloche</td><td>on</td><td>on</td><td>off</td></tr>
-          <tr><td>Core sphere</td><td>128 × 64</td><td>96 × 48</td><td>64 × 32</td></tr>
-          <tr><td>Turntable rim samples</td><td>64</td><td>48</td><td>40</td></tr>
-          <tr><td>Plate rim samples</td><td>reach · 420, 72–150</td><td>× 0.72</td><td>× 0.55</td></tr>
-          <tr><td>Dial rim samples</td><td>dial · 800, 64–112</td><td>× 0.7</td><td>× 0.55</td></tr>
-          <tr><td>Supersample</td><td>1×, up to 2× from the GUI</td><td>never</td><td>never</td></tr>
-          <tr><td>Drawing buffer</td><td>dpr × supersample</td><td>≤ 2.6 MP</td><td>≤ 1 MP</td></tr>
-          <tr><td>Settled still</td><td>64 frames</td><td>16 frames</td><td>8 frames</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="facts">
-      <div class="fact"><b>~2.5 ms a frame</b><span>GPU time at 1200 × 900 on an RTX 4060 laptop with motion blur on, against 3.1 ms before the work above, without blur.</span></div>
-      <div class="fact"><b>~2.8–2.9 ms on the phone profile</b><span>The medium tier measured the same way, down from 3.3 ms.</span></div>
-      <div class="fact"><b>Low: well under half</b><span>The low tier's GPU time against medium's on the same phone profile. Other GPU load disturbed the absolute numbers, so only the ratio holds.</span></div>
-      <div class="fact"><b>~2.0M → ~1.4M triangles</b><span>Submitted per frame on the layout measured at the time, after the gears were collapsed and the rims trimmed. The count follows the number of plates, so a dense layout such as the default dodecahedral rings can differ.</span></div>
-      <div class="fact"><b>Nothing drawn when settled</b><span>Once the still has its 64 frames (16 on medium, 8 on low), the scene is not rendered again until something moves; only bloom and the final pass run.</span></div>
-      <div class="fact"><b>No first-frame stall</b><span>The programs don't depend on the plates' vertex data, so they compile against placeholder geometry while the first layout is still being built.</span></div>
-    </div>
-
+  <!-- Controls -->
+  <section>
     <div class="col prose">
-      <h3>Playing with it</h3>
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
     </div>
-    <ul class="keys">
+    <ul class="keys col">
       <li><b>Click</b> or tap a turntable to pop it out and send its bead onto another circle; a dial or plate pops out and spins.</li>
       <li><b>Drag</b> orbits; scroll or pinch zooms.</li>
       <li><b>Layout</b>: symmetric, one of the presets (dodecahedral rings by default), or random. <b>Circles</b>, 4 to 6, shows only for the random layout, the only one it shapes.</li>
@@ -609,15 +579,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <li><b>M</b> or the speaker button toggles sound.</li>
       <li><b>Space</b> pauses, <b>Tab</b> hides the panel, <b>F</b> goes fullscreen, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
     </ul>
-      <figure class="still">
-      <img src="explainer/finishes.jpg" alt="Six finishes on the same orrery: frosted gilt, blued steel, rhodium, verdigris, rose gold and pewter." width="1200" height="800" loading="lazy" decoding="async">
-      <figcaption>Frosted gilt, blued steel, rhodium, verdigris, rose gold, pewter.</figcaption>
-    </figure>
-    <figure class="still">
-      <img src="explainer/finishes-more.jpg" alt="Ten more finishes on the same orrery: rhodium and blued, brass and blued, steel and rose gold, gilt and rhodium, ruthenium, niello, blackened steel, ormolu, lapis and white enamel." width="1200" height="480" loading="lazy" decoding="async">
-      <figcaption>Rhodium and blued, brass and blued, steel and rose gold, gilt and rhodium, ruthenium; niello, blackened steel, ormolu, lapis, white enamel.</figcaption>
-    </figure>
-</section>
+  </section>
 
   <footer class="col">
     <div class="meta">

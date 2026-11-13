@@ -129,6 +129,9 @@ td b { color: var(--candy); }
 .formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: nowrap; }
 .formula .c { color: var(--muted); }
 footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
 
 @media (max-width: 760px) {
   .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
@@ -153,12 +156,14 @@ footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px so
     </figure>
   </header>
 
+  <!-- The idea -->
   <section>
     <div class="col prose">
-      <div class="eyebrow">Playing with it · <b>main.js</b> · <b>rotation.js</b></div>
-      <h2>What you can do</h2>
-      <p>Hold on the object to grow a blob. A press shorter than 0.25 s drops a medium blob instead, and pressing an existing blob feeds it. A hold on the underside grows a pool after 0.3 s and keeps it topped up, so it drips like a tap. If the pointer moves more than 5 pixels (10 on touch), the press becomes a drag that turns the object, and the blob it had started sinks back in. Dragging off the object orbits the camera; scroll or pinch to zoom.</p>
-      <p>Shape picks one of nine solids and Finish one of five materials. Amount sets how many blobs the object carries, from 10 to 60 (8 to 36 on phones), and how fast pools are fed. Viscosity slows everything: blob speed falls as e<sup>−3·viscosity</sup>, seeping takes 1.2 to 2.5 s, trails last longer, and drops pinch more slowly and hang longer. Size scales blob radii and drop size, and Drip length stretches the hanging drops. Reset melt (M) dries the object. Motion is Rock, Tumble or Still, with Spin in radians per second. Flip (F) turns the object over. Height raises it above the floor and refits the camera and shadow. Set picks a light or dark studio and Reflections the environment the surface reflects. The Rendering section holds the pipeline's options, including Wireframe (W). Space pauses, R randomises, Tab hides the panel and P saves a screenshot.</p>
+      <div class="eyebrow">The idea</div>
+      <h2>A coat of liquid that drips</h2>
+      <p>Day 3's prompt was Melt. A floating object melts under a coat of glossy liquid: blobs seep out of its skin, sag and run downhill, merge and leave wet trails. On the underside the liquid gathers into pools that swell into teardrops, stretch on a thinning thread and drop into a puddle on the floor.</p>
+      <p>There are nine solids, Suzanne among them, and five finishes. Hold on the object to grow a blob, or drag it to turn it: the liquid always runs toward the real down as the object rocks, tumbles or flips.</p>
+      <p>The liquid isn't a fluid simulation. It is a field of soft bumps on the body's surface, displaced in the vertex shader and refined per pixel, so it stays smooth up close. Blobs walk the mesh under gravity, the displaced surface is computed once a frame and read by every pass, and the hanging pools are real pendant-drop profiles grafted onto the skin. The <a href="../modules/pipeline/explainer.html">shared pipeline</a> adds the shadows, AO and motion blur.</p>
     </div>
   </section>
 
@@ -469,6 +474,26 @@ footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px so
         <p class="fig-cap">Each circle is as large as the distance to the nearest surface, so the trace can never step outside. Its length t through the wax sets how much of the key light comes through.</p>
       </div>
     </div>
+  </section>
+
+  <!-- Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>Hold on the object to grow a blob; a press shorter than 0.25 s drops a medium one, and pressing a blob feeds it. A hold on the underside grows a pool after 0.3 s and keeps it dripping like a tap.</li>
+      <li>Drag the object to turn it: a press that moves more than 5 pixels (10 on touch) becomes a drag, and its blob sinks back in. Drag off the object to orbit; scroll or pinch to zoom.</li>
+      <li><b>Shape</b>: one of nine solids. <b>Finish</b>: one of five materials.</li>
+      <li><b>Amount</b>: 10 to 60 blobs (8 to 36 on phones), and how fast pools are fed.</li>
+      <li><b>Viscosity</b> slows everything: blob speed falls as e<sup>−3·viscosity</sup>, seeping takes 1.2 to 2.5 s, trails last longer, and drops pinch more slowly and hang longer.</li>
+      <li><b>Size</b> scales blob radii and drop size; <b>Drip length</b> stretches the hanging drops.</li>
+      <li><b>Motion</b>: Rock, Tumble or Still, with <b>Spin</b> in radians per second. <b>Height</b> raises it above the floor and refits the camera and shadow.</li>
+      <li><b>Set</b>: a light or dark studio. <b>Reflections</b>: the environment the surface reflects.</li>
+      <li><b>M</b> resets the melt, <b>F</b> flips the object, <b>W</b> toggles wireframe (in the Rendering section).</li>
+      <li><b>R</b> randomises, <b>Space</b> pauses, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot.</li>
+    </ul>
   </section>
 
   <footer class="col">

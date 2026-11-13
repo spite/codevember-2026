@@ -142,6 +142,17 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </figure>
   </header>
 
+  <!-- The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>Stone grown by chemistry, then overgrown</h2>
+      <p>Day 5's prompt was Moss. A stone sculpture is grown by reaction-diffusion, then slowly overgrown by moss that spreads from its best spots outward.</p>
+      <p>The shapes are simple solids (sphere, egg, pebble, torus, Suzanne) and implicit surfaces with structure inside (gyroids, Schwarz P, Neovius, the tanglecube). The reaction hollows the shape into a lattice, grows coral over a solid core, fills it like a sponge, or only erodes grooves into its skin. Four species of moss grow in patches and small islands.</p>
+      <p>Gray-Scott reaction-diffusion runs on the GPU in a 128³ volume and is meshed in a worker with surface nets. The moss is a displaced mat plus instanced fur shells cut from a 3D Voronoi of shoots, so it casts shadows and gets AO like the stone. The stone is shaded per pixel, and the <a href="../modules/pipeline/explainer.html">shared pipeline</a>'s studio is overcast, with mist.</p>
+    </div>
+  </section>
+
   <!-- 1. Reaction-diffusion -->
   <section>
     <div class="col prose">

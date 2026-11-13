@@ -374,20 +374,6 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </div>
   </section>
 
-  <!-- 13. Cost -->
-  <section>
-    <div class="col prose">
-      <div class="eyebrow">Cost</div>
-      <h2>Where the time goes</h2>
-    </div>
-    <div class="facts">
-      <div class="fact"><b>Overdraw</b><span>Gears overlap a lot. The rust shader reads the prepass depth first, and fragments hidden behind another part get the base rust colour and skip the rest.</span></div>
-      <div class="fact"><b>Lite rust</b><span>On the medium and low tiers (phones), the material leaves out the scanned normals, the old-scale scan and the flaking.</span></div>
-      <div class="fact"><b>Pixel budget</b><span>Big screens render at most 3.7 million pixels (2.2 million on medium and low), scaled down from the device's pixel ratio. Captures skip the budget.</span></div>
-      <div class="fact"><b>Building</b><span>Generating a machine, meshing its worn parts and scoring 144 views runs in the page between two machines. The colliders' points are cached, and gear meshes are built once per set of arguments.</span></div>
-    </div>
-  </section>
-
   <!-- 14. Controls -->
   <section>
     <div class="col prose">

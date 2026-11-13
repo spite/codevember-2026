@@ -111,6 +111,9 @@ td b { color: var(--accent); }
 .formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: nowrap; }
 .formula .c { color: var(--muted); }
 footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
 
 @media (max-width: 760px) {
   .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
@@ -134,6 +137,17 @@ footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px so
       <figcaption>The gallery frame of Day 1.</figcaption>
     </figure>
   </header>
+
+  <!-- The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>Paper solids that fold themselves</h2>
+      <p>Day 1's prompt was Fold. A handful of paper polyhedra float in a pale studio. Each one unfolds into a flat net, the net melts into the net of the next solid, and it folds back up with rounded creases, bowed faces and softly rounded peaks.</p>
+      <p>The solids grow from a tetrahedron by Conway operators: the Platonic and Archimedean solids, their duals, pyramids pushed out of every face or dimpled into it, and star solids. Each is a convex hull in Ammo with zero gravity and a spring pulling it home, so the shapes drift and bump into each other: drag one to throw it, tap empty space to scatter them. The paper is egg white, white with a coloured accent, or mixed origami colours.</p>
+      <p>The work splits three ways: finding a net that unfolds without overlapping, building the folded paper with an exact fillet at every crease, and morphing one flat net into the next. The <a href="../modules/pipeline/explainer.html">shared pipeline</a> renders the paper, with a fibre texture baked once.</p>
+    </div>
+  </section>
 
   <section>
     <div class="col prose">
@@ -309,13 +323,23 @@ footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px so
     </div>
   </section>
 
+  <!-- Controls -->
   <section>
     <div class="col prose">
-      <div class="eyebrow">The controls · <b>1/main.js</b></div>
-      <h2>Playing with it</h2>
-      <p>Solid picks one of twelve solids, or mixed, which draws each shape from the five Platonic solids plus the truncated dodecahedron and icosahedron. Faces picks plain, pyramids, inverted or mixed. Colors picks white, accents or colorful. Count sets 3 to 12 shapes (default 7), and Size the mean radius (default 0.85), with each shape 0.75 to 1.2 times that. Changing any of these starts a transition to a new layout.</p>
-      <p>Home spring, Bounce, Drift and Spin change the physics live: the stiffness that pulls each shape home, the restitution of the shapes and floor, the strength of the wandering force, and how fast each home orientation turns (0.5 to 1.5 times the value, in radians per second). Crease sets the fillet radius and the depth of the valley shading; a quarter second after the slider stops, every shape is rebuilt in place with the same net and layout.</p>
-      <p>Drag a shape to grab and throw it; tap empty space for a burst; drag elsewhere to orbit, and scroll or pinch to zoom between 4 and 14 units. Space pauses, R randomises, Tab hides the panel, P saves a screenshot (Shift+P at 2×) and M toggles sound.</p>
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>Drag a shape to grab and throw it; tap empty space for a burst. Drag elsewhere to orbit; scroll or pinch to zoom, between 4 and 14 units.</li>
+      <li><b>Solid</b>: one of twelve solids, or mixed, which draws from the five Platonic solids plus the truncated dodecahedron and icosahedron.</li>
+      <li><b>Faces</b>: plain, pyramids, inverted or mixed. <b>Colors</b>: white, accents or colorful.</li>
+      <li><b>Count</b>: 3 to 12 shapes (default 7). <b>Size</b>: the mean radius (default 0.85), each shape 0.75 to 1.2 times that. These start a transition to a new layout.</li>
+      <li><b>Home spring</b>, <b>Bounce</b>, <b>Drift</b> and <b>Spin</b> change the physics live: the pull home, the restitution of the shapes and floor, the wandering force, and how fast each home orientation turns.</li>
+      <li><b>Crease</b>: the fillet radius and the depth of the valley shading. Every shape is rebuilt in place a quarter second after the slider stops.</li>
+      <li><b>R</b> randomises; <b>M</b> or the speaker button toggles sound.</li>
+      <li><b>Space</b> pauses, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
+    </ul>
+    <div class="col prose">
       <p>Every random choice in a layout comes from the seed. While a layout is planned, Math.random is swapped for a generator seeded with the page seed plus ":layout", covering the solids, sizes, homes, orientations, spin axes, colours, face variants and a per-shape seed. That per-shape seed drives the shape's net search, crease jitter and face bow, so two cubes in one layout fold from different nets, and a link with the same seed rebuilds the same scene. The url carries the seed plus any setting that differs from what the seed gives. On load the shapes appear already folded; only later changes animate.</p>
     </div>
   </section>

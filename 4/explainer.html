@@ -164,6 +164,17 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </figure>
   </header>
 
+  <!-- The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>Bands that tie themselves in knots</h2>
+      <p>Day 4's prompt was Tangle. Two to five flat, iridescent bands lie side by side and wind together around a central hole, twisting round each other as they go. The coil writhes slowly, and every few seconds it re-ties itself into a new knot, the bands sliding from one shape into the next.</p>
+      <p>The finish is holographic chrome, a pearl coat or tinted glass, in three palettes, and the band's section can be a squircle, pinched, fluted or a lens.</p>
+      <p>The bands follow one torus-knot path with a wobble. Their surface is a smooth union of swept bands: a mesh is projected onto it on the GPU every frame and its normals are recomputed per pixel, so merged bands blend into soft fillets. The bands reflect each other through a coarse distance volume, the colours come from thin-film optics, and the <a href="../modules/pipeline/explainer.html">shared pipeline</a> adds depth of field.</p>
+    </div>
+  </section>
+
   <!-- 1. The coil -->
   <section>
     <div class="col prose">
@@ -393,49 +404,13 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </div>
   </section>
 
-  <!-- 9. Studio, lens, phones -->
+  <!-- 9. Studio and lens -->
   <section>
     <div class="col prose">
       <div class="eyebrow">The studio · <b>main.js</b> · <b>modules/pipeline</b></div>
-      <h2>Studio, lens and phones</h2>
+      <h2>Studio and lens</h2>
       <p>The coil floats in a grey cyc, <code>#dcdad6</code>, above a floor at y = −1.7, lit by the shared pipeline's studio: a key at intensity 30 from the upper left, with fill, floor and wall bounce. Shadows are PCSS, denoised in screen space. The floor and the pearl finish get ambient occlusion and one bounce of indirect light. The frame ends with bloom at 0.03, a 0.15 vignette, a little grain and AgX at an exposure of 1.5. Chrome and glass are drawn entirely as emissive colour, so their colour pass skips the pipeline's lighting. Reflections can show the baked studio or a photographed one, Studio Small 03, turned so its brightest light sits at the key's azimuth and scaled to the studio's brightness.</p>
       <p>Depth of field focuses on the near side of the coil, 0.45 in front of the orbit target. While anything moves, each frame gets the pipeline's tiled half-resolution gather. Once the camera, the scene and the time hold still, frames rendered from points across the lens are averaged instead, up to 24, which gives the exact blur with correct occlusion. Section, finish, palette, iridescence and merge changes restart the average.</p>
-      <p>Phones get a lighter tier, chosen from the user agent or a coarse pointer: a coarser mesh, a smaller volume and half the reflection steps. The pipeline drops to its medium tier on the same test.</p>
-    </div>
-    <div class="fig">
-      <div class="order">
-        <div class="order-col">
-          <h3>Tangle's own work, each frame</h3>
-          <div class="pass"><span>Coil<small>knots.js, on the CPU: samples, waves, re-tie</small></span><span class="chips"><span class="chip read">128 × 10 texture</span></span></div>
-          <div class="pass own"><span>Project<small>one pixel per vertex, Newton steps</small></span><span class="chips"><span class="chip">if changed</span></span></div>
-          <div class="pass own"><span>Bake volume<small>64³ distances and band ids</small></span><span class="chips"><span class="chip">if changed</span></span></div>
-          <div class="pass own"><span>Reflection trace<small>jittered ray, three exact hits</small></span><span class="chips"><span class="chip">front pixels</span></span></div>
-          <div class="pass own"><span>Resolve<small>reproject, clamp, average</small></span><span class="chips"><span class="chip">16 / 64</span></span></div>
-        </div>
-        <div class="order-col">
-          <h3>The shared pipeline around it</h3>
-          <div class="pass"><span>Shadow map<small>PCSS, denoised</small></span><span class="chips"><span class="chip read">pipeline</span></span></div>
-          <div class="pass"><span>Prepass<small>normals, velocity, depth</small></span><span class="chips"><span class="chip read">pipeline</span></span></div>
-          <div class="pass"><span>GTAO + SSIL<small>half resolution</small></span><span class="chips"><span class="chip read">pipeline</span></span></div>
-          <div class="pass"><span>Colour pass<small>trace and resolve run here, then the bands</small></span><span class="chips"><span class="chip read">MSAA</span></span></div>
-          <div class="pass"><span>Depth of field<small>gather, or lens average when still</small></span><span class="chips"><span class="chip read">24 lens</span></span></div>
-          <div class="pass"><span>Bloom, AgX, vignette, grain<small>exposure 1.5</small></span><span class="chips"><span class="chip read">final</span></span></div>
-        </div>
-      </div>
-    </div>
-    <div class="scroll">
-      <table>
-        <thead><tr><th>Budget</th><th>Desktop</th><th>Phone</th></tr></thead>
-        <tbody>
-          <tr><td>Rings × sides per band</td><td>256 × 36</td><td>192 × 28</td></tr>
-          <tr><td>Vertices per band</td><td>9,216</td><td>5,376</td></tr>
-          <tr><td>Newton steps</td><td>3</td><td>3</td></tr>
-          <tr><td>Distance volume</td><td>64³ in 512²</td><td>32³ in 192²</td></tr>
-          <tr><td>Reflection march steps</td><td>24</td><td>12</td></tr>
-          <tr><td>Lens samples when still</td><td>24</td><td>24</td></tr>
-          <tr><td>Pipeline tier</td><td>high: 4× MSAA</td><td>medium: 2× MSAA</td></tr>
-        </tbody>
-      </table>
     </div>
     <figure class="still">
       <img src="explainer/wide.jpg" width="1200" height="630" alt="The coil in a wide frame, its far side softly out of focus." loading="lazy" decoding="async">
@@ -446,10 +421,15 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="fact"><b>Paused, but alive</b><span>Section morphs and finish fades run on wall-clock time, so they play out while the coil is paused. Pausing also restarts the Auto change countdown.</span></div>
       <div class="fact"><b>Never under the floor</b><span>The orbit's lowest tilt depends on the camera distance, so the camera can't sink below the floor, and the camera is kept inside the cyc.</span></div>
     </div>
+  </section>
+
+  <!-- Controls -->
+  <section>
     <div class="col prose">
-      <h3>Playing with it</h3>
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
     </div>
-    <ul class="keys">
+    <ul class="keys col">
       <li><b>Drag</b> orbits; pinch or scroll zooms.</li>
       <li><b>Finish</b>: holographic, pearl or glass.</li>
       <li><b>Palette</b>: purple-cyan, gold-green or pink-orange.</li>

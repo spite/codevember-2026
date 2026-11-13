@@ -366,38 +366,6 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </div>
   </section>
 
-  <!-- 12. Cost -->
-  <section>
-    <div class="col prose">
-      <div class="eyebrow">Cost</div>
-      <h2>Where the time goes</h2>
-      <p>Measured at 1080p on a desktop GPU, one run at a time, with the volume turning. The GPU spends about 3 ms a frame. The physics runs in parallel in its worker, so it costs the frame nothing as long as it keeps up.</p>
-    </div>
-    <div class="fig">
-      <div class="scroll">
-        <table>
-          <thead><tr><th>Work</th><th>Time</th></tr></thead>
-          <tbody>
-            <tr><td>GPU, whole frame, 1080p</td><td>~3 ms</td></tr>
-            <tr><td class="sub">Main scene pass (floor, floaters), 4× MSAA</td><td>1.1 ms</td></tr>
-            <tr><td class="sub">Glass shell (volume pass)</td><td>0.3 ms</td></tr>
-            <tr><td class="sub">Jelly composite</td><td>0.1 ms</td></tr>
-            <tr><td class="sub">Each Gaussian pyramid (four a frame)</td><td>0.08 ms</td></tr>
-            <tr><td>Physics worker, one step, 16 bodies, 1820 particles</td><td>1.8 ms</td></tr>
-            <tr><td class="sub">Collision pair search, of that</td><td>0.6 ms</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="fig-cap">The rest of the frame is spread across the smaller passes: the shadow map, the prepass, the skins' front and thickness passes, the light map, bloom and the final pass.</p>
-    </div>
-    <div class="facts">
-      <div class="fact"><b>Pixel budget</b><span>Fullscreen on a 16" MacBook the canvas is far bigger than 1080p. Rendering is capped at about 4.2 megapixels (2.6 on the medium and low tiers), which took that screen from 61 to 140 frames per second.</span></div>
-      <div class="fact"><b>Adaptive scale</b><span>Under the cap, the render scale drops by 15% while frames run slow, down to half, and climbs back by 10% once they keep up, checked every second and a half. Recordings skip both.</span></div>
-      <div class="fact"><b>No AO or GI</b><span>The bodies are drawn outside the pipeline, so its ambient occlusion and indirect light only reached the floor and the floaters, invisibly. Turning them off saved about 25% with no visible difference.</span></div>
-      <div class="fact"><b>Phones</b><span>Five substeps instead of eight, 92-particle shells and a Count of at most 14. Phones get the medium tier, which also means 48 steps for the glass instead of 72 and the smaller light map.</span></div>
-    </div>
-  </section>
-
   <!-- 13. Controls -->
   <section>
     <div class="col prose">

@@ -419,42 +419,6 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </div>
   </section>
 
-  <!-- 15. Cost -->
-  <section>
-    <div class="col prose">
-      <div class="eyebrow">Cost</div>
-      <h2>Where the time goes</h2>
-      <p>Making a piece costs more than drawing it. Growing and packing run in the worker, so the page keeps rendering, and the time shows as the wait between pieces. Measured in Node on a desktop, one run each, on the sphere at Variation 1 and Scale 1.3; the worker runs the same code.</p>
-    </div>
-    <div class="fig">
-      <div class="scroll">
-        <table>
-          <thead><tr><th>Pattern</th><th>Primitives</th><th>Grow</th><th>Pack</th><th>Cell refs</th><th>Most in a cell</th></tr></thead>
-          <tbody>
-            <tr><td>rinceau</td><td>36,005</td><td>1.98 s</td><td>0.34 s</td><td>2.01 M</td><td>43</td></tr>
-            <tr><td>veins</td><td>22,690</td><td>1.17 s</td><td>0.18 s</td><td>1.62 M</td><td>22</td></tr>
-            <tr><td>paisley</td><td>18,088</td><td>1.00 s</td><td>0.15 s</td><td>1.00 M</td><td>35</td></tr>
-            <tr><td>biomech</td><td>16,900</td><td>0.71 s</td><td>0.15 s</td><td>1.16 M</td><td>20</td></tr>
-            <tr><td>feathers</td><td>14,642</td><td>0.58 s</td><td>0.67 s</td><td>1.80 M</td><td>42</td></tr>
-            <tr><td>girih</td><td>12,454</td><td>0.39 s</td><td>0.20 s</td><td>1.33 M</td><td>16</td></tr>
-            <tr><td>knotwork</td><td>11,375</td><td>0.22 s</td><td>0.22 s</td><td>1.94 M</td><td>15</td></tr>
-            <tr><td>coral</td><td>7,608</td><td>0.58 s</td><td>0.18 s</td><td>1.17 M</td><td>20</td></tr>
-            <tr><td>meander</td><td>4,432</td><td>0.12 s</td><td>0.60 s</td><td>1.22 M</td><td>12</td></tr>
-            <tr><td>guilloché</td><td>3,624</td><td>0.03 s</td><td>0.28 s</td><td>0.89 M</td><td>13</td></tr>
-            <tr><td>friezes</td><td>980</td><td>0.44 s</td><td>0.15 s</td><td>0.76 M</td><td>7</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="fig-cap">Long, thin primitives (feathers' segments, the meander's straps) cost more to pack: they are tested against their segment in every cell of their bounding sphere. Friezes are few primitives, each a whole period of moulding, but their bands take time to lay.</p>
-    </div>
-    <div class="facts">
-      <div class="fact"><b>Lookup textures</b><span>The sphere's 130³ cells take 17.6 MB as RG32UI, though only about one in eight lists anything; a rinceau's 2 million references take 8 MB more and its primitives 2.9 MB. CPU copies are dropped once uploaded.</span></div>
-      <div class="fact"><b>Samples per pixel</b><span>Three relief evaluations a pixel on the high tier, one on phones (medium and low), with the slope from screen derivatives.</span></div>
-      <div class="fact"><b>Fumes per step</b><span>Twenty-five full-screen passes over the 147,456-texel atlas (18 of them Jacobi), then a 56-step march with three shadow taps at half resolution, a resolve and a composite. High tier only, and only while there is vapour.</span></div>
-      <div class="fact"><b>Adaptive scale</b><span>A safety net for slow devices: if frames stay over 40 ms for about 6 s, the render scale drops by 20%, down to half at most. It never climbs back, so the image doesn't pump between sizes. Recordings skip it.</span></div>
-    </div>
-  </section>
-
   <!-- 16. Controls -->
   <section>
     <div class="col prose">

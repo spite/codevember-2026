@@ -146,6 +146,17 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </figure>
   </header>
 
+  <!-- The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>Mirrors that never end</h2>
+      <p>Day 8's prompt was Tesseract. It is an infinity polyhedron, after Anthony James's sculptures: a convex solid with a dark steel frame, faces of two-way mirror glass and a light tube along every edge inside. The mirrors send the tubes back and forth without end, and the solid opens onto a lattice of light in every direction. The page opens on a cube with a smaller cube nested inside and joined to it at every corner, the usual picture of a tesseract.</p>
+      <p>There are forty solids: Platonic, Archimedean and Catalan solids, prisms, antiprisms and bipyramids, with up to 64 faces, and a change morphs one into the next. The piece floats in a pale dome, which it lights through its windows.</p>
+      <p>The frame is a mesh rendered by the <a href="../modules/pipeline/explainer.html">shared pipeline</a>. The inside is ray traced exactly, per pixel, in the pipeline's composite pass, through dozens of bounces, with no reflection probes or screen-space tricks.</p>
+    </div>
+  </section>
+
   <!-- 1. The piece -->
   <section>
     <div class="col prose">
@@ -300,30 +311,6 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="fact"><b>Patterns and animation</b><span>Colours per window, per tube, in segments or as a gradient; windows that breathe, wave, scan, light in sequence, flicker or chase. The room, haze and tail follow each window's light.</span></div>
       <div class="fact"><b>Floor</b><span>On a glossy floor the mirror image of the camera ray is traced too, with the floor's roughness widening its footprint, so the lattice reflects softly.</span></div>
       <div class="fact"><b>Depth of field</b><span>The pipeline blurs by depth, and the traced inside is in no depth buffer, so after the trace the solid's hull is drawn into the pipeline's depth. Aperture and Focus then work as for any mesh: a quick blur while moving, and an exact average over the lens once still.</span></div>
-    </div>
-  </section>
-
-  <!-- 7. Cost -->
-  <section>
-    <div class="col prose">
-      <div class="eyebrow">Cost</div>
-      <h2>Where the time goes</h2>
-      <p>The trace scales with the number of faces: crossing planes, testing windows and the haze all loop over them. Measured headlessly on a desktop GPU, one run at a time, GPU-synced, with the camera orbiting so the still never converges, on a 2528 × 1410 canvas (pixel ratio 2).</p>
-    </div>
-    <div class="fig">
-      <div class="scroll">
-        <table>
-          <thead><tr><th>Configuration</th><th>Frames per second</th></tr></thead>
-          <tbody>
-            <tr><td>Cube with its tesseract, defaults, high tier</td><td>108</td></tr>
-            <tr><td>The same, no haze</td><td>124</td></tr>
-            <tr><td>The same, medium tier</td><td>120</td></tr>
-            <tr><td>Truncated icosidodecahedron (62 faces), empty</td><td>54</td></tr>
-            <tr><td>Phone emulation (iPhone, pixel ratio 2)</td><td>168</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="fig-cap">Deep pixels get two extra rays only on screens below a pixel ratio of 1.5, where pixels are big enough to alias, and in captures. Solids with more than 30 faces trace fewer bounces and get no extra rays. The medium and low tiers cap the bounces lower still and use a smaller direction map. The pipeline's AO and GI are off: the room is lit by the windows, which they barely change. While nothing moves, the pipeline averages jittered frames into a still, up to 32 of them.</p>
     </div>
   </section>
 
