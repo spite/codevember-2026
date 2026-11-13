@@ -91,7 +91,7 @@ const defaults = {
   angle: 1.89,
   lean: 0,
   seeThrough: 1,
-  spin: 0.05,
+  spin: 0.25,
   look: "light",
   shadows: "stochastic",
   backdrop: 0.35,
@@ -129,7 +129,7 @@ globalUniforms.shadowNormalBias.value = 0.006;
 globalUniforms.aoMultiBounce.value = 1;
 globalUniforms.giIntensity.value = 1.2;
 
-const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: true });
+const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
 const knotOnly = { visibleWhen: () => params.shape() === "knot" };
 const anyKnot = { visibleWhen: () => params.shape() !== "torus" && params.shape() !== "curl" };
 gui.addSection("Form");
