@@ -77,8 +77,11 @@ export function createSound() {
   // Bursts played (for tests: sound is checked in code, never by listening).
   let played = 0;
 
-  function start() {
-    ctx = new AudioContext();
+  // offline: a recording's own clock (seconds), when the sound is rendered offline for it (see startOffline).
+  let offline = null;
+  const clock = () => (offline ? offline.t : ctx.currentTime);
+  function start(context = new AudioContext()) {
+    ctx = context;
     if (paused) ctx.suspend();
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -18;
@@ -137,7 +140,7 @@ export function createSound() {
   }
   start();
   const resume = () => {
-    if (ctx && ctx.state === "suspended" && !paused) ctx.resume();
+    if (ctx && !offline && ctx.state === "suspended" && !paused) ctx.resume();
   };
   for (const e of ["pointerdown", "touchend", "click", "keydown"]) addEventListener(e, resume, { capture: true });
 
@@ -193,7 +196,7 @@ export function createSound() {
     p.pan.value = Math.max(-1, Math.min(1, pan));
     src.connect(g).connect(p).connect(master);
     g.connect(room);
-    src.start(ctx.currentTime + delay);
+    src.start(clock() + delay);
     played++;
   }
 
@@ -201,9 +204,10 @@ export function createSound() {
   // plumage), pan (-1..1, where the pointer is), and lap (seconds the rouse takes to run round).
   function update(dt, { breath, rouse, stir, pan, lap = 1, shakeHz = 7, rouseCount = 0, swipe = 0, swipePan = 0, gust = 0, gustPan = 0 }) {
     if (!ctx || !on) return;
-    const live = ctx.state === "running";
+    if (offline) offline.t += dt;
+    const live = !!offline || ctx.state === "running";
     if (live) {
-      const now = ctx.currentTime;
+      const now = clock();
       windGain.gain.setTargetAtTime(0.015 + 0.35 * gust * gust, now, 0.25);
       windFilter.frequency.setTargetAtTime(350 + 700 * gust + 150 * Math.sin(now * 0.7), now, 0.4);
       windPanNode.pan.setTargetAtTime(gustPan, now, 0.5);
@@ -216,7 +220,7 @@ export function createSound() {
     }
     if (live) {
       const inhale = Math.max(0, (breath - 1) / 0.024);
-      breathGain.gain.setTargetAtTime(0.02 + 0.07 * inhale, ctx.currentTime, 0.15);
+      breathGain.gain.setTargetAtTime(0.02 + 0.07 * inhale, clock(), 0.15);
     }
     // A rouse starting: the dry "brrrrt" of a bird shaking out: tight bursts of vanes knocking together, 22-30 a
     // second with silence between, fading as the shake dies down. No air layer under it (that reads as wind).
@@ -244,18 +248,39 @@ export function createSound() {
     } else brushDue = 0;
   }
 
+  // For recordings: from now on everything is rendered into an offline buffer, seconds long, on the update clock
+  // (the recording's virtual time); render() then returns it as a 16-bit stereo WAV.
+  function startOffline(seconds, sampleRate = 48000) {
+    ctx?.close?.();
+    start(new OfflineAudioContext(2, Math.ceil(seconds * sampleRate), sampleRate));
+    offline = { t: 0 };
+  }
+  async function render() {
+    const buf = await ctx.startRendering();
+    const n = buf.length, ch = [buf.getChannelData(0), buf.getChannelData(1)];
+    const out = new DataView(new ArrayBuffer(44 + n * 4));
+    const str = (o, s) => [...s].forEach((c, i) => out.setUint8(o + i, c.charCodeAt(0)));
+    str(0, "RIFF"); out.setUint32(4, 36 + n * 4, true); str(8, "WAVE"); str(12, "fmt ");
+    out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 2, true); out.setUint32(24, buf.sampleRate, true);
+    out.setUint32(28, buf.sampleRate * 4, true); out.setUint16(32, 4, true); out.setUint16(34, 16, true); str(36, "data"); out.setUint32(40, n * 4, true);
+    for (let i = 0; i < n; i++) for (let c = 0; c < 2; c++) out.setInt16(44 + i * 4 + c * 2, Math.max(-1, Math.min(1, ch[c][i])) * 32767, true);
+    return out.buffer;
+  }
+
   return {
     update,
+    startOffline,
+    render,
     get enabled() { return on; },
     get running() { return !!ctx && ctx.state === "running"; },
     get played() { return played; },
     setEnabled(v) {
       on = v;
-      if (master) master.gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, 0.05);
+      if (master) master.gain.setTargetAtTime(on ? 1 : 0, clock(), 0.05);
     },
     setPaused(v) {
       paused = v;
-      if (!ctx) return;
+      if (!ctx || offline) return;
       if (v) ctx.suspend();
       else ctx.resume();
     },

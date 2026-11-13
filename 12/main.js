@@ -1,5 +1,5 @@
 import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, keysHelp, setDay, showHint, loadingStep, getSeed, addKey, addActionButton, randomize, onPause, showSoundHint } from "common";
-import { GUI } from "guspira";
+import { GUI, signal } from "guspira";
 import { Scene, Group, Vector3, Vector4, Color, Raycaster, Vector2, Matrix4, Quaternion, Mesh, SphereGeometry, ShaderMaterial, BackSide } from "three";
 import { Pipeline } from "modules/pipeline/Pipeline.js";
 import { createStudioEnvironmentAsync, applyEnvironment } from "modules/pipeline/studio.js";
@@ -223,6 +223,15 @@ gui.addSegmented("Shadows", params.shadows, ["opaque", "translucent", "stochasti
 // The light one layer of feathers passes on to what's under it (translucent and stochastic shadows).
 gui.addSlider("Shadow light", params.shadowLight, 0, 0.9, 0.01, { randomizable: false, visibleWhen: () => params.shadows() !== "opaque" });
 gui.addSlider("Spin", params.spin, 0, 0.5, 0.01, { randomizable: false });
+// Performance: frames per second, the time the GPU spends on a frame (when the browser can measure it; otherwise the
+// time between frames, which can't go below the screen's refresh), feathers drawn, and about how many this device
+// could draw at 60 fps (feather cost scaled to the frame budget; optimistic, as some of a frame doesn't scale).
+gui.addSection("Performance", { open: false });
+const stats = { fps: signal(0), ms: signal("–"), feathers: signal(0), budget: signal("–") };
+gui.addMonitor("FPS", stats.fps);
+gui.addMonitor("Frame", stats.ms);
+gui.addMonitor("Feathers drawn", stats.feathers);
+gui.addMonitor("At 60 fps", stats.budget);
 gui.endSection();
 // Sound: breathing and the rustle of the plumage, synthesized.
 const sound = createSound();
@@ -323,7 +332,8 @@ function rebuild(preview = false, direct = false) {
   const under = params.underLayer();
   const per = 1 / 0.22 ** 2 * (under ? 1 : (0.22 / 0.17) ** 2) + (under ? 1 / (0.28 * 0.7) ** 2 : 0);
   const area = tubeArea(line, r);
-  const count = Math.min(params.density() * area, params.feathers());
+  // Phones and low-end devices draw fewer feathers (larger, so the form stays covered).
+  const count = Math.min(params.density() * area, params.feathers(), pipeline.quality === "high" || pipeline.quality === "capture" ? Infinity : 6000);
   const ideal = Math.sqrt((per * area) / (DENSITY * count));
   const length = Math.min(ideal, 2 * r);
   const spread = ideal / length;
@@ -516,7 +526,9 @@ const ease = (x) => {
 function runChange(dt) {
   change.t += dt;
   if (change.stage === "shrink") {
-    const k = 1 - ease(change.t / timing.shrink);
+    // Holds its size, then goes quickly (so little empty space follows).
+    const x = Math.min(1, change.t / timing.shrink);
+    const k = 1 - x * x * x;
     // Hidden rather than scaled to nothing (degenerate matrices).
     group.visible = k > 0.03;
     group.scale.setScalar(Math.max(0.03, k));
@@ -535,7 +547,9 @@ function runChange(dt) {
     pipeline.background.copy(backgroundFrom).lerp(_bg, ease(change.t / timing.background));
     if (change.t >= timing.background) change = { stage: "grow", t: 0 };
   } else {
-    const k = ease(change.t / timing.grow);
+    // Comes up quickly from its first frames, then settles into its size.
+    const x = Math.min(1, change.t / timing.grow);
+    const k = 1 - (1 - x) ** 3;
     group.visible = k > 0.03;
     group.scale.setScalar(Math.max(0.03, k));
     if (change.t < timing.grow) return;
@@ -647,7 +661,7 @@ window.app = {
 for (const look of Object.keys(LOOKS)) bake(look);
 
 // Life: the form breathes, now and then rouses its plumage like a bird, and stirs where the pointer passes close.
-const gust = { t: 99, peak: 0, rise: 1, fall: 1, pan: 0 };
+const gust = { t: 99, peak: 0, rise: 1, fall: 1, pan: 0, dir: new Vector3(1, 0, 0) };
 let gustAt = 6 + 10 * nativeRandom();
 const swipe = { t: 9, from: 0, span: 0, side: 0, time: 1, count: 0 };
 let swipeAt = 3 + 6 * nativeRandom();
@@ -664,6 +678,7 @@ addEventListener("pointerleave", () => (pointer.inside = false));
 const raycaster = new Raycaster();
 const _inv = new Matrix4();
 const _pw = new Vector3();
+const _qInv = new Quaternion();
 const rouseShape = new Vector4(0, 1, 0.12, 0);
 function updateLife(time, dt) {
   const breath = 1 + 0.018 * Math.sin(time * 1.6) + 0.006 * Math.sin(time * 0.53);
@@ -707,14 +722,17 @@ function updateLife(time, dt) {
   swipe.t += dt / swipe.time;
   const swipeOn = swipe.t < 1.4;
   const swipeU = swipe.from + swipe.span * Math.min(1, swipe.t);
-  // Gusts of wind now and then: a swell over a second or two and a slower fade; they stir the whole plumage a little.
+  // Gusts of wind now and then, each from its own direction: a swell over a second or two and a slower fade.
   gustAt -= dt;
   if (gustAt <= 0) {
     gust.t = 0;
     gust.peak = 0.5 + 0.5 * nativeRandom();
     gust.rise = 0.8 + 1.2 * nativeRandom();
     gust.fall = 1.5 + 2.5 * nativeRandom();
-    gust.pan = (nativeRandom() - 0.5) * 1.4;
+    const a = nativeRandom() * Math.PI * 2;
+    gust.dir.set(Math.cos(a), (nativeRandom() - 0.5) * 0.4, Math.sin(a)).normalize();
+    // Heard from the side it comes from.
+    gust.pan = -gust.dir.x * 0.8;
     gustAt = 8 + 22 * nativeRandom();
   }
   gust.t += dt;
@@ -731,6 +749,8 @@ function updateLife(time, dt) {
     u.breath.value.set(breath, breathPrev);
     u.rouse.value = rouseNow;
     u.gust.value = gustNow;
+    // The wind blows in the world; the form turns, so it's carried into the form's own frame.
+    u.gustDir.value.copy(gust.dir).applyQuaternion(_qInv.copy(group.quaternion).invert());
     u.rouseFront.value = rouseFront;
     u.rouseShape.value.copy(rouseShape);
     u.rouseSwing.value = swing;
@@ -748,8 +768,55 @@ function updateLife(time, dt) {
     for (let i = 0; i < P.length; i += step) best = Math.min(best, raycaster.ray.distanceSqToPoint(_pw.copy(P[i]).applyMatrix4(group.matrixWorld)));
     near = Math.exp(-(Math.max(0, Math.sqrt(best) - form.r) ** 2) / 0.3);
   }
-  sound.update(dt, { breath, rouse: rouseNow, stir: pointer.stir * near, pan: pointer.ndc.x, lap: rouseLength, shakeHz, rouseCount, swipe: swipe.t < 1 ? 1 : 0, swipePan: Math.sin(swipe.side) * 0.6, gust: gustNow, gustPan: gust.pan });
+  // Sound runs on real time (a slowed recording's audio still lines up with its frames).
+  const slow = window.app?.timeScale ?? 1;
+  sound.update(realDt, { breath, rouse: rouseNow, stir: pointer.stir * near, pan: pointer.ndc.x, lap: rouseLength / slow, shakeHz: shakeHz * slow, rouseCount, swipe: swipe.t < 1 ? 1 : 0, swipePan: Math.sin(swipe.side) * 0.6, gust: gustNow, gustPan: gust.pan });
 }
+
+// The meter: GPU time from timer queries where the browser has them, frame intervals otherwise; reported twice a second.
+const meter = (() => {
+  const gl = renderer.getContext();
+  const ext = gl.getExtension("EXT_disjoint_timer_query_webgl2");
+  const pending = [];
+  let gpuSum = 0, gpuN = 0, frames = 0, since = performance.now(), last = since, intervalSum = 0;
+  return {
+    begin() {
+      if (!ext || pending.length > 4) return;
+      const q = gl.createQuery();
+      gl.beginQuery(ext.TIME_ELAPSED_EXT, q);
+      pending.push(q);
+      this.open = true;
+    },
+    // running: false while paused (the still settles, then stops rendering): nothing is counted or shown then.
+    end(running) {
+      if (this.open) gl.endQuery(ext.TIME_ELAPSED_EXT);
+      this.open = false;
+      while (pending.length && gl.getQueryParameter(pending[0], gl.QUERY_RESULT_AVAILABLE)) {
+        const q = pending.shift();
+        if (running && !gl.getParameter(ext.GPU_DISJOINT_EXT)) (gpuSum += gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6), gpuN++;
+        gl.deleteQuery(q);
+      }
+      const now = performance.now();
+      if (!running) {
+        gpuSum = gpuN = frames = intervalSum = 0;
+        since = last = now;
+        return;
+      }
+      intervalSum += now - last;
+      last = now;
+      frames++;
+      if (now - since < 500) return;
+      const ms = gpuN ? gpuSum / gpuN : intervalSum / frames;
+      const drawn = sets.reduce((n, s) => n + (s.mesh.visible ? s.count : 0), 0);
+      stats.fps.set(Math.round((frames * 1000) / (now - since)));
+      stats.ms.set(`${ms.toFixed(1)} ms${gpuN ? " GPU" : ""}`);
+      stats.feathers.set(drawn);
+      stats.budget.set(gpuN && drawn ? `~${Math.round((drawn * 16.7) / ms / 1000)}k feathers` : "–");
+      gpuSum = gpuN = frames = intervalSum = 0;
+      since = now;
+    },
+  };
+})();
 
 let shownPalette = "";
 let previewing = false;
@@ -757,7 +824,13 @@ let pointerHeld = false;
 let stillKey = null;
 addEventListener("pointerdown", () => (pointerHeld = true), true);
 for (const e of ["pointerup", "pointercancel"]) addEventListener(e, () => (pointerHeld = false), true);
+// Recordings can slow the whole piece down (timeScale < 1): the clock everything runs on.
+let sceneTime = 0, realDt = 0;
 render(({ time, dt }) => {
+  realDt = dt;
+  dt *= window.app?.timeScale ?? 1;
+  sceneTime += dt;
+  time = sceneTime;
   autoChange.update(dt);
   // While a pointer is held (dragging a slider) the form is rebuilt bare; feathered on release.
   if (fitPending) {
@@ -786,7 +859,8 @@ render(({ time, dt }) => {
     u.featherCurl.value = look.curl;
     u.featherAngle.value = look.angle;
     u.featherLean.value = look.lean;
-    u.seeThrough.value = look.seeThrough;
+    // Each opening shades the feather below: capped on phones.
+    u.seeThrough.value = pipeline.quality === "high" || pipeline.quality === "capture" ? look.seeThrough : Math.min(look.seeThrough, 0.4);
     u.patternKind.value = PATTERNS.indexOf(look.pattern);
     u.patternAmount.value = look.patternAmount;
     u.underShade.value = look.underShade;
@@ -842,5 +916,7 @@ render(({ time, dt }) => {
     stillKey = still + moving;
     pipeline.restartAccumulation(false);
   }
+  meter.begin();
   pipeline.render(scene, camera, time);
+  meter.end(dt > 0);
 });

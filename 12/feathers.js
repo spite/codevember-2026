@@ -388,6 +388,8 @@ uniform float rouseSwing;
 uniform vec4 swipe;
 // A gust of wind (0..1): lifts the whole plumage a little, unevenly, and makes it flutter.
 uniform float gust;
+// Which way it blows (object space, unit).
+uniform vec3 gustDir;
 uniform vec3 pointerOrigin;
 uniform vec3 pointerDir;
 uniform float pointerStir;
@@ -446,7 +448,18 @@ vec3 displace(vec3 p, inout vec3 n) {
   if (rouseShape.w > 0.5) x = ownS.z > 0.5 ? min(x, 1.0 - x) : abs(uR - rouseShape.x);
   float behind = rouseFront - x;
   float stir = rouse > 0.0 ? rouse * (behind < 0.0 ? exp(-behind * behind / 0.0016) : exp(-behind / rouseShape.z)) : 0.0;
-  stir += gust * (0.35 + 0.5 * rnoise(R * 1.3 + vec3(time * 1.5, 0.0, 0.0)));
+  // Wind: feathers facing it are pressed flat, those on the lee side lift and flutter, all lean downwind, and the
+  // flutter runs across the form with the gust (a ripple along the wind).
+  vec3 windL = vec3(0.0);
+  if (gust > 0.0) {
+    mat3 Fw;
+    vec3 rootW = toSpine(R, Fw);
+    windL = transpose(Fw) * gustDir;
+    float facing = dot(n0, windL);
+    float ripple = 0.5 + 0.5 * sin(dot(rootW, gustDir) * 4.0 - time * 9.0);
+    m *= 1.0 - 0.45 * gust * smoothstep(0.0, 0.6, -facing);
+    stir += gust * smoothstep(-0.2, 0.6, facing) * (0.3 + 0.9 * ripple);
+  }
   float stirR = stir;
   // The swipe stirs a short stretch of the tube, all the way round it, as it passes (and those behind it settle).
   if (swipe.z > 0.0) {
@@ -486,7 +499,7 @@ vec3 displace(vec3 p, inout vec3 n) {
   float pitch = atan(tanPitch) + stir * (0.45 + 0.15 * shake);
   // Side to side: the rouse swings its feathers strongly (neighbours nearly together), the pointer gently.
   float swingR = sin(time * 38.0 + 6.2831853 * 6.0 * uR + 0.6 * ph);
-  dir = normalize(dir + cross(n0, dir) * (stirR * 0.9 * swingR + stirP * 0.35 * shake));
+  dir = normalize(dir + cross(n0, dir) * (stirR * 0.9 * swingR + stirP * 0.35 * shake) + (windL - n0 * dot(windL, n0)) * gust * 0.8);
   across = cross(n0, dir);
   vec3 fwd = cos(pitch) * dir + sin(pitch) * n0;
   vec3 up = cos(pitch) * n0 - sin(pitch) * dir;
@@ -557,6 +570,7 @@ function createFeathers({ color = new Color(1.0, 0.985, 0.955), alphaToCoverage 
     rouseSwing: { value: 0 },
     swipe: { value: new Vector4(0, 0, 0, 0.03) },
     gust: { value: 0 },
+    gustDir: { value: new Vector3(1, 0, 0) },
     pointerOrigin: { value: new Vector3() },
     pointerDir: { value: new Vector3(0, 0, -1) },
     pointerStir: { value: 0 },
