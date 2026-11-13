@@ -244,6 +244,14 @@ function isRunning() {
 function setRunning(v) {
   running = v;
   document.body.classList.toggle("paused", !running);
+  // The button shows what a click does: Play while paused, Pause while running.
+  const button = document.querySelector("#pause-button");
+  const icon = button?.querySelector("img");
+  if (button) button.title = running ? "Pause" : "Play";
+  if (icon) {
+    icon.src = icon.src.replace(/(pause|play)\.svg/, running ? "pause.svg" : "play.svg");
+    icon.alt = button.title;
+  }
   for (const fn of pauseFns) fn(running);
 }
 
