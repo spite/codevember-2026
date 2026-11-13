@@ -269,6 +269,10 @@ export function createSound() {
 
   return {
     update,
+    // A bird calls on the next update.
+    chirp() {
+      chirpAt = 0;
+    },
     startOffline,
     render,
     get enabled() { return on; },

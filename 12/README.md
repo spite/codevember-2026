@@ -10,6 +10,7 @@ colours blending on the way.
 
 - Drag to turn the form, scroll or pinch to zoom. Move the pointer close to stir the feathers (touch on phones).
 - R: a new form and plumage. M or the speaker button: sound.
+- O: a rouse, S: a swipe along the form, W: a gust of wind, C: a bird's call.
 - Space stops the spin (the plumage keeps breathing and answering the pointer), F fullscreen, Tab hides the UI, P a
   screenshot.
 - The panel sets the shape and its size, the palette and the feathers' own pattern, how many feathers (Density, up to

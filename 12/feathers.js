@@ -373,6 +373,9 @@ uniform float underLift;
 // Feather length and width as multipliers on the laid-out feathers (live: nothing is rebuilt).
 uniform float featherStretch;
 uniform float featherWidthScale;
+uniform float lengthVariation;
+uniform float widthVariation;
+uniform float variationScale;
 // -1 while this set fades out of a morph, 1 while it grows in.
 uniform float fadeDir;
 // A rouse now and then (0..1, like a bird shaking its plumage), and the pointer: a ray (object space) and how much it
@@ -407,6 +410,18 @@ float rnoise(vec3 p) {
   return mix(mix(mix(rhash(i), rhash(i + vec3(1, 0, 0)), f.x), mix(rhash(i + vec3(0, 1, 0)), rhash(i + vec3(1, 1, 0)), f.x), f.y),
              mix(mix(rhash(i + vec3(0, 0, 1)), rhash(i + vec3(1, 0, 1)), f.x), mix(rhash(i + vec3(0, 1, 1)), rhash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
 }
+// Each feather's length and width over the laid-out ones (1, 1 with no variation): a smooth noise over the skin, along
+// the form (round a circle, so a loop has no seam) and round the tube, at Variation scale.
+vec2 sizeVariation() {
+  if (lengthVariation <= 0.0 && widthVariation <= 0.0) return vec2(1.0);
+  vec4 S = layoutIsB > 0.5 ? shapeB : shapeA;
+  float a = 6.2831853 * aDir.w, c = S.x / 6.2831853;
+  vec3 q = vec3(cos(a) * c, sin(a) * c, 0.0) * variationScale;
+  vec2 x = aRoot.yz * variationScale;
+  float nl = 0.5 * (rnoise(q + vec3(0.0, 0.0, x.x)) + rnoise(q + vec3(31.7, 0.0, x.y)));
+  float nw = 0.5 * (rnoise(q + vec3(-12.3, 4.1, x.x)) + rnoise(q + vec3(5.9, -21.4, x.y)));
+  return max(vec2(0.25), 1.0 + vec2(lengthVariation, widthVariation) * (2.0 * vec2(nl, nw) - 1.0) * 1.6);
+}
 // How much feathers lift at a point of the skin: a fixed pattern a couple of feathers across that breathes slowly in
 // place. It depends on the point only, so every feather stacked there is scaled alike and their order is kept.
 float ruffleAt(vec3 R) {
@@ -427,7 +442,8 @@ float liftCurve(float d, float k) {
 const vertex = /* glsl */ `
 vec3 displace(vec3 p, inout vec3 n) {
   vec3 R = aRoot.xyz;
-  float L = aRoot.w * featherStretch;
+  vec2 sv = sizeVariation();
+  float L = aRoot.w * featherStretch * sv.x;
   vec3 n0 = aNorm.xyz;
   float r0 = aNorm.w;
   float k = 1.0;
@@ -448,6 +464,13 @@ vec3 displace(vec3 p, inout vec3 n) {
   if (rouseShape.w > 0.5) x = ownS.z > 0.5 ? min(x, 1.0 - x) : abs(uR - rouseShape.x);
   float behind = rouseFront - x;
   float stir = rouse > 0.0 ? rouse * (behind < 0.0 ? exp(-behind * behind / 0.0016) : exp(-behind / rouseShape.z)) : 0.0;
+  // Running one way round a loop, the wave would step where it starts (puffed just past the origin, untouched just
+  // before it): the origin's puff tapers off upstream instead.
+  if (rouse > 0.0 && ownS.z > 0.5 && rouseShape.w < 0.5) {
+    float s0 = rouseFront < 0.0 ? exp(-rouseFront * rouseFront / 0.0016) : exp(-rouseFront / rouseShape.z);
+    float d = 1.0 - x;
+    stir = max(stir, rouse * s0 * exp(-d * d / 0.0025));
+  }
   // Wind: feathers facing it are pressed flat, those on the lee side lift and flutter, all lean downwind, and the
   // flutter runs across the form with the gust (a ripple along the wind).
   vec3 windL = vec3(0.0);
@@ -482,7 +505,7 @@ vec3 displace(vec3 p, inout vec3 n) {
   m *= 1.0 + stir * (1.0 + 0.4 * shake);
   // The skin drops away under a feather as the square of its length (a curved surface).
   float hs[4] = float[4](aSkin.x, aSkin.y, aSkin.z, aSkin.w);
-  for (int i = 0; i < 4; i++) hs[i] *= featherStretch * featherStretch;
+  for (int i = 0; i < 4; i++) hs[i] *= featherStretch * featherStretch * sv.x * sv.x;
   // Each feather has its own shape: curved down toward its tip by its own amount (sometimes slightly up), cupped more
   // or less, and twisted along its length. The pitch below accounts for the bend, so it still clears.
   float r1 = fract(aShape.z * 7.31), r2 = fract(aShape.z * 13.7), r3 = fract(aShape.z * 29.3);
@@ -504,8 +527,8 @@ vec3 displace(vec3 p, inout vec3 n) {
   vec3 fwd = cos(pitch) * dir + sin(pitch) * n0;
   vec3 up = cos(pitch) * n0 - sin(pitch) * dir;
   float a = p.y * L;
-  float b = p.x * aShape.x * featherWidthScale;
-  float W = max(aShape.x * featherWidthScale, 1e-3);
+  float b = p.x * aShape.x * featherWidthScale * sv.y;
+  float W = max(aShape.x * featherWidthScale * sv.y, 1e-3);
   // Cupped across like the skin it lies on, plus its own cup.
   float bendAcross = min(1.0 / max(r0, 1e-3), 0.7 / W) + featherCurl * mix(-0.3, 1.0, r2) / W;
   float twist = featherCurl * (r3 - 0.5) * 0.6 * a / L;
@@ -553,6 +576,9 @@ function createFeathers({ color = new Color(1.0, 0.985, 0.955), alphaToCoverage 
     underLift: { value: 0 },
     featherStretch: { value: 1 },
     featherWidthScale: { value: 1 },
+    lengthVariation: { value: 0 },
+    widthVariation: { value: 0 },
+    variationScale: { value: 1 },
     featherScale: { value: 0.36 },
     spineTex: { value: null },
     spineCount: { value: 2 },
@@ -616,7 +642,8 @@ function createFeathers({ color = new Color(1.0, 0.985, 0.955), alphaToCoverage 
       // Where the feather is for its colour: across the form's palette, a body feather, not a flight feather.
       float gu = aDir.w;
       vPal = vec3(0.5 - 0.5 * cos((gradientClosed > 0.5 ? 6.2831853 : 3.1415927) * gu * gradientRepeat), 0.0, 0.0);
-      vSize = vec3(aRoot.w * featherStretch, aShape.x * featherWidthScale / ${f(PLANE_WIDTH)}, aRoot.w * featherStretch);
+      vec2 sv = sizeVariation();
+      vSize = vec3(aRoot.w * featherStretch * sv.x, aShape.x * featherWidthScale * sv.y / ${f(PLANE_WIDTH)}, aRoot.w * featherStretch * sv.x);
       vAlong = normalize(mat3(modelMatrix) * featherAlong);
       vAcross = normalize(mat3(modelMatrix) * featherAcross);
       vRuffle = featherRuffle;

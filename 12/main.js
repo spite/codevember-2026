@@ -79,6 +79,9 @@ const defaults = {
   patternAmount: 0.56,
   featherLength: 1.43,
   featherWidth: 1.27,
+  lengthVariation: 0,
+  widthVariation: 0,
+  variationScale: 1,
   density: 350,
   feathers: 9000,
   underLayer: false,
@@ -93,6 +96,7 @@ const defaults = {
   seeThrough: 1,
   spin: 0.25,
   look: "light",
+  backdropColor: "white",
   shadows: "stochastic",
   backdrop: 0.35,
   shadowLight: 0.6,
@@ -103,6 +107,11 @@ const defaults = {
 const params = fromDefaults(defaults);
 const load = { layout: loadingStep(1), studio: loadingStep(1), compile: loadingStep(4) };
 
+// Soft studio colours for the light look (white is the plain studio).
+const BACKDROPS = { white: "#f3f2ef", blush: "#e6a99c", peach: "#ebb088", butter: "#e6cc7c", sage: "#a3c09a", mist: "#98b6d6", lavender: "#b5a5dc" };
+const STUDIO_TINT = 0.6;
+const studioKey = (look, colour) => (look === "light" && colour !== "white" ? `${look}:${colour}` : look);
+const backdropOf = (look, colour, out) => out.set(look === "light" ? BACKDROPS[colour] : LOOKS[look].background).multiplyScalar(LOOKS[look].backgroundGain);
 // Temporal antialiasing (one jittered sample per pixel, resolved over frames) instead of MSAA, so the stochastic
 // transparency and shadows average out in motion too; ?taa=0 goes back to MSAA for comparison.
 const temporal = new URLSearchParams(location.search).get("taa") !== "0";
@@ -202,6 +211,10 @@ gui.addSlider("Density", params.density, 20, 600, 1, { randomizable: false });
 gui.addSlider("Max feathers", params.feathers, 2000, 40000, 500, { randomizable: false });
 gui.addSlider("Feather length", params.featherLength, 0.5, 2, 0.01).randomize = () => params.featherLength.set(Math.round((1.35 + 0.15 * Math.random()) * 100) / 100);
 gui.addSlider("Feather width", params.featherWidth, 0.5, 2, 0.01).randomize = () => params.featherWidth.set(Math.round((1.2 + 0.15 * Math.random()) * 100) / 100);
+// Each feather's length and width varied by a smooth noise over the form (Variation scale: how fine it is).
+gui.addSlider("Length variation", params.lengthVariation, 0, 1, 0.01, { randomizable: false });
+gui.addSlider("Width variation", params.widthVariation, 0, 1, 0.01, { randomizable: false });
+gui.addSlider("Variation scale", params.variationScale, 0.1, 4, 0.01, { randomizable: false });
 // Short, wide, flat feathers under the coat, so its gaps show feathers rather than skin.
 gui.addCheckbox("Under-layer", params.underLayer, { randomizable: false });
 gui.addSlider("Under-layer shade", params.underShade, 0, 1, 0.01, { randomizable: false, visibleWhen: () => params.underLayer() });
@@ -220,6 +233,8 @@ gui.addSlider("Gradient", params.gradientAmount, 0, 1, 0.01).randomize = () => p
 gui.addSlider("Repeat", params.gradientRepeat, 1, 8, 1).randomize = () => params.gradientRepeat.set(1 + Math.floor(Math.random() * 2));
 gui.addSection("Light");
 gui.addSegmented("Look", params.look, Object.keys(LOOKS), { randomizable: false });
+// The light studio's colour: its backdrop, and the studio tinted toward it, so the coat's shaded side picks it up.
+gui.addSelect("Backdrop colour", params.backdropColor, Object.keys(BACKDROPS));
 // How much the backdrop darkens toward the edges (0: flat).
 gui.addSlider("Backdrop", params.backdrop, 0, 0.8, 0.01, { randomizable: false });
 gui.addSegmented("Shadows", params.shadows, ["opaque", "translucent", "stochastic"], { randomizable: false });
@@ -254,6 +269,11 @@ function toggleSound() {
   soundButton.querySelector("img").src = `../assets/${sound.enabled ? "sound" : "sound-off"}.svg`;
 }
 addKey("KeyM", "toggle sound", toggleSound);
+// The life effects on demand: each starts on the next frame.
+addKey("KeyO", "rouse", () => (rouseAt = 0));
+addKey("KeyS", "swipe", () => (swipeAt = 0));
+addKey("KeyW", "gust of wind", () => (gustAt = 0));
+addKey("KeyC", "chirp", () => sound.chirp());
 // Pausing stops only the spin (and auto change): the plumage keeps breathing, rousing and answering the pointer.
 let paused = false;
 onPause((running) => (paused = !running));
@@ -535,7 +555,7 @@ let change = null;
 let backgroundFrom = null;
 // The values are drawn at once (they belong to the new seed), but the form on show keeps reading the old ones (its
 // geometry is built, and its look is held) until it's gone.
-const LOOK_KEYS = ["palette", "pattern", "patternAmount", "ruffle", "curl", "angle", "lean", "gradientAmount", "gradientRepeat", "underShade", "seeThrough", "featherLength", "featherWidth", "internalShadow"];
+const LOOK_KEYS = ["backdropColor", "palette", "pattern", "patternAmount", "ruffle", "curl", "angle", "lean", "gradientAmount", "gradientRepeat", "underShade", "seeThrough", "featherLength", "featherWidth", "lengthVariation", "widthVariation", "variationScale", "internalShadow"];
 const lookNow = () => Object.fromEntries(LOOK_KEYS.map((k) => [k, params[k]()]));
 let pendingHeld = null;
 // A new variation: set applies its values; the form then morphs into it or shrinks away (see Transition).
@@ -582,8 +602,7 @@ function runChange(dt) {
   } else if (change.stage === "build") {
     // Hidden until the new form is laid out.
   } else if (change.stage === "background") {
-    const look = LOOKS[params.look()];
-    _bg.set(look.background).multiplyScalar(look.backgroundGain);
+    backdropOf(params.look(), params.backdropColor(), _bg);
     pipeline.background.copy(backgroundFrom).lerp(_bg, ease(change.t / timing.background));
     if (change.t >= timing.background) change = { stage: "grow", t: 0 };
   } else {
@@ -606,16 +625,21 @@ let built = signature();
 
 // Each look's studio is baked once; a switch waits for its bake, then swaps everything at once.
 const bakes = {};
-const bake = (look) => (bakes[look] ??= createStudioEnvironmentAsync(renderer, { ...LOOKS[look].studio, apply: false }));
+const bake = (key) => {
+  const [look, colour] = key.split(":");
+  const tint = colour ? new Color(1, 1, 1).lerp(new Color(BACKDROPS[colour]), STUDIO_TINT).getHex() : 0xffffff;
+  return (bakes[key] ??= createStudioEnvironmentAsync(renderer, { ...LOOKS[look].studio, tint, apply: false }));
+};
 let shownLook = "";
-async function updateLook() {
+// colour: the backdrop colour on show (held through a transition until the old form is gone, or half a morph).
+async function updateLook(colour = params.backdropColor()) {
   const look = params.look();
-  if (look === shownLook) return;
-  shownLook = look;
-  const env = await bake(look);
-  if (params.look() !== look) return;
+  const key = studioKey(look, colour);
+  if (key === shownLook) return;
+  shownLook = key;
+  const env = await bake(key);
+  if (shownLook !== key) return;
   applyEnvironment(env);
-  pipeline.background.set(LOOKS[look].background).multiplyScalar(LOOKS[look].backgroundGain);
   pipeline.exposure = LOOKS[look].exposure;
   pipeline.bloomStrength = LOOKS[look].bloom;
   pipeline.vignette = LOOKS[look].vignette;
@@ -625,7 +649,7 @@ async function updateLook() {
   globalUniforms.shadowSoftness.value = LOOKS[look].shadowSoftness;
   globalUniforms.shadowLightSize.value = LOOKS[look].shadowLightSize;
   pipeline.restartAccumulation();
-  document.querySelector("#loading")?.style.setProperty("--loading-background", LOOKS[look].background);
+  document.querySelector("#loading")?.style.setProperty("--loading-background", look === "light" ? BACKDROPS[colour] : LOOKS[look].background);
 }
 const studio = load.studio.track(updateLook());
 
@@ -699,6 +723,7 @@ window.app = {
 };
 // The other look bakes in the background, so switching never waits.
 for (const look of Object.keys(LOOKS)) bake(look);
+for (const colour of Object.keys(BACKDROPS)) bake(studioKey("light", colour));
 
 // Life: the form breathes, now and then rouses its plumage like a bird, and stirs where the pointer passes close.
 const gust = { t: 99, peak: 0, rise: 1, fall: 1, pan: 0, dir: new Vector3(1, 0, 0) };
@@ -719,6 +744,7 @@ const raycaster = new Raycaster();
 const _inv = new Matrix4();
 const _pw = new Vector3();
 const _qInv = new Quaternion();
+const _gf = new Vector3(), _gr = new Vector3(), _gu = new Vector3();
 const rouseShape = new Vector4(0, 1, 0.12, 0);
 function updateLife(time, dt) {
   const breath = 1 + 0.018 * Math.sin(time * 1.6) + 0.006 * Math.sin(time * 0.53);
@@ -769,10 +795,16 @@ function updateLife(time, dt) {
     gust.peak = 0.5 + 0.5 * nativeRandom();
     gust.rise = 0.8 + 1.2 * nativeRandom();
     gust.fall = 1.5 + 2.5 * nativeRandom();
-    const a = nativeRandom() * Math.PI * 2;
-    gust.dir.set(Math.cos(a), (nativeRandom() - 0.5) * 0.4, Math.sin(a)).normalize();
+    // From in front, 35-45 degrees off the view direction (more to the sides than above or below), so the plumage
+    // blows away from the viewer at a slant.
+    const a = nativeRandom() * Math.PI * 2, off = ((35 + 10 * nativeRandom()) * Math.PI) / 180;
+    _gf.subVectors(controls.target, camera.position).normalize();
+    _gr.crossVectors(_gf, camera.up).normalize();
+    _gu.crossVectors(_gr, _gf);
+    _gu.multiplyScalar(Math.sin(a) * 0.5).addScaledVector(_gr, Math.cos(a)).normalize();
+    gust.dir.copy(_gf).multiplyScalar(Math.cos(off)).addScaledVector(_gu, Math.sin(off));
     // Heard from the side it comes from.
-    gust.pan = -gust.dir.x * 0.8;
+    gust.pan = -gust.dir.dot(_gr) * 2;
     gustAt = 8 + 22 * nativeRandom();
   }
   gust.t += dt;
@@ -909,11 +941,19 @@ render(({ time, dt }) => {
     previewing = false;
     rebuild(false, true);
   }
-  updateLook();
   backdrop.material.uniforms.falloff.value = params.backdrop();
   const shadowMode = params.shadows();
   // While the old form shrinks away it keeps its own look.
   const shown = change?.stage === "shrink" && change.held ? change.held : pendingHeld ?? lookNow();
+  // The studio's colour: the old one until the form is gone (shrink) or halfway through a morph, where its light
+  // swaps; the backdrop itself fades across the whole morph.
+  const hiding = (change?.stage === "shrink" || change?.stage === "build") && change.held;
+  const was = hiding ? change.held.backdropColor : morph?.held ? morph.held.backdropColor : shown.backdropColor;
+  updateLook(morph?.held && morph.t >= 0.5 ? shown.backdropColor : was);
+  if (change?.stage !== "background") {
+    backdropOf(params.look(), was, pipeline.background);
+    if (morph?.held) pipeline.background.lerp(backdropOf(params.look(), shown.backdropColor, _bg), smooth(morph.t));
+  }
   for (const [i, set] of sets.entries()) {
     const u = set.uniforms;
     // While morphing, both forms blend from the old look to the new; a pattern's kind and repeat stay each form's own.
@@ -934,6 +974,9 @@ render(({ time, dt }) => {
     u.featherStretch.value = look.featherLength;
     u.internalShadow.value = look.internalShadow;
     u.featherWidthScale.value = look.featherWidth;
+    u.lengthVariation.value = look.lengthVariation;
+    u.widthVariation.value = look.widthVariation;
+    u.variationScale.value = look.variationScale;
     u.stochasticShadow.value = shadowMode === "stochastic" ? 1 : 0;
   }
   // Feather shadows: opaque cutouts; translucent by the depth gap to the blockers; or a screen door averaged over
@@ -968,7 +1011,7 @@ render(({ time, dt }) => {
   if (morph) frame(false);
   if (morph?.t >= 1) finishMorph();
   controls.update();
-  const still = [signature(), params.ruffle(), params.curl(), params.palette(), params.shadows(), params.shadowLight(), params.angle(), params.lean(), params.seeThrough(), params.look(), params.backdrop(), params.pattern(), params.patternAmount(), params.underShade(), params.gradientAmount(), params.gradientRepeat(), params.featherLength(), params.featherWidth(), params.internalShadow()].join();
+  const still = [signature(), params.ruffle(), params.curl(), params.palette(), params.shadows(), params.shadowLight(), params.angle(), params.lean(), params.seeThrough(), params.look(), params.backdrop(), params.pattern(), params.patternAmount(), params.underShade(), params.gradientAmount(), params.gradientRepeat(), params.featherLength(), params.featherWidth(), params.lengthVariation(), params.widthVariation(), params.variationScale(), params.internalShadow()].join();
   // Everything else that moves the image (the form turned, transitions, rousing, breathing, the pointer stirring): while
   // paused, those frames render live instead of into the still average, which would smear.
   const u0 = sets[cur].uniforms;
