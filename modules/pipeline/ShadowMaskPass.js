@@ -71,6 +71,11 @@ export class ShadowMaskPass {
         shadowNormalBias: u.shadowNormalBias,
         shadowEnabled: u.shadowEnabled,
         shadowMaxRadius: u.shadowMaxRadius,
+        shadowTwoSided: u.shadowTwoSided,
+        shadowTranslucency: u.shadowTranslucency,
+        shadowLayerT: u.shadowLayerT,
+        shadowLayerSpacing: u.shadowLayerSpacing,
+        shadowMinTexels: u.shadowMinTexels,
       },
       { SHADOW_PCF_SAMPLES: pcfSamples, SHADOW_BLOCKER_SAMPLES: blockerSamples },
     );

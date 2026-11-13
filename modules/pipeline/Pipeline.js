@@ -42,6 +42,7 @@ import { fullscreenVertex, copyFragment } from "shaders/pipeline/copy.js";
 import { bloomDownFragment, bloomUpFragment } from "shaders/pipeline/bloom.js";
 import { finalFragment } from "shaders/pipeline/final.js";
 import { fxaaFragment } from "shaders/pipeline/fxaa.js";
+import { taaFragment } from "shaders/pipeline/taa.js";
 import { tileMaxFragment, neighborMaxFragment, reconstructFragment } from "shaders/pipeline/motionBlur.js";
 
 const TIERS = {
@@ -134,7 +135,13 @@ class Pipeline {
     this.autoQuality = resolveQuality(options.quality ?? "auto", false);
     const tier = TIERS[this.quality];
 
-    this.msaa = Math.min(options.msaa ?? tier.msaa, renderer.capabilities.maxSamples);
+    // Opt-in temporal antialiasing: one jittered sample per pixel each frame, resolved against the reprojected
+    // history (see shaders/pipeline/taa.js), so anything a material samples stochastically per frame (transparency,
+    // shadows) averages out in motion too. It replaces MSAA (and FXAA) unless msaa is given.
+    this.temporal = !!options.temporal;
+    this.temporalFeedback = options.temporal?.feedback ?? 0.9;
+    this.temporalClamp = options.temporal?.clamp ?? 1.25;
+    this.msaa = Math.min(options.msaa ?? (this.temporal ? 0 : tier.msaa), renderer.capabilities.maxSamples);
     this.samples = options.samples ?? tier.samples;
     this.shadows = options.shadows ?? true;
     this.giEnabled = options.gi ?? true;
@@ -214,7 +221,12 @@ class Pipeline {
       depthTexture: this.depthTexture,
     });
     // Nothing reads the main pass's depth (passes use the prepass's), so MSAA depth is neither resolved nor kept.
-    this.mainTarget = colorTarget(HalfFloatType, { depthBuffer: true, samples: this.msaa, resolveDepthBuffer: false, storeMultisampledDepthBuffer: false });
+    // Temporal without MSAA instead draws the main pass over the prepass's depth, so hidden surfaces are rejected
+    // before they are shaded (only the nearest is lit, however deep the overdraw).
+    this.reuseDepth = this.temporal && this.msaa === 0 && (options.temporal?.reuseDepth ?? true);
+    this.mainTarget = this.reuseDepth
+      ? colorTarget(HalfFloatType, { depthBuffer: true, depthTexture: this.depthTexture })
+      : colorTarget(HalfFloatType, { depthBuffer: true, samples: this.msaa, resolveDepthBuffer: false, storeMultisampledDepthBuffer: false });
     this.prevColorTarget = colorTarget(HalfFloatType);
     this.accumTarget = colorTarget(HalfFloatType);
     this.ldrTarget = colorTarget(UnsignedByteType);
@@ -301,6 +313,19 @@ class Pipeline {
       isOrtho: { value: 0 },
     });
     this.fxaaMaterial = quadMaterial(fxaaFragment, { tInput: { value: this.ldrTarget.texture } });
+    this.taaTargets = this.temporal ? [colorTarget(HalfFloatType), colorTarget(HalfFloatType)] : [];
+    this.taaIndex = 0;
+    this.taaHistory = false;
+    this.taaMaterial = quadMaterial(taaFragment, {
+      tCurrent: { value: null },
+      tHistory: { value: null },
+      tNormalVelocity: { value: this.prepassTarget.texture },
+      tDepth: { value: this.depthTexture },
+      resolution: { value: new Vector2() },
+      feedback: { value: this.temporalFeedback },
+      hasHistory: { value: 0 },
+      clampGamma: { value: this.temporalClamp },
+    }, { blending: NoBlending });
 
     renderer.getDrawingBufferSize(_size);
     this._resize(_size.x, _size.y);
@@ -319,9 +344,10 @@ class Pipeline {
     if (w === this.width && h === this.height) return;
     this.width = w;
     this.height = h;
-    for (const rt of [this.prepassTarget, this.mainTarget, this.prevColorTarget, this.accumTarget, this.ldrTarget]) {
+    for (const rt of [this.prepassTarget, this.mainTarget, this.prevColorTarget, this.accumTarget, this.ldrTarget, ...this.taaTargets]) {
       rt.setSize(w, h);
     }
+    this.taaHistory = false;
     this.gi.setSize(w, h);
     this.dof?.setSize(w, h);
     this.lensCount = 0;
@@ -661,8 +687,35 @@ class Pipeline {
     const renderer = this.renderer;
     renderer.setRenderTarget(this.mainTarget);
     renderer.setClearColor(this.background, 1);
-    renderer.clear(true, true, true);
-    renderer.render(scene, camera);
+    if (!this.reuseDepth) {
+      renderer.clear(true, true, true);
+      renderer.render(scene, camera);
+      return;
+    }
+    // Over the prepass depth: everything the prepass drew tests against it without writing, pulled a hair toward the
+    // camera so its own surface passes.
+    renderer.clear(true, false, false);
+    const saved = [];
+    scene.traverseVisible((object) => {
+      const m = object.material;
+      if (!m?.isPipelineMaterial || m.transparent) return;
+      saved.push(m, m.depthWrite, m.polygonOffset, m.polygonOffsetFactor, m.polygonOffsetUnits);
+      m.depthWrite = false;
+      m.polygonOffset = true;
+      m.polygonOffsetFactor = -1;
+      m.polygonOffsetUnits = -4;
+    });
+    try {
+      renderer.render(scene, camera);
+    } finally {
+      for (let i = 0; i < saved.length; i += 5) {
+        const m = saved[i];
+        m.depthWrite = saved[i + 1];
+        m.polygonOffset = saved[i + 2];
+        m.polygonOffsetFactor = saved[i + 3];
+        m.polygonOffsetUnits = saved[i + 4];
+      }
+    }
   }
 
   _renderBloom(source) {
@@ -735,6 +788,7 @@ class Pipeline {
       if (!still) this.lensCount = 0;
       if (!still) (this._settleShown = null), (this._settleFade = false);
       const lensPath = still && ((dof && this.lensSamples > 0) || settle);
+      if (lensPath) this.taaHistory = false;
       if (lensPath) {
         hdr = this._renderLens(scene, camera, settle ? this.stillSamples : this.lensSamples, !settle);
       } else if (samples > 1) {
@@ -758,6 +812,26 @@ class Pipeline {
         }
         this._updateCameraUniforms(camera);
         hdr = this.accumTarget.texture;
+      } else if (this.temporal && debug === "none") {
+        // A new sub-pixel offset each frame (Halton 2,3 over 16), resolved against the history.
+        _projection.copy(camera.projectionMatrix);
+        const k = (this.frame % 16) + 1;
+        this._setJitter(camera, ((halton(k, 2) - 0.5) * 2) / this.width, ((halton(k, 3) - 0.5) * 2) / this.height);
+        this._renderFrame(scene, camera);
+        camera.projectionMatrix.copy(_projection);
+        globalUniforms.jitter.value.set(0, 0);
+        this._updateCameraUniforms(camera);
+        const t = this.taaMaterial.uniforms;
+        t.tCurrent.value = this.mainTarget.texture;
+        t.tHistory.value = this.taaTargets[this.taaIndex].texture;
+        t.resolution.value.set(this.width, this.height);
+        t.feedback.value = this.temporalFeedback;
+        t.clampGamma.value = this.temporalClamp;
+        t.hasHistory.value = this.taaHistory ? 1 : 0;
+        this.taaIndex = 1 - this.taaIndex;
+        this._pass(this.taaMaterial, this.taaTargets[this.taaIndex]);
+        this.taaHistory = true;
+        hdr = this.taaTargets[this.taaIndex].texture;
       } else {
         globalUniforms.jitter.value.set(0, 0);
         this._renderFrame(scene, camera);
@@ -792,7 +866,7 @@ class Pipeline {
       f.clipWarning.value = this.clipWarning && debug === "none" ? 1 : 0;
       f.bloomScale.value = 1 / this.bloomNorm;
 
-      if (this.msaa === 0) {
+      if (this.msaa === 0 && !this.temporal) {
         this._pass(this.finalMaterial, this.ldrTarget);
         this._pass(this.fxaaMaterial, null);
       } else {
@@ -809,7 +883,7 @@ class Pipeline {
   // Fullscreen-pass programs, started in the constructor so they compile alongside the day's setup.
   _compilePasses() {
     const gi = this.gi;
-    const materials = [this.copyMaterial, this.accumMaterial, this.downMaterial, this.upMaterial, this.finalMaterial, this.fxaaMaterial];
+    const materials = [this.copyMaterial, this.accumMaterial, this.downMaterial, this.upMaterial, this.finalMaterial, this.fxaaMaterial, this.taaMaterial];
     if (this.motionBlurAvailable) materials.push(this.tileMaxMaterial, this.neighborMaxMaterial, this.reconstructMaterial);
     if (this.dof) materials.push(...this.dof.materials);
     materials.push(gi.geometryMaterial, gi.traceMaterial, gi.temporalMaterial, gi.blurMaterial, gi.tileMaterial, gi.skipMaterial);
@@ -944,9 +1018,10 @@ class Pipeline {
       level.up.dispose();
     }
     this.depthTexture.dispose();
-    for (const m of [this.copyMaterial, this.accumMaterial, this.downMaterial, this.upMaterial, this.finalMaterial, this.fxaaMaterial]) {
+    for (const m of [this.copyMaterial, this.accumMaterial, this.downMaterial, this.upMaterial, this.finalMaterial, this.fxaaMaterial, this.taaMaterial]) {
       m.dispose();
     }
+    for (const rt of this.taaTargets) rt.dispose();
     this.quad.geometry.dispose();
     this.shadow.dispose();
     this.shadowMask?.dispose();

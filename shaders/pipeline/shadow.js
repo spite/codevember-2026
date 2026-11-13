@@ -13,6 +13,11 @@ uniform float shadowBias;
 uniform float shadowNormalBias;
 uniform float shadowEnabled;
 uniform float shadowMaxRadius;
+uniform float shadowTwoSided;
+uniform float shadowTranslucency;
+uniform float shadowLayerT;
+uniform float shadowLayerSpacing;
+uniform float shadowMinTexels;
 #endif
 
 #ifndef SHADOW_FRAME
@@ -71,6 +76,10 @@ float getShadow(vec3 worldPos, vec3 worldNormal) {
 
   vec3 N = normalize(worldNormal);
   float ndl = dot(N, L);
+  if (shadowTwoSided > 0.5 && ndl < 0.0) {
+    N = -N;
+    ndl = -ndl;
+  }
   if (ndl <= 0.0) return 1.0;
   // Normal offset grows with texel size and toward grazing, where acne starts.
   float texelWorld = worldPerUV / shadowMapSize.x;
@@ -92,6 +101,7 @@ float getShadow(vec3 worldPos, vec3 worldNormal) {
   // The search covers the widest kernel softness can ask for.
   float texel = 1.0 / shadowMapSize.x;
   float searchRadius = clamp(shadowLightSize * max(shadowSoftness, 1.0) * c.z * worldPerDepth / worldPerUV, texel, shadowMaxRadius);
+  searchRadius = max(searchRadius, shadowMinTexels * texel);
   // The receiver's own texel always counts, so a wide search cannot miss a contact blocker.
   float dC = textureLod(shadowMap, c.xy, 0.0).r;
   float blockers = dC < shadowRef(zR, grad, vec2(0.0), texel) ? 1.0 : 0.0;
@@ -111,6 +121,7 @@ float getShadow(vec3 worldPos, vec3 worldNormal) {
 
   float penumbra = (c.z - zB) * worldPerDepth * shadowLightSize / worldPerUV;
   float radius = clamp(penumbra * shadowSoftness, texel, shadowMaxRadius);
+  radius = max(radius, shadowMinTexels * texel);
   shadowKernelRadius = radius;
 
   // Hardware comparison: each tap is a bilinear 2x2 PCF. Zero gradients (not textureLod) keep
@@ -121,6 +132,12 @@ float getShadow(vec3 worldPos, vec3 worldNormal) {
     lit += textureGrad(shadowMapCmp, vec3(c.xy + o, shadowRef(zR, grad, o, texel)), vec2(0.0), vec2(0.0));
   }
   float result = mix(1.0, lit / float(SHADOW_PCF_SAMPLES), fade);
+  if (shadowTranslucency > 0.0) {
+    // Thin layers close above pass some light: one layer per shadowLayerSpacing of gap to the blockers.
+    vec4 s0 = shadowMatrix * vec4(worldPos, 1.0);
+    float layers = max(1.0, (s0.z / s0.w * 0.5 + 0.5 - zB) * worldPerDepth / shadowLayerSpacing);
+    result = mix(result, result + (1.0 - result) * pow(shadowLayerT, layers), shadowTranslucency * fade);
+  }
   // Near the terminator direct light is ~0 anyway, and fading hides acne; only for blockers a few
   // texels away (self-shadowing), so shadows cast on receivers under a low light keep their strength.
   float selfShadow = 1.0 - smoothstep(2.0, 6.0, (c.z - zB) * worldPerDepth / texelWorld);

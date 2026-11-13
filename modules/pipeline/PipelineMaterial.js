@@ -111,7 +111,7 @@ void main() {
 `;
 }
 
-function fragmentShader({ fragmentPars, surface, varyings }) {
+function fragmentShader({ fragmentPars, surface, varyings, fragmentPrelude = "" }) {
   return /* glsl */ `
 uniform vec2 resolution;
 uniform mat4 projectionMatrixInverse;
@@ -136,6 +136,7 @@ uniform vec3 aoColor;
 uniform float aoPower;
 uniform float aoDirect;
 uniform float aoMin;
+uniform float aoMultiBounce;
 uniform vec4 occluders[16];
 uniform int occluderCount;
 uniform float occluderStrength;
@@ -167,6 +168,7 @@ in vec4 vPrevClip;
 ${varyingDecls(varyings, "in")}
 
 layout(location = 0) out vec4 outColor;
+${fragmentPrelude}
 
 struct Surface {
   vec3 albedo;
@@ -180,6 +182,12 @@ struct Surface {
   float occlusion;
   vec3 transmission; // thin-sheet diffuse transmission (light through the back face)
   float specular; // scales the dielectric F0 (1 = 0.04)
+  float transmissionOcclusion; // thinSheet only: how open the far side is to the environment
+  float transmissionForward; // thinSheet only: Henyey-Greenstein g of the key light through the sheet (0 = diffuse)
+  float anisotropy; // anisotropy only: -1..1, stretches the highlight along anisotropyDirection (> 0) or across it
+  vec3 anisotropyDirection; // anisotropy only: world-space direction in the surface plane
+  float fiber; // thinSheet only: 0..1, how much the key lights the sheet as round fibres along fiberAxis (edge-on vanes)
+  vec3 fiberAxis; // thinSheet only: world-space fibre direction
 };
 
 ${shadowChunk}
@@ -234,12 +242,25 @@ void main() {
   s.occlusion = 1.0;
   s.transmission = transmission;
   s.specular = 1.0;
+  s.transmissionOcclusion = 1.0;
+  s.transmissionForward = 0.0;
+  s.anisotropy = 0.0;
+  s.anisotropyDirection = vec3(1.0, 0.0, 0.0);
+  s.fiber = 0.0;
+  s.fiberAxis = vec3(1.0, 0.0, 0.0);
 #ifdef PIPELINE_SURFACE
   surface(s);
 #endif
 
 #if defined(PIPELINE_SHADOW)
+  #ifdef PIPELINE_STOCHASTIC_SHADOW
+  // Opt-in: alpha is the chance of blocking the light, drawn afresh every frame (interleaved gradient noise), so
+  // the filtered, denoised shadow converges to partial shadows that multiply through stacked layers.
+  vec2 shadowNoiseP = gl_FragCoord.xy + 5.588238 * mod(frame, 64.0);
+  if (s.alpha <= fract(52.9829189 * fract(dot(shadowNoiseP, vec2(0.06711056, 0.00583715))))) discard;
+  #else
   if (s.alpha < 0.5) discard;
+  #endif
   // The shadow map's raw depth (ShadowPass).
   outColor = vec4(gl_FragCoord.z);
 #elif defined(PIPELINE_PREPASS)
@@ -250,6 +271,10 @@ void main() {
 #else
   #ifdef OPAQUE
   if (s.alpha < 0.5) discard;
+  #endif
+  #ifdef ALPHA_TO_COVERAGE
+  // Opt-in (alphaToCoverage: true): alpha becomes MSAA coverage; opaque otherwise.
+  if (s.alpha < 0.02) discard;
   #endif
   vec3 P = vWorldPosition;
   vec3 n = normalize(s.normal);
@@ -269,7 +294,19 @@ void main() {
   vec3 L = normalize(lightDirection);
   vec3 H = normalize(L + V);
   // A geometric back face gets no key, even where the shading normal tilts toward it.
-  #ifdef PIPELINE_SOFT_TERMINATOR
+  #if defined(PIPELINE_THIN_SHEET)
+  // Thin sheets: near the terminator the lighting follows the geometric normal, so the front and back terms meet.
+  vec3 nl = normalize(mix(N, n, smoothstep(0.0, 0.25, abs(dot(N, L)))));
+  float NdotL = max(dot(nl, L), 0.0) * step(0.0, dot(N, L));
+  if (s.fiber > 0.0) {
+    // A sheet of round fibres seen edge-on is still lit: each fibre's visible half faces the key by how close the key
+    // and the eye are round the fibre (Kajiya-Kay diffuse, the lit fraction of the visible side).
+    vec3 A = normalize(s.fiberAxis);
+    vec3 Lp = L - dot(L, A) * A, Vp = V - dot(V, A) * A;
+    float fl = length(Lp) * (0.5 + 0.5 * dot(Lp, Vp) / max(length(Lp) * length(Vp), 1e-4));
+    NdotL = mix(NdotL, fl, clamp(s.fiber, 0.0, 1.0));
+  }
+  #elif defined(PIPELINE_SOFT_TERMINATOR)
   // Opt-in: fades it over the terminator instead, for strong per-pixel relief.
   float NdotL = clamp(dot(n, L), 0.0, 1.0) * smoothstep(-0.25, 0.15, dot(N, L));
   #else
@@ -277,7 +314,7 @@ void main() {
   #endif
   float NdotH = clamp(dot(n, H), 0.0, 1.0);
   float VdotH = clamp(dot(V, H), 0.0, 1.0);
-  #ifdef OPAQUE
+  #if defined(OPAQUE) || defined(ALPHA_TO_COVERAGE)
   // The shadow mask and GI share one set of upsampling weights.
   float zTol = giDepthTolerance();
   GIUpsample giU = GIUpsample(ivec2(0), ivec2(0), ivec2(0), ivec2(0), vec4(0.0), 0.0);
@@ -289,28 +326,70 @@ void main() {
     shadow = giUpsampleApply(shadowMask, giU).a;
     maskMatch = giU.match;
   }
+  #ifdef PIPELINE_THIN_SHEET
+  // Thin sheets seen edge-on rarely match the half-res mask: their fallback is the noise-free kernel (the noisy
+  // PCSS read shows as grain without the mask's denoising), from the side the light reaches.
+  if (maskMatch < 0.05) {
+    vec3 nf = shadowTwoSided > 0.5 && dot(n, L) < 0.0 ? -n : n;
+    shadow = getShadowFixed(P, nf, max(4.0, shadowMinTexels));
+  }
+  #else
   if (maskMatch < 0.05) shadow = getShadow(P, N);
+  #endif
   #else
   float shadow = getShadow(P, N);
   #endif
   vec3 E = lightColor * NdotL * shadow;
+  #ifdef PIPELINE_ANISOTROPY
+  // Opt-in anisotropic GGX (Burley / Filament): roughness grows along the anisotropy direction.
+  vec3 aT = normalize(s.anisotropyDirection - dot(s.anisotropyDirection, n) * n);
+  vec3 aB = cross(n, aT);
+  float at = max(alpha * (1.0 + s.anisotropy), 0.002);
+  float ab = max(alpha * (1.0 - s.anisotropy), 0.002);
+  float ToH = dot(aT, H), BoH = dot(aB, H), ToV = dot(aT, V), BoV = dot(aB, V), ToL = dot(aT, L), BoL = dot(aB, L);
+  float aD = ToH * ToH / (at * at) + BoH * BoH / (ab * ab) + NdotH * NdotH;
+  float D_a = 1.0 / (PIPELINE_PI * at * ab * aD * aD);
+  float V_a = 0.5 / max(NdotL * length(vec3(at * ToV, ab * BoV, NdotV)) + NdotV * length(vec3(at * ToL, ab * BoL, NdotL)), 1e-5);
+  vec3 directSpecular = E * F_Schlick(VdotH, f0) * D_a * V_a * lightSpecular;
+  #else
   vec3 directSpecular = E * F_Schlick(VdotH, f0) * D_GGX(NdotH, alpha) * V_SmithGGXCorrelated(alpha, NdotV, NdotL) * lightSpecular;
+  #endif
   vec3 directDiffuse = E * diffuseColor * PIPELINE_INV_PI;
   vec3 directSheen = E * s.sheenColor * D_Charlie(sheenRough, NdotH) * V_Neubelt(NdotV, NdotL) * lightSheen;
   // Thin sheet: the key lighting the back side, shadowed from there.
   vec3 directTransmission = vec3(0.0);
   if (pipelineMax3(s.transmission) > 0.0) {
+    #ifdef PIPELINE_THIN_SHEET
+    // Lit through the sheet only when the key is geometrically behind it; with two-sided shadows the (denoised)
+    // shadow above is already the back side's.
+    float backNdotL = max(-dot(nl, L), 0.0) * step(0.0, -dot(N, L));
+    float backShadow = shadowTwoSided > 0.5 ? shadow : getShadowFixed(P, -N, 3.0);
+    #else
     float backNdotL = clamp(-dot(n, L), 0.0, 1.0);
-    if (backNdotL > 0.0) directTransmission = lightColor * backNdotL * getShadowFixed(P, -N, 3.0) * s.transmission * diffuseColor * PIPELINE_INV_PI;
+    float backShadow = backNdotL > 0.0 ? getShadowFixed(P, -N, 3.0) : 0.0;
+    #endif
+    if (backNdotL > 0.0) directTransmission = lightColor * backNdotL * backShadow * s.transmission * diffuseColor * PIPELINE_INV_PI;
+    #ifdef PIPELINE_THIN_SHEET
+    // Forward scattering (Henyey-Greenstein, normalized to keep the transmitted energy): edges glow toward the light.
+    float g = s.transmissionForward;
+    float hg = (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * dot(V, -L), 1.5);
+    directTransmission *= min(hg / (1.0 + 2.6 * g), 6.0);
+    #endif
   }
 
   // Indirect: SH env irradiance with AO, screen-space GI, prefiltered env specular.
-  #ifdef OPAQUE
+  #if defined(OPAQUE) || defined(ALPHA_TO_COVERAGE)
   vec4 gi = sampleGI(giU);
   #else
   vec4 gi = vec4(0.0, 0.0, 0.0, 1.0);
   #endif
   gi.a = pow(clamp(gi.a, 0.0, 1.0), aoPower);
+  if (aoMultiBounce > 0.0) {
+    // Bright surfaces fill their own crevices with interreflections (Jimenez et al. 2016).
+    float rho = clamp(dot(diffuseColor * (1.0 + s.transmission), vec3(0.2126, 0.7152, 0.0722)), 0.0, 0.95);
+    float ma = 2.0404 * rho - 0.3324, mb = -4.7951 * rho + 0.6417, mc = 2.7552 * rho + 0.6903, x = gi.a;
+    gi.a = mix(x, max(x, ((x * ma + mb) * x + mc) * x), aoMultiBounce);
+  }
   float sphereVis = occluderCount > 0 ? sphereOcclusion(P, n) : 1.0;
   float ao = max(mix(1.0, gi.a, aoIntensity) * s.occlusion * sphereVis, aoMin);
   vec3 aoTint = max(mix(vec3(1.0), mix(aoColor, vec3(1.0), gi.a), aoIntensity) * s.occlusion * sphereVis, vec3(aoMin));
@@ -323,8 +402,23 @@ void main() {
   vec3 Favg = f0 + (1.0 - f0) * 0.047619;
   vec3 multiScatter = FssEss * Favg / (1.0 - Ems * Favg) * Ems;
   vec3 kD = diffuseColor * (1.0 - pipelineMax3(FssEss + multiScatter));
+  #ifdef PIPELINE_THIN_SHEET
+  // What the surface reflects specularly doesn't enter the sheet.
+  float enterE = 1.0 - pipelineMax3(FssEss + multiScatter);
+  directDiffuse *= enterE;
+  directTransmission *= enterE;
+  #endif
 
+  #ifdef PIPELINE_ANISOTROPY
+  // Bent reflection normal for the environment (Filament's approximation).
+  vec3 aDir = s.anisotropy >= 0.0 ? aB : aT;
+  vec3 aTangent = cross(aDir, V);
+  vec3 aNormal = cross(aTangent, aDir);
+  float bend = abs(s.anisotropy) * clamp(5.0 * rough, 0.0, 1.0);
+  vec3 R = reflect(-V, normalize(mix(n, aNormal, bend)));
+  #else
   vec3 R = reflect(-V, n);
+  #endif
   R = normalize(mix(R, n, alpha * alpha));
   vec3 radiance = textureLod(envMap, envRotation * R, envMapMaxLod * rough * (2.0 - rough)).rgb * envIntensity;
   float so = specularOcclusion(NdotV, ao, alpha);
@@ -336,6 +430,11 @@ void main() {
   indirectSpecular *= specShadow;
   indirectSheen *= specShadow;
 
+  #ifdef PIPELINE_THIN_SHEET
+  // Environment light from the far side through the sheet; screen-space AO is this side's, so the surface says
+  // how open the far side is.
+  directTransmission += s.transmission * diffuseColor * max(evalSH(envRotation * -n), vec3(0.0)) * envIntensity * s.transmissionOcclusion;
+  #endif
   vec3 color = (directDiffuse + directSpecular + indirectDiffuse + indirectSpecular + directTransmission) * sheenScale
     + directSheen + indirectSheen + s.emissive;
 
@@ -346,6 +445,8 @@ void main() {
 
   #ifdef OPAQUE
   outColor = vec4(color, 1.0);
+  #elif defined(ALPHA_TO_COVERAGE)
+  outColor = vec4(color, clamp(s.alpha, 0.0, 1.0));
   #else
   float a = clamp(s.alpha, 0.0, 1.0);
   outColor = vec4(color * a, a);
@@ -378,9 +479,13 @@ class PipelineMaterial extends ShaderMaterial {
       vertexMain = "",
       varyings = {},
       fragmentPars = "",
+      fragmentPrelude = "",
       surface = "",
       defines = {},
       instanceMotion = false,
+      thinSheet = false,
+      anisotropy = false,
+      stochasticShadows = false,
       ...rest
     } = params;
 
@@ -396,11 +501,14 @@ class PipelineMaterial extends ShaderMaterial {
       transmission: { value: new Color(transmissionColor).multiplyScalar(transmission) },
       prevModelMatrix: { value: new Matrix4() },
     };
-    const source = { vertexPars, vertex, vertexMain, varyings, fragmentPars, surface };
+    const source = { vertexPars, vertex, vertexMain, varyings, fragmentPars, fragmentPrelude, surface };
     const baseDefines = { ...defines };
     if (vertex.trim()) baseDefines.PIPELINE_DISPLACE = "";
     if (surface.trim()) baseDefines.PIPELINE_SURFACE = "";
     if (instanceMotion) baseDefines.PIPELINE_PREV_INSTANCING = "";
+    if (thinSheet) baseDefines.PIPELINE_THIN_SHEET = "";
+    if (anisotropy) baseDefines.PIPELINE_ANISOTROPY = "";
+    if (stochasticShadows) baseDefines.PIPELINE_STOCHASTIC_SHADOW = "";
 
     super({
       ...rest,

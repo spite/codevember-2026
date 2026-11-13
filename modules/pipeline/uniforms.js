@@ -37,6 +37,14 @@ export const globalUniforms = {
   shadowNormalBias: { value: 0.02 },
   shadowEnabled: { value: 0 },
   shadowMaxRadius: { value: 0.12 }, // PCSS radius clamp in shadow-map uv
+  shadowTwoSided: { value: 0 }, // opt-in: back faces are shadowed from their own side (thin sheets lit through)
+  // Opt-in translucent shadows: a blocker passes shadowLayerT of the light per shadowLayerSpacing of depth gap (thin
+  // layers of a coat), while deep blockers stay opaque.
+  shadowTranslucency: { value: 0 },
+  shadowLayerT: { value: 0.33 },
+  shadowLayerSpacing: { value: 0.02 },
+  // Opt-in smallest PCF disc, in shadow texels: averages screen-door (stochastic) casters into partial shadow.
+  shadowMinTexels: { value: 0 },
   shadowMask: { value: null }, // half-res denoised shadow (ShadowMaskPass), read from .a
   shadowMaskEnabled: { value: 0 },
   // AO + GI
@@ -48,6 +56,7 @@ export const globalUniforms = {
   aoPower: { value: 1 },
   aoDirect: { value: 0 }, // fraction of AO applied to direct diffuse
   aoMin: { value: 0 }, // floor on the combined occlusion, so deep pockets never go black
+  aoMultiBounce: { value: 0 }, // opt-in: AO brightened for bright albedo (Jimenez 2016 multi-bounce fit)
   depthTexture: { value: null },
   giGeoMap: { value: null }, // half-res x = linear depth, y = packed world normal
   // analytic sphere occluders (xyz centre, w radius), for soft contact darkening

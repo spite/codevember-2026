@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Feather · Codevember 2026 #12</title>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <!-- Share tags: crawlers don't run JS, so they are static, with absolute urls. Fill them in when the day is finished. -->
+    <meta name="description" content="One-sentence description. Day 12 of Codevember 2026." />
+    <meta name="author" content="Jaume Sanchez Elias" />
+    <meta name="theme-color" content="#ebe9e5" />
+    <link rel="canonical" href="https://spite.github.io/codevember-2026/12/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Codevember 2026" />
+    <meta property="og:title" content="Feather · Codevember 2026 #12" />
+    <meta property="og:description" content="One-sentence description. Day 12 of Codevember 2026." />
+    <meta property="og:url" content="https://spite.github.io/codevember-2026/12/" />
+    <meta property="og:image" content="https://spite.github.io/codevember-2026/screenshots/12-social.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="What the share card shows." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@thespite" />
+    <meta name="twitter:creator" content="@thespite" />
+    <meta name="twitter:title" content="Feather · Codevember 2026 #12" />
+    <meta name="twitter:description" content="One-sentence description. Day 12 of Codevember 2026." />
+    <meta name="twitter:image" content="https://spite.github.io/codevember-2026/screenshots/12-social.jpg" />
+    <meta name="twitter:image:alt" content="What the share card shows." />
+    <link rel="stylesheet" type="text/css" href="../css/styles.css" />
+    <link rel="stylesheet" type="text/css" href="../css/gui.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "maf": "../modules/maf.js",
+          "guspira": "../third_party/guspira.js",
+          "common": "../modules/common.js",
+          "easings": "../modules/easings.js",
+          "three": "../third_party/three.module.js",
+          "three/": "../third_party/",
+          "third_party/": "../third_party/",
+          "shaders/": "../shaders/",
+          "modules/": "../modules/"
+        }
+      }
+    </script>
+    <script type="module" src="main.js"></script>
+  </head>
+  <body>
+    <!-- The day's backdrop colour, and its prompt as a verb: Folding…, Shattering… -->
+    <div id="loading" style="--loading-background: #ebe9e5"><span>Feathering…</span></div>
+    <div id="main-gui">
+      <div id="randomize-button" class="button" title="Randomize">
+        <img src="../assets/randomize.svg" alt="Randomize" />
+      </div>
+      <div id="pause-button" class="button action" title="Pause">
+        <img src="../assets/pause.svg" alt="Pause" />
+      </div>
+      <div id="gui-container"></div>
+    </div>
+  </body>
+</html>
