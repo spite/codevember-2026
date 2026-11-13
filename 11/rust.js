@@ -99,6 +99,8 @@ uniform highp sampler3D noiseTex;
 uniform float age;
 uniform float seed;
 uniform float brass;
+uniform vec4 puffZones;   // gearZones for the vertex stage: root, pitch, tip, bore radius (0: not a gear)
+uniform float puffMeshing;
 `;
 
 const vertex = /* glsl */ `
@@ -118,10 +120,15 @@ vec3 displace(vec3 p, inout vec3 n) {
   // Brass only tarnishes: it barely heaves or rounds.
   float k = 1.0 - 0.85 * brass;
   float hv = heave(p);
-  // Rust swells: the crust puffs out a fraction of a millimetre in lumps (under the gears' backlash, so meshed teeth
-  // stay clear) and only softens the edges a little.
+  // Rust swells: the crust puffs out a millimetre or two in lumps, enough to change the profile. Only the flanks where
+  // meshed teeth touch stay under the backlash; tips and roots have the tooth clearance to swell into.
   float amount = smoothstep(0.15, 0.9, age);
-  float puff = amount * (0.00022 + 0.00016 * (hv - 0.5));
+  float fine = textureLod(noiseTex, (p + seed * 3.7) * 61.0 + 0.7, 0.0).z;
+  float lumps = 0.0013 + 0.0018 * (hv - 0.5) + 0.0006 * (fine - 0.5);
+  float r = length(p.xy), m = puffZones.z - puffZones.y;
+  float side = 1.0 - abs(normalize(aSmooth).z);
+  float contact = puffMeshing * step(0.0001, puffZones.y) * side * smoothstep(puffZones.x, puffZones.x + 0.3 * m, r) * (1.0 - smoothstep(puffZones.z - 0.5 * m, puffZones.z - 0.1 * m, r));
+  float puff = amount * mix(lumps, 0.00022 + 0.00016 * (hv - 0.5), contact);
   float eaten = aConvex * smoothstep(0.3, 1.0, age) * 0.0012 * (0.6 + 0.8 * hv);
   rmDisplaced = p + aSmooth * (k * (puff - eaten));
   rmHasDisplaced = true;
@@ -628,6 +635,8 @@ export function createRustMaterial(textures, info, { lite = false } = {}) {
       meshing: { value: info.meshing ? 1 : 0 },
       seed: { value: info.seed ?? 0 },
       gearZones: { value: new Vector4(...(info.zones ?? [0, 0, 0, 0])) },
+      puffZones: { value: new Vector4(...(info.zones ?? [0, 0, 0, 0])) },
+      puffMeshing: { value: info.meshing ? 1 : 0 },
       halfWidth: { value: info.halfWidth ?? 0 },
       gearBody: { value: new Vector4(...(info.body ?? [0, 0, 0, 0])) },
       edgePits: { value: 0.6 },
