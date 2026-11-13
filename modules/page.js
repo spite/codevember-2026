@@ -21,7 +21,18 @@
 footer > .meta { margin-bottom: 12px; }
 .hero .live { display: inline-flex; align-self: flex-start; align-items: center; gap: 9px; padding: 12px 16px; border-radius: 3px; font: 600 13px/1 var(--mono, monospace); letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none; color: var(--bg, #fff); background: var(--accent, var(--candy, var(--ink, #000))); transition: background 0.2s ease; }
 .hero .live:hover, .hero .live:focus-visible { background: var(--ink, #000); }
-.hero .live:focus-visible { outline: 2px solid var(--accent, var(--candy, currentColor)); outline-offset: 2px; }`;
+.hero .live:focus-visible { outline: 2px solid var(--accent, var(--candy, currentColor)); outline-offset: 2px; }
+.hero figure img { cursor: zoom-in; }
+.lightbox { position: fixed; inset: 0; z-index: 1000; background: rgb(12 12 12 / 0.94); overflow: hidden; opacity: 0; transition: opacity 0.25s ease; cursor: zoom-in; touch-action: pan-x pan-y; overscroll-behavior: contain; }
+.lightbox.open { opacity: 1; }
+.lightbox.zoomed { overflow: auto; cursor: grab; scrollbar-width: none; }
+.lightbox::-webkit-scrollbar { display: none; }
+.lightbox.dragging { cursor: grabbing; }
+.lightbox .frame { min-width: 100%; min-height: 100%; display: grid; place-items: center; }
+.fade-images .lightbox img, .lightbox img { opacity: 1; display: block; max-width: none; border-radius: 0; user-select: none; -webkit-user-drag: none; }
+.lightbox button { position: fixed; top: 14px; right: 14px; width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgb(255 255 255 / 0.12); color: #fff; font: 400 24px/1 sans-serif; cursor: pointer; }
+.lightbox button:hover, .lightbox button:focus-visible { background: rgb(255 255 255 / 0.25); }
+@media (prefers-reduced-motion: reduce) { .lightbox { transition: none; } }`;
   const style = document.createElement("style");
   style.textContent = css;
   document.head.append(style);
@@ -75,8 +86,92 @@ footer > .meta { margin-bottom: 12px; }
     nodes.forEach(highlightText);
   }
 
+  // Click the hero image to see it full screen; click again for a closer look, drag to pan.
+  function lightbox(src, alt) {
+    const box = document.createElement("div");
+    box.className = "lightbox";
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-modal", "true");
+    box.setAttribute("aria-label", alt);
+    box.innerHTML = `<div class="frame"><img alt=""></div><button type="button" aria-label="Close">×</button>`;
+    const img = box.querySelector("img"), frame = box.querySelector(".frame"), close = box.querySelector("button");
+    img.alt = alt;
+    let zoomed = false;
+    const layout = (cx, cy) => {
+      const w = img.naturalWidth || 1, h = img.naturalHeight || 1, pad = innerWidth < 600 ? 0 : 32;
+      const fit = Math.min((innerWidth - pad * 2) / w, (innerHeight - pad * 2) / h);
+      const scale = zoomed ? Math.max(1, fit * 2) : fit;
+      const fx = cx === undefined ? 0.5 : (cx - img.getBoundingClientRect().left) / img.getBoundingClientRect().width;
+      const fy = cy === undefined ? 0.5 : (cy - img.getBoundingClientRect().top) / img.getBoundingClientRect().height;
+      img.style.width = `${w * scale}px`;
+      img.style.height = `${h * scale}px`;
+      box.classList.toggle("zoomed", zoomed);
+      if (zoomed) {
+        const r = img.getBoundingClientRect();
+        box.scrollLeft += r.left + fx * r.width - (cx ?? innerWidth / 2);
+        box.scrollTop += r.top + fy * r.height - (cy ?? innerHeight / 2);
+      }
+    };
+    const shut = () => {
+      box.classList.remove("open");
+      removeEventListener("keydown", key);
+      removeEventListener("resize", onResize);
+      removeEventListener("pointerup", up);
+      document.documentElement.style.overflow = "";
+      setTimeout(() => box.remove(), 250);
+    };
+    const key = (e) => {
+      if (e.key === "Escape") shut();
+    };
+    const onResize = () => layout();
+    let drag = null;
+    box.addEventListener("pointerdown", (e) => {
+      if (e.target === close || e.pointerType !== "mouse") return;
+      drag = { x: e.clientX, y: e.clientY, sl: box.scrollLeft, st: box.scrollTop, moved: false };
+    });
+    box.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+      drag.moved = true;
+      box.classList.add("dragging");
+      box.scrollLeft = drag.sl - dx;
+      box.scrollTop = drag.st - dy;
+    });
+    const up = () => setTimeout(() => ((drag = null), box.classList.remove("dragging")));
+    addEventListener("pointerup", up);
+    box.addEventListener("click", (e) => {
+      if (e.target === close || drag?.moved) return;
+      if (e.target !== img && !zoomed) return shut();
+      zoomed = !zoomed;
+      layout(e.clientX, e.clientY);
+    });
+    close.addEventListener("click", shut);
+    addEventListener("keydown", key);
+    addEventListener("resize", onResize);
+    img.addEventListener("load", () => layout(), { once: true });
+    img.src = src;
+    if (img.complete) layout();
+    document.documentElement.style.overflow = "hidden";
+    document.body.append(box);
+    requestAnimationFrame(() => box.classList.add("open"));
+    close.focus({ preventScroll: true });
+  }
+
+  const zoomable = () => {
+    for (const img of document.querySelectorAll(".hero figure img")) {
+      img.tabIndex = 0;
+      img.setAttribute("role", "button");
+      img.title = "View full size";
+      const open = () => lightbox(img.currentSrc || img.src, img.alt);
+      img.addEventListener("click", open);
+      img.addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), open()));
+    }
+  };
+
   const ready = () => {
     sweep();
+    zoomable();
     document.querySelectorAll(".formula, code").forEach(highlight);
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready);
