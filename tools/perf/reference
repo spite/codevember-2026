@@ -1,0 +1,4 @@
+# Machine reference for run.sh: a fixed commit and days measured alongside every run, so entries from different
+# sessions can be scaled to the same GPU speed. Change only together with a note in history (old entries keep theirs).
+commit d5597c8
+days 2 7
