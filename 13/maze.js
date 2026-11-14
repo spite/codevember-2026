@@ -4811,7 +4811,7 @@ export function buildLabyrinth({
   );
 
   // Margin beyond the wall's own reach that the reflection march may step without missing a capsule.
-  const renderGrid = packRenderGrid(capsuleData, wallHalfWidth + wallHeight + 0.03);
+  const renderGrid = packRenderGrid(capsuleData, wallHalfWidth + wallHeight + 0.06);
 
   // 2. Place Start and Goal inside the largest connected component of verified-passable corridors (guaranteed 100% passable end-to-end!)
   const minPassableSpan = wallHalfWidth + marbleRadius * 1.04;

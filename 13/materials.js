@@ -342,44 +342,52 @@ float refFetch(highp sampler2D t, int i) {
   return texelFetch(t, ivec2(i & 1023, i >> 10), 0).r;
 }
 
-vec3 capTexel(int i, int k) {
-  int j = i * 3 + k;
-  return texelFetch(uRefCaps, ivec2(j & 1023, j >> 10), 0).xyz;
+// Four texels per wall: bounding sphere (centre, radius), start point and length, then the unit axes x (along) and y (up).
+vec4 capTexel(int i, int k) {
+  int j = i * 4 + k;
+  return texelFetch(uRefCaps, ivec2(j & 1023, j >> 10), 0);
 }
 
-// Distance to the nearest wall or the marble; kind 0 = wall, 1 = marble.
-float refScene(vec3 p, out vec3 nrm, out float top, out float kind) {
-  float best = length(p - uMarbleLocalPos) - uMarbleRefRadius;
-  nrm = normalize(p - uMarbleLocalPos);
-  top = 0.0;
-  kind = 1.0;
-  vec3 g = floor((p + uRefHalf) * (uRefRes / (2.0 * uRefHalf)));
-  if (any(lessThan(g, vec3(0.0))) || any(greaterThanEqual(g, vec3(uRefRes)))) return best;
-  int res = int(uRefRes);
-  int cell = (int(g.z) * res + int(g.y)) * res + int(g.x);
-  int start = int(refFetch(uRefOffsets, cell));
-  int end = min(int(refFetch(uRefOffsets, cell + 1)), start + 64);
+// Ray against one wall, as a box in the wall's own frame (x along it, y up, z across), widened by the blur cone
+// e. Returns the entry distance (or -1 on a miss) and writes how fully the ray meets the unwidened box.
+float refWallHit(int i, vec3 o, vec3 d, float cone, float reach, float maxT, out float cover, out vec3 nrm, out float top) {
+  // Reject by the bounding sphere first: one read, and most walls near a ray never come close to it.
+  vec4 sphere = capTexel(i, 0);
+  vec3 oc = sphere.xyz - o;
+  float tc = dot(oc, d);
+  if (tc < -sphere.w || tc - sphere.w > maxT) return -1.0;
+  float te = max(tc, 0.004);
+  float e = (cone + 0.15 * te / reach) * te;
+  float reachR = sphere.w + e;
+  if (dot(oc, oc) - tc * tc > reachR * reachR) return -1.0;
+  vec4 start = capTexel(i, 1);
+  vec3 a = start.xyz;
+  float len = start.w;
+  vec3 X = capTexel(i, 2).xyz;
+  vec3 Y = capTexel(i, 3).xyz;
+  vec3 Z = cross(X, Y);
   float H = uWallH * clamp(uWallRaise, 0.0, 1.0);
-  for (int k = start; k < end; k++) {
-    int i = int(refFetch(uRefItems, k));
-    vec3 a = capTexel(i, 0);
-    vec3 ab = capTexel(i, 1) - a;
-    vec3 up = capTexel(i, 2);
-    float t = clamp(dot(p - a, ab) / max(dot(ab, ab), 1e-10), 0.0, 1.0);
-    vec3 q = p - (a + ab * t);
-    float h = dot(q, up);
-    vec3 side = q - up * h;
-    float lat = length(side);
-    vec2 d = vec2(lat - uWallHalfW, abs(h - H * 0.5) - H * 0.5);
-    float dist = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
-    if (dist < best) {
-      best = dist;
-      nrm = d.y > d.x ? up : side / max(lat, 1e-6);
-      top = clamp(h / max(H, 1e-5), 0.0, 1.0);
-      kind = 0.0;
-    }
-  }
-  return best;
+  vec3 ol = vec3(dot(o - a, X), dot(o - a, Y), dot(o - a, Z));
+  vec3 dl = vec3(dot(d, X), dot(d, Y), dot(d, Z));
+  vec3 lo = vec3(-uWallHalfW, -0.014, -uWallHalfW);
+  vec3 hi = vec3(len + uWallHalfW, H, uWallHalfW);
+  vec3 center = (lo + hi) * 0.5;
+  vec3 inv = 1.0 / (dl + vec3(equal(dl, vec3(0.0))) * 1e-7);
+  vec3 t0 = (lo - vec3(e, 0.0, e) - ol) * inv;
+  vec3 t1 = (hi + vec3(e) - ol) * inv;
+  vec3 tmin = min(t0, t1);
+  vec3 tmax = max(t0, t1);
+  float tNear = max(max(tmin.x, tmin.y), max(tmin.z, 0.002));
+  float tFar = min(min(tmax.x, tmax.y), min(tmax.z, maxT));
+  if (tNear > tFar) return -1.0;
+  // How far the ray passes from the real box, sampled mid-way through the widened one.
+  vec3 q = abs(ol + dl * (0.5 * (tNear + tFar)) - center) - (hi - lo) * 0.5;
+  float dist = length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+  cover = 1.0 - smoothstep(0.0, e, dist);
+  // End faces are almost always joints hidden inside the next piece: shade them as the wall's side.
+  nrm = tmin.y >= tmin.x && tmin.y >= tmin.z ? Y * -sign(dl.y) : Z * -sign(dl.z);
+  top = clamp((ol.y + dl.y * tNear) / max(H, 1e-5), 0.0, 1.0);
+  return tNear;
 }
 
 // P and R in world space. Returns lit radiance and how much of the reflection it covers (soft for rough floors).
@@ -402,36 +410,65 @@ vec4 traceReflection(vec3 P, vec3 R, float rough) {
   float rise = dot(dir, refFloorNormal);
   float maxT = min(max(uRefReach * uWallH, 1e-4) * 3.0, (uWallH + 0.01) / max(rise, 0.025));
   float cone = 0.012 + rough * 1.3;
-  float t = 0.003;
-  float best = 1e9;
+  float reach = max(uRefReach * uWallH, 1e-4);
+  float bestCover = 0.0;
   float hitT = 0.0;
   vec3 hitN = vec3(0.0, 1.0, 0.0);
   float hitTop = 0.0;
   float hitKind = 0.0;
-  // Contact hardening: the cone widens with distance, so reflections blur as they move away from what casts them.
-  float reach = max(uRefReach * uWallH, 1e-4);
-  for (int k = 0; k < 40; k++) {
-    vec3 n;
-    float top, kind;
-    float d = refScene(o + dir * t, n, top, kind);
-    float ratio = d / ((cone + 0.15 * t / reach) * t);
-    if (ratio < best) {
-      best = ratio;
-      hitT = t;
-      hitN = n;
-      hitTop = top;
-      hitKind = kind;
+
+  // The marble, exactly.
+  vec3 mc = uMarbleLocalPos - o;
+  float tc = dot(mc, dir);
+  if (uMarbleRefRadius > 0.0 && tc > 0.0 && tc < maxT + uMarbleRefRadius) {
+    float md = length(mc - dir * tc) - uMarbleRefRadius;
+    float mcov = 1.0 - smoothstep(0.0, (cone + 0.15 * tc / reach) * tc + 1e-4, md);
+    if (mcov > 0.0) {
+      bestCover = mcov;
+      hitT = tc;
+      hitN = normalize(dir * tc - mc);
+      hitKind = 1.0;
     }
-    if (d < 0.0004) {
-      best = 0.0;
-      break;
-    }
-    // A step floor that grows with distance keeps rays skimming a wall face from running out of steps.
-    t += clamp(d, 0.0015 + t * 0.02, uRefMargin);
-    if (t > maxT) break;
   }
-  // A blurred edge spreads the reflection thinner rather than widening it at full strength.
-  float soft = 1.0 - smoothstep(0.0, 1.0, best);
+
+  // Walls in the grid cells along the ray, sampled close enough that none within reach is missed.
+  int res = int(uRefRes);
+  // Each cell lists the walls within uRefMargin of it, so samples 2 * margin apart (from the middle of their span)
+  // cover the whole ray: one lookup for most rays.
+  float spacing = max(uRefMargin * 1.8, 0.01);
+  int samples = int(ceil(maxT / spacing));
+  int lastCell = -1;
+  for (int k = 0; k < 6; k++) {
+    if (k >= samples) break;
+    float ts = min((float(k) + 0.5) * spacing, maxT);
+    vec3 g = floor((o + dir * ts + uRefHalf) * (uRefRes / (2.0 * uRefHalf)));
+    if (any(lessThan(g, vec3(0.0))) || any(greaterThanEqual(g, vec3(uRefRes)))) break;
+    int cell = (int(g.z) * res + int(g.y)) * res + int(g.x);
+    if (cell != lastCell) {
+      lastCell = cell;
+      int start = int(refFetch(uRefOffsets, cell));
+      int end = min(int(refFetch(uRefOffsets, cell + 1)), start + 96);
+      for (int j = start; j < end; j++) {
+        float c;
+        vec3 n;
+        float top;
+        float th = refWallHit(int(refFetch(uRefItems, j)), o, dir, cone, reach, maxT, c, n, top);
+        if (th < 0.0) continue;
+        // Among solid hits the nearest wins, so a neighbouring piece's end face inside this one never shows.
+        bool solid = c > 0.98;
+        bool bestSolid = bestCover > 0.98;
+        if (solid ? (!bestSolid || th < hitT) : (!bestSolid && c > bestCover)) {
+          bestCover = max(bestCover, c);
+          hitT = th;
+          hitN = n;
+          hitTop = top;
+          hitKind = 0.0;
+        }
+      }
+    }
+  }
+  if (bestCover <= 0.0) return vec4(0.0);
+  float soft = bestCover;
   float cover = soft * soft * exp(-hitT / reach) * uRefStrength * lod;
   if (cover <= 0.0) return vec4(0.0);
 
@@ -1550,19 +1587,33 @@ export function setReflectionData(shared, labyrinth) {
   for (const key of ["uRefCaps", "uRefOffsets", "uRefItems"]) shared[key].value?.dispose();
   const caps = labyrinth.capsuleData;
   const count = caps.length / 12;
-  const texels = new Float32Array(count * 12);
+  const hw = labyrinth.wallHalfWidth;
+  const H = labyrinth.wallHeight;
+  const texels = new Float32Array(count * 16);
   for (let i = 0; i < count; i++) {
     const c = i * 12;
-    const o = i * 12;
-    texels.set([caps[c], caps[c + 1], caps[c + 2], 0, caps[c + 6], caps[c + 7], caps[c + 8], 0], o);
-    const nx = caps[c + 3] + caps[c + 9];
-    const ny = caps[c + 4] + caps[c + 10];
-    const nz = caps[c + 5] + caps[c + 11];
-    const len = Math.hypot(nx, ny, nz) || 1;
-    texels.set([nx / len, ny / len, nz / len, 0], o + 8);
+    const [ax, ay, az] = [caps[c], caps[c + 1], caps[c + 2]];
+    let [xx, xy, xz] = [caps[c + 6] - ax, caps[c + 7] - ay, caps[c + 8] - az];
+    const len = Math.hypot(xx, xy, xz) || 1e-6;
+    [xx, xy, xz] = [xx / len, xy / len, xz / len];
+    // Up: the averaged surface normal, made perpendicular to the wall's axis.
+    let [yx, yy, yz] = [caps[c + 3] + caps[c + 9], caps[c + 4] + caps[c + 10], caps[c + 5] + caps[c + 11]];
+    const along = yx * xx + yy * xy + yz * xz;
+    [yx, yy, yz] = [yx - xx * along, yy - xy * along, yz - xz * along];
+    const ylen = Math.hypot(yx, yy, yz) || 1;
+    [yx, yy, yz] = [yx / ylen, yy / ylen, yz / ylen];
+    const mid = len / 2;
+    const midH = (H - 0.014) / 2;
+    const radius = Math.hypot(mid + hw, (H + 0.014) / 2, hw);
+    texels.set([
+      ax + xx * mid + yx * midH, ay + xy * mid + yy * midH, az + xz * mid + yz * midH, radius,
+      ax, ay, az, len,
+      xx, xy, xz, 0,
+      yx, yy, yz, 0,
+    ], i * 16);
   }
   const grid = labyrinth.renderGrid;
-  shared.uRefCaps.value = floatTexture(texels, count * 3, 4);
+  shared.uRefCaps.value = floatTexture(texels, count * 4, 4);
   shared.uRefOffsets.value = floatTexture(Float32Array.from(grid.offsets), grid.offsets.length, 1);
   shared.uRefItems.value = floatTexture(Float32Array.from(grid.items), Math.max(1, grid.items.length), 1);
   shared.uRefRes.value = grid.res;
