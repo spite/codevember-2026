@@ -421,6 +421,11 @@ void main() {
   #endif
   R = normalize(mix(R, n, alpha * alpha));
   vec3 radiance = textureLod(envMap, envRotation * R, envMapMaxLod * rough * (2.0 - rough)).rgb * envIntensity;
+  #ifdef PIPELINE_REFLECTIONS
+  // The material's own tracer (fragmentPars) replaces the environment where its reflection ray hits something.
+  vec4 traced = traceReflection(P, R, rough);
+  radiance = mix(radiance, traced.rgb, clamp(traced.a, 0.0, 1.0));
+  #endif
   float so = specularOcclusion(NdotV, ao, alpha);
 
   vec3 indirectDiffuse = kD * (irradiance * aoTint + gi.rgb * giIntensity);
@@ -486,6 +491,7 @@ class PipelineMaterial extends ShaderMaterial {
       thinSheet = false,
       anisotropy = false,
       stochasticShadows = false,
+      reflections = false,
       ...rest
     } = params;
 
@@ -509,6 +515,7 @@ class PipelineMaterial extends ShaderMaterial {
     if (thinSheet) baseDefines.PIPELINE_THIN_SHEET = "";
     if (anisotropy) baseDefines.PIPELINE_ANISOTROPY = "";
     if (stochasticShadows) baseDefines.PIPELINE_STOCHASTIC_SHADOW = "";
+    if (reflections) baseDefines.PIPELINE_REFLECTIONS = "";
 
     super({
       ...rest,
