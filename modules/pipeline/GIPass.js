@@ -28,6 +28,7 @@ import {
   traceFragment,
   temporalFragment,
   blurFragment,
+  blurPairFragment,
   tileFragment,
   skipFragment,
 } from "shaders/pipeline/gi.js";
@@ -151,6 +152,17 @@ export class GIPass {
       tSkip: { value: null },
       skipReach: { value: 0 },
     });
+    // GI and the shadow mask blurred in one pass (blurWith): textures[0] = GI, textures[1] = mask.
+    this.blurPairMaterial = make(blurPairFragment, {
+      tInput: { value: null },
+      tMask: { value: null },
+      tGeo: { value: null },
+      stepSize: { value: 1 },
+      planeSigma: { value: planeSigma },
+      normalPower: { value: normalPower },
+      tSkip: { value: null },
+      skipReach: { value: 0 },
+    });
     // Opt-in: tiles where everything in reach is one plane skip the trace and blur. Flat floors come out
     // slightly lighter than the trace makes them (it darkens them a little through texel snapping).
     this.skipFlat = skipFlat;
@@ -165,6 +177,11 @@ export class GIPass {
       return rt;
     });
     this.blurTargets = [target(HalfFloatType, LinearFilter), target(HalfFloatType, LinearFilter)];
+    this.blurPairTargets = [0, 1].map(() => {
+      const rt = target(HalfFloatType, LinearFilter, 2);
+      rt.textures[1].minFilter = rt.textures[1].magFilter = NearestFilter;
+      return rt;
+    });
     this.tileTarget = target(FloatType);
     this.skipTarget = target(UnsignedByteType);
     this.historyIndex = 0;
@@ -187,7 +204,7 @@ export class GIPass {
     this.fullRes.set(width, height);
     if (w === this.halfRes.x && h === this.halfRes.y) return;
     this.halfRes.set(w, h);
-    for (const rt of [this.geometryTarget, this.traceTarget, ...this.history, ...this.blurTargets]) {
+    for (const rt of [this.geometryTarget, this.traceTarget, ...this.history, ...this.blurTargets, ...this.blurPairTargets]) {
       rt.setSize(w, h);
     }
     for (const rt of [this.tileTarget, this.skipTarget]) rt.setSize(Math.ceil(w / 8), Math.ceil(h / 8));
@@ -202,7 +219,7 @@ export class GIPass {
     v = !!v;
     if (v === this._skipFlat) return;
     this._skipFlat = v;
-    for (const m of [this.traceMaterial, this.blurMaterial]) {
+    for (const m of [this.traceMaterial, this.blurMaterial, this.blurPairMaterial]) {
       if (v) m.defines.GI_SKIP = "";
       else delete m.defines.GI_SKIP;
       m.needsUpdate = true;
@@ -246,7 +263,8 @@ export class GIPass {
     globalUniforms.giGeoMap.value = this.geometryTarget.texture;
   }
 
-  render(renderer, { depthTexture, normalVelocity, prevColor, camera }) {
+  // blur: false leaves the blur to blurWith(), which runs it together with the shadow mask's.
+  render(renderer, { depthTexture, normalVelocity, prevColor, camera, blur = true }) {
     const prevTarget = renderer.getRenderTarget();
     const prevAutoClear = renderer.autoClear;
     renderer.autoClear = false;
@@ -309,38 +327,83 @@ export class GIPass {
     }
     this.historyValid = true;
 
+    this.blurSource = source;
+    if (blur) this._blur(renderer, source, 0);
+    renderer.setRenderTarget(prevTarget);
+    renderer.autoClear = prevAutoClear;
+
+    if (blur) globalUniforms.giMap.value = this.output.texture;
+    globalUniforms.depthTexture.value = depthTexture;
+    globalUniforms.giEnabled.value = 1;
+  }
+
+  get blurPassCount() {
+    return Math.max(0, Math.round(this.blurPasses));
+  }
+
+  // A-trous passes from index `from` on (each doubles the step), starting from `source`.
+  _blur(renderer, source, from) {
+    const prevTarget = renderer.getRenderTarget();
     const bl = this.blurMaterial.uniforms;
     bl.tGeo.value = this.geometryTarget.texture;
     bl.planeSigma.value = this.planeSigma;
     bl.normalPower.value = this.normalPower;
-    const passes = Math.max(0, Math.round(this.blurPasses));
+    const passes = this.blurPassCount;
     // Ends on blurTargets[1] so the output texture keeps its identity; 0 passes is a centre-only copy.
-    for (let i = 0; i < Math.max(passes, 1); i++) {
+    for (let i = from; i < Math.max(passes, 1); i++) {
       const dst = this.blurTargets[(Math.max(passes, 1) - 1 - i) % 2 === 0 ? 1 : 0];
       bl.tInput.value = source;
       bl.stepSize.value = passes === 0 ? 0 : 1 << i;
       // Tiles reached by this pass and the earlier ones (2 * (2^(i+1) - 1) texels, plus the temporal 3x3);
       // without variance clipping, history can carry ghosts into skipped tiles, so nothing is skipped.
-      const clamped = !this.temporal || this.historyClamp > 0;
-      bl.skipReach.value = clamped ? Math.ceil((2 * ((1 << (i + 1)) - 1) + 1) / 8) : 0;
+      bl.skipReach.value = this._skipReach(i);
       this._pass(renderer, this.blurMaterial, dst);
       source = dst.texture;
     }
-    this.output = this.blurTargets[1];
-
+    this.output = { texture: source };
     renderer.setRenderTarget(prevTarget);
-    renderer.autoClear = prevAutoClear;
+  }
 
+  _skipReach(i) {
+    const clamped = !this.temporal || this.historyClamp > 0;
+    return clamped ? Math.ceil((2 * ((1 << (i + 1)) - 1) + 1) / 8) : 0;
+  }
+
+  // Blurs GI (after render(..., { blur: false })) and the shadow mask (after its render(..., { blur: false })):
+  // the passes both have run as one pair pass, with the same result as blurring each on its own.
+  blurWith(renderer, mask) {
+    const prevTarget = renderer.getRenderTarget();
+    const nG = this.blurPassCount;
+    const nM = mask.blurPassCount;
+    const sameWeights = mask.blurMaterial.uniforms.planeSigma.value === this.planeSigma && mask.blurMaterial.uniforms.normalPower.value === this.normalPower;
+    const shared = nG > 0 && nM > 0 && sameWeights ? Math.min(nG, nM) : 0;
+    let gi = this.blurSource;
+    let m = mask.blurSource;
+    const bp = this.blurPairMaterial.uniforms;
+    bp.tGeo.value = this.geometryTarget.texture;
+    bp.planeSigma.value = this.planeSigma;
+    bp.normalPower.value = this.normalPower;
+    for (let i = 0; i < shared; i++) {
+      const dst = this.blurPairTargets[i % 2];
+      bp.tInput.value = gi;
+      bp.tMask.value = m;
+      bp.stepSize.value = 1 << i;
+      bp.skipReach.value = this._skipReach(i);
+      this._pass(renderer, this.blurPairMaterial, dst);
+      gi = dst.textures[0];
+      m = dst.textures[1];
+    }
+    renderer.setRenderTarget(prevTarget);
+    this._blur(renderer, gi, shared);
+    mask._blur(renderer, m, shared);
     globalUniforms.giMap.value = this.output.texture;
-    globalUniforms.depthTexture.value = depthTexture;
-    globalUniforms.giEnabled.value = 1;
   }
 
   dispose() {
-    for (const rt of [this.geometryTarget, this.traceTarget, ...this.history, ...this.blurTargets, this.tileTarget, this.skipTarget]) {
+    for (const rt of [this.geometryTarget, this.traceTarget, ...this.history, ...this.blurTargets, ...this.blurPairTargets, this.tileTarget, this.skipTarget]) {
       rt.dispose();
     }
-    for (const m of [this.geometryMaterial, this.traceMaterial, this.temporalMaterial, this.blurMaterial, this.tileMaterial, this.skipMaterial]) {
+    for (const m of [this.geometryMaterial, this.traceMaterial, this.temporalMaterial, this.blurMaterial, this.blurPairMaterial, this.tileMaterial, this.skipMaterial]) {
       m.dispose();
     }
     this.quad.geometry.dispose();

@@ -511,6 +511,82 @@ void main() {
 }
 `;
 
+// blurFragment for GI and the shadow mask at once: the same weights, computed once and applied to both; the mask's
+// taps also stay within its PCF kernel radius, as blurFragment does with PENUMBRA_LIMIT.
+export const blurPairFragment = /* glsl */ `${giCommon}
+uniform sampler2D tInput;
+uniform sampler2D tMask;
+uniform sampler2D tGeo;
+uniform mat4 uView;
+uniform float stepSize;
+uniform float planeSigma;
+uniform float normalPower;
+#ifdef GI_SKIP
+uniform sampler2D tSkip;
+uniform int skipReach;
+#endif
+
+layout(location = 0) out vec4 outGI;
+layout(location = 1) out vec4 outMask;
+
+void main() {
+  ivec2 h = ivec2(gl_FragCoord.xy);
+  vec4 g = texelFetch(tGeo, h, 0);
+  if (g.x <= 0.0) {
+    outGI = vec4(0.0, 0.0, 0.0, 1.0);
+    outMask = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
+
+  bool giSkip = false;
+#ifdef GI_SKIP
+  ivec2 tc = h / 8;
+  ivec2 ts = textureSize(tSkip, 0) - 1;
+  float skip = skipReach > 0 ? 1.0 : 0.0;
+  for (int y = -skipReach; y <= skipReach; y++)
+    for (int x = -skipReach; x <= skipReach; x++) skip = min(skip, texelFetch(tSkip, clamp(tc + ivec2(x, y), ivec2(0), ts), 0).r);
+  giSkip = skip > 0.5;
+#endif
+  vec3 P = viewPosition(halfToUv(h), g.x);
+  vec3 nw = unpackNormal(g.y);
+  vec3 nv = mat3(uView) * nw;
+  float k[3] = float[3](0.375, 0.25, 0.0625);
+  int st = int(stepSize);
+  float sigma = max(planeSigma * stepSize * g.x, 1e-6);
+  float reach = max(texelFetch(tMask, h, 0).g, 0.5);
+
+  vec4 sum = vec4(0.0);
+  float wsum = 0.0;
+  vec4 msum = vec4(0.0);
+  float mwsum = 0.0;
+  for (int y = -2; y <= 2; y++) {
+    for (int x = -2; x <= 2; x++) {
+      ivec2 t = h + ivec2(x, y) * st;
+      if (any(lessThan(t, ivec2(0))) || any(greaterThanEqual(t, ivec2(halfRes)))) continue;
+      bool inMask = !(float(max(abs(x), abs(y)) * st) > reach);
+      if (giSkip && !inMask) continue;
+      vec4 tg = texelFetch(tGeo, t, 0);
+      if (tg.x <= 0.0) continue;
+      vec3 Pt = viewPosition(halfToUv(t), tg.x);
+      float plane = abs(dot(nv, Pt - P));
+      float wd = exp(-plane / sigma);
+      float wn = pow(max(dot(nw, unpackNormal(tg.y)), 0.0), normalPower);
+      float w = k[abs(x)] * k[abs(y)] * wd * wn;
+      if (!giSkip) {
+        sum += texelFetch(tInput, t, 0) * w;
+        wsum += w;
+      }
+      if (inMask) {
+        msum += texelFetch(tMask, t, 0) * w;
+        mwsum += w;
+      }
+    }
+  }
+  outGI = giSkip ? vec4(0.0, 0.0, 0.0, 1.0) : wsum > 1e-6 ? sum / wsum : texelFetch(tInput, h, 0);
+  outMask = mwsum > 1e-6 ? msum / mwsum : texelFetch(tMask, h, 0);
+}
+`;
+
 // Included by PipelineMaterial (ShaderMaterial prefix provides isOrthographic).
 export const giChunk = /* glsl */ `
 #ifndef GI_CHUNK

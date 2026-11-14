@@ -146,7 +146,8 @@ export class ShadowMaskPass {
   }
 
   // After gi.renderGeometry() (or gi.render()) and the shadow map for this frame.
-  render(renderer, { normalVelocity }) {
+  // blur: false leaves the blur to gi.blurWith(), which runs it together with GI's.
+  render(renderer, { normalVelocity, blur = true }) {
     this._syncSize();
     const prevTarget = renderer.getRenderTarget();
     const geometryTexture = this.gi.geometryTarget.texture;
@@ -172,22 +173,32 @@ export class ShadowMaskPass {
     this.historyIndex = 1 - this.historyIndex;
     this.historyValid = true;
 
-    let source = write.textures[0];
+    this.blurSource = write.textures[0];
+    renderer.setRenderTarget(prevTarget);
+    if (blur) this._blur(renderer, this.blurSource, 0);
+    globalUniforms.shadowMaskEnabled.value = 1;
+  }
+
+  get blurPassCount() {
+    return Math.max(0, Math.round(this.blurPasses));
+  }
+
+  // A-trous passes from index `from` on (each doubles the step), starting from `source`.
+  _blur(renderer, source, from) {
+    const prevTarget = renderer.getRenderTarget();
     const bl = this.blurMaterial.uniforms;
-    bl.tGeo.value = geometryTexture;
-    const passes = Math.max(0, Math.round(this.blurPasses));
-    for (let i = 0; i < Math.max(passes, 1); i++) {
+    bl.tGeo.value = this.gi.geometryTarget.texture;
+    const passes = this.blurPassCount;
+    for (let i = from; i < Math.max(passes, 1); i++) {
       const dst = this.blurTargets[(Math.max(passes, 1) - 1 - i) % 2 === 0 ? 1 : 0];
       bl.tInput.value = source;
       bl.stepSize.value = passes === 0 ? 0 : 1 << i;
       this._pass(renderer, this.blurMaterial, dst);
       source = dst.texture;
     }
-    this.output = this.blurTargets[1];
+    this.output = { texture: source };
     renderer.setRenderTarget(prevTarget);
-
-    globalUniforms.shadowMask.value = this.output.texture;
-    globalUniforms.shadowMaskEnabled.value = 1;
+    globalUniforms.shadowMask.value = source;
   }
 
   resetHistory() {

@@ -672,12 +672,15 @@ class Pipeline {
     if (denoise && !this._denoiseWasEnabled) this.shadowMask?.resetHistory();
     this._denoiseWasEnabled = denoise;
 
+    // With both on, GI and the shadow mask share their blur passes (gi.blurWith).
+    const jointBlur = this.giEnabled && denoise;
     if (this.giEnabled) {
       this.gi.render(renderer, {
         depthTexture: this.depthTexture,
         normalVelocity: this.prepassTarget.texture,
         prevColor: this.hasPrevColor ? this._prevColor : null,
         camera,
+        blur: !jointBlur,
       });
     } else {
       u.giEnabled.value = 0;
@@ -688,7 +691,8 @@ class Pipeline {
         this.gi.renderGeometry(renderer, { depthTexture: this.depthTexture, normalVelocity: this.prepassTarget.texture, camera });
       }
       this.shadowMask ??= new ShadowMaskPass(this.gi, this.shadowMaskOptions);
-      this.shadowMask.render(renderer, { normalVelocity: this.prepassTarget.texture });
+      this.shadowMask.render(renderer, { normalVelocity: this.prepassTarget.texture, blur: !jointBlur });
+      if (jointBlur) this.gi.blurWith(renderer, this.shadowMask);
     } else {
       u.shadowMaskEnabled.value = 0;
     }
@@ -921,7 +925,7 @@ class Pipeline {
     const materials = [this.copyMaterial, this.accumMaterial, this.downMaterial, this.upMaterial, this.finalMaterial, this.fxaaMaterial, this.taaMaterial];
     if (this.motionBlurAvailable) materials.push(this.tileMaxMaterial, this.neighborMaxMaterial, this.reconstructMaterial);
     if (this.dof) materials.push(...this.dof.materials);
-    materials.push(gi.geometryMaterial, gi.traceMaterial, gi.temporalMaterial, gi.blurMaterial, gi.tileMaterial, gi.skipMaterial);
+    materials.push(gi.geometryMaterial, gi.traceMaterial, gi.temporalMaterial, gi.blurMaterial, gi.blurPairMaterial, gi.tileMaterial, gi.skipMaterial);
     const mask = this.shadowMask;
     if (mask) materials.push(mask.traceMaterial, mask.temporalMaterial, mask.blurMaterial);
     const scene = new Scene();
