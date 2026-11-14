@@ -190,6 +190,11 @@ struct Surface {
   vec3 fiberAxis; // thinSheet only: world-space fibre direction
 };
 
+#if defined(PIPELINE_DENOISED_SHADOWS) && (defined(OPAQUE) || defined(ALPHA_TO_COVERAGE))
+// With the denoised mask, getShadow only fills the mask's rare gaps; a small kernel keeps the main shader light.
+#define SHADOW_BLOCKER_SAMPLES 8
+#define SHADOW_PCF_SAMPLES 8
+#endif
 ${shadowChunk}
 ${giChunk}
 ${brdf}
@@ -355,7 +360,9 @@ void main() {
   vec3 directSpecular = E * F_Schlick(VdotH, f0) * D_GGX(NdotH, alpha) * V_SmithGGXCorrelated(alpha, NdotV, NdotL) * lightSpecular;
   #endif
   vec3 directDiffuse = E * diffuseColor * PIPELINE_INV_PI;
-  vec3 directSheen = E * s.sheenColor * D_Charlie(sheenRough, NdotH) * V_Neubelt(NdotV, NdotL) * lightSheen;
+  bool hasSheen = pipelineMax3(s.sheenColor) > 0.0;
+  vec3 directSheen = vec3(0.0);
+  if (hasSheen) directSheen = E * s.sheenColor * D_Charlie(sheenRough, NdotH) * V_Neubelt(NdotV, NdotL) * lightSheen;
   // Thin sheet: the key lighting the back side, shadowed from there.
   vec3 directTransmission = vec3(0.0);
   if (pipelineMax3(s.transmission) > 0.0) {
@@ -430,7 +437,8 @@ void main() {
 
   vec3 indirectDiffuse = kD * (irradiance * aoTint + gi.rgb * giIntensity);
   vec3 indirectSpecular = (radiance * FssEss + multiScatter * irradiance) * so;
-  vec3 indirectSheen = s.sheenColor * IBLSheenBRDF(NdotV, sheenRough) * irradiance * ao;
+  vec3 indirectSheen = vec3(0.0);
+  if (hasSheen) indirectSheen = s.sheenColor * IBLSheenBRDF(NdotV, sheenRough) * irradiance * ao;
   float specShadow = mix(1.0, shadow, specularShadow);
   indirectSpecular *= specShadow;
   indirectSheen *= specShadow;

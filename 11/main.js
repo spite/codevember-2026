@@ -150,6 +150,7 @@ const scene = new Scene();
 const rig = new Group();
 scene.add(rig);
 const backdrop = createBackdrop();
+backdrop.mesh.renderOrder = 1;
 backdrop.place(-1.05, 0);
 scene.add(backdrop.mesh);
 

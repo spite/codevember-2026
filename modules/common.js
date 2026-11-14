@@ -117,7 +117,7 @@ const renderer = new WebGLRenderer({
   antialias: !pipelineCanvas,
   depth: !pipelineCanvas,
   alpha: true,
-  preserveDrawingBuffer: true,
+  preserveDrawingBuffer: false,
 });
 renderer.outputColorSpace = SRGBColorSpace;
 renderer.toneMapping = ACESFilmicToneMapping;

@@ -126,6 +126,8 @@ function updateReflections() {
 const scene = new Scene();
 
 const backdrop = createBackdrop({ floorY: FLOOR_Y, color: SETS.Light.color });
+// Drawn after the body (before its wire overlay) so depth testing skips hidden backdrop pixels.
+backdrop.mesh.renderOrder = 0.5;
 scene.add(backdrop.mesh);
 
 const field = createField({ lite, quality: pipeline.quality });
@@ -466,6 +468,7 @@ function updateOccluders() {
 
 camera.near = 0.3;
 camera.far = 80;
+camera.updateProjectionMatrix();
 const target = new Vector3();
 const view = new Vector3(0.34, 0.26, 1).normalize();
 // Portrait swings round towards the key so the shadow, cast to the right, stays in frame.

@@ -1015,6 +1015,7 @@ function poke(p) {
 
 camera.near = 0.1;
 camera.far = 80;
+camera.updateProjectionMatrix();
 camera.position.set(0.5, 0.7, 4.6);
 controls.target.set(0, -0.05, 0);
 controls.enablePan = false;

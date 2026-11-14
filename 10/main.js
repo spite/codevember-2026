@@ -789,6 +789,7 @@ function takeOver(next) {
 scene.add(mesh);
 // The studio: a floor and sweep under the floating piece, taking its soft shadow. Off by default on the low tier.
 const backdrop = createBackdrop();
+backdrop.mesh.renderOrder = 1;
 scene.add(backdrop.mesh);
 // Vapour off the acid, and ripples in its film: high tier only.
 const ACID_FX = pipeline.quality === "high" || pipeline.quality === "capture";

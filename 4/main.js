@@ -176,6 +176,7 @@ scene.add(tangle.mesh);
 
 camera.near = 0.1;
 camera.far = 80;
+camera.updateProjectionMatrix();
 camera.position.set(0.3, 0.5, 4.2);
 controls.target.set(0, 0, 0);
 controls.enablePan = false;

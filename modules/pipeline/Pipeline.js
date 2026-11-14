@@ -377,6 +377,7 @@ class Pipeline {
       level.up.dispose();
     }
     this.bloomLevels = [];
+    this._bloomCache = null;
     let lw = w;
     let lh = h;
     for (let i = 0; i < 7; i++) {
@@ -477,6 +478,7 @@ class Pipeline {
     scene.traverseVisible((object) => {
       if (!object.material) return;
       meshes.push(object);
+      this._syncShadowDefines(object);
       if (!object.userData.prevMatrixWorld) object.userData.prevMatrixWorld = object.matrixWorld.clone();
       else if (!object.matrixWorld.equals(object.userData.prevMatrixWorld)) signature += 1e9;
       signature += object.id * 31 + (object.geometry?.id ?? 0) * 7 + (object.instanceMatrix?.version ?? 0) + (object.count ?? 0);
@@ -498,6 +500,17 @@ class Pipeline {
       _box.union(_meshBox);
     });
     this.sceneSignature = signature + meshes.length;
+  }
+
+  // Pipeline materials compile a lighter getShadow fallback while the denoised shadow mask is on.
+  _syncShadowDefines(object) {
+    const want = this.shadows && this.shadowDenoise;
+    for (const m of Array.isArray(object.material) ? object.material : [object.material]) {
+      if (!m?.isPipelineMaterial || ("PIPELINE_DENOISED_SHADOWS" in m.defines) === want) continue;
+      if (want) m.defines.PIPELINE_DENOISED_SHADOWS = "";
+      else delete m.defines.PIPELINE_DENOISED_SHADOWS;
+      m.needsUpdate = true;
+    }
   }
 
   // True while the camera, the scene, time and focus have not changed since the last frame.
@@ -540,7 +553,10 @@ class Pipeline {
   // there are enough of them.
   _renderLens(scene, camera, limit = this.lensSamples, gather = true) {
     const dof = this.dof;
-    if (this.lensCount >= limit) return gather ? dof.lensResult : (this._settleShown = dof.lensResult);
+    if (this.lensCount >= limit) {
+      this._lensDone = true;
+      return gather ? dof.lensResult : (this._settleShown = dof.lensResult);
+    }
     const n = ++this.lensCount;
     dof.lensSample(n, camera, _lens);
     _p0.copy(camera.position);
@@ -591,8 +607,15 @@ class Pipeline {
 
   _updateCameraUniforms(camera) {
     const u = globalUniforms;
-    u.cameraNear.value = camera.near;
-    u.cameraFar.value = camera.far;
+    // From the projection matrix rather than camera.near/far, which a day can change without updateProjectionMatrix().
+    const p = camera.projectionMatrix.elements;
+    if (camera.isOrthographicCamera) {
+      u.cameraNear.value = (p[14] + 1) / p[10];
+      u.cameraFar.value = (p[14] - 1) / p[10];
+    } else {
+      u.cameraNear.value = p[14] / (p[10] - 1);
+      u.cameraFar.value = p[14] / (p[10] + 1);
+    }
     u.projectionMatrixInverse.value.copy(camera.projectionMatrix).invert();
     u.viewMatrixInverse.value.copy(camera.matrixWorld);
     this.finalMaterial.uniforms.isOrtho.value = camera.isOrthographicCamera ? 1 : 0;
@@ -794,6 +817,7 @@ class Pipeline {
       if (!still) this.lensCount = 0;
       if (!still) (this._settleShown = null), (this._settleFade = false);
       const lensPath = still && ((dof && this.lensSamples > 0) || settle);
+      this._lensDone = false;
       if (lensPath) this.taaHistory = false;
       if (lensPath) {
         hdr = this._renderLens(scene, camera, settle ? this.stillSamples : this.lensSamples, !settle);
@@ -858,7 +882,12 @@ class Pipeline {
       const bloomOn = this.bloom && this.bloomStrength > 0 && (debug === "none" || debug === "clipping");
       const f = this.finalMaterial.uniforms;
       f.tColor.value = hdr;
-      f.tBloom.value = bloomOn ? this._renderBloom(hdr) : null;
+      // A converged still is the same image as last frame, so its bloom is too.
+      const cache = this._bloomCache;
+      const reuseBloom = bloomOn && this._lensDone && cache && cache.source === hdr && cache.radius === this.bloomRadius;
+      if (bloomOn && !reuseBloom) this._bloomCache = { source: hdr, radius: this.bloomRadius, texture: this._renderBloom(hdr) };
+      if (!bloomOn) this._bloomCache = null;
+      f.tBloom.value = bloomOn ? this._bloomCache.texture : null;
       f.bloomStrength.value = bloomOn ? this.bloomStrength : 0;
       f.exposure.value = this.exposure;
       f.vignette.value = this.vignette;
@@ -913,6 +942,7 @@ class Pipeline {
     try {
       // Programs depend on the target's colour space: every scene pass draws into a render target.
       renderer.setRenderTarget(this.mainTarget);
+      scene.traverse((object) => object.material && this._syncShadowDefines(object));
       jobs.push(renderer.compileAsync(scene, camera));
       jobs.push(compileVariant(renderer, scene, camera, "prepass"));
       jobs.push(compileVariant(renderer, scene, this.shadow.camera, "shadow", this.shadow.filter));
