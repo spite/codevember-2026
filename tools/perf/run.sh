@@ -79,14 +79,15 @@ fi
 SITES=(b)
 REF_COMMIT=$(awk '$1 == "commit" { print $2 }' "$REPO/tools/perf/reference")
 read -ra REF_DAYS <<<"$(awk '$1 == "days" { $1 = ""; print }' "$REPO/tools/perf/reference")"
-build "$OUT/r" "$REF_COMMIT" "${REF_DAYS[@]}"
+[ -z "${PERF_NO_REF:-}" ] && build "$OUT/r" "$REF_COMMIT" "${REF_DAYS[@]}"
 BASE_COMMIT=""
 if [ -n "$BASE" ]; then
   build "$OUT/a" "$BASE"
   if [ -d "$BASE" ]; then BASE_COMMIT=$(basename "$BASE"); else BASE_COMMIT=$(git -C "$REPO" rev-parse --short "$BASE"); fi
   SITES=(b a)
 fi
-SITES+=(r)
+# PERF_NO_REF=1 skips the machine reference (for throwaway experiment runs with -n).
+[ -z "${PERF_NO_REF:-}" ] && SITES+=(r)
 
 reap() {
   powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | Where-Object { \$_.CommandLine -like '*user-data-dir=C:\\Temp\\$PROFILE*' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force -ErrorAction SilentlyContinue }" 2>/dev/null || true
@@ -122,8 +123,9 @@ load() {
 
 # Each repeat starts with the reference days (the last site), then every day on the measured build(s).
 R=$((${#SITES[@]} - 1))
+[ -n "${PERF_NO_REF:-}" ] && R=${#SITES[@]}
 for rep in $(seq 1 "$REPEATS"); do
-  for day in "${REF_DAYS[@]}"; do load "$R" "$day" "$rep"; done
+  [ -z "${PERF_NO_REF:-}" ] && for day in "${REF_DAYS[@]}"; do load "$R" "$day" "$rep"; done
   for day in "${DAYS[@]}"; do
     order=($(seq 0 $((R - 1))))
     [ $((rep % 2)) -eq 0 ] && [ "$R" -eq 2 ] && order=(1 0)
