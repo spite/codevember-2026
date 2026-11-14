@@ -25,8 +25,10 @@ def stat(r, d, days_key="days"):
     if not day:
         return None
     if args.metric.startswith("pass:"):
-        v = day.get("passes", {}).get(args.metric[5:])
-        return {"med": v} if v is not None else None
+        # A pass includes its stages (gi.trace, ...); a stage name (pass:gi.trace) reads just that stage.
+        name, ps = args.metric[5:], day.get("passes", {})
+        vals = [v for k, v in ps.items() if k == name or ("." not in name and k.startswith(name + "."))]
+        return {"med": sum(vals)} if vals else None
     return day.get(args.metric)
 
 

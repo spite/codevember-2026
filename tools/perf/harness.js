@@ -58,6 +58,22 @@
     };
     obj[name].__perf = true;
   };
+  // A pass object's _pass(renderer, material, rt): each draw is timed as "<prefix>.<material key>" (gi.trace, ...).
+  const wrapStages = (obj, prefix) => {
+    const orig = obj?._pass;
+    if (!orig || orig.__perf) return;
+    obj._pass = function (renderer, material, rt) {
+      const key = Object.keys(this).find((k) => k.endsWith("Material") && this[k] === material);
+      const prev = label;
+      switchTo(`${prefix}.${key ? key.slice(0, -8) : "other"}`);
+      try {
+        return orig.call(this, renderer, material, rt);
+      } finally {
+        switchTo(prev);
+      }
+    };
+    obj._pass.__perf = true;
+  };
   const instrument = () => {
     const pl = window.app.pipeline;
     if (!pl || !ext) return;
@@ -72,6 +88,8 @@
     wrap(pl, "_renderMotionBlur", "motion");
     wrap(pl.dof, "gather", "dof");
     wrap(pl.dof, "accumulate", "dof");
+    wrapStages(pl.gi, "gi");
+    wrapStages(pl.shadowMask, "shadowMask");
   };
   const collect = (count) =>
     new Promise((resolve) => {

@@ -40,8 +40,17 @@ def breakdown(days, key="passes"):
     print(f"GPU ms per pass ({'animating' if key == 'passes' else 'paused'}), median")
     print(f"{'day':>4} " + " ".join(f"{p:>10}" for p in PASSES) + f" {'sum':>7}")
     for d, r in days.items():
-        ps = r.get(key, {})
+        ps = dict(r.get(key, {}))
+        for k in [k for k in ps if "." in k]:
+            ps[k.split(".")[0]] = ps.get(k.split(".")[0], 0) + ps.pop(k)
         print(f"{d:>4} " + " ".join(f"{ps[p]:>10.2f}" if ps.get(p) else f"{'·':>10}" for p in PASSES) + f" {sum(ps.values()):>7.2f}")
+    stages = sorted({k for r in days.values() for k in r.get(key, {}) if "." in k})
+    if stages:
+        print("GPU ms per stage (included in the passes above)")
+        print(f"{'day':>4} " + " ".join(f"{k:>18}" for k in stages))
+        for d, r in days.items():
+            ps = r.get(key, {})
+            print(f"{d:>4} " + " ".join(f"{ps[k]:>18.2f}" if ps.get(k) else f"{'·':>18}" for k in stages))
 
 
 days = {d: summarize(rs) for d, rs in runs["b"].items()}
