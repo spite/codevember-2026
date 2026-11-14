@@ -85,6 +85,8 @@ const rustTextures = load.rust.track(
 
 const pipeline = new Pipeline(renderer, {
   background: STUDIOS.bone.background,
+  // Much of the geometry hides behind itself: shade only the frontmost surface.
+  depthPrepass: true,
   exposure: 1,
   bloomStrength: 0.02,
   vignette: 0.3,

@@ -63,6 +63,8 @@ const load = { sound: loadingStep(2), studio: loadingStep(1), compile: loadingSt
 
 const pipeline = new Pipeline(renderer, {
   quality: lowEnd ? "low" : "auto",
+  // Much of the geometry hides behind itself: shade only the frontmost surface.
+  depthPrepass: true,
   background: BACKDROP,
   exposure: 1.1,
   bloomStrength: 0.04,

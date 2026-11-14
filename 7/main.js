@@ -19,6 +19,8 @@ const load = { studio: loadingStep(1), compile: loadingStep(2), sculpture: loadi
 
 const pipeline = new Pipeline(renderer, {
   background: 0xd6d3cd,
+  // Much of the geometry hides behind itself: shade only the frontmost surface.
+  depthPrepass: true,
   exposure: 1.05,
   bloomStrength: 0.055,
   bloomRadius: 0.7,

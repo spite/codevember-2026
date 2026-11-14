@@ -224,6 +224,9 @@ class Pipeline {
     // Temporal without MSAA instead draws the main pass over the prepass's depth, so hidden surfaces are rejected
     // before they are shaded (only the nearest is lit, however deep the overdraw).
     this.reuseDepth = this.temporal && this.msaa === 0 && (options.temporal?.reuseDepth ?? true);
+    // Opt-in: the main pass draws depth first with a depth-only variant, then shades only the frontmost surface.
+    // Pays off where a lot of the geometry hides behind itself.
+    this.depthPrepass = options.depthPrepass ?? false;
     this.mainTarget = this.reuseDepth
       ? colorTarget(HalfFloatType, { depthBuffer: true, depthTexture: this.depthTexture })
       : colorTarget(HalfFloatType, { depthBuffer: true, samples: this.msaa, resolveDepthBuffer: false, storeMultisampledDepthBuffer: false });
@@ -478,7 +481,7 @@ class Pipeline {
     scene.traverseVisible((object) => {
       if (!object.material) return;
       meshes.push(object);
-      this._syncShadowDefines(object);
+      this._syncDefines(object);
       if (!object.userData.prevMatrixWorld) object.userData.prevMatrixWorld = object.matrixWorld.clone();
       else if (!object.matrixWorld.equals(object.userData.prevMatrixWorld)) signature += 1e9;
       signature += object.id * 31 + (object.geometry?.id ?? 0) * 7 + (object.instanceMatrix?.version ?? 0) + (object.count ?? 0);
@@ -502,14 +505,18 @@ class Pipeline {
     this.sceneSignature = signature + meshes.length;
   }
 
-  // Pipeline materials compile a lighter getShadow fallback while the denoised shadow mask is on.
-  _syncShadowDefines(object) {
-    const want = this.shadows && this.shadowDenoise;
+  // Pipeline-wide shader defines: a lighter getShadow fallback while the denoised shadow mask is on, and an invariant
+  // position while depthPrepass is on (so the depth and shading passes agree exactly).
+  _syncDefines(object) {
+    const want = { PIPELINE_DENOISED_SHADOWS: this.shadows && this.shadowDenoise, PIPELINE_INVARIANT: this.depthPrepass };
     for (const m of Array.isArray(object.material) ? object.material : [object.material]) {
-      if (!m?.isPipelineMaterial || ("PIPELINE_DENOISED_SHADOWS" in m.defines) === want) continue;
-      if (want) m.defines.PIPELINE_DENOISED_SHADOWS = "";
-      else delete m.defines.PIPELINE_DENOISED_SHADOWS;
-      m.needsUpdate = true;
+      if (!m?.isPipelineMaterial) continue;
+      for (const [name, on] of Object.entries(want)) {
+        if (name in m.defines === on) continue;
+        if (on) m.defines[name] = "";
+        else delete m.defines[name];
+        m.needsUpdate = true;
+      }
     }
   }
 
@@ -719,20 +726,36 @@ class Pipeline {
     const renderer = this.renderer;
     renderer.setRenderTarget(this.mainTarget);
     renderer.setClearColor(this.background, 1);
-    if (!this.reuseDepth) {
+    const depthPass = this.depthPrepass && !this.reuseDepth;
+    if (!this.reuseDepth && !depthPass) {
       renderer.clear(true, true, true);
       renderer.render(scene, camera);
       return;
     }
-    // Over the prepass depth: everything the prepass drew tests against it without writing, pulled a hair toward the
-    // camera so its own surface passes.
-    renderer.clear(true, false, false);
+    // Over depth already in place: everything that drew it tests against it without writing. The prepass's depth comes
+    // from another program, so surfaces are pulled a hair toward the camera to pass; the depth-only pass matches exactly.
+    const takesDepth = (m) => m?.isPipelineMaterial && !m.transparent && m.depthWrite && m.depthTest && m.colorWrite && !m.alphaToCoverage;
+    if (depthPass) {
+      renderer.clear(true, true, true);
+      const color = renderer.state.buffers.color;
+      color.setMask(false);
+      color.setLocked(true);
+      try {
+        renderVariant(renderer, scene, camera, "depth", undefined, (object) => takesDepth(object.material));
+      } finally {
+        color.setLocked(false);
+        color.setMask(true);
+      }
+    } else {
+      renderer.clear(true, false, false);
+    }
     const saved = [];
     scene.traverseVisible((object) => {
       const m = object.material;
-      if (!m?.isPipelineMaterial || m.transparent) return;
+      if (depthPass ? !takesDepth(m) : !m?.isPipelineMaterial || m.transparent) return;
       saved.push(m, m.depthWrite, m.polygonOffset, m.polygonOffsetFactor, m.polygonOffsetUnits);
       m.depthWrite = false;
+      if (depthPass) return;
       m.polygonOffset = true;
       m.polygonOffsetFactor = -1;
       m.polygonOffsetUnits = -4;
@@ -946,9 +969,10 @@ class Pipeline {
     try {
       // Programs depend on the target's colour space: every scene pass draws into a render target.
       renderer.setRenderTarget(this.mainTarget);
-      scene.traverse((object) => object.material && this._syncShadowDefines(object));
+      scene.traverse((object) => object.material && this._syncDefines(object));
       jobs.push(renderer.compileAsync(scene, camera));
       jobs.push(compileVariant(renderer, scene, camera, "prepass"));
+      if (this.depthPrepass) jobs.push(compileVariant(renderer, scene, camera, "depth"));
       jobs.push(compileVariant(renderer, scene, this.shadow.camera, "shadow", this.shadow.filter));
       if (this.shadows && this.shadowDenoise && !this.shadowMask) {
         this.shadowMask = new ShadowMaskPass(this.gi, this.shadowMaskOptions);
@@ -1025,6 +1049,7 @@ class Pipeline {
     add("Shadow softness", () => u.shadowSoftness.value, (v) => (u.shadowSoftness.value = v), 0, 4, 0.01);
     add("Light size", () => u.shadowLightSize.value, (v) => (u.shadowLightSize.value = v), 0, 0.6, 0.001);
     gui.addCheckbox("AO + GI", this.giEnabled, opts((v) => (this.giEnabled = v)));
+    gui.addCheckbox("Depth pre-pass", this.depthPrepass, opts((v) => (this.depthPrepass = v)));
     add("AO", () => u.aoIntensity.value, (v) => (u.aoIntensity.value = v), 0, 2, 0.01);
     add("AO power", () => u.aoPower.value, (v) => (u.aoPower.value = v), 0.5, 4, 0.01);
     add("GI", () => u.giIntensity.value, (v) => (u.giIntensity.value = v), 0, 4, 0.01);

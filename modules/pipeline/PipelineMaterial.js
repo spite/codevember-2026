@@ -13,6 +13,7 @@ const VARIANT_DEFINES = {
   color: "PIPELINE_COLOR",
   prepass: "PIPELINE_PREPASS",
   shadow: "PIPELINE_SHADOW",
+  depth: "PIPELINE_DEPTH",
 };
 
 function varyingDecls(varyings, qualifier) {
@@ -21,6 +22,9 @@ function varyingDecls(varyings, qualifier) {
 
 function vertexShader({ vertexPars, vertex, vertexMain, varyings }) {
   return /* glsl */ `
+#ifdef PIPELINE_INVARIANT
+invariant gl_Position;
+#endif
 uniform mat4 prevModelMatrix;
 uniform mat4 prevViewProjection;
 uniform float time;
@@ -268,6 +272,10 @@ void main() {
   #endif
   // The shadow map's raw depth (ShadowPass).
   outColor = vec4(gl_FragCoord.z);
+#elif defined(PIPELINE_DEPTH)
+  // Pipeline depthPrepass: depth only, with the main pass's own cutout.
+  if (s.alpha < 0.5) discard;
+  outColor = vec4(0.0);
 #elif defined(PIPELINE_PREPASS)
   if (s.alpha < 0.5) discard;
   vec3 nv = normalize(mat3(viewMatrix) * normalize(s.normal));
