@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Kelp Sways</title>
+<meta name="description" content="How Codevember 2026 day 17, Kelp, grows and moves a giant kelp forest: three kinds of kelp built in a worker, a swell and surges driving CPU kelp physics, and an underwater renderer with refracted sunlight, real caustics, amber light through the blades, translucent shadows, light shafts and Snell's window.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* One reading column on a warm grey; figures are small benches on a dark stage. */
+:root {
+  --bg: #ebe7df;
+  --panel: #f3f0e9;
+  --ink: #1b1813;
+  --muted: #5f584c;
+  --line: #d2cbbd;
+  --accent: #b5650a;
+  --accent2: #d99a12;
+  --stage: #15130f;
+  --stage-ink: #8f8676;
+  --crust: #f2b10c;
+  --crust2: #e07a0a;
+  --core: #2a2520;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12100d; --panel: #1b1814; --ink: #efe9df; --muted: #a79e8f; --line: #342e26;
+    --accent: #f0a540; --accent2: #ffc35a; --stage: #0b0a08; --stage-ink: #8f8676; --core: #3a332b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12100d; --panel: #1b1814; --ink: #efe9df; --muted: #a79e8f; --line: #342e26;
+  --accent: #f0a540; --accent2: #ffc35a; --stage: #0b0a08; --stage-ink: #8f8676; --core: #3a332b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+
+/* Hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .glow { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .glow {
+    background: linear-gradient(100deg, var(--accent) 10%, var(--accent2) 95%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; background: var(--stage); }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+
+/* Figures */
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; border-radius: 3px; background: var(--stage); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+input[type="checkbox"] { accent-color: var(--accent); }
+button {
+  font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px;
+  padding: 9px 14px; cursor: pointer;
+}
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 12.5px/1.2 var(--mono); color: var(--muted); }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid currentColor; vertical-align: middle; margin-right: 6px; }
+.legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: currentColor; vertical-align: middle; margin-right: 6px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+
+.items { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.item { background: var(--panel); border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.item img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--stage); }
+.item > div { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 10px; }
+.item h3 { font-size: 20px; }
+.item p { font-size: 15px; line-height: 1.55; color: var(--muted); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: nowrap; }
+.formula .c { color: var(--muted); }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 17</b> · Kelp</div>
+      <h1>How Kelp <span class="glow">sways</span></h1>
+      <p class="lede">A giant kelp forest seen from the reef, looking up into the sun. Here is how thirty thousand blades are grown and moved by a sea that swells and surges, and how the water is lit: the sun bent at the surface, caustics focused by its waves, light passing amber through the blades, and shafts that break behind them.</p>
+      <a class="live" href="./">See it live <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M3 1.8v8.4c0 .5.5.8.9.5l6.6-4.2a.6.6 0 0 0 0-1L3.9 1.3c-.4-.3-.9 0-.9.5z" fill="currentColor"/></svg></a>
+    </div>
+    <figure>
+      <img src="../screenshots/17.jpg" width="1080" height="1080" alt="Columns of giant kelp rising toward a bright sun at the surface, golden blades backlit, shafts of light fanning down through blue water." fetchpriority="high" decoding="async">
+      <figcaption>The composed forest, from the fixed camera on the reef.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>A photograph from the reef</h2>
+      <p>The day started from a small kelp-forest sketch with a CPU fluid and kelp physics, and grew toward one photograph: the classic shot of a California kelp forest from the bottom, columns of giant kelp rising to a canopy at the surface, the sun breaking through in shafts, and every blade between the camera and the sun glowing gold. The camera stays fixed on that view; the sea does the moving.</p>
+      <p>Unlike most days this month, it doesn't use the shared rendering pipeline. Underwater light is mostly about what happens in the water between things, so the day has its own small renderer built around that, and borrows the pipeline's bloom and final pass (exposure, AgX, vignette, grain) for the finish.</p>
+    </div>
+  </section>
+
+  <!-- 2. The kelp -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The kelp · <b>kelpBuilder.js, forest.worker.js</b></div>
+      <h2>Three kinds of kelp, grown in a worker</h2>
+      <p><b>Giant kelp</b> (<i>Macrocystis</i>) grows in bundles of stipes from a holdfast on the rock. Each stipe is a thin stalk that wanders up to the surface and, if it is old enough, carries on along it as the canopy. Blades grow from its tip, so along a frond they are crowded and small near the top and long and worn lower down, where old fronds have shed some. Every blade sits on a small pear-shaped gas bladder: a wedge base, widest about a third up, pointed when young and blunt when old, with ruffled margins, bending over from its bladder and hanging downstream.</p>
+      <p><b>Bull kelp</b> (<i>Nereocystis</i>) is a single whip of a stipe that swells into a bulb under the surface, with two bunches of long ribbons streaming from it. <b>Palm kelp</b> (<i>Pterygophora</i>) stands on the reef: a short woody stipe with two rows of narrow dark blades. The reef itself is a field of boulders, and every plant stands on it.</p>
+      <p>All of it is one mesh of about two million triangles, built in a web worker so a new forest never stalls the page, together with a coarser copy for the shadow map and the layout the physics needs.</p>
+    </div>
+    <div class="items">
+      <article class="item"><img src="explainer/hero.jpg" alt="A column of giant kelp close up: many long blades on thin stalks, some glowing gold against the light, some dark." loading="lazy"><div>
+        <h3>A column of fronds</h3>
+        <p>Dense, overlapping blades on stalked bladders. The ones between the camera and the sun glow; the ones in another blade's shadow stay dark brown.</p>
+      </div></article>
+      <article class="item"><img src="explainer/canopy.jpg" alt="The canopy seen from just below the surface: a gold mass of blades against the bright, rippled surface." loading="lazy"><div>
+        <h3>The canopy</h3>
+        <p>Fronds that reach the surface run along it downstream, a gold mass against Snell's window.</p>
+      </div></article>
+      <article class="item"><img src="explainer/bull.jpg" alt="Long gold kelp blades streaming across the frame near the surface." loading="lazy"><div>
+        <h3>Near the surface</h3>
+        <p>Up here the blades get the most light and the most motion: they stream with the surge and ripple along their length.</p>
+      </div></article>
+      <article class="item"><img src="explainer/palm.jpg" alt="The rocky reef with a few palm kelp stalks standing on it, giant kelp columns behind." loading="lazy"><div>
+        <h3>The reef</h3>
+        <p>Boulders under a blanket of caustics, with palm kelp standing on them and the giant kelp's holdfasts among them.</p>
+      </div></article>
+    </div>
+  </section>
+
+  <!-- 3. Motion -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The sea · <b>fluidSim.js, kelpPhysics.js, kelpVertex.js</b></div>
+      <h2>A steady surge, and now and then a big one</h2>
+      <p>The water is a sum of two things. A swell, evaluated exactly as linear waves over the depth of the reef: one long wave with a ten-second period that sways the whole forest back and forth together, and two small ones that roughen it. On top, a coarse fluid on the CPU (24 × 18 × 24 cells) carries what stirs the water: slow eddies, the probe's wake, the pointer. Every ten to twenty-five seconds a surge passes: a pulse of flow that builds over two seconds, pushes the forest further one way, and eases off over three and a half.</p>
+      <p>Each stipe is a chain of fourteen Verlet nodes pinned at its holdfast, dragged by the difference between the water and itself, held up by buoyancy (bull kelp by its bulb) or by its own stiffness (palm kelp), and kept under the surface. Near plants' blades are simulated too, as tip particles hinged to their stipe within a cone; further back they ride their stipes. On the GPU each blade is turned toward its tip and bent along an arc, so a ribbon bends all along while a palm blade barely does, with a ripple running down it; stipes are drawn through their nodes as smooth Catmull-Rom curves.</p>
+    </div>
+    <div class="formula">flow = current + Σ swell<sub>i</sub>(depth) · cos(k<sub>i</sub>·x − ω<sub>i</sub>t) + surge · pulse(t) + stirs<br><span class="c">pulse: smoothstep up over 1.8 s, held 1.2 s, smoothstep down over 3.5 s; a node is pulled by drag · (flow − its velocity)</span></div>
+    <div class="fig">
+      <div class="fig-head"><h3>A stipe in the surge</h3>
+        <div class="controls">
+          <label>surge <input id="mS" type="range" min="0" max="2" step="0.05" value="1"><output id="mSo"></output></label>
+          <button id="mGo" class="ghost">A big surge</button>
+        </div>
+      </div>
+      <canvas id="swayCanvas" aria-label="A kelp stipe drawn as a chain rising from the bottom of the frame, swaying left and right in a steady rhythm, with a plot below of the water's speed over time; pressing the button sends a surge that pushes the chain further and shows as a bump in the plot."></canvas>
+      <p class="fig-cap">The same recipe in two dimensions: a chain of nodes pinned at the bottom, dragged toward the water's flow and held up by buoyancy. The steady swell sways it; a surge pushes it further, then it swings back. Below, the flow over the last twenty seconds.</p>
+    </div>
+  </section>
+
+  <!-- 4. Light in water -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The light · <b>water.js</b></div>
+      <h2>One model for the water</h2>
+      <p>Everything is lit by one model of the water. The sun is bent where it enters (Snell's law) and loses light on its way down, red first; the eye's ray loses it again on its way back, so distant kelp fades to blue. A diffuse light comes down from the bright surface and is scattered toward the eye along every ray, and that in-scatter, integrated in closed form, is what colours the water: brighter looking up toward the surface, darker looking down, deep blue in between. The fog on every surface and the backdrop behind them are the same function, so the forest fades into exactly the water behind it.</p>
+      <p>Looking up, the surface shows Snell's window: inside the critical angle of 48.6° the sky, squeezed into a disc with the sun's glints in it; outside it, the deep water reflected. Both ripple with the same waves that make the caustics.</p>
+    </div>
+  </section>
+
+  <!-- 5. Caustics -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Caustics · <b>water.js Caustics</b></div>
+      <h2>Light focused by the waves</h2>
+      <p>The ripples of light on the reef and the blades are real refraction. A grid laid over a tiling patch of the surface refracts the sun through the wave normals, and each cell lands where its light goes at a focus depth of nine metres. How bright it lands is how much its area shrank on the way, measured with screen-space derivatives as the grid is drawn into a texture (Evan Wallace's method). Everything underwater looks the pattern up along the sun, sharper near the focus depth and blurred further from it by reading a lower mip.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Caustics in a slice of water</h3>
+        <div class="controls">
+          <label>waves <input id="cA" type="range" min="0" max="2" step="0.05" value="1"><output id="cAo"></output></label>
+          <label>depth <input id="cD" type="range" min="1" max="20" step="0.5" value="9"><output id="cDo"></output></label>
+        </div>
+      </div>
+      <canvas id="causticCanvas" aria-label="A wavy water surface at the top, sunlight rays refracted through it fanning and crossing on their way down, and at a chosen depth a bright, uneven line of light where they bunch together."></canvas>
+      <p class="fig-cap">Rays of sunlight refract at the wavy surface and bunch where the surface curves like a lens. The bright line is the light arriving at the chosen depth: sharp filaments near the focus, softer bands deeper down.</p>
+    </div>
+  </section>
+
+  <!-- 6. Translucency and shadows -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Blades and shadows · <b>shaders.js createKelpMaterial, shadow.js</b></div>
+      <h2>Thin sheets the sun shines through</h2>
+      <p>A kelp blade is a thin sheet of tissue: it reflects little, and what it lets through comes out amber, because it absorbs blue first, then green. The side facing the sun gets its reflected light; the other side gets the light through the blade, half spread out and half scattered forward, so a blade between the eye and the sun glows brightest. Seen obliquely the path through it is longer and the colour deeper; thick bases go darker amber, thin tips lemon.</p>
+      <p>The sun's shadow map is drawn from a coarser copy of the forest. Shadows soften with distance to what casts them, and kelp doesn't cast black shadows: light through one blade is amber, and each further layer of blades above takes more of it, which is why the inside of a column glows dark gold rather than going grey. A wide, coarse lookup of the same map darkens whatever lies under the canopy.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Sunlight through kelp</h3>
+        <div class="controls">
+          <label>layers <input id="tL" type="range" min="1" max="5" step="1" value="1"><output id="tLo"></output></label>
+          <label>angle <input id="tA" type="range" min="0" max="80" step="1" value="0"><output id="tAo"></output></label>
+        </div>
+      </div>
+      <canvas id="tissueCanvas" aria-label="Swatches of colour from pale lemon to deep amber and brown: sunlight passed through kelp of increasing thickness, more blade layers, and a steeper viewing angle."></canvas>
+      <p class="fig-cap">The colour of sunlight after passing through kelp, from a blade's thin margin to its thick base (left to right), for the number of blade layers and the viewing angle you choose. Blue goes first, then green: the light turns from lemon to amber to brown.</p>
+    </div>
+  </section>
+
+  <!-- 7. Shafts and frame -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Shafts and the frame · <b>shafts.js, renderer.js</b></div>
+      <h2>Beams that break behind the kelp</h2>
+      <p>The light shafts are the sun scattered toward the eye along every view ray. At half resolution, each ray is marched up to whatever the pixel shows (or the surface), asking the shadow map at every step how much sun gets through the kelp above and the caustic pattern how much the waves focused there. So the beams fan out from the sun, break behind every column and flicker with the surface; under the canopy the water goes dark. The result is blurred and upsampled with the ray lengths as a guide, so thin stalks in front of bright water don't pick up its glow.</p>
+      <p>The kelp's depth is drawn first, so the costly shading runs once per pixel however many layers of blades overlap; positions are computed identically in both passes. The frame then gets the shared pipeline's bloom and final pass, with a gentle softening of the far forest, as small-angle scattering does in water.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>About 2M triangles</b><span>Thirty thousand blades, about four thousand of them simulated; a coarser half-million-triangle copy for the shadow map.</span></div>
+      <div class="fact"><b>Fixed steps</b><span>Kelp and water step at 60 Hz on the main thread, about 2 ms each, so the motion is the same at any frame rate.</span></div>
+      <div class="fact"><b>Phones</b><span>Fewer stipes and blades, lighter meshes, the water stepped at 30 Hz, a smaller shadow map and fewer shaft steps.</span></div>
+      <div class="fact"><b>Randomize</b><span>Silt clouds the water while a new forest is built in the worker: the composed plants moved, leaned, resized and mirrored half the time.</span></div>
+    </div>
+  </section>
+
+  <footer class="col">
+    <div class="meta">
+      <span><b>three.js</b> r187</span><span>WebGL2</span><span>CPU kelp physics and fluid</span><span>its own underwater renderer</span><span>made in <b>Claude Code</b> with Opus 5.5</span>
+    </div>
+    Day 17 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/17/">spite.github.io/codevember-2026/17</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/17">17/ of the codevember-2026 repository</a>. Caustics after Evan Wallace's WebGL Water.
+  </footer>
+</main>
+
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1, W = 0, H = 0;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      W = canvas.clientWidth || 600; H = Math.round(W * aspect);
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, W, H);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    new MutationObserver(() => fit(true)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return { redraw: () => fit(true), paint: () => draw(ctx, W, H) };
+  }
+  function animate(canvas, step) {
+    let on = false, last = 0;
+    new IntersectionObserver(([e]) => { on = e.isIntersecting; if (on) { last = performance.now(); requestAnimationFrame(loop); } }).observe(canvas);
+    function loop(now) {
+      if (!on) return;
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      step(dt);
+      requestAnimationFrame(loop);
+    }
+  }
+  const bind = (id, out, fmt, fn) => { const el = $(id); const o = $(out); const show = () => { if (o) o.textContent = fmt(+el.value); }; el.addEventListener("input", () => { show(); fn(); }); show(); return el; };
+  const water = (ctx, W, H) => {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "#2f6f8c"); g.addColorStop(1, "#0b2433");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  };
+
+  // 1. A stipe in the surge: a chain of nodes, drag toward the flow, buoyancy, fixed lengths; the flow plotted below.
+  {
+    const N = 14, SEG = 1;
+    const S = bind("mS", "mSo", (v) => v.toFixed(2), () => {});
+    let t = 0, surgeStart = -99, nextSurge = 12;
+    const px = new Float32Array(N), py = new Float32Array(N), ox = new Float32Array(N), oy = new Float32Array(N);
+    for (let i = 0; i < N; i++) { px[i] = ox[i] = 0; py[i] = oy[i] = i * SEG; }
+    const hist = [];
+    const pulse = (a) => (a < 0 || a > 6.5 ? 0 : a < 1.8 ? (a / 1.8) ** 2 * (3 - 2 * a / 1.8) : a < 3 ? 1 : 1 - ((a - 3) / 3.5) ** 2 * (3 - 2 * (a - 3) / 3.5));
+    const flowAt = (y, time) => S.value * (0.55 * (0.6 + 0.4 * y / N) * Math.cos(2 * Math.PI * time / 10) + 0.12 * Math.cos(2 * Math.PI * time / 6.3 + 1) + 1.4 * pulse(time - surgeStart)) + 0.08;
+    $("mGo").addEventListener("click", () => (surgeStart = t));
+    const fig = setup($("swayCanvas"), 0.62, (ctx, W, H) => {
+      water(ctx, W, H);
+      const plotH = H * 0.22, top = H - plotH;
+      const scale = (top - 20) / (N * SEG);
+      const x0 = W / 2;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "#5b3d14"; ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let i = 0; i < N; i++) { const X = x0 + px[i] * scale, Y = top - 6 - py[i] * scale; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
+      ctx.stroke();
+      for (let i = 1; i < N; i++) {
+        const X = x0 + px[i] * scale, Y = top - 6 - py[i] * scale;
+        // A blade on each node, streaming downstream with the chain's lean.
+        const lean = (px[i] - px[i - 1]) * scale, side = i % 2 ? 1 : -1;
+        ctx.strokeStyle = i > N - 4 ? "#e0a32a" : "#b8761a"; ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.moveTo(X, Y);
+        ctx.quadraticCurveTo(X + side * 12 + lean, Y - 6, X + side * 18 + lean * 2.5 + 10, Y + 10);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.fillRect(0, top, W, plotH);
+      ctx.strokeStyle = "#ffc35a"; ctx.lineWidth = 1.5; ctx.beginPath();
+      hist.forEach((v, i) => { const X = (i / 1199) * W, Y = top + plotH / 2 - v * plotH * 0.22; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); });
+      ctx.stroke();
+      ctx.fillStyle = "#c9bfae"; ctx.font = font(11); ctx.fillText("flow over the last 20 s", 8, top + 14);
+    });
+    animate($("swayCanvas"), (dt) => {
+      const steps = Math.max(1, Math.round(dt / (1 / 60)));
+      for (let s = 0; s < steps; s++) {
+        const h = 1 / 60; t += h;
+        if (t > nextSurge) { surgeStart = t; nextSurge = t + 10 + Math.random() * 15; }
+        for (let i = 1; i < N; i++) {
+          const vx = (px[i] - ox[i]) / h, vy = (py[i] - oy[i]) / h;
+          ox[i] = px[i]; oy[i] = py[i];
+          const ax = 2.5 * (flowAt(i, t) - vx), ay = 2.5 * (0 - vy) + 0.9;
+          px[i] += vx * h * 0.97 + ax * h * h; py[i] += vy * h * 0.97 + ay * h * h;
+        }
+        for (let it = 0; it < 4; it++) for (let i = 1; i < N; i++) {
+          const dx = px[i] - px[i - 1], dy = py[i] - py[i - 1], d = Math.hypot(dx, dy) || 1, k = (d - SEG) / d;
+          if (i > 1) { px[i - 1] += dx * k * 0.5; py[i - 1] += dy * k * 0.5; px[i] -= dx * k * 0.5; py[i] -= dy * k * 0.5; } else { px[i] -= dx * k; py[i] -= dy * k; }
+        }
+        hist.push(flowAt(N / 2, t)); if (hist.length > 1200) hist.shift();
+      }
+      fig.paint();
+    });
+  }
+
+  // 2. Caustics in a slice: rays refracted at a wavy surface, their arrivals at a depth binned into a brightness line.
+  {
+    const A = bind("cA", "cAo", (v) => v.toFixed(2), () => {});
+    const D = bind("cD", "cDo", (v) => v.toFixed(1) + " m", () => {});
+    let t = 0;
+    const height = (x, time) => A.value * (0.35 * Math.sin(0.45 * x - 0.9 * time) + 0.14 * Math.sin(1.7 * x + 1.6 * time + 1) + 0.06 * Math.sin(3.1 * x - 2.1 * time));
+    const slope = (x, time) => (height(x + 0.01, time) - height(x - 0.01, time)) / 0.02;
+    const fig = setup($("causticCanvas"), 0.55, (ctx, W, H) => {
+      water(ctx, W, H);
+      const span = 16, sx = W / span, depth = D.value, sy = (H - 40) / 20, y0 = 16;
+      const bins = new Float32Array(Math.ceil(W));
+      ctx.strokeStyle = "rgba(255,230,170,0.08)"; ctx.lineWidth = 1;
+      const RAYS = 900;
+      for (let r = 0; r < RAYS; r++) {
+        const x = -2 + (r / RAYS) * (span + 4);
+        const s = slope(x, t);
+        const n = [-s, 1]; const nl = Math.hypot(...n); n[0] /= nl; n[1] /= nl;
+        // Refract a vertical ray (0, -1) into water (eta 1/1.333).
+        const ix = 0, iy = -1, eta = 1 / 1.333, cosi = -(ix * n[0] + iy * n[1]);
+        const k = 1 - eta * eta * (1 - cosi * cosi);
+        const rx = eta * ix + (eta * cosi - Math.sqrt(k)) * n[0], ry = eta * iy + (eta * cosi - Math.sqrt(k)) * n[1];
+        const xe = x + rx / -ry * depth;
+        if (r % 9 === 0) { ctx.beginPath(); ctx.moveTo(x * sx, y0 - height(x, t) * sy * 4); ctx.lineTo(xe * sx, y0 + depth * sy); ctx.stroke(); }
+        const b = Math.floor(xe * sx); if (b >= 0 && b < bins.length) bins[b] += 1;
+      }
+      ctx.strokeStyle = "#cfe7f2"; ctx.lineWidth = 2; ctx.beginPath();
+      for (let X = 0; X <= W; X += 2) { const x = X / sx; const Y = y0 - height(x, t) * sy * 4; X ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
+      ctx.stroke();
+      const mean = RAYS / ((span + 4) * sx);
+      const yD = y0 + depth * sy;
+      for (let X = 0; X < bins.length; X++) {
+        let v = 0; for (let k = -2; k <= 2; k++) v += bins[clamp(X + k, 0, bins.length - 1)] || 0; v /= 5 * mean;
+        ctx.fillStyle = `rgba(255,${Math.round(200 + 40 * Math.min(1, v / 3))},120,${Math.min(1, v * 0.45)})`;
+        ctx.fillRect(X, yD - 3, 1, 6);
+      }
+      ctx.fillStyle = "#c9bfae"; ctx.font = font(11); ctx.fillText(`${depth.toFixed(1)} m below the surface`, 8, Math.min(H - 8, yD + 18));
+    });
+    animate($("causticCanvas"), (dt) => { t += dt; fig.paint(); });
+  }
+
+  // 3. Sunlight through kelp: Beer-Lambert through a blade's optical depth, longer when seen obliquely, per layer.
+  {
+    const L = bind("tL", "tLo", (v) => String(v), () => fig.redraw());
+    const Ang = bind("tA", "tAo", (v) => v + "°", () => fig.redraw());
+    const sigma = [1.2, 1.7, 7.0];
+    const toSRGB = (c) => Math.round(255 * clamp(c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055, 0, 1));
+    const fig = setup($("tissueCanvas"), 0.32, (ctx, W, H) => {
+      ctx.fillStyle = css("--stage") || "#111"; ctx.fillRect(0, 0, W, H);
+      const n = 12, gap = 6, w = (W - gap * (n + 1)) / n;
+      const nv = Math.cos((Ang.value * Math.PI) / 180);
+      for (let i = 0; i < n; i++) {
+        const thickness = 0.14 + (0.86 * i) / (n - 1);
+        const depth = (0.55 + 0.6 * thickness) * (0.5 + 0.5 / Math.max(nv, 0.2)) * L.value;
+        const c = sigma.map((s) => Math.exp(-s * depth));
+        ctx.fillStyle = `rgb(${toSRGB(c[0])},${toSRGB(c[1])},${toSRGB(c[2])})`;
+        ctx.fillRect(gap + i * (w + gap), 12, w, H - 40);
+      }
+      ctx.fillStyle = css("--stage-ink") || "#888"; ctx.font = font(11);
+      ctx.fillText("thin margin", gap, H - 10);
+      const label = "thick base"; ctx.fillText(label, W - gap - ctx.measureText(label).width, H - 10);
+    });
+  }
+})();
+</script>
+</body>
+</html>
