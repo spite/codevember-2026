@@ -186,7 +186,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="eyebrow">The sea · <b>fluidSim.js, kelpPhysics.js, kelpVertex.js</b></div>
       <h2>A steady surge, and now and then a big one</h2>
       <p>The water is a sum of two things. A swell, evaluated exactly as linear waves over the depth of the reef: one long wave with a ten-second period that sways the whole forest back and forth together, and two small ones that roughen it. On top, a coarse fluid on the CPU (24 × 18 × 24 cells) carries what stirs the water: slow eddies, the probe's wake, the pointer. Every ten to twenty-five seconds a surge passes: a pulse of flow that builds over two seconds, pushes the forest further one way, and eases off over three and a half.</p>
-      <p>Each stipe is a chain of fourteen Verlet nodes pinned at its holdfast, dragged by the difference between the water and itself, held up by buoyancy (bull kelp by its bulb) or by its own stiffness (palm kelp), and kept under the surface. Near plants' blades are simulated too, as tip particles hinged to their stipe within a cone; further back they ride their stipes. On the GPU each blade is turned toward its tip and bent along an arc, so a ribbon bends all along while a palm blade barely does, with a ripple running down it; stipes are drawn through their nodes as smooth Catmull-Rom curves.</p>
+      <p>The fluid is a stable-fluids solver on that small grid: each 60 Hz step it adds vorticity confinement, so eddies and wakes keep swirling instead of smearing out, advects the field semi-Lagrangian along the total flow (so a wake drifts away with the swell), and projects it divergence-free with a Gauss-Seidel pressure solve. On phones it steps every other frame. Anything in the scene can ask it for the water's velocity at a point: the kelp, the probe and up to 2,400 flakes of marine snow, which drift with it and sink at five centimetres a second.</p>
     </div>
     <div class="formula">flow = current + Σ swell<sub>i</sub>(depth) · cos(k<sub>i</sub>·x − ω<sub>i</sub>t) + surge · pulse(t) + stirs<br><span class="c">pulse: smoothstep up over 1.8 s, held 1.2 s, smoothstep down over 3.5 s; a node is pulled by drag · (flow − its velocity)</span></div>
     <div class="fig">
@@ -198,6 +198,42 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       </div>
       <canvas id="swayCanvas" aria-label="A kelp stipe drawn as a chain rising from the bottom of the frame, swaying left and right in a steady rhythm, with a plot below of the water's speed over time; pressing the button sends a surge that pushes the chain further and shows as a bump in the plot."></canvas>
       <p class="fig-cap">The same recipe in two dimensions: a chain of nodes pinned at the bottom, dragged toward the water's flow and held up by buoyancy. The steady swell sways it; a surge pushes it further, then it swings back. Below, the flow over the last twenty seconds.</p>
+    </div>
+  </section>
+
+  <!-- 3b. The solver -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The solver · <b>kelpPhysics.js step, solveBlades, solveStipes, balance</b></div>
+      <h2>Constraints, not springs</h2>
+      <p>The kelp is solved with position-based dynamics, the same family of solver as inverse kinematics chains like FABRIK. Nothing in it is a stiff spring that has to be stepped carefully. Each stipe is a chain of fourteen nodes pinned at its holdfast; each simulated blade is one more particle, its tip, hinged to a point on the stipe. A step has two halves.</p>
+      <p><b>Move freely.</b> Every node and tip takes a Verlet step: its velocity is where it is minus where it was, kept at 99.5% per step, plus what the forces give it. The force is drag toward the water, but only toward the part of the flow that differs from the mean current, because the forest was built already leaning into that current; buoyancy lifts each node, and the top node of a giant stipe gets an extra lift from its floating canopy. A weak spring pulls each node back toward a target pose. Blade tips are dragged twenty times more readily than stipes, and spring back toward their rest direction with a hinge stiffness of 2.5 for giant and palm kelp and 0.3 for bull kelp's ribbons.</p>
+      <p><b>Then satisfy the constraints.</b> Four times per step (three on phones), every blade is checked, then every stipe:</p>
+      <p>The blade is pushed clear of the probe sphere; if it has swung more than its kind's limit from its rest direction (1.6 radians for giant kelp, 2.2 for bull, 1.0 for palm), its tip is moved 55% of the way back onto that cone; and it is put back to its length, the tip taking 85% of the correction. Every one of those corrections also pushes the opposite way on the stipe, at the two nodes nearest the blade's base, so blades tug their stipe around as they swing. The stipe is then walked from the holdfast up: the base is pinned back, each segment is restored to its length (the first one moving only its upper node, the rest splitting the correction evenly), nodes inside the probe's reach are pushed out to its surface, and nothing rises above the surface. Stipes with no simulated blades skip the last two iterations; they have nothing pulling on them that needs them.</p>
+      <p>Because each fix moves positions directly, the next Verlet step reads the move as velocity: a blade knocked aside by the sphere carries on swinging and comes back on its own. The kelp's rest pose is the one it was built in. For a curved giant stipe, buoyancy would straighten that, so before the forest appears a few damped static solves find how far buoyancy moves each node and aim its target spring that far past the built pose, then the whole forest is stepped fifteen times so it starts settled.</p>
+    </div>
+    <div class="formula">x′ = x + (x − x<sub>prev</sub>) · 0.995 + a · Δt² &nbsp; a = drag · (flow − current − v) + stiffness · (target − x) + buoyancy<br><span class="c">then 4 × { blades: sphere, hinge cone, length → feed back to stipe; stipes: pin base, segment lengths, sphere, surface }</span></div>
+    <div class="fig">
+      <div class="fig-head"><h3>Pushing through a stipe</h3>
+        <div class="controls">
+          <label>iterations <input id="pI" type="range" min="1" max="8" step="1" value="4"><output id="pIo"></output></label>
+          <label><input id="pFeed" type="checkbox" checked> blades tug the stipe</label>
+        </div>
+      </div>
+      <canvas id="pushCanvas" aria-label="A kelp stipe drawn as a chain of nodes with blades on it, standing in water; a sphere moves back and forth through it, and the chain and its blades bend out of the sphere's way, then swing back. Dragging moves the sphere."></canvas>
+      <div class="readout"><span>length error <b id="pErr"></b></span><span>blades in contact <b id="pHit"></b></span></div>
+      <p class="fig-cap">One stipe and its blades, solved as in the day: a Verlet step, then a number of passes of sphere, hinge cone and length constraints. Drag on the bench to move the sphere yourself. With one iteration the chain stretches as it is pushed (the length error grows); with four it holds. Untick the feedback and the blades are pushed aside on their own, while the stipe stays put.</p>
+    </div>
+  </section>
+
+  <!-- 3c. Probe and pointer -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The probe and the pointer · <b>main.js lissajous, stirLine; fluidSim.js applyMovingSphere, addImpulse</b></div>
+      <h2>Something to push the kelp around</h2>
+      <p>The sphere, 58 cm in radius, flies a Lissajous path through the forest, three sines of different periods (about 10, 6.5 and 13 seconds), so it loops round without ever quite repeating. It touches the kelp in two ways. Directly, as the collider above: a blade is pushed clear of its radius plus most of its half-width plus 14 cm, measured from the nearest point along the blade, and the tip takes between a quarter and all of the push, more the nearer the contact is to it, the rest going into the stipe; a stipe node is kept 36 cm further out.</p>
+      <p>And through the water, which reaches further. Every step the grid cells within 2.8 m of the sphere are blended toward the flow around a moving sphere: inside it, the water moves with it; outside, it is the potential flow round a sphere, bulging away in front and closing in behind, plus a little drag that carries water along, all fading to nothing at 2.8 m. Blended, not added, so it never builds up past what a sphere would make. That bow wave is what moves the kelp before the sphere arrives, and the wake behind it keeps the fronds swinging after it has gone.</p>
+      <p>Moving the pointer stirs the water too. The pointer's path is cast onto a plane through the forest 8.5 m in front of the camera, and its speed (capped at 6 m/s) is added there as a soft impulse 4.2 m wide, and again 4.5 m deeper along the same ray, so a sweep moves the nearer kelp and the kelp behind it. S, or "Stir the water", sends two broad impulses in opposite directions through the whole forest. "Surge" starts a big surge at once: between 0.45 and 0.7 m/s at its height, turned up to 23° either way from the current.</p>
     </div>
   </section>
 
@@ -263,6 +299,28 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="fact"><b>Fixed steps</b><span>Kelp and water step at 60 Hz on the main thread, about 2 ms each, so the motion is the same at any frame rate.</span></div>
       <div class="fact"><b>Phones</b><span>Fewer stipes and blades, lighter meshes, the water stepped at 30 Hz, a smaller shadow map and fewer shaft steps.</span></div>
       <div class="fact"><b>Randomize</b><span>Silt clouds the water while a new forest is built in the worker: the composed plants moved, leaned, resized and mirrored half the time.</span></div>
+      <div class="fact"><b>Exposure</b><span>Follows the view as a camera would, opening up to 1.9× looking down into the dark and stopping down toward the sun, easing over about half a second.</span></div>
+    </div>
+  </section>
+
+  <!-- 8. A new forest and the tiers -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">A new forest · <b>main.js changeForest, updateChange, showForest</b></div>
+      <h2>Silt, then a new forest</h2>
+      <p>R (or the kiosk's auto change, every fifteen seconds) asks the worker for a new forest from a new seed and, at the same moment, stirs up silt: the water clouds over 0.9 s, the same fog every surface and the backdrop use, thickening until nothing shows. The new forest only comes in once the worker has delivered it and the silt has fully closed, so the swap is never seen; its physics is built, balanced and settled for fifteen steps, then the silt clears over 1.6 s. Paused, the new forest simply replaces the old one. The auto change counts again only once the water is clear.</p>
+      <p>The first forest is composed by hand for the fixed view: three big giant kelp plants of 8 to 12 stipes reaching the canopy, a frond close to the lens framing the left of the picture, bull kelp floating at set depths, more giant kelp further back between them and the far forest, and palm kelp on the boulders. A random forest keeps that composition and varies it from the seed: each plant moved, leaned and resized, its stipes and blades redrawn, the whole layout mirrored half the time.</p>
+    </div>
+    <div class="col prose">
+      <div class="eyebrow">Quality tiers · <b>renderer.js TIERS, main.js</b></div>
+      <h2>What a phone gives up</h2>
+      <p>Desktops get high and phones medium; <code>?quality=low</code> goes lower, and <code>?capture</code> renders the high forest with a tier of its own for recordings. Below high, the forest itself is lighter too: medium builds 60% of the plants with meshes at 55% of the detail, low 45% at 40%.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>High</b><span>4× MSAA, a 2048 shadow map, 36 shaft steps at half resolution, a 512 caustic map from a 192² grid; 4 constraint passes, up to 4,500 simulated blades, 2,400 snow flakes.</span></div>
+      <div class="fact"><b>Medium</b><span>2× MSAA, a 1536 shadow map, 20 shaft steps, a 128² caustic grid; the water stepped at 30 Hz, 3 passes, 2,400 simulated blades, 1,200 flakes.</span></div>
+      <div class="fact"><b>Low</b><span>No MSAA, a 1024 shadow map, 14 shaft steps at a third of the resolution, a 256 caustic map from 96², no far-forest softening; 1,600 simulated blades, 700 flakes.</span></div>
+      <div class="fact"><b>Capture</b><span>4× MSAA, a 4096 shadow map, 64 shaft steps at three-quarter resolution, a 1024 caustic map from a 256² grid.</span></div>
     </div>
   </section>
 
@@ -410,6 +468,112 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       ctx.fillStyle = "#c9bfae"; ctx.font = font(11); ctx.fillText(`${depth.toFixed(1)} m below the surface`, 8, Math.min(H - 8, yD + 18));
     });
     animate($("causticCanvas"), (dt) => { t += dt; fig.paint(); });
+  }
+
+  // 4. Pushing through a stipe: Verlet, then iterations of sphere / hinge cone / length for blades (fed back), and pin / lengths / sphere for the stipe.
+  {
+    const N = 10, SEG = 1, NB = N - 2, BL = 1.3, R = 0.9;
+    const I = bind("pI", "pIo", (v) => String(v), () => {});
+    const feed = $("pFeed");
+    const px = new Float32Array(N), py = new Float32Array(N), ox = new Float32Array(N), oy = new Float32Array(N);
+    const rx = new Float32Array(N), ry = new Float32Array(N);
+    for (let i = 0; i < N; i++) { px[i] = ox[i] = rx[i] = 0; py[i] = oy[i] = ry[i] = i * SEG; }
+    const bn = [], bdx = [], bdy = [], tx = [], ty = [], qx = [], qy = [];
+    for (let b = 0; b < NB; b++) {
+      const n = b + 2, side = b % 2 ? 1 : -1, a = side * 0.9 + 0.25;
+      bn.push(n); bdx.push(Math.sin(a)); bdy.push(Math.cos(a));
+      tx.push(px[n] + Math.sin(a) * BL); ty.push(py[n] + Math.cos(a) * BL); qx.push(tx[b]); qy.push(ty[b]);
+    }
+    const sp = { x: -4, y: 5 }; let t = 0, drag = null, err = 0, hits = 0;
+    const COS = Math.cos(1.6), SIN = Math.sin(1.6);
+    let view = { s: 1, x0: 0, y0: 0 };
+    const canvas = $("pushCanvas");
+    const toWorld = (e) => { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left - view.x0) / view.s, y: (view.y0 - (e.clientY - r.top)) / view.s }; };
+    canvas.addEventListener("pointerdown", (e) => { drag = toWorld(e); canvas.setPointerCapture(e.pointerId); });
+    canvas.addEventListener("pointermove", (e) => { if (drag) drag = toWorld(e); });
+    const end = () => (drag = null);
+    canvas.addEventListener("pointerup", end); canvas.addEventListener("pointercancel", end);
+    function step(h) {
+      t += h;
+      if (drag) { sp.x += (drag.x - sp.x) * 0.2; sp.y += (drag.y - sp.y) * 0.2; }
+      else { sp.x = 4.2 * Math.sin(t * 0.6); sp.y = 5 + 2.5 * Math.sin(t * 0.9 + 0.7); }
+      for (let i = 1; i < N; i++) {
+        const vx = (px[i] - ox[i]) * 0.97, vy = (py[i] - oy[i]) * 0.97; ox[i] = px[i]; oy[i] = py[i];
+        px[i] += vx + (rx[i] - px[i]) * 1.5 * h * h; py[i] += vy + ((ry[i] - py[i]) * 1.5 + 0.3) * h * h;
+      }
+      for (let b = 0; b < NB; b++) {
+        const vx = (tx[b] - qx[b]) * 0.95, vy = (ty[b] - qy[b]) * 0.95; qx[b] = tx[b]; qy[b] = ty[b];
+        const n = bn[b];
+        tx[b] += vx + (px[n] + bdx[b] * BL - tx[b]) * 2.5 * h * h; ty[b] += vy + (py[n] + bdy[b] * BL - ty[b]) * 2.5 * h * h;
+      }
+      hits = 0;
+      for (let it = 0; it < I.value; it++) {
+        const fb = feed.checked ? 1 : 0;
+        for (let b = 0; b < NB; b++) {
+          const n = bn[b];
+          let ax = px[n], ay = py[n];
+          // Sphere: the nearest point along the blade, pushed clear; the tip takes more the nearer the contact.
+          let dx = tx[b] - ax, dy = ty[b] - ay;
+          let u = clamp(((sp.x - ax) * dx + (sp.y - ay) * dy) / (dx * dx + dy * dy + 1e-6), 0, 1);
+          const cx = ax + dx * u - sp.x, cy = ay + dy * u - sp.y, d = Math.hypot(cx, cy) + 1e-5, clear = R + 0.12;
+          if (d < clear) {
+            if (it === 0) hits++;
+            const k = (clear - d) / d, share = 0.25 + 0.75 * u;
+            tx[b] += cx * k * share; ty[b] += cy * k * share;
+            px[n] += cx * k * (1 - share) * 0.55 * fb; py[n] += cy * k * (1 - share) * 0.55 * fb;
+            ax = px[n]; ay = py[n];
+          }
+          // Hinge cone around the rest direction.
+          dx = tx[b] - ax; dy = ty[b] - ay;
+          let dist = Math.hypot(dx, dy) + 1e-6;
+          const dot = (dx * bdx[b] + dy * bdy[b]) / dist;
+          if (dot < COS) {
+            const cross = Math.sign(bdx[b] * dy - bdy[b] * dx) || 1;
+            const ex = ax + (bdx[b] * COS - cross * bdy[b] * SIN) * BL - tx[b], ey = ay + (bdy[b] * COS + cross * bdx[b] * SIN) * BL - ty[b];
+            tx[b] += ex * 0.55; ty[b] += ey * 0.55; px[n] -= ex * 0.28 * fb; py[n] -= ey * 0.28 * fb;
+            ax = px[n]; ay = py[n];
+          }
+          // Length: the tip takes 85%, the stipe the rest.
+          dx = tx[b] - ax; dy = ty[b] - ay; dist = Math.hypot(dx, dy) + 1e-6;
+          const diff = (dist - BL) / dist;
+          tx[b] -= dx * diff * 0.85; ty[b] -= dy * diff * 0.85; px[n] += dx * diff * 0.15 * fb; py[n] += dy * diff * 0.15 * fb;
+        }
+        px[0] = 0; py[0] = 0;
+        for (let i = 0; i < N - 1; i++) {
+          const dx = px[i + 1] - px[i], dy = py[i + 1] - py[i], dist = Math.hypot(dx, dy) + 1e-6, diff = (dist - SEG) / dist;
+          if (i === 0) { px[1] -= dx * diff; py[1] -= dy * diff; }
+          else { px[i] += dx * diff * 0.5; py[i] += dy * diff * 0.5; px[i + 1] -= dx * diff * 0.5; py[i + 1] -= dy * diff * 0.5; }
+        }
+        for (let i = 1; i < N; i++) {
+          const dx = px[i] - sp.x, dy = py[i] - sp.y, d = Math.hypot(dx, dy) + 1e-5, clear = R + 0.2;
+          if (d < clear) { px[i] = sp.x + dx * clear / d; py[i] = sp.y + dy * clear / d; }
+        }
+      }
+      err = 0;
+      for (let i = 0; i < N - 1; i++) err = Math.max(err, Math.abs(Math.hypot(px[i + 1] - px[i], py[i + 1] - py[i]) - SEG));
+    }
+    const fig = setup(canvas, 0.62, (ctx, W, H) => {
+      water(ctx, W, H);
+      view = { s: (H - 30) / (N * SEG + 1.2), x0: W / 2, y0: H - 14 };
+      const X = (x) => view.x0 + x * view.s, Y = (y) => view.y0 - y * view.s;
+      ctx.fillStyle = "#3a3328"; ctx.fillRect(0, view.y0, W, H - view.y0);
+      ctx.fillStyle = "rgba(220,235,245,0.18)"; ctx.strokeStyle = "rgba(220,235,245,0.7)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(X(sp.x), Y(sp.y), R * view.s, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.lineCap = "round";
+      for (let b = 0; b < NB; b++) {
+        const n = bn[b];
+        ctx.strokeStyle = b > NB - 3 ? "#e0a32a" : "#b8761a"; ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.moveTo(X(px[n]), Y(py[n])); ctx.lineTo(X(tx[b]), Y(ty[b])); ctx.stroke();
+      }
+      ctx.strokeStyle = "#5b3d14"; ctx.lineWidth = 3; ctx.beginPath();
+      for (let i = 0; i < N; i++) i ? ctx.lineTo(X(px[i]), Y(py[i])) : ctx.moveTo(X(px[i]), Y(py[i]));
+      ctx.stroke();
+      ctx.fillStyle = "#f3e2c0";
+      for (let i = 0; i < N; i++) { ctx.beginPath(); ctx.arc(X(px[i]), Y(py[i]), 2.5, 0, Math.PI * 2); ctx.fill(); }
+      $("pErr").textContent = (err * 100).toFixed(1) + "%";
+      $("pHit").textContent = String(hits);
+    });
+    animate(canvas, (dt) => { const n = Math.max(1, Math.round(dt * 60)); for (let i = 0; i < n; i++) step(1 / 60); fig.paint(); });
   }
 
   // 3. Sunlight through kelp: Beer-Lambert through a blade's optical depth, longer when seen obliquely, per layer.
