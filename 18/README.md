@@ -4,20 +4,20 @@ November 18, 2026
 
 A pendulum swings through a row of moving gates, and everything is always just in time: discs turn their holes into
 line as the bob arrives, a wall of bars shuffles back into a tunnel, a camera iris spirals open, rings spinning like
-coins turn face on (most round a solid disc with the bob's outline cut through it), a stack of thin discs, whole in an
-open trench through the base and riding on two rails, turns into line as a tunnel (each slit marked either side on
-the rim, so the slits lining up read as two lines), a slit torus spins face on to whichever pendulum comes through, and at the top of each swing the bob
-may slide into a socket and stop a hair from its back. Every few swings every turning part comes back round at once
-and their gold marks line up, with a bell. Each new one is built from scratch: its layout, its hero mechanism, the
-gates around it, its bob and its finish.
+coins turn face on (most round a solid disc with the bob's outline cut through it), a stack of thin discs turns into
+line as a tunnel (whole in an open trench through the base, riding on two rails, each slit marked either side on the
+rim so the slits lining up read as two lines), a slit torus spins face on to whichever pendulum comes through, and at
+the top of each swing the bob may slide into a socket and stop a hair from its back. Every few swings every turning
+part comes back round at once and their gold marks line up, with a bell. Each new one is built from scratch: its
+layout, its hero mechanism, the gates around it, its bob and its finish.
 
 Controls: click (tap) a gate to knock it: it spins or shoves, and always gets back into line before the bob comes.
 Drag to orbit, scroll to zoom, R for a new pendulum; left alone, the camera drifts slowly round its angle. M or the
-speaker button: sound. The panel picks the layout, the hero, whether pendulums cross, the bob, the finish and look, the
-clearance and the speed, the Motion (constant or quick) and Physical (below). Instant change makes R and auto change
-cut straight to the next contraption (once it's built), the camera cutting to its framing, instead of flying the pieces
-out and in. Auto change brings a new one every 15 seconds; randomizing, pausing or any interaction starts the count
-over.
+speaker button: sound. The panel picks the layout (Foucault only when picked), the hero, whether pendulums cross, the
+bob, the finish and look, the clearance and the speed, the Motion (constant or quick), Slow motion, Pendulum view and
+Physical (all below). Instant change makes R and auto change cut straight to the next contraption (once it's built),
+the camera cutting to its framing, instead of flying the pieces out and in. Auto change brings a new one every 15
+seconds; randomizing, pausing or any interaction starts the count over.
 
 Notable:
 
@@ -108,7 +108,12 @@ Notable:
   against the swing only while it is up or on its way, in the pose it has at each moment, column and all, so it can
   stand where the other swings cross. Finishes: pastel clay, one
   colour throughout, and polished stone (marble, travertine) with brass.
-- Sound: a whoosh of noise following each bob's speed, a swish through every gate, and mechanical one-shots for the
+- Recordings: `window.app.nextLook({ seed, look, layout, hero, crossing })` brings in the next contraption;
+  `app.stage.pace` speeds the comings and goings up (after the pendulum reaches the top of its swing), and
+  `app.director.orbit` (radians a second) turns the camera steadily across the front of each one. Both are off by
+  default. `app.sound.beginOffline(seconds)` schedules every sound on an offline context timed by the page's clock
+  (CCapture's virtual one in a capture) and `renderOffline()` mixes it to a WAV, for muxing; nothing is heard.
+- Sound: a soft rush of brown noise following each bob's speed, a swish through every gate, and mechanical one-shots for the
   gates' ticks, latches, slides and clacks, knocks and the stage's machinery; the bell is synthesized. The one-shots are
   day 6's set, cut from CC0 recordings on freesound.org: "watch-ticking-contact-mic.wav" by Astounded (478738),
   "Metal_Mechanism_Click_Small.wav" by LamaMakesMusic (403587), "MECHRtch_Ratchet01" by InMotionAudio (689528),

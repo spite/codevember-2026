@@ -18,6 +18,15 @@ function pick(random, items, weights) {
 
 const range = (random, a, b) => a + (b - a) * random();
 
+// Shuffled in place by `random` (Fisher–Yates): the same order in every browser, unlike sorting with a random comparator.
+function shuffle(random, items) {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
+}
+
 // The bob's lowest point over the floor, for layouts standing on it.
 const LOWEST = 0.62;
 const FLOOR = 0;
@@ -283,7 +292,7 @@ function heroGate(random, pendulum, bob, family, station, side = 1, below = 0.27
   }
   if (family === "iris") {
     // A camera iris: shut between passes, its blades turning back into the ring as the bob comes.
-    // Drawn as before (a blade count, an opening), so the rest of the design stays the same.
+    // Unused draws (a blade count, an opening), kept so the seed's later draws are unchanged.
     pick(random, [6, 7, 8, 9]);
     if (random() >= 0.3) range(random, 0.4, 0.5);
     const rise = range(random, 0.16, 0.26);
@@ -311,12 +320,11 @@ function heroGate(random, pendulum, bob, family, station, side = 1, below = 0.27
       // ring out one more, so they all come face on together as the bob comes through.
       const d = (k % 2 ? -1 : 1) * dir;
       const turns = count - k;
-      // Drawn as before, so the rest of the design stays the same.
+      // An unused draw, kept so the seed's later draws are unchanged.
       if (!(centre && random() < 0.5)) indexed(pendulum, station, Math.PI, [1, 1], style, random, "ry");
       return steady(pendulum, station, 1, 1, Math.PI, d * turns, "ry");
     });
-    // Two in three have a solid disc in the middle, the bob's outline cut through it. Read off what is already drawn,
-    // so the rest of the design stays as it was.
+    // Two in three have a solid disc in the middle, the bob's outline cut through it (read off draws already made).
     const solid = dir > 0 || count === 4;
     return { family, station, motions, outer: 0.44, solid };
   }
@@ -585,7 +593,7 @@ function designGimbal(random, want) {
   const slotted = [];
   const free = (c, gap) => taken.every((q) => Math.hypot(c[0] - q[0], c[1] - q[1], c[2] - q[2]) > gap);
   // Candidate times round the loop, in a seeded order.
-  const order = Array.from({ length: Math.floor(T / 0.025) }, (_, i) => i * 0.025 + 0.01).sort(() => random() - 0.5);
+  const order = shuffle(random, Array.from({ length: Math.floor(T / 0.025) }, (_, i) => i * 0.025 + 0.01));
   if (foucault) {
     // A gate for each swing, on one of its lobe's long sides, somewhere part way out: it rises from the floor just in
     // time for the bob to go through, and sinks again before the next one comes up, so only one is ever up.
@@ -701,7 +709,7 @@ function designGimbal(random, want) {
     }
     // Its foot: the bottom of its pedestal, on top of its column (as the contraption builds it).
     const foot = -(below + 0.15);
-    const ways = [[1, 0], [-1, 0], [1, Math.PI / 2], [-1, Math.PI / 2]].sort(() => random() - 0.5);
+    const ways = shuffle(random, [[1, 0], [-1, 0], [1, Math.PI / 2], [-1, Math.PI / 2]]);
     for (const [face, turn] of ways) {
       const lift = (U) => ({ ...LIFT, up: [...U], down: slotFrame(U, face, turn, foot), foot });
       const p = placement(t, box, lift);
@@ -857,10 +865,16 @@ function constantly(want, design) {
   const slitted = (g, m, i, pendulum) => {
     const passes = m.passes ?? pendulum.passesInPeriod(g.station);
     if (passes.length < 2) return constantMotion(m);
-    const k = counts[Math.round(Math.abs(i - (g.count - 1) / 2)) % counts.length];
-    const step = TAU / k;
-    const n = steadySteps([passes], pendulum.period, step, design.loop, 0.3, k);
-    return steadyMotion(passes, pendulum.period, step, n, Math.sign(m.step) || 1, m.v0 ?? 0);
+    // Where its count can't turn smoothly (far up the swing, the gaps very uneven), the next with more slits that can.
+    const first = Math.round(Math.abs(i - (g.count - 1) / 2)) % counts.length;
+    let best = null;
+    for (const k of [counts[first], ...counts.slice(0, first).reverse()]) {
+      const n = steadySteps([passes], pendulum.period, TAU / k, design.loop, 0.3, k);
+      const { swell } = steadySwell(passes, pendulum.period, TAU / k, n);
+      if (!best || swell < best.swell) best = { k, n, swell };
+      if (swell <= 0.3) break;
+    }
+    return steadyMotion(passes, pendulum.period, TAU / best.k, best.n, Math.sign(m.step) || 1, m.v0 ?? 0);
   };
   const each = (g, pendulum, step) => {
     if (g.motion) [g.motion] = turnAll(g, [g.motion], pendulum, step);
@@ -909,7 +923,8 @@ function steadySteps(passesList, period, step, loop, tolerance = 0.3, slits = 0)
       if (!best || swell < best.swell - 1e-9) best = { swell, n };
     }
   }
-  return best ? best.n : steadySteps(passesList, period, step, loop, tolerance);
+  // No count that brings every slit round turns smoothly enough: the smoothest regardless.
+  return best && (!slits || best.swell <= tolerance) ? best.n : steadySteps(passesList, period, step, loop, tolerance);
 }
 
 // The steady turn: n steps a period at a constant rate, plus a gentle swell of speed once a period (none where the

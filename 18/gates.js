@@ -144,7 +144,9 @@ class Gate {
   // part, every moving piece. True if anything moved.
   knock(mesh, point, ray, t) {
     const hit = mesh.userData.piece;
-    const targets = hit?.knock ? [hit] : this.pieces.filter((p) => p.knock);
+    // Pieces sharing one knock (an iris's blades) are kicked once.
+    const knocks = new Set();
+    const targets = hit?.knock ? [hit] : this.pieces.filter((p) => p.knock && !knocks.has(p.knock) && knocks.add(p.knock));
     let moved = false;
     for (const p of targets) moved = this.kickPiece(p, point, ray, t) || moved;
     return moved;

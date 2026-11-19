@@ -28,10 +28,14 @@ class Foley {
     if (m.type === "indexed") {
       const T = m.period;
       for (let c = Math.floor((from - m.passes[0]) / T) - 1; c * T + m.passes[0] < to + T; c++) {
-        const segments = [
-          [m.passes[0] + c * T, m.passes[1] + c * T, m.steps[0]],
-          [m.passes[1] + c * T, m.passes[0] + (c + 1) * T, m.steps[1]],
-        ];
+        // One pass a period (a gimbal's gates): one move, all the way round to the next.
+        const segments =
+          m.passes.length === 1
+            ? [[m.passes[0] + c * T, m.passes[0] + (c + 1) * T, m.steps[0]]]
+            : [
+                [m.passes[0] + c * T, m.passes[1] + c * T, m.steps[0]],
+                [m.passes[1] + c * T, m.passes[0] + (c + 1) * T, m.steps[1]],
+              ];
         for (const [ta, tb, steps] of segments) {
           if (!steps) continue;
           if (m.style === "tick") {

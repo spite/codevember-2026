@@ -92,7 +92,7 @@ addKey("KeyM", "toggle sound", toggleSound);
 // Sounds already scheduled freeze with the animation.
 onPause((running) => sound.setPaused(!running));
 
-const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: true });
+const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
 gui.addSelect("Motion", params.motion, ["quick", "constant"], { randomizable: false, tooltip: "Quick: the mechanisms wait, then snap into line just in time. Constant: they never stop, each turning at one steady rate and swinging smoothly into line." });
 gui.addCheckbox("Instant change", params.instant, { randomizable: false, tooltip: "R and auto change cut straight to the next contraption, with no pieces flying out and in." });
 gui.addCheckbox("Slow motion", params.slowMotion, { randomizable: false, tooltip: "Time slows right down as the bob goes through each gate, then picks up again." });
@@ -236,6 +236,12 @@ window.app = {
   },
   // A new contraption for `seed`, with the usual transition.
   change: (seed) => loadSeed(seed),
+  // Recordings: the next contraption, as { seed, look, layout, hero, crossing } (any left out stay as they are).
+  nextLook: (pick = {}) => {
+    for (const k of ["look", "layout", "hero", "crossing"]) if (pick[k] !== undefined) params[k].set(pick[k]);
+    if (pick.seed) loadSeed(pick.seed);
+    else loadSeed(Math.floor(nativeRandom() * 2 ** 31).toString(36));
+  },
   // Straight to the contraption of `seed`, without a transition.
   jump: async (seed, time = 0.37, set = {}) => {
     for (const [k, v] of Object.entries(set)) params[k].set(v);
@@ -352,7 +358,8 @@ render(({ time, dt }) => {
   const swinging = stage.state === "idle" ? stage.current?.contraption : null;
   const slow = slowAt(swinging, stage.time);
   const rate = params.speed() * slow;
-  stage.update(dt * rate);
+  // Comings and goings keep at least a fifth of their pace, so a speed of 0 can't stall a change half way.
+  stage.update(dt * (stage.state === "idle" ? rate : Math.max(0.2, params.speed())));
   if (stage.state !== stageState) {
     stageSounds(stage.state);
     stageState = stage.state;

@@ -34,6 +34,11 @@ class Cutter {
       if (data.error) p.reject(new Error(data.error));
       else p.resolve(data.results);
     };
+    // A worker that fails to load or dies takes every batch waiting on it down with it, rather than leaving them hanging.
+    this.worker.onerror = this.worker.onmessageerror = (e) => {
+      for (const p of this.pending.values()) p.reject(new Error(e.message ?? "cutter worker failed"));
+      this.pending.clear();
+    };
   }
 
   run(batch) {
@@ -248,7 +253,9 @@ class Contraption {
         return [pivot.x + r * Math.sin(a), pivot.y - r * Math.cos(a)];
       });
       const [a0, a1] = [g.station - h, g.station + h];
-      out.push({ cut: { type: "poly", points: [...arc(r1, a0, a1), ...arc(r0, a1, a0)] }, from: a0 - 0.03 / L, to: a1 + 0.03 / L });
+      const span = { from: a0 - 0.03 / L, to: a1 + 0.03 / L };
+      // Where the base lies below the discs (under the rings it drops away) there is no trench: the rails stand on legs.
+      out.push(r0 < r1 ? { ...span, cut: { type: "poly", points: [...arc(r1, a0, a1), ...arc(r0, a1, a0)] } } : span);
     }
     return out;
   }
@@ -457,7 +464,7 @@ class Contraption {
     const R = bob.radius * 1.12 + 0.01;
     const baseJobs = this.baseJobs(below, halfAngle);
     const trenches = this.trenches(below);
-    for (const job of baseJobs) (job.outline.sub ??= []).push(...trenches.map((t) => t.cut));
+    for (const job of baseJobs) (job.outline.sub ??= []).push(...trenches.filter((t) => t.cut).map((t) => t.cut));
     const outlined = !bob.solid;
     const [bobShapes, ...baseShapes] = await cutter.run({
       rig: null,
@@ -501,12 +508,36 @@ class Contraption {
       this.base.add(new Mesh(geometry, materials.cradle));
       baseTop = Math.max(baseTop, geometry.boundingBox.max.y);
     }
-    // Each trench's discs ride on two rails along its floor, either side of their lowest point, set into its ends.
+    // Each tunnel's discs ride on two rails, either side of their lowest point.
     for (const { from, to } of trenches) {
       const r = 0.012, phi = 0.5, out = TUMBLER_RADIUS + r;
+      const rail = L + out * Math.cos(phi), deep = L + design.below + 0.03;
       for (const side of [-1, 1]) {
-        const geometry = new TorusGeometry(L + out * Math.cos(phi), r, 12, 48, to - from).rotateZ(from - Math.PI / 2);
-        this.base.add(new Mesh(geometry.translate(this.pivot.x, this.pivot.y, side * out * Math.sin(phi)), materials.rod));
+        const z = side * out * Math.sin(phi);
+        if (deep - rail < 0.06) {
+          // Along the trench, set into its ends.
+          const geometry = new TorusGeometry(rail, r, 12, 48, to - from).rotateZ(from - Math.PI / 2);
+          this.base.add(new Mesh(geometry.translate(this.pivot.x, this.pivot.y, z), materials.rod));
+          continue;
+        }
+        // Where the base lies further down (under the rings it drops away), each rail bends down at either end into a
+        // leg of the same rod, into the base: one tube, legs, bends and rail, along (u, radius) with u round the arc.
+        const b = 0.04, length = (to - from) * rail;
+        const at = (u, rr) => new Vector3(this.pivot.x + rr * Math.sin(from + u / rail), this.pivot.y - rr * Math.cos(from + u / rail), z);
+        const points = [];
+        for (let k = 0; k <= 4; k++) points.push(at(0, deep + ((rail + b - deep) * k) / 4));
+        for (let k = 1; k <= 8; k++) {
+          const a = (k / 8) * (Math.PI / 2);
+          points.push(at(b - b * Math.cos(a), rail + b - b * Math.sin(a)));
+        }
+        for (let k = 1; k < 24; k++) points.push(at(b + ((length - 2 * b) * k) / 24, rail));
+        for (let k = 0; k <= 8; k++) {
+          const a = (k / 8) * (Math.PI / 2);
+          points.push(at(length - b + b * Math.sin(a), rail + b - b * Math.cos(a)));
+        }
+        for (let k = 1; k <= 4; k++) points.push(at(length, rail + b + ((deep - rail - b) * k) / 4));
+        const curve = new CatmullRomCurve3(points, false, "centripetal");
+        this.base.add(new Mesh(new TubeGeometry(curve, 200, r, 12, false), materials.rod));
       }
     }
     if (design.layout === "ring") {

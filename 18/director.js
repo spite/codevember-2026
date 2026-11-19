@@ -46,7 +46,7 @@ class Director {
     this.framing = framing;
     const side = this.random() < 0.5 ? -1 : 1;
     const [e0, e1] = framing.elevation ?? [9, 18];
-    this.shot = { az: side * MathUtils.degToRad(MathUtils.lerp(22, 40, this.random())), el: MathUtils.degToRad(MathUtils.lerp(e0, e1, this.random())) };
+    this.shot = { az: side * MathUtils.degToRad(MathUtils.lerp(22, 40, this.random())), el: MathUtils.degToRad(MathUtils.lerp(e0, e1, this.random())), from: this.time };
     if (now) this.place(1);
   }
 
@@ -54,7 +54,9 @@ class Director {
   pose() {
     const { az, el } = this.shot;
     const t = this.time;
-    const a = az + MathUtils.degToRad(9) * Math.sin((t * 2 * Math.PI) / 47);
+    // `orbit` (radians a second, 0 by default): a steady turn on top, for a recording, across the front from the side
+    // the shot starts on.
+    const a = az + MathUtils.degToRad(9) * Math.sin((t * 2 * Math.PI) / 47) - Math.sign(az) * (this.orbit ?? 0) * (t - (this.shot.from ?? 0));
     const e = el + MathUtils.degToRad(3.5) * Math.sin((t * 2 * Math.PI) / 31 + 1.3);
     const { fov, distance } = this.lens(this.framing, a, e);
     const d = distance * (1 + 0.03 * Math.sin((t * 2 * Math.PI) / 37 + 0.4));

@@ -93,12 +93,17 @@ class Stage {
 
   // Swaps in whatever `next` (a promise of { contraption, look }) resolves to.
   change(next) {
+    // One built but not yet brought in is dropped for the newer one.
+    this.next?.contraption.dispose();
     this.next = null;
     this.pending = next;
-    next.then((entry) => {
-      if (this.pending === next) this.next = entry;
-      else entry.contraption.dispose();
-    });
+    next.then(
+      (entry) => {
+        if (this.pending === next) this.next = entry;
+        else entry.contraption.dispose();
+      },
+      (error) => console.error("day 18: building a contraption failed", error),
+    );
     if (this.state === "idle") {
       if (!this.current) return this.enter("empty");
       const c = this.current.contraption;
@@ -121,6 +126,7 @@ class Stage {
   enter(state) {
     this.state = state;
     this.clock = 0;
+    this.top = undefined;
   }
 
   // Offsets (metres): the pendulums raised by `arm`, gate i moved by gate(i) ([up, along z]), the base raised by `base`.
@@ -203,8 +209,12 @@ class Stage {
     this.onCue?.(name, gate);
   }
 
+  // `pace` (1 by default) speeds the comings and goings up, for a recording: flights, the base and the drop-in.
   update(dt) {
-    this.clock += dt;
+    const pace = this.pace ?? 1;
+    // The swing keeps its own time until it reaches the top; only what follows is sped up.
+    const swinging = this.state === "idle" || (this.state === "leave" && this.time < this.apex);
+    this.clock += swinging ? dt : dt * pace;
     const entry = this.current;
     const c = entry?.contraption;
     if (this.state === "idle") {
@@ -221,7 +231,9 @@ class Stage {
       c.holdArms(Math.min(this.time, this.apex));
       const p = this.planned;
       const t = this.clock;
-      const top = this.apex - (this.time - t);
+      // When it reached the top, on the stage's clock (which runs faster from then on).
+      if (this.time >= this.apex) this.top ??= this.apex - (this.time - t);
+      const top = this.top ?? this.apex - (this.time - t);
       // Away quicker than they came: shorter flights, closer together, each as soon as the swing allows.
       const fly = p.duration * 0.6;
       const stagger = Math.min(0.09, 0.6 / Math.max(1, p.n - 1));
