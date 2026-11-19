@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Pendulum Threads Its Gates</title>
+<meta name="description" content="How Codevember 2026 day 18, Pendulum, builds a contraption of moving gates around an exactly solved pendulum: holes cut by the swing itself, gates that turn and open into line just in time, crossing pendulums sharing slit tori, gimbals and a Foucault pendulum whose gates pop up from the floor, knocks that always recover, and the foley.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* One reading column on warm clay; figures are small benches on a pale stage, like the studio the day is lit in. */
+:root {
+  --bg: #efe7e0;
+  --panel: #f7f1eb;
+  --ink: #221a16;
+  --muted: #6b5d54;
+  --line: #ddcfc4;
+  --accent: #c2573a;
+  --accent2: #e2876b;
+  --stage: #e6dcd3;
+  --stage-ink: #7d6c61;
+  --slab: #fbf7f2;
+  --disc: #e2876b;
+  --disc2: #eca58b;
+  --rod: #8f8a86;
+  --gold: #d9a441;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15110f; --panel: #1e1916; --ink: #f1e9e2; --muted: #ab9d93; --line: #3a312b;
+    --accent: #f08a68; --accent2: #f4b196; --stage: #231d19; --stage-ink: #9c8c80; --slab: #3a322c;
+    --disc: #e2876b; --disc2: #b9705a; --rod: #a9a39e; --gold: #e8b85a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15110f; --panel: #1e1916; --ink: #f1e9e2; --muted: #ab9d93; --line: #3a312b;
+  --accent: #f08a68; --accent2: #f4b196; --stage: #231d19; --stage-ink: #9c8c80; --slab: #3a322c;
+  --disc: #e2876b; --disc2: #b9705a; --rod: #a9a39e; --gold: #e8b85a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .glow { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .glow { background: linear-gradient(100deg, var(--accent) 10%, var(--accent2) 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; background: var(--stage); }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; border-radius: 3px; background: var(--stage); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+input[type="checkbox"] { accent-color: var(--accent); }
+button { font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px; padding: 9px 14px; cursor: pointer; }
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+.items { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.item { background: var(--panel); border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.item img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--stage); }
+.item > div { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 10px; }
+.item h3 { font-size: 20px; }
+.item p { font-size: 15px; line-height: 1.55; color: var(--muted); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: nowrap; }
+.formula .c { color: var(--muted); }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 18</b> · Pendulum</div>
+      <h1>How Pendulum <span class="glow">threads its gates</span></h1>
+      <p class="lede">A pendulum swings through gate after gate that turn, slide and open into line just in time. Here is how a new contraption is designed and built around a swing solved exactly, how every hole is cut by the swing itself, how the gates keep time, and how the whole thing comes and goes.</p>
+      <a class="live" href="./">See it live <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M3 1.8v8.4c0 .5.5.8.9.5l6.6-4.2a.6.6 0 0 0 0-1L3.9 1.3c-.4-.3-.9 0-.9.5z" fill="currentColor"/></svg></a>
+    </div>
+    <figure>
+      <img src="../screenshots/18.jpg" width="1080" height="1080" alt="Three pendulums over a white block, mint tori around their bobs: the main bob at the bottom of its swing in one torus, the two crossing bobs at the bottoms of theirs in two more, gates on posts either side." fetchpriority="high" decoding="async">
+      <figcaption>Three pendulums and three tori, every bob at the bottom of its swing inside its own.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>Everything just in time</h2>
+      <p>The day comes from the "oddly satisfying" machines of looping animation: a weight swings, and everything in its way moves aside at the last moment, then closes behind it. Discs turn their keyholes into line as the bob arrives, a wall of bars shuffles open, an iris spirals back, rings spinning like coins come face on. Nothing ever touches; every miss is a matter of millimetres.</p>
+      <p>None of it is animated by hand. Each press of R designs a contraption from a seed: a layout, a bob, a hero mechanism at the bottom of the swing, supporting gates either side, now and then pendulums swinging across it, a finish. Then it is built: every moving piece is a slab whose holes are cut by the swing itself, so whatever the bob's shape and however the gates move, they fit. The same seed always builds the same contraption.</p>
+    </div>
+    <div class="items">
+      <article class="item"><img src="explainer/rings.jpg" alt="A peach clay block with a cage of spinning rings at the bottom of the swing and a tunnel of keyhole discs either side, standing on thin bent rails." loading="lazy"><div>
+        <h3>Rings and tunnels</h3>
+        <p>The rings hero at the bottom, tunnels of thin discs either side, keyhole plates further up. The base drops away under the rings, so the tunnels' rails stand on bent legs.</p>
+      </div></article>
+      <article class="item"><img src="explainer/trench.jpg" alt="A white marble rocker with brass tunnels of discs sitting in trenches cut through it, keyhole plates at each end." loading="lazy"><div>
+        <h3>Brass on marble</h3>
+        <p>A rocker whose tips are sockets, with tunnels whole in open trenches through the stone, riding on two rails.</p>
+      </div></article>
+      <article class="item"><img src="explainer/iris.jpg" alt="A pale blue and white rocker with an iris at the bottom and keyhole gates either side, two crossing pendulums behind." loading="lazy"><div>
+        <h3>An iris</h3>
+        <p>Five blades on pivots, shut between passes and spiralling open as the bob comes, inside a housing with a slot for the rod.</p>
+      </div></article>
+      <article class="item"><img src="explainer/wall.jpg" alt="A pink and white block with a wall of sliding bars in the middle and two pendulums crossing the main one, keyhole gates on posts." loading="lazy"><div>
+        <h3>A wall of bars</h3>
+        <p>Bars sliding apart into a tunnel for the bob, with crossing pendulums threading their own gates either side.</p>
+      </div></article>
+    </div>
+  </section>
+
+  <!-- 2. The pendulum -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The swing · <b>pendulum.js</b></div>
+      <h2>A pendulum solved exactly</h2>
+      <p>A gate that has to be in line the moment the bob arrives needs to know exactly when that is, forever. So the swing isn't stepped through time at all: its angle is a closed formula of time. A pendulum released from amplitude <i>A</i> swings as θ(t) = 2·asin(k·sn(ω₀t, k²)), where k = sin(A/2), ω₀ = √(g/L) and sn is the Jacobi elliptic sine; its period is 4K(k²)/ω₀, with K the complete elliptic integral of the first kind. Both are computed with the arithmetic–geometric mean, to machine precision, in a dozen steps. There is no small-angle approximation: at the 40–55° the day swings, that would be 3–6% out, and a gate a few swings in would be visibly late.</p>
+      <p>Time 0 is a pass through the bottom, swinging toward positive angles. The inverse is exact too: <code>timeTo(angle)</code> is the incomplete elliptic integral F, so for any station on the arc the two times in a period when the bob passes it are known in closed form, and every gate's motion is written as a function of those times. Pausing, changing speed, slow motion and scrubbing all just move the clock.</p>
+      <p>The plane swings use a 2 m pendulum (the ring layout 1.25–1.45 m, swinging up to 115–150°), with g = 9.81, so a period is about 3 s.</p>
+    </div>
+    <div class="formula">θ(t) = 2·asin(k·sn(ω₀t, k²)) &nbsp; k = sin(A/2), ω₀ = √(g/L), T = 4K(k²)/ω₀<br><span class="c">passes of a station s: t₁ = F(asin(sin(s/2)/k), k²)/ω₀ and T/2 − t₁ (for s &gt; 0)</span></div>
+    <div class="fig">
+      <div class="fig-head"><h3>Exact against small angles</h3>
+        <div class="controls"><label>amplitude <input id="pA" type="range" min="5" max="160" step="1" value="50"><output id="pAo"></output></label></div>
+      </div>
+      <canvas id="penCanvas" aria-label="Two curves of a pendulum's angle over six seconds: the exact swing and the small-angle sine with the same amplitude, drifting apart as the amplitude grows."></canvas>
+      <div class="readout"><span>exact period <b id="pT"></b></span><span>small-angle period <b id="pT0"></b></span><span>late after 10 swings <b id="pLate"></b></span></div>
+      <p class="fig-cap">The exact swing (solid) against the sine a small-angle model would give (dashed), at the same amplitude. At the day's angles the two come apart within a few swings; the ring layout's 150° swing spends most of its time crawling near the top.</p>
+    </div>
+  </section>
+
+  <!-- 3. Stations -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Where gates stand · <b>design.js RATIOS, stationForRatio, steady</b></div>
+      <h2>Two gaps a period</h2>
+      <p>Away from the bottom, a gate is passed twice a period, and the two gaps between passes aren't equal: a short one while the bob goes on up toward the top and comes back, and a long one while it swings out the other side. A gate that turns at a constant rate and has to be in line at both passes needs those gaps to stand in a small whole ratio, so stations are chosen where they do: the gaps 3 : 4, 2 : 3, 3 : 5, 1 : 2, 2 : 5, 1 : 3, 1 : 4 or 1 : 5, each solved exactly with <code>stationForRatio</code>. A disc there turning p + q steps a period lands on a step at every pass.</p>
+      <p>Supporting gates go in mirrored pairs at those stations, out from the hero, keeping clear of each other and of the sockets at the top of the swing; how far each reaches along the arc is known per family (a tunnel's 8–12 discs 3.3 cm apart, a ring cage half a metre).</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Where the gaps split</h3>
+        <div class="controls"><label>station <input id="sS" type="range" min="0" max="0.98" step="0.01" value="0.5"><output id="sSo"></output></label></div>
+      </div>
+      <canvas id="gapCanvas" aria-label="An arc of the pendulum's swing with a gate marked on it, and below a timeline of one period with the two passes of that gate and the gaps between them labelled with their lengths and ratio."></canvas>
+      <div class="readout"><span>gaps <b id="sG"></b></span><span>ratio <b id="sR"></b></span><span>nearest whole ratio <b id="sN"></b></span></div>
+      <p class="fig-cap">Slide the gate up the arc (as a fraction of the amplitude). At the bottom the two gaps are equal; toward the top the short one shrinks to nothing. The day only puts steady gates where the ratio is one of the small whole ones.</p>
+    </div>
+  </section>
+
+  <!-- 4. Cutting -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">No hole is designed · <b>cutter.js, sweep.js, field.js, slab.js, cut.worker.js</b></div>
+      <h2>Holes cut by the swing</h2>
+      <p>Every moving piece starts as a plain 2D outline: a disc, a bar, a plate, a blade. Its holes are whatever the bob and its rod pass through it. For each pass of the piece over a whole loop of the contraption (twelve periods, or one loop of a gimbal), the cutter steps through the window in which the arm is within reach of the piece's slab, in steps fine enough that the turning piece moves no more than about a millimetre between them, and the bob less than most of the slab's thickness (up to 500 steps), and at each step rasterizes the bob and rod, as triangle soups in the piece's own frame, into the piece's grid, clipped to the slab's thickness. Passes that find the piece in the same pose going the same way are only cut once.</p>
+      <p>The union is turned into a distance field by a distance transform, and the piece's outline is compiled into a signed-distance function (circles, rounded rectangles, polygons, stars, wedges, combined with unions, subtractions and clips). The two are combined so the solid is the outline minus everything within the clearance of the swept volume, 4 mm by default and anything from 1 to 20 on the panel. The result is contoured, simplified and smoothed (Taubin), and extruded with rounded edges into a slab: a keyhole disc's grid cell is 1.25 mm. All of it runs in a web worker, batch by batch, while the old contraption is still leaving.</p>
+      <p>So the fit is exact by construction. A gate that turns while the bob is inside it gets a hole that is the union of the bob's outline at every angle it was at, which is why steady discs have slightly wider holes than ones that hold still for the pass. Bobs come in eight kinds: stars, polygons, crosses, gears, flowers, a key, a sphere and Blender's Suzanne; the flat ones are prisms of their outline, thin along the swing, 13–17 cm in radius.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Cutting a keyhole</h3>
+        <div class="controls">
+          <label>disc turns during the pass <input id="cW" type="range" min="0" max="60" step="1" value="0"><output id="cWo"></output></label>
+          <label>clearance <input id="cC" type="range" min="1" max="20" step="1" value="4"><output id="cCo"></output></label>
+        </div>
+      </div>
+      <canvas id="cutCanvas" aria-label="A disc seen face on with a cross-shaped bob outline stamped into it several times at slightly different angles, the union forming the keyhole, with the clearance drawn as a margin round it."></canvas>
+      <p class="fig-cap">A cross-shaped bob passing through a disc. Each stamp is the bob in the disc's frame at one moment of the pass; the hole is their union, grown by the clearance. A disc that holds still for the pass (0°) gets a hole the bob's shape; one that keeps turning gets the shape swept round.</p>
+    </div>
+  </section>
+
+  <!-- 5. Gates -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The gates · <b>gates.js</b></div>
+      <h2>Eight ways to get out of the way</h2>
+      <p>Every gate is a set of pieces in a frame square to the path at its station, each with a motion (a function of time) and a support (what holds it up, for the physical mode). The hero goes at the bottom of the swing (or, now and then, as a mirrored pair part way up); supporting gates are keyholes, shutters and short tunnels.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Keyhole</b><span>A disc 48 cm across in a plate 60 cm wide, turning in its own plane; its hole is the bob, cut. Held at its rim by the plate.</span></div>
+      <div class="fact"><b>Tunnel</b><span>8–12 thin discs (2.6 cm thick, 3.3 cm apart, 62 cm across), each at its own station, turning alternately each way; they line up into one tunnel only as the bob comes. A gold arc marks either side of every slit for the rod.</span></div>
+      <div class="fact"><b>Shutter</b><span>Two halves meeting on the path that part, by 3 cm or by the bob's radius plus 3, over 0.12–0.24 s around the pass; whatever they don't clear is notched out of their edges.</span></div>
+      <div class="fact"><b>Wall</b><span>6–12 bars 6.4 cm apart, from 40 cm over the path down into the base, each sliding 8–26 cm one way or the other, the ones the bob goes through locking last.</span></div>
+      <div class="fact"><b>Iris</b><span>Five blades turning on pivots, 82° from open to shut, in a housing 2.42 apertures across: shut between passes, open for each.</span></div>
+      <div class="fact"><b>Rings</b><span>Three or four concentric rings, the outermost 84 cm across, spinning on the upright like coins, neighbours opposite ways; two in three have a solid disc in the middle with the bob's outline cut through it.</span></div>
+      <div class="fact"><b>Torus</b><span>A ring of round tube, parted by a slit for the rods, spinning on the upright and face on whenever a bob goes through; it stands on the base by its lowest point, like a spinning coin.</span></div>
+      <div class="fact"><b>Socket</b><span>At the top of each swing on some layouts: a cradle the bob slides into and stops a hair from its back, with a pop.</span></div>
+    </div>
+    <div class="col prose">
+      <h3>The iris</h3>
+      <p>The iris follows a real camera iris: five identical blades, each turning on a fixed pivot at the housing, with a pin riding a slot so that all of them turn together. Each blade is a crescent traced from a measured diagram, turned 72° from the next, overlapping like shingles; they are thin sheets 1.5 mm apart in a stack between a front and a back plate, with a rim between the plates closing the housing just beyond the blades' reach. A gap is left between two blades for the rod, which is harmless: when the blades are drawn back for the pass, the rod runs through it.</p>
+      <h3>The rings</h3>
+      <p>The rings all spin steadily, at different speeds: the innermost half a turn between passes, each one further out a half turn more, and neighbours the opposite way, so they all come face on together as the bob comes through. A ring's marker dot tells them apart as they cross.</p>
+      <h3>The tunnel's trench and rails</h3>
+      <p>A tunnel sits whole in an open trench cut through the base, 3.5 cm below its discs and as long as the stack, open at both faces so the discs are seen turning all the way round. They ride on two steel rails, 2.4 cm round, either side of their lowest point (30° from it) and set into the trench's end walls. Where the base lies further down, as under the rings, where it drops away so their sweep clears it, there is no trench: each rail bends down at its ends through a 4 cm curve into a leg of the same rod.</p>
+    </div>
+  </section>
+
+  <!-- 6. Motion -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Keeping time · <b>motion.js; design.js constantly, steadySteps, steadySwell</b></div>
+      <h2>Constant or quick</h2>
+      <p>Every piece's motion is plain data both the page and the cutting worker evaluate the same way. In <b>constant</b> motion (the default), nothing ever stops: a turning part spins at one steady rate and lands exactly in line at every pass, like the rings. Its rate is a whole number of steps a period, the slowest that needs little correction: up to a turn a period first (three whole turns physically), then up to two, and whole turns every loop so the grand alignment holds. Where the two gaps don't split the period exactly as the steps do, the speed swells and eases once a period, a sine with no effect at the passes' midpoint, sized so both passes land exactly: a few per cent typically, a third at worst. Keyholes stand where no swell is needed.</p>
+      <p>A tunnel's discs differ in how many slits they have for the rod: a count dividing the bob's symmetry (a disc lines up again at every slit), set by each disc's distance from the tunnel's middle, so the tunnel is symmetric and its discs turn at different speeds, the fewer slits the faster; where a disc's count can't turn smoothly (far up the swing, the gaps very uneven), it takes more. Opening parts (shutters, bars, irises) swing smoothly shut and back between passes, open only while the bob goes through.</p>
+      <p><b>Quick</b> motion is the first version: pieces wait, then snap into line. A tick moves right after the bob clears, with a little overshoot; a burst drifts back, then dashes over and lands just before the next pass; a spin turns like a coin over the same window. Shutters, bars and the iris open over 0.12–0.26 s around each pass.</p>
+      <p>Every turning part makes whole turns (half turns for even bobs) every period or two, so every so often everything comes round at once: the <b>grand alignment</b>. Each turning part carries a gold mark placed so that at time 0 all of them face front, a stripe along each tunnel disc's rim lining up into one bar, a dot on each keyhole disc and ring. When they come round, a bell rings and the marks glow for half a second.</p>
+    </div>
+    <div class="formula">v(t) = phase + rate·t + swell·sin(2π(t − t̄)/T) &nbsp; rate = n·step/T<br><span class="c">swell = (a·step − rate·g₀) / (2·sin(π·g₀/T)), a = round(n·g₀/T): exact at both passes</span></div>
+    <div class="fig">
+      <div class="fig-head"><h3>A disc landing on both passes</h3>
+        <div class="controls">
+          <label>station <input id="dS" type="range" min="0" max="0.9" step="0.01" value="0.3"><output id="dSo"></output></label>
+          <label>slits <input id="dK" type="range" min="1" max="4" step="1" value="2"><output id="dKo"></output></label>
+          <label><input id="dSw" type="checkbox" checked> swell</label>
+        </div>
+      </div>
+      <canvas id="discCanvas" aria-label="A disc with slits turning steadily, and below it a plot of its angle within one step over two periods, with the passes marked; with the swell on, the curve passes through zero at every pass."></canvas>
+      <div class="readout"><span>steps a period <b id="dN"></b></span><span>speed <b id="dV"></b></span><span>swell <b id="dW"></b></span><span>miss at the passes <b id="dM"></b></span></div>
+      <p class="fig-cap">A disc at a station turning at the day's chosen rate. Below, how far it runs ahead of a plain constant rate, over two periods; each circle is where it has to be at a pass (the grey lines) for a slit to be straight up the rod. Without the swell the curve stays flat and misses the circles unless the gaps happen to split as the steps do; with it, the curve goes through every one, for a gentle change in speed once a period.</p>
+    </div>
+  </section>
+
+  <!-- 7. Knocks -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Knocking a gate · <b>knock.js, gates.js knock, main.js</b></div>
+      <h2>Always back in time</h2>
+      <p>Click a gate and it jolts: a disc spins the way the click pushes it, harder the further from its axis (up to 9 radians a second); a sliding piece is shoved 0.9 m/s the way of the click. The jolt is a quintic put on top of the piece's schedule: from its offset and speed at the knock to an offset its own cut pattern repeats under (a whole symmetry step for a turning part, zero for a sliding one), at rest and with no acceleration, by the next moment the arm comes within reach of the piece. So it is always back in line before the bob comes: the later the knock, the shorter the curve and the gentler it is, and none is taken while the bob is close. A shutter half can only be pushed open, not shut; a bar can't be pushed off its track; an iris's five blades share one knock, as their actuator ring would.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A knock dying away</h3>
+        <div class="controls"><button id="kGo">Knock</button><button id="kLate" class="ghost">Knock late</button></div>
+      </div>
+      <canvas id="knockCanvas" aria-label="A plot of a gate's offset over time: grey bands where the pendulum is near the gate, and after each knock a curve that jumps and then eases back to a whole step before the next band."></canvas>
+      <p class="fig-cap">The offset a knock adds, over time; the shaded bands are where the arm is within reach. A knock early in a gap swings out far and eases back; one just before a band has little time, so it comes out small. Each ends on a whole step, at rest, before the band.</p>
+    </div>
+  </section>
+
+  <!-- 8. Layouts -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Layouts · <b>design.js designContraption, designGimbal; contraption.js baseJobs, buildGimbal; gimbal.js</b></div>
+      <h2>Block, rocker, posts, ring, gimbal</h2>
+      <p>The base is an outline in the swing's plane, extruded across it, deep enough that nothing a gate hides in it shows through its sides. A <b>block</b> is a slab with the swing's circle cut out of its top; a <b>rocker</b> is a band round the pivot, its tips sockets; <b>posts</b> give each gate a short piece of band on a column down to the floor; the <b>ring</b> stands on the floor round its pivot, its axle held from behind by a spoked hub, with a shorter pendulum swinging most of the way round. The base comes up to just under each gate: further down under the rings, so their sweep clears it, and up to just under a torus's lowest point.</p>
+      <p>The <b>gimbal</b> hangs its bob from two hinges, one above the other: the upper arm swings about one axis and the lower one, hinged at its end, about the other, each solved exactly as its own pendulum at frequencies 1 : 2 or 2 : 3 (the upper over the bob's whole distance from the pivot, 2.2 m, the lower over its own arm), so the bob draws a closed figure eight or pretzel, inlaid in gold on a plinth like a harmonograph's drawing. The bob turns on a swivel to face the way it goes. Its gates stand upright along the loop on pedestals and columns, each placed only where nothing of the swing ever comes near it but its own pass: its box is checked against the bob, the lower rod and the upper arm at every sample of the loop. Its tunnel is a straight stack on one pedestal, square to the path at its middle disc, each disc cut and timed for its own pass.</p>
+    </div>
+    <div class="items">
+      <article class="item"><img src="explainer/gimbal.jpg" alt="A lilac and white plinth with a figure eight inlaid in gold, a two-hinged pendulum above it, and gates on columns along the loop: a stack of discs and keyhole plates." loading="lazy"><div>
+        <h3>The gimbal</h3>
+        <p>A 1 : 2 swing drawing a figure eight, its gates on columns along the loop, a straight stack of discs at one end.</p>
+      </div></article>
+      <article class="item"><img src="explainer/ring.jpg" alt="A large white ring standing on the floor, with a pendulum swinging round inside it from a hub and gates set round the ring's inside." loading="lazy"><div>
+        <h3>The ring</h3>
+        <p>A shorter pendulum swinging up to 150°, slowing to a crawl through the gates near the top.</p>
+      </div></article>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Two swings drawn from above</h3>
+        <div class="controls">
+          <label><input id="lG" type="radio" name="lay" checked> gimbal 1 : 2</label>
+          <label><input id="lG2" type="radio" name="lay"> gimbal 2 : 3</label>
+          <label><input id="lF" type="radio" name="lay"> Foucault</label>
+          <label>swings a turn <input id="lS" type="range" min="4" max="10" step="2" value="8"><output id="lSo"></output></label>
+        </div>
+      </div>
+      <canvas id="pathCanvas" aria-label="A top view of the bob's path: a figure eight or pretzel for the gimbal, or a rosette of long lobes for the Foucault pendulum, with the bob moving along it."></canvas>
+      <p class="fig-cap">The bob's path from above. The gimbal's two swings at a whole ratio close into a loop; the Foucault pendulum's plane turns a whole turn every few swings, so each swing ends at its own place and the path is a rosette. The dots on the rosette are where its gates could stand, one per swing on a lobe's long side; the highlighted one is up.</p>
+    </div>
+  </section>
+
+  <!-- 9. Foucault -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Layout: foucault (only when picked) · <b>gimbal.js Foucault; design.js tryLifted, slotFrame; lift.js</b></div>
+      <h2>Gates that pop up from the floor</h2>
+      <p>The Foucault pendulum is one long arm whose swing plane turns steadily round the upright, a whole turn every six or eight swings, at 43–46°; it is built on the gimbal's machinery, as a path with the same interface, so its gates are placed, cut and timed the same way. Its gates can't stand anywhere for good: every swing goes somewhere new, and its neighbours' swings cross where a gate would be. So they live in slots in the plinth and come up only for their pass.</p>
+      <p>Each swing gets one gate, a keyhole cut down to the bob, a pair of shutters or an iris, on one of its lobe's long sides, 45–85% of the way out, square to the swing there. Down, it lies flat in its slot, flush with the plinth, face up or down, along the swing or across it, whichever keeps its slot clear of the others' (so 4 to 10 fit). For its pass, its column telescopes up out of the slot and the gate turns upright into place on top of it, pivoting on its foot so that the foot never leaves the column: the rise leads and the turn finishes after it, 0.45 s in all. It stays up 0.14 s either side of the pass and folds back down the same way, with a slide and a thump. Passes are at least 1.29 s apart, so only one gate is ever up.</p>
+      <p>A gate is checked against the swing only while it is up or on its way, in the exact pose it has at each moment, column and all, so it can stand where the other swings cross. While up, a keyhole spins steadily, a third to half a turn a second, landing in line as the bob goes through; shutters and irises snap open for it, which is all a second's view shows.</p>
+    </div>
+    <div class="items">
+      <article class="item"><img src="explainer/foucault.jpg" alt="A round plinth with flat slots in it, gates lying in most of them, and one keyhole gate standing upright on a column as the bob swings through it." loading="lazy"><div>
+        <h3>One gate up</h3>
+        <p>The rest lie flat in their slots; this one has come up on its column and turned into place for the bob.</p>
+      </div></article>
+    </div>
+  </section>
+
+  <!-- 10. Crossing -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Crossing pendulums · <b>crossing.js, design.js torusClear, gates.js TorusGate</b></div>
+      <h2>Three pendulums, three tori</h2>
+      <p>Some contraptions add a pair of pendulums swinging across the main plane, one either side of the bottom of its arc, at the same period and a smaller swing (24–34°, their length solved for the same period), with balls 7.5–9.5 cm in radius. They swing in opposition, scissoring past each other, and in step with the main one: each crosses the main plane as the main bob passes the bottom, so the main bob passes just behind it. Their stations are solved so the closest approach over a whole period, bob against bob and each rod against the other's bob, is 2.5 cm. They thread gates of their own, keyholes and shutters on posts either side.</p>
+      <p>With the torus as hero, a crossing turns into sharing. Half the time a single crosser hangs through the bottom of the main swing, a quarter period out of step, and the torus, spinning at the single rate (half a turn between passes), is face on to each in turn. The other half both crossers stay, and each gets a torus of its own where it crosses the main path, an eighth of a period past the bottom: spinning at the double rate, each is face on to the main bob as it passes, and a quarter turn later face on to its crosser, which goes through at the bottom of its swing, while the main bob has its own torus at the bottom. Three pendulums, three tori.</p>
+      <p>A torus isn't cut. Its tube (6 cm plus a tenth of the bob's radius) is opened up until, spinning, it clears every ball going through by 12 mm, sampled over each pass; its slit is worked out from every rod through it: each rod is sampled over a period, the torus turning under it, and every angle round the tube at which a rod comes within reach of the tube's centre line goes into the slit, plus room for the gold domed ends. One rod through the top needs about 18°; a crosser's upright rod, at an angle to the main one, opens it to one side, to about 60°. Out of step, a shared pair is never at rest together, so that set is caught and let go wherever nothing is near a gate.</p>
+    </div>
+    <div class="formula">torus at θ(T/8): ω = 4π/T &nbsp; main passes T/8, 3T/8 → face on &nbsp; crosser passes 0, T/2 → a quarter turn round, face on to it<br><span class="c">shared at the bottom: crosser phase T/4, ω = 2π/T, face on to each pendulum in turn</span></div>
+  </section>
+
+  <!-- 11. Physical -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Physical · <b>contraption.js support check; design.js physical</b></div>
+      <h2>Nothing floating on air</h2>
+      <p>The cut is ruthless: a bob's sweep can split a slab into pieces nothing holds. The <b>Physical</b> switch (off by default) keeps every piece held by something, without changing the designs: each piece has a support (its bottom in the base, a rim in a housing, a single cradle, guide columns for sliding bars, a pin), fragments the cut leaves unsupported are removed, and the design keeps to what can be held: turning parts make whole turns between passes so a disc keeps a single slot for the rod, wall bars slide no further than keeps both halves between their columns, shutter halves keep their feet on a pedestal however far they part, rocker and ring bands reach the floor, and gimbal shutters split along the rod. With it off, a few hundred loose fragments are counted over thirty designs; with it on, about one sliver.</p>
+    </div>
+  </section>
+
+  <!-- 12. Stage -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Comings and goings · <b>stage.js; main.js swapTo, slowAt</b></div>
+      <h2>Piece by piece</h2>
+      <p>A new contraption is designed and cut in the worker while the old one is still there. It leaves on its last swing: each gate flies up as soon as the bob has passed it for good (0.6 × 0.85 s flights, launched up to 0.09 s apart), the pendulum is whisked up from the top of that swing, the gates it hung over follow, and the base goes last. A ring's gates slide forward out of it first. Then the backdrop and floor ease to the new look over 0.6 s, the new base comes down and lands with a centimetre's dip, its gates drop in one by one (0.85 s each, up to 0.22 s apart, 1.6 s for the lot), and the pendulum is lowered last and let go from the top of its swing; the gates run in step all the while, so everything is in line the moment the bob moves. A gimbal's bob, never at rest, is caught and let go wherever it is clear of every gate, easing up to speed. Each piece's shadow shrinks away as it leaves, so none is left on the floor once it's gone. <b>Instant change</b> cuts straight to the next one instead, the camera with it.</p>
+      <p><b>Slow motion</b> eases time right down, to a twenty-fifth, as the bob goes through each gate (a bell curve 0.09 s of pendulum time either side of the pass) and picks up again between. Everything goes with it: each sound plays slowed and lowered by the pace at its moment (down to 0.15 of its speed) and timed by the pace on the way to it, the air past the bobs drops with their real speed, the grand alignment's bell rings lower, and the camera drifts slower. <b>Pendulum view</b> rolls the camera about its line of sight to the pivot so the rod stays upright on screen while the rest swings round it.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Auto change</b><span>A new contraption every 15 s of no interaction, once the last has settled; randomizing, pausing or any input starts the count over.</span></div>
+      <div class="fact"><b>Camera</b><span>Three-quarter on from a fresh side each time (22–40° round, 9–18° up, higher for a gimbal), fitted to the contraption with a 24° lens; after 4 s untouched it drifts slowly round that angle.</span></div>
+      <div class="fact"><b>Looks</b><span>Seven pastel clays (two-tone: white slabs, coloured discs), five one-colour monos and four stones with brass: carrara, travertine, nero and verde.</span></div>
+      <div class="fact"><b>Recordings</b><span><code>app.nextLook</code>, <code>stage.pace</code> (faster comings and goings), <code>director.orbit</code> and an offline soundtrack timed by the capture's clock.</span></div>
+    </div>
+  </section>
+
+  <!-- 13. Sound -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Foley · <b>foley.js, sound.js</b></div>
+      <h2>Clicks, slides and air</h2>
+      <p>The sound is made from the motion, not the other way round. Every frame, the foley looks 0.12 s ahead and schedules what happens in that window from each piece's motion: a tick and a clack for a clockwork step, a slide and a latch for a burst, a shift for a shutter, a clack as it closes, a soft slide for a steady wave, a pop for a socket, and a swish of air through every gate as the bob passes, louder and brighter the faster it goes. Each is a one-shot from a set of 73 CC0 recordings in 17 kinds (ticks, clicks, latches, ratchets, bolts, cogs and more), a random variant at a slightly random pitch, panned by where the gate is on screen, with at most 32 voices and a minimum spacing per kind so a cascade becomes a patter. The air past each bob is a loop of brown noise through a low-pass that opens and swells with its speed; the swish is a short burst of the same, swept up and back down. The bell is synthesized, five inharmonic partials each dying away at its own rate.</p>
+    </div>
+  </section>
+
+  <!-- 14. Rendering -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Rendering · <b>modules/pipeline, materials.js, looks.js</b></div>
+      <h2>A product shot in a studio</h2>
+      <p>The day renders through the shared pipeline: soft PCSS shadows from a key light high to one side, half-resolution ambient occlusion and one bounce of light (GTAO and SSIL), MSAA, AgX tonemapping, and a touch of grain and vignette. Motion blur over a 1/90 s shutter (16 samples) streaks the bob at the bottom of its swing and the fastest discs. Clay is rough and matte, the stones are veined procedurally, brass is a polished metal, and the gold marks are an accent glaze that glows when everything lines up. At high quality on a laptop GPU a frame costs about 1.6 ms.</p>
+    </div>
+  </section>
+
+  <footer class="col">
+    <div class="meta">
+      <span><b>three.js</b> r187</span><span>WebGL2</span><span>exact pendulums</span><span>holes cut in a worker</span><span>made in <b>Claude Code</b> with Opus 5.5</span>
+    </div>
+    Day 18 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/18/">spite.github.io/codevember-2026/18</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/18">18/ of the codevember-2026 repository</a>. Sounds are CC0 recordings from freesound.org, credited in the day's README.
+  </footer>
+</main>
+
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+  const TAU = Math.PI * 2;
+
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1, W = 0, H = 0;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      W = canvas.clientWidth || 600; H = Math.round(W * aspect);
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, W, H);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    new MutationObserver(() => fit(true)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return { redraw: () => fit(true), paint: () => draw(ctx, W, H) };
+  }
+  function animate(canvas, step) {
+    let on = false, last = 0;
+    new IntersectionObserver(([e]) => { on = e.isIntersecting; if (on) { last = performance.now(); requestAnimationFrame(loop); } }).observe(canvas);
+    function loop(now) {
+      if (!on) return;
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      step(dt);
+      requestAnimationFrame(loop);
+    }
+  }
+  const bind = (id, out, fmt, fn) => { const el = $(id); const o = $(out); const show = () => { if (o) o.textContent = fmt(+el.value); }; el.addEventListener("input", () => { show(); fn(); }); show(); return el; };
+  const stage = (ctx, W, H) => { ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H); };
+
+  // The exact pendulum: complete and incomplete elliptic integrals by the AGM, sn by Landen's descending transformation.
+  function ellipK(m) { let a = 1, b = Math.sqrt(1 - m); for (let i = 0; i < 20; i++) [a, b] = [(a + b) / 2, Math.sqrt(a * b)]; return Math.PI / (2 * a); }
+  function sn(u, m) {
+    if (m < 1e-12) return Math.sin(u);
+    const as = [1], cs = [Math.sqrt(m)];
+    let a = 1, b = Math.sqrt(1 - m), c = Math.sqrt(m), n = 0;
+    while (Math.abs(c) > 1e-15 && n < 20) { [a, b, c] = [(a + b) / 2, Math.sqrt(a * b), (a - b) / 2]; as.push(a); cs.push(c); n++; }
+    let phi = 2 ** n * a * u;
+    for (let i = n; i > 0; i--) phi = (phi + Math.asin((cs[i] / as[i]) * Math.sin(phi))) / 2;
+    return Math.sin(phi);
+  }
+  function pendulum(A, L = 2) {
+    const k = Math.sin(A / 2), m = k * k, w0 = Math.sqrt(9.81 / L), T = (4 * ellipK(m)) / w0;
+    const angle = (t) => 2 * Math.asin(clamp(k * sn(w0 * t, m), -1, 1));
+    // Time after a bottom pass to reach |a| (incomplete F by bisection on the exact angle: fine for a figure).
+    const timeTo = (a) => { let lo = 0, hi = T / 4; for (let i = 0; i < 50; i++) { const mid = (lo + hi) / 2; if (angle(mid) < a) lo = mid; else hi = mid; } return lo; };
+    return { k, w0, T, angle, timeTo, A };
+  }
+
+  // 1. Exact against small angles.
+  {
+    const A = bind("pA", "pAo", (v) => v + "°", () => fig.redraw());
+    const fig = setup($("penCanvas"), 0.4, (ctx, W, H) => {
+      stage(ctx, W, H);
+      const a = (A.value * Math.PI) / 180, p = pendulum(a), T0 = TAU / p.w0, span = 6;
+      const X = (t) => 12 + ((W - 24) * t) / span, Y = (v) => H / 2 - (v / a) * (H / 2 - 16);
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(12, H / 2); ctx.lineTo(W - 12, H / 2); ctx.stroke();
+      ctx.setLineDash([5, 4]); ctx.strokeStyle = css("--stage-ink"); ctx.lineWidth = 1.5; ctx.beginPath();
+      for (let i = 0; i <= 600; i++) { const t = (span * i) / 600, v = a * Math.sin((TAU * t) / T0); i ? ctx.lineTo(X(t), Y(v)) : ctx.moveTo(X(t), Y(v)); }
+      ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2.5; ctx.beginPath();
+      for (let i = 0; i <= 600; i++) { const t = (span * i) / 600, v = p.angle(t); i ? ctx.lineTo(X(t), Y(v)) : ctx.moveTo(X(t), Y(v)); }
+      ctx.stroke();
+      ctx.fillStyle = css("--stage-ink"); ctx.font = font(11);
+      for (let s = 1; s < span; s++) ctx.fillText(s + " s", X(s) - 8, H - 6);
+      $("pT").textContent = p.T.toFixed(3) + " s";
+      $("pT0").textContent = T0.toFixed(3) + " s";
+      $("pLate").textContent = (10 * (p.T - T0)).toFixed(2) + " s";
+    });
+  }
+
+  // 2. Where the gaps split.
+  {
+    const S = bind("sS", "sSo", (v) => Math.round(v * 100) + "%", () => fig.redraw());
+    const ratios = [[1, 1], [3, 4], [2, 3], [3, 5], [1, 2], [2, 5], [1, 3], [1, 4], [1, 5]];
+    const fig = setup($("gapCanvas"), 0.46, (ctx, W, H) => {
+      stage(ctx, W, H);
+      const p = pendulum((48 * Math.PI) / 180), st = S.value * p.A, T = p.T;
+      // The arc, the gate on it.
+      const cx = W * 0.28, cy = 18, R = Math.min(W * 0.24, H * 0.75);
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.beginPath(); ctx.arc(cx, cy, R, Math.PI / 2 - p.A, Math.PI / 2 + p.A); ctx.stroke();
+      const t = performance.now() / 1000, th = p.angle(t % T);
+      ctx.strokeStyle = css("--rod"); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + R * Math.sin(th), cy + R * Math.cos(th)); ctx.stroke();
+      ctx.fillStyle = css("--slab"); ctx.strokeStyle = css("--stage-ink"); ctx.lineWidth = 1;
+      ctx.save(); ctx.translate(cx + R * Math.sin(st), cy + R * Math.cos(st)); ctx.rotate(-st); ctx.fillRect(-4, -16, 8, 32); ctx.strokeRect(-4, -16, 8, 32); ctx.restore();
+      ctx.fillStyle = css("--accent"); ctx.beginPath(); ctx.arc(cx + R * Math.sin(th), cy + R * Math.cos(th), 7, 0, TAU); ctx.fill();
+      // The period, its two passes.
+      const t1 = p.timeTo(st), passes = st < 1e-6 ? [0, T / 2] : [t1, T / 2 - t1];
+      const x0 = W * 0.56, x1 = W - 16, y = H / 2, X = (tt) => x0 + ((x1 - x0) * tt) / T;
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+      const g0 = passes[1] - passes[0], g1 = T - g0;
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = css("--accent"); ctx.beginPath(); ctx.moveTo(X(passes[0]), y); ctx.lineTo(X(passes[1]), y); ctx.stroke();
+      ctx.strokeStyle = css("--accent2"); ctx.beginPath(); ctx.moveTo(X(passes[1]), y); ctx.lineTo(x1, y); ctx.moveTo(x0, y); ctx.lineTo(X(passes[0]), y); ctx.stroke();
+      ctx.fillStyle = css("--ink");
+      for (const tp of passes) { ctx.fillRect(X(tp) - 1, y - 14, 2, 28); }
+      ctx.fillStyle = css("--stage-ink"); ctx.font = font(11);
+      ctx.fillText("0", x0 - 3, y + 30); ctx.fillText("T", x1 - 4, y + 30);
+      ctx.fillStyle = css("--ink");
+      ctx.beginPath(); ctx.arc(X(t % T), y - 24, 4, 0, TAU); ctx.fill();
+      $("sG").textContent = g0.toFixed(2) + " s and " + g1.toFixed(2) + " s";
+      $("sR").textContent = (g0 / g1).toFixed(3);
+      const best = ratios.reduce((b, [a, c]) => (Math.abs(a / c - g0 / g1) < Math.abs(b[0] / b[1] - g0 / g1) ? [a, c] : b));
+      $("sN").textContent = best[0] + " : " + best[1] + (Math.abs(best[0] / best[1] - g0 / g1) < 0.01 ? " (a station)" : "");
+    });
+    animate($("gapCanvas"), () => fig.paint());
+  }
+
+  // 3. Cutting a keyhole: stamps of a cross rotated by the disc's turn over the pass, unioned and grown by the clearance.
+  {
+    const Wd = bind("cW", "cWo", (v) => v + "°", () => fig.redraw());
+    const C = bind("cC", "cCo", (v) => v + " mm", () => fig.redraw());
+    const cross = (r, w) => [[-w, -r], [w, -r], [w, -w], [r, -w], [r, w], [w, w], [w, r], [-w, r], [-w, w], [-r, w], [-r, -w], [-w, -w]];
+    const fig = setup($("cutCanvas"), 0.5, (ctx, W, H) => {
+      stage(ctx, W, H);
+      const D = Math.min(H - 24, W * 0.42), cx = W / 2, cy = H / 2, s = D / 2 / 0.24;
+      const N = 160, cell = 0.48 / N, grid = new Uint8Array(N * N);
+      const shape = cross(0.15, 0.045), turn = (Wd.value * Math.PI) / 180, stamps = Wd.value ? 13 : 1;
+      const inside = (x, y, poly) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c; } return c; };
+      for (let k = 0; k < stamps; k++) {
+        const a = stamps > 1 ? turn * (k / (stamps - 1) - 0.5) : 0, c = Math.cos(a), sn_ = Math.sin(a);
+        const poly = shape.map(([x, y]) => [x * c - y * sn_, x * sn_ + y * c]);
+        for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (inside(-0.24 + (i + 0.5) * cell, -0.24 + (j + 0.5) * cell, poly)) grid[j * N + i] = 1;
+      }
+      const grow = Math.round((C.value / 1000) / cell);
+      const hole = new Uint8Array(N * N);
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        if (!grid[j * N + i]) continue;
+        for (let dj = -grow; dj <= grow; dj++) for (let di = -grow; di <= grow; di++) {
+          if (di * di + dj * dj > grow * grow) continue;
+          const ii = i + di, jj = j + dj; if (ii >= 0 && jj >= 0 && ii < N && jj < N) hole[jj * N + ii] = 1;
+        }
+      }
+      ctx.fillStyle = css("--disc"); ctx.beginPath(); ctx.arc(cx, cy, D / 2, 0, TAU); ctx.fill();
+      const px = cell * s;
+      ctx.fillStyle = css("--stage");
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (hole[j * N + i]) ctx.fillRect(cx + (-0.24 + i * cell) * s, cy + (-0.24 + j * cell) * s, px + 0.6, px + 0.6);
+      ctx.strokeStyle = css("--ink"); ctx.globalAlpha = 0.35; ctx.lineWidth = 1;
+      for (let k = 0; k < stamps; k++) {
+        const a = stamps > 1 ? turn * (k / (stamps - 1) - 0.5) : 0, c = Math.cos(a), sn_ = Math.sin(a);
+        ctx.beginPath(); shape.forEach(([x, y], i) => { const X = cx + (x * c - y * sn_) * s, Y = cy + (x * sn_ + y * c) * s; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); ctx.closePath(); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = css("--stage-ink"); ctx.font = font(11);
+      ctx.fillText("disc 24 cm, cell 1.25 mm (drawn coarser)", 12, H - 10);
+    });
+  }
+
+  // 4. A disc landing on both passes: the day's slowest-smooth steps, with or without the swell.
+  {
+    const S = bind("dS", "dSo", (v) => Math.round(v * 100) + "%", () => fig.redraw());
+    const K = bind("dK", "dKo", (v) => String(v), () => fig.redraw());
+    const Sw = $("dSw"); Sw.addEventListener("change", () => fig.redraw());
+    let model = null;
+    const fit = () => {
+      const p = pendulum((48 * Math.PI) / 180), T = p.T, st = S.value * p.A;
+      const t1 = p.timeTo(st), passes = st < 1e-6 ? [0, T / 2] : [t1, T / 2 - t1], g0 = passes[1] - passes[0];
+      const step = TAU / K.value;
+      const swellOf = (n) => { const rate = (n * step) / T, a = Math.min(n - 1, Math.max(1, Math.round((n * g0) / T))); const w = (a * step - rate * g0) / (2 * Math.sin((Math.PI * g0) / T)); return { rate, a, w, swell: (Math.abs(w) * TAU) / T / rate }; };
+      let n = 2, best = null;
+      for (const cap of [1, 2]) { for (let k = 2; k * step <= Math.max(cap * TAU, 3 * step) + 1e-9; k++) { const s = swellOf(k); if (s.swell <= 0.3) { best = k; break; } if (!best || s.swell < swellOf(best).swell) best = best ?? k; } if (best && swellOf(best).swell <= 0.3) break; }
+      n = best ?? 2;
+      const sw = swellOf(n), mid = (passes[0] + passes[1]) / 2, w = Sw.checked ? sw.w : 0;
+      const phase = -sw.rate * passes[0] - w * Math.sin((TAU * (passes[0] - mid)) / T);
+      const v = (t) => phase + sw.rate * t + w * Math.sin((TAU * (t - mid)) / T);
+      const off = (x) => { const r = ((x % step) + step) % step; return Math.min(r, step - r); };
+      const miss = Math.max(off(v(passes[1])), off(v(passes[0] + T)));
+      model = { T, passes, step, n, v, rate: sw.rate, swell: sw.swell, miss };
+      $("dN").textContent = String(n);
+      $("dV").textContent = Math.round((sw.rate * 180) / Math.PI) + "°/s";
+      $("dW").textContent = Sw.checked ? Math.round(sw.swell * 100) + "%" : "off";
+      $("dM").textContent = ((miss * 180) / Math.PI).toFixed(miss < 1e-6 ? 0 : 1) + "°";
+    };
+    const fig = setup($("discCanvas"), 0.5, (ctx, W, H) => {
+      fit();
+      stage(ctx, W, H);
+      const { T, passes, step, v } = model, t = (performance.now() / 1000) % (2 * T);
+      const R = Math.min(H * 0.32, W * 0.16), cx = R + 24, cy = H / 2;
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(v(t));
+      ctx.fillStyle = css("--disc"); ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+      ctx.fillStyle = css("--stage");
+      for (let k = 0; k < K.value; k++) { ctx.save(); ctx.rotate((k * TAU) / K.value); ctx.fillRect(-4, -R - 1, 8, R * 0.62); ctx.restore(); }
+      ctx.beginPath(); ctx.arc(0, 0, R * 0.36, 0, TAU); ctx.fill();
+      ctx.restore();
+      ctx.strokeStyle = css("--rod"); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, cy - R - 14); ctx.lineTo(cx, cy - R * 0.6); ctx.stroke();
+      // How far the disc is ahead of a constant rate, against where it has to be at each pass to land on a slit.
+      const x0 = cx + R + 30, x1 = W - 12, y0 = 16, y1 = H - 22, X = (tt) => x0 + ((x1 - x0) * tt) / (2 * T);
+      const line = (tt) => model.rate * (tt - passes[0]);
+      const need = (tt) => { const l = line(tt); return Math.round(l / step) * step - l; };
+      const marks = [0, 1].flatMap((c) => passes.map((tp) => tp + c * T));
+      const span = Math.max(0.05, ...marks.map((tp) => Math.abs(need(tp))), ...Array.from({ length: 60 }, (_, i) => Math.abs(v((2 * T * i) / 60) - line((2 * T * i) / 60)))) * 1.3;
+      const Y = (a) => (y0 + y1) / 2 - (a / span) * ((y1 - y0) / 2);
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, Y(0)); ctx.lineTo(x1, Y(0)); ctx.stroke();
+      ctx.fillStyle = css("--line");
+      for (const tp of marks) ctx.fillRect(X(tp) - 1, y0, 2, y1 - y0);
+      ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2; ctx.beginPath();
+      for (let i = 0; i <= 400; i++) { const tt = (2 * T * i) / 400; const r = v(tt) - line(tt); i ? ctx.lineTo(X(tt), Y(r)) : ctx.moveTo(X(tt), Y(r)); }
+      ctx.stroke();
+      ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1.5;
+      for (const tp of marks) { ctx.beginPath(); ctx.arc(X(tp), Y(need(tp)), 5, 0, TAU); ctx.stroke(); }
+      ctx.fillStyle = css("--ink"); ctx.beginPath(); ctx.arc(X(t), y1 + 10, 3.5, 0, TAU); ctx.fill();
+      ctx.fillStyle = css("--stage-ink"); ctx.font = font(11); ctx.fillText("ahead of a constant rate; circles: where a pass needs it", x0, H - 4);
+    });
+    animate($("discCanvas"), () => fig.paint());
+  }
+
+  // 5. A knock dying away: quintic to a whole step, at rest, before the next band.
+  {
+    const p = pendulum((48 * Math.PI) / 180), T = p.T, st = 0.45 * p.A, t1 = p.timeTo(st), reach = 0.35 / 2;
+    const passes = [t1, T / 2 - t1];
+    const near = (t) => Math.abs(p.angle(t) - st) < reach;
+    const step = TAU / 6;
+    const curves = [];
+    let now = 0;
+    const quintic = (a, b, d, h, s) => { const x = clamp(s / h, 0, 1), x3 = x ** 3, x4 = x3 * x, x5 = x4 * x; return a * (1 - 10 * x3 + 15 * x4 - 6 * x5) + b * h * (x - 6 * x3 + 8 * x4 - 3 * x5) + d * (10 * x3 - 15 * x4 + 6 * x5); };
+    const offsetAt = (t) => { let o = 0; for (const c of curves) if (t >= c.t0) o = t < c.t0 + c.h ? quintic(c.a, c.b, c.d, c.h, t - c.t0) : c.d; return o; };
+    const knock = (late) => {
+      let t = now;
+      if (late) { let u = t; while (!near(u)) u += 0.01; t = Math.max(t, u - 0.25); }
+      if (near(t)) return;
+      let end = t; while (!near(end) && end < t + T) end += 0.005;
+      const a = offsetAt(t), b = 9 * (Math.random() < 0.5 ? 1 : -1) * (0.5 + 0.5 * Math.random());
+      const h = end - t, guess = a + (b * h) / 2, d = Math.round(guess / step) * step;
+      curves.push({ t0: t, a, b, d, h });
+    };
+    $("kGo").addEventListener("click", () => knock(false));
+    $("kLate").addEventListener("click", () => knock(true));
+    const span = 2 * T;
+    const fig = setup($("knockCanvas"), 0.36, (ctx, W, H) => {
+      stage(ctx, W, H);
+      const t0 = now - span * 0.6, X = (t) => ((t - t0) / span) * W, Y = (o) => H / 2 - (o / (2 * step)) * (H / 2 - 10);
+      ctx.fillStyle = css("--line");
+      for (let t = Math.floor(t0 / 0.01) * 0.01; t < t0 + span; t += 0.01) if (near(((t % T) + T) % T)) ctx.fillRect(X(t), 0, Math.ceil(W / (span / 0.01)) + 1, H);
+      ctx.strokeStyle = css("--stage-ink"); ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+      for (let k = -2; k <= 2; k++) { ctx.beginPath(); ctx.moveTo(0, Y(k * step)); ctx.lineTo(W, Y(k * step)); ctx.stroke(); }
+      ctx.setLineDash([]);
+      ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2.5; ctx.beginPath();
+      for (let i = 0; i <= 400; i++) { const t = t0 + (span * i) / 400; if (t > now) break; const o = offsetAt(t); i ? ctx.lineTo(X(t), Y(o)) : ctx.moveTo(X(t), Y(o)); }
+      ctx.stroke();
+      ctx.fillStyle = css("--ink"); ctx.fillRect(X(now) - 1, 0, 2, H);
+      ctx.fillStyle = css("--stage-ink"); ctx.font = font(11); ctx.fillText("offset (dashed: whole steps); shaded: the arm near the gate", 8, H - 6);
+    });
+    void passes;
+    animate($("knockCanvas"), (dt) => { now += dt; fig.paint(); });
+  }
+
+  // 6. Two swings from above: a gimbal's Lissajous loop or the Foucault rosette with its lifted gates.
+  {
+    const S = bind("lS", "lSo", (v) => String(v), () => fig.redraw());
+    let mode = "g12";
+    $("lG").addEventListener("change", () => (mode = "g12"));
+    $("lG2").addEventListener("change", () => (mode = "g23"));
+    $("lF").addEventListener("change", () => (mode = "f"));
+    let t = 0;
+    const fig = setup($("pathCanvas"), 0.56, (ctx, W, H) => {
+      stage(ctx, W, H);
+      const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.44;
+      const pt = (tt) => {
+        if (mode === "f") {
+          const p = pendulum((44 * Math.PI) / 180, 2.2), M = S.value, psi = (TAU * tt) / (p.T * M), r = Math.sin(p.angle(tt)) / Math.sin(p.A);
+          return [r * Math.cos(psi), r * Math.sin(psi), p.T * M];
+        }
+        const [q1, q2] = mode === "g12" ? [1, 2] : [2, 3];
+        const Ta = 3, T = Ta * q1;
+        return [Math.sin((TAU * tt) / Ta), Math.sin((TAU * tt * q2) / (q1 * Ta)), T];
+      };
+      const total = pt(0)[2];
+      ctx.strokeStyle = css("--gold"); ctx.lineWidth = 1.5; ctx.beginPath();
+      for (let i = 0; i <= 2000; i++) { const [x, y] = pt((total * i) / 2000); i ? ctx.lineTo(cx + x * R, cy + y * R) : ctx.moveTo(cx + x * R, cy + y * R); }
+      ctx.stroke();
+      if (mode === "f") {
+        const p = pendulum((44 * Math.PI) / 180, 2.2), M = S.value, T0 = p.T;
+        const gates = [];
+        for (let k = 0; k < 2 * M; k++) {
+          const f = 0.45 + 0.4 * (((k * 0.618) % 1));
+          const ts = p.timeTo(Math.asin(f * Math.sin(p.A)));
+          const tg = (k * T0) / 2 + (k % 2 ? T0 / 2 - ts : ts);
+          gates.push(tg);
+        }
+        const local = t % total;
+        for (const tg of gates) {
+          const [x, y] = pt(tg), up = Math.abs(local - tg) < 0.6;
+          ctx.fillStyle = up ? css("--accent") : css("--slab"); ctx.strokeStyle = css("--stage-ink"); ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(cx + x * R, cy + y * R, up ? 8 : 5, 0, TAU); ctx.fill(); ctx.stroke();
+        }
+      }
+      const [bx, by] = pt(t % total);
+      ctx.fillStyle = css("--ink"); ctx.beginPath(); ctx.arc(cx + bx * R, cy + by * R, 6, 0, TAU); ctx.fill();
+    });
+    animate($("pathCanvas"), (dt) => { t += dt; fig.paint(); });
+  }
+})();
+</script>
+</body>
+</html>
