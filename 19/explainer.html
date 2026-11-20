@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Erosion Wears Glass Smooth</title>
+<meta name="description" content="How Codevember 2026 day 19, Erosion, draws frosted sea glass in layers of screen-space refraction, ray traces the inside of tori, blends every piece between its broken and its worn shape, collides pieces by their real shapes, sweeps sets away with a wave, and turns contacts into clinks and grinding.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* One reading column on warm sand at sunrise; dark is the sea before dawn. Figures sit on a pale shore. */
+:root {
+  --bg: #f3ebe4;
+  --panel: #faf4ee;
+  --ink: #1d1a1f;
+  --muted: #6c6068;
+  --line: #e2d4cb;
+  --accent: #d0525a;
+  --accent2: #f09a6e;
+  --stage: #ece2da;
+  --stage-ink: #857580;
+  --sea: #3f9c9a;
+  --cobalt: #3a68c8;
+  --amber: #e2a03c;
+  --green: #4f9a54;
+  --frost: #ffffff;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1518; --panel: #162026; --ink: #ecf0ee; --muted: #93a3a6; --line: #263239;
+    --accent: #f27c7f; --accent2: #f6b08a; --stage: #1a252c; --stage-ink: #7f9399;
+    --sea: #5cc4c0; --cobalt: #6f97ec; --amber: #f0b65a; --green: #73bd76; --frost: #dfe9ec;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1518; --panel: #162026; --ink: #ecf0ee; --muted: #93a3a6; --line: #263239;
+  --accent: #f27c7f; --accent2: #f6b08a; --stage: #1a252c; --stage-ink: #7f9399;
+  --sea: #5cc4c0; --cobalt: #6f97ec; --amber: #f0b65a; --green: #73bd76; --frost: #dfe9ec;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--body); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .glow { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .glow { background: linear-gradient(100deg, var(--accent) 10%, var(--accent2) 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; background: var(--stage); }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; border-radius: 3px; background: var(--stage); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+input[type="checkbox"] { accent-color: var(--accent); }
+button { font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px; padding: 9px 14px; cursor: pointer; }
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+.items { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.item { background: var(--panel); border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.item img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--stage); }
+.item > div { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 10px; }
+.item h3 { font-size: 20px; }
+.item p { font-size: 15px; line-height: 1.55; color: var(--muted); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: nowrap; }
+.formula .c { color: var(--muted); }
+.table-wrap { overflow-x: auto; background: var(--panel); border-radius: 4px; }
+table { border-collapse: collapse; width: 100%; font: 400 14px/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+td.num, th.num { text-align: right; }
+tr:last-child td { border-bottom: 0; }
+.bar { display: inline-block; height: 8px; border-radius: 2px; background: var(--accent2); vertical-align: middle; }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 19</b> · Erosion</div>
+      <h1>How Erosion wears glass <span class="glow">smooth</span></h1>
+      <p class="lede">Sea glass floats in front of a sunrise beach, clinking as it touches. A wave sweeps the set away and its backwash brings a new one, freshly broken, which the sea wears smooth while you watch. Here is how the frosted glass is drawn, how every piece holds two shapes at once, how they collide as they look, and how all of it sounds.</p>
+      <a class="live" href="./">See it live <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M3 1.8v8.4c0 .5.5.8.9.5l6.6-4.2a.6.6 0 0 0 0-1L3.9 1.3c-.4-.3-.9 0-.9.5z" fill="currentColor"/></svg></a>
+    </div>
+    <figure>
+      <img src="../screenshots/19.jpg" width="1080" height="1080" alt="Frosted red and pink pieces of sea glass and a torus floating against a blurred sunrise over the sea." fetchpriority="high" decoding="async">
+      <figcaption>A Carnelian set on the Umhlanga sunrise: worn pebbles, shards and a torus.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>A beach's worth of glass, in the air</h2>
+      <p>Sea glass is broken bottle, jar and tableware glass that the surf has rolled in sand for decades: the sharp fracture edges round off, the surface frosts into tiny pits, and what was a shard turns into something like a soft pebble of coloured ice. Collectors prize the rare finds: marbles, bottle stoppers, the necks of bottles, the white spiral threads of latticino cane.</p>
+      <p>The day floats a handful of them weightlessly, as if suspended in water, in front of a blurred beach HDRI. Each press of R (or every few seconds on its own) sends a wave: the set is swept off the screen, and the backwash carries in a new one in the shape it had the day it broke, which then rests a beat and wears smooth in a few seconds, to the sound of grinding and water. Pieces drift on a slow current, can be grabbed and thrown, and knock against each other with a click, or grind when they slide.</p>
+    </div>
+    <div class="items">
+      <article class="item"><img src="explainer/sweep.jpg" alt="Jewel-coloured sea glass being swept to the right edge of the frame, the sunrise backdrop showing through the gap." loading="lazy"><div>
+        <h3>The wave</h3>
+        <p>The old set leaves along the sweep direction, leading edge first, while the next one is generated out of sight.</p>
+      </div></article>
+      <article class="item"><img src="explainer/broken.jpg" alt="A red and pink set just landed, its pieces still sharp-edged, with fracture facets and threads standing out." loading="lazy"><div>
+        <h3>Freshly broken</h3>
+        <p>New pieces land in their raw shape: flat fracture faces, sharp rims, deep pattern relief.</p>
+      </div></article>
+      <article class="item"><img src="explainer/wearing.jpg" alt="The same red set halfway worn, edges softening and the surface starting to frost." loading="lazy"><div>
+        <h3>Wearing down</h3>
+        <p>Every vertex slides from its broken position to its worn one; the pattern wears at its own rate.</p>
+      </div></article>
+      <article class="item"><img src="explainer/worn.jpg" alt="The red set fully worn: soft rounded pebbles and a smooth torus, deeply frosted." loading="lazy"><div>
+        <h3>Sea glass</h3>
+        <p>Rounded, frosted and quiet. The next wave takes it.</p>
+      </div></article>
+    </div>
+  </section>
+
+  <!-- 2. Pieces -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The pieces · <b>glass.js</b></div>
+      <h2>Ten kinds, two shapes each</h2>
+      <p>A set is drawn from ten kinds of piece, picked by weight. Most of a beach is flat slabs and curved shards; the oddities are rare finds. The weights are sliders in the Pieces section of the panel, and R rerolls them: the five common kinds each get 0.3 to 10, leaning low so one or two dominate a set; the five oddities stay under 0.6, except that in about a third of sets one of them is "the find" at 2 to 6. That is how a set full of tori or of canes turns up.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>kind</th><th>what it was</th><th class="num">default weight</th><th>share</th></tr></thead>
+        <tbody id="kinds"></tbody>
+      </table>
+    </div>
+    <div class="col prose">
+      <p>Every piece starts from an icosphere, cached per detail level, whose every vertex is mapped into its kind: a pebble squashed and lumpy, a bottle shard a slab of cylinder wall wrapping 75° to 130°, a bowl shard a doubly curved dish patch with an optional rolled lip, pressed glass with one of four flute styles (bottle base, panelled wall, hobnails, jar lip), a marble a sphere whose swirl veins wear faster or slower than the glass around them, a stopper lathed on its side with a faceted finial and collar, a bottle neck a collar of rounded-rectangle section around a wide hole, a torus a wobbly ring with a thread, a cane a rod with white spiral threads inside. Shards, pebbles and pressed glass also get chips scooped out of them. The detail and the count follow the quality tier: 32 subdivisions and 28 pieces when capturing, 20 and 24 on high, 14 and 18 on medium, 12 and 12 on low. Building a set takes tens of milliseconds a piece, so it is a generator stepped a few milliseconds per frame.</p>
+      <p>The key is that each piece is generated <em>twice</em>, from the same vertices. The <b>raw</b> pose is the glass as it broke: fracture faces, sharp rims, the full relief of whatever pattern it carries (flutes, threads, ribs). The <b>worn</b> pose is that shape after the sea, computed from the same vertex by the same formulas with softer settings: the fracture outline blended towards an organic one, the slab's profile raised to a gentler power (the edge rounds instead of breaking off), the relief shallower. Both are then run through Taubin smoothing (a shrink-free low-pass over the mesh, on cached adjacency), which wears off creases and steps the mesh is too coarse to resolve. Both live in the same geometry as attributes (<code>position</code> and <code>aRawPos</code>, their normals, plus the pattern's offset in each pose as <code>aPatternE</code> / <code>aPatternR</code>), so erosion is a blend in the vertex shader: no rebuild, no pop, any value between 0 and 1. The pattern blends on its own amount, "Pattern wear", so the flutes of pressed glass can outlast its rim, or go first.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Broken to worn</h3>
+        <div class="controls">
+          <label>erosion <input id="eE" type="range" min="0" max="1" step="0.01" value="0.35"><output id="eEo"></output></label>
+          <label>pattern wear <input id="eP" type="range" min="0" max="1" step="0.01" value="0.2"><output id="ePo"></output></label>
+          <button class="ghost" id="eNew">new shard</button>
+        </div>
+      </div>
+      <canvas id="erodeFig" aria-label="A shard outline blended between a jagged broken shape and a smooth worn one, with ribs that wear separately."></canvas>
+      <p class="fig-cap">A cross-section of one shard. The dashed line is the raw pose, the outline is what is drawn: every vertex sits at <code>mix(raw, worn, erosion)</code>, and the ribs on top add their own offset scaled by <code>1 − pattern wear</code>. Both poses come from the same vertex, so nothing has to be matched up between the two.</p>
+    </div>
+  </section>
+
+  <!-- 3. Glass -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The glass · <b>render.js</b></div>
+      <h2>Frosted glass in layers</h2>
+      <p>Frosted glass is mostly about what is behind it: a blurred, tinted, slightly bent view of the world, blurrier the deeper the frost and the thicker the glass. The shared pipeline renders the sunrise backdrop; then a day-specific composite pass, plugged into the pipeline's <code>composite</code> hook, draws all the glass over it in screen space.</p>
+      <p>Glass in front of glass has to see the glass behind it, already drawn. So the pieces are sorted back to front and grouped greedily into <b>layers</b>: walking from the farthest, a piece joins the current layer unless its projected bounding circle overlaps one already in it, in which case a new layer starts. Pieces in one layer never cover each other, so a layer can be drawn in one go against everything drawn before it. A set of 24 pieces makes about ten layers.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Greedy layers</h3>
+        <div class="controls"><label>pieces <input id="lN" type="range" min="6" max="36" step="1" value="24"><output id="lNo"></output></label><button class="ghost" id="lNew">shuffle</button></div>
+      </div>
+      <canvas id="layerFig" aria-label="Overlapping circles coloured by the layer they fall in, numbered back to front."></canvas>
+      <div class="readout" id="lRead"></div>
+      <p class="fig-cap">Circles are pieces' projected bounds, the number is the order from the back. Each colour is one layer: no two circles of a colour overlap. The more crowded the view, the more layers, and every layer costs a blur pyramid and a copy.</p>
+    </div>
+    <div class="col prose">
+      <p>For each layer, four passes run:</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>1 · Blur pyramid</b><span>Everything drawn so far, blurred into 6 levels (full, ½, ¼, ⅛, 1/16, 1/32 resolution), each a separable 9-tap Gaussian (5 bilinear fetches a direction) of the one above. The glass reads it with bicubic upsampling at a level set by frost and thickness.</span></div>
+      <div class="fact"><b>2 · Thickness</b><span>The layer's pieces drawn additively into a half-float target: back faces add their view depth, front faces subtract it, so each pixel holds the total length of glass along its ray, with no seams between pieces.</span></div>
+      <div class="fact"><b>3 · Copy</b><span>The image so far is copied into the other of two ping-pong targets. Both share one depth texture, so earlier layers' depth carries over: a piece partly behind another stays hidden there even if their centres swap order.</span></div>
+      <div class="fact"><b>4 · Shading</b><span>Each piece's outer surface is shaded against the pyramid and its thickness: refraction offset, absorption, frost, swirls and threads, reflection of the environment, a key light from the sun.</span></div>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>What the frost sees</h3>
+        <div class="controls"><label>frost <input id="fF" type="range" min="0" max="1" step="0.01" value="0.7"><output id="fFo"></output></label><label>thickness <input id="fT" type="range" min="0" max="1" step="0.01" value="0.5"><output id="fTo"></output></label></div>
+      </div>
+      <canvas id="frostFig" aria-label="The six blur pyramid levels of a scene, and a glass disc showing the blend of levels picked by frost and thickness."></canvas>
+      <p class="fig-cap">The pyramid's six levels of the same view (top), and a disc of glass reading it (bottom). Frost and thickness choose a fractional level, so a thin, clear edge shows a sharp, tinted backdrop and a thick, frosted middle shows only colour.</p>
+    </div>
+    <div class="col prose">
+      <h3>Inside the shading</h3>
+      <p>The surface normal is broken up by frost pits: one Voronoi cell lookup per pixel, a shallow crater per cell, the "percussion" marks sand leaves. Light through the glass is absorbed by Beer–Lambert with the thickness (density 4.2 by default), with the red, green and blue channels refracted by slightly different amounts for a trace of dispersion. Forward-scattered light inside lifts the glass where it faces the sun, and where the view runs along the glass (edge-on pieces, the far side of a ring) the transmitted light becomes a saturated glow, as light piped inside the glass would be, instead of going dark. Marbles get swirls of whiter glass in the body; canes get latticino, white spiral threads inside the rod at the rod's own radius.</p>
+      <p>Each glass slider in the panel (frosting, wetness, diffusion and the rest) is a <em>range</em>, and every piece rolls its own place in each one, so a set has some cloudier and some clearer pieces, as a real handful does. A piece's look also carries its own erosion and pattern wear, which is how one set can arrive broken while the last one is still leaving worn.</p>
+    </div>
+    <div class="col prose">
+      <h3>Tori, traced</h3>
+      <p>Screen-space refraction only knows the surface the glass is drawn on, which is fine for a slab and wrong for a ring: through a torus you should see its own far side, bent, and the world through the hole. So rings and tori are ray traced inside. Each piece's geometry carries a fitted ideal torus (major radius, tube radii, a superellipse exponent for the squarer collars of bottle necks, a wobble and a thread), in both its raw and worn shape, blended by erosion like the mesh. The shader refracts the view ray into it at the fitted surface's smooth normal (the frost pits would make the path flicker), marches it through the tube to the far wall, and there follows both the transmitted ray and the Fresnel-reflected one, so the image stays continuous across the critical angle. The transmitted ray may go through the hole, into the other side of the ring and out again. Whatever the final ray looks at is read from the pyramid.</p>
+      <p>Frosted pieces average two rays over a cone (when frost is above 0.15). Frost then blends the traced view back towards the ordinary diffuse look, by up to 85%: a frosted torus shows only a hint of the lensing inside, a wet one stays glassy. The tracer is its own shader variant (<code>TRACE</code>); compiled into the shared glass shader it made every piece about three times slower. It compiles in the background after load (rings use plain glass until it is ready), and its loop bounds come from uniforms rather than constants, which stops Direct3D from unrolling them; unrolled, the programs took 5–6 s to compile.</p>
+    </div>
+    <div class="col prose">
+      <h3>What it costs</h3>
+      <p>On a laptop RTX 4060 at 1264×705 on the high tier, a frame takes about 3.2 ms of GPU, nearly all of it this composite.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>stage</th><th class="num">GPU ms / frame</th><th></th></tr></thead>
+        <tbody id="costs"></tbody>
+      </table>
+    </div>
+    <div class="col prose">
+      <p>Two things keep it there. After the first layer, only the area under the previous layer has changed, so the pyramid, the copy and the thickness clear are scissored to that rectangle (its screen bounds from the projected corners of a camera-aligned box around each piece's bounding sphere); each pyramid level grows the rectangle by 10 texels to cover its blur's reach, and the targets keep the rest from the last build. That took the copies from 0.19 to 0.05 ms and the pyramid from about 0.53 to 0.35. And while nothing the composite reads changes (paused, view still), it reuses its last image: the camera, every piece's matrix, look and colour, the settings and every shared uniform are flattened into a key each frame, and an unchanged key costs 0.13 ms instead of 3.47. The CPU side is about 1.5 ms a frame, mostly the ~200 draw calls of ten layers; the physics is 0.16 ms of it.</p>
+    </div>
+  </section>
+
+  <!-- 4. Collisions -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Touching · <b>collide.js, physics.js</b></div>
+      <h2>Colliding by their real shapes</h2>
+      <p>The pieces are weightless, as if in water. A slow current moves them: a divergence-free field of sines with incommensurate frequencies, so it never repeats, which drags each piece towards the local flow (smaller ones follow faster) and spins it at its local vorticity, four times what a sphere would get, since lopsided pieces also tumble. A soft push keeps neighbours apart once their centres come within 60% of their summed radii, and a gentle tether pulls strays back beyond 1.9× the set's spread. Physics steps at a fixed 120 Hz.</p>
+      <p>Spheres made poor colliders, though: a flat shard's sphere touches its neighbour well before the glass does, so the clinks played in mid-air. So every piece builds a <b>signed distance grid</b> of its own geometry: 22 cells along its longest side, each cell's distance to the nearest of 480 surface samples, negative when it is behind that sample's normal. There are two grids, one per pose, blended by erosion exactly as the mesh is. Another piece then tests 128 of its own surface points against that field, sampled trilinearly with its gradient: any point with a negative distance is inside. The deepest one sets the push, along a depth-weighted average of the gradients. A ring's hole is empty space in its field, so a pebble can sit in it.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A field and the points that reach into it</h3>
+        <div class="controls"><label>erosion <input id="cE" type="range" min="0" max="1" step="0.01" value="0.6"><output id="cEo"></output></label><button class="ghost" id="cPause">pause</button></div>
+      </div>
+      <canvas id="collideFig" aria-label="A grid of signed distances around a shard, with a second shard's surface points moving through it; points inside are highlighted with their push direction."></canvas>
+      <div class="readout" id="cRead"></div>
+      <p class="fig-cap">Cells are shaded by distance (inside darker); the second piece's sampled surface points turn red where they reach in, and the arrow is the deepest one's push. Erosion changes the field with the shape, so worn pebbles roll where broken shards caught.</p>
+    </div>
+    <div class="col prose">
+      <p>A contact becomes an impulse at the touching point, with lever arms and a scalar rotational inertia (a box of the piece's half-extents), so a glancing knock sets a piece spinning. Restitution is 0.2 and Coulomb friction 0.25. Two iterations per step resolve stacks. Overlaps are pushed apart by at most 0.004 per step (about half a unit a second) instead of in one step, so nothing visibly snaps when a crowd forms. A piece being dragged is held by the point under the pointer on a damped spring, so pulling it off-centre swings it round, and it keeps its spin when let go.</p>
+    </div>
+  </section>
+
+  <!-- 5. The wave -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">A new set · <b>startSweep</b></div>
+      <h2>Away with the wave, back with the backwash</h2>
+      <p>A sweep picks a direction across the screen (left or right of the camera, tilted a little up or down) and sorts the pieces along it, leading edge first. Each leaves on an eased flight off-screen, starting up to 0.8 s after the first, in 2.2 s. Pieces in flight neither collide nor push.</p>
+      <p>Meanwhile the new set is generated, a few milliseconds a frame, at erosion 0 and with its collision grids. Then it is <b>settled out of sight</b>: a separate cluster with only the new pieces runs 360 physics steps of 1/120 s, three seconds of drifting and pushing apart, so the places they fly to are places the physics would leave them in. Without this, pieces overlapping in the fresh layout jumped apart as soon as they landed.</p>
+      <p>When the old set is gone, the set is ready and the wave's backwash is due (2.6 s in), the arrivals start: farthest places first, so later pieces cross empty space rather than the ones already landed, staggered over 0.9 s, each a 2.4 s flight in from off-screen. They rest 1.5 s in their broken shape, then erode to the set's target over 9 s with a smoothstep. The sound follows: a wave rushing in at the start, the backwash as the new set arrives, then grinding and water while the glass wears down.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>One sweep</h3>
+        <div class="controls"><label><input id="sRec" type="checkbox"> recording pace</label><button class="ghost" id="sPlay">replay</button></div>
+      </div>
+      <canvas id="sweepFig" aria-label="A timeline of one sweep: old pieces leaving, generation and settling, arrivals, the rest in broken shape, erosion, with the sounds marked."></canvas>
+      <p class="fig-cap">Each row is a piece. Leaving (old set), flying in, resting broken, wearing down; the bar on top is the new set's generation and its 360 settle steps. Recording pace is what the video uses to fit a whole set in 10 s: flights 1.8× faster, a 0.6 s rest and 4 s of erosion.</p>
+    </div>
+  </section>
+
+  <!-- 6. Sound -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Sound · <b>sound.js</b></div>
+      <h2>Clinks, grinding and the shore</h2>
+      <p>Physics reports every contact with its impact speed and sliding speed. A contact is a pair of pieces touching on consecutive steps; it ends when they haven't touched for 60 ms. Its <b>length</b> decides the sound. A touch shorter than 0.15 s is a knock: when it ends it plays a click, a tick if soft, pitched up for small pieces (1.4× at the base, ±15% by size). A touch that lasts is a grind: a short scrape first, then, while the pieces keep sliding, a grinding stroke every 1.1 s.</p>
+      <p>A crowd of pieces touches constantly, so the clicks run on a budget that refills at 1.6 a second with bursts of two (a hard knock always gets through), at most two clicks ring at once, and two never start within 90 ms. Grinds have their own budget, at most three at once. Each sound is panned by where on screen it happens and quieter farther from the camera, measured against the distance the view is framed at, so a big set framed from further out isn't quieter.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Short knocks and long grinds</h3>
+        <div class="controls"><label>contacts / s <input id="kR" type="range" min="1" max="12" step="1" value="6"><output id="kRo"></output></label></div>
+      </div>
+      <canvas id="soundFig" aria-label="A scrolling timeline of contacts as bars; short ones end in a click mark, long ones get grind marks; clicks dropped by the budget are greyed."></canvas>
+      <div class="readout" id="kRead"></div>
+      <p class="fig-cap">Bars are contacts, their length how long the pieces touched. Short ones end in a click (red), unless the budget or the two-at-once limit drops it (grey); long ones get a scrape at 0.15 s, a stroke at 0.5 s and every 1.1 s after (blue).</p>
+    </div>
+    <div class="col prose">
+      <p>The clicks are cut from a recording of pebbles on gravel, low-passed so their brightness centres around 2.3 kHz instead of 4.5: glass under water knocks, it doesn't ring. While new pieces wear down, two looping beds swell in: grinding strokes chained into a seamless loop, and the hiss of a backwash. Their level follows how many pieces are eroding and how far along they are, and the grind's pitch rises from 0.85× to 1.2× as the glass gets finer. Under everything is a minute-long loop of surf on a pebble beach, which skips the compressor so the clicks don't make it pump. The wave-in and backwash of a sweep are overlapping cuts of one stretch of that surf, at one level, so the second picks up as the first fades.</p>
+      <p>For recordings the whole soundtrack can be rendered offline: every sound is scheduled on an <code>OfflineAudioContext</code> timed by the page's virtual clock, and rendered to a WAV once the frames are done, so it lines up with every touch on screen without anything ever playing.</p>
+    </div>
+  </section>
+
+  <!-- 7. Light and view -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Light and view · <b>main.js</b></div>
+      <h2>Facing the sun</h2>
+      <p>The backdrop and the light are four beach HDRIs from Poly Haven: Spiaggia di Mondello, a secluded cove, Fish Hoek and the Umhlanga sunrise, the default. R picks a beach for each set. Each is loaded when first chosen and prefetched once the page is up. Its sun direction is taken from the panorama's brightest pixel and becomes the key light; an overcast one keeps the sky's. Changing beach crossfades the backdrop, the irradiance and the key light over 2.5 s. The backdrop the glass refracts is the HDRI itself, blurred.</p>
+      <p>The camera starts on the far side of the glass from the sun, so the set is backlit, and drifts calmly: yaw, pitch and distance from incommensurate slow sines, applied as the change since the last frame so they add to the visitor's own orbiting. The orbit controls have no pole lock: the camera's up vector turns with it, so you can go over and under the floating glass.</p>
+      <p>The framing follows the set. Each frame, the cluster's centre and radius are measured (the 90th-percentile reach of its pieces, so one stray doesn't zoom everything out), and the distance that fits that radius in the narrower of the two angles of view, with a 1.2 margin, is eased towards over a few seconds, as is the look-at point. A sweep holds the framing until the new set has landed. Wide, square and portrait screens all frame the whole set; scroll zoom stays a factor on top.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Fitting the narrower angle</h3>
+        <div class="controls"><label>aspect <input id="vA" type="range" min="0.5" max="2.2" step="0.01" value="1.78"><output id="vAo"></output></label><button class="ghost" id="vNew">new set</button></div>
+      </div>
+      <canvas id="viewFig" aria-label="A screen frame of the chosen aspect with a cluster of pieces, its 90th percentile circle fitted inside the narrower side."></canvas>
+      <p class="fig-cap">The frame is the screen at the chosen aspect; the dashed circle is the set's 90th-percentile reach, scaled by the 1.2 margin, fitted to the narrower side. A landscape screen fits it to the height, a portrait one to the width.</p>
+    </div>
+    <div class="items">
+      <article class="item"><img src="explainer/jewel.jpg" alt="Jewel-toned sea glass with blue tori against the sunrise." loading="lazy"><div>
+        <h3>Jewel</h3><p>Reds, blues, yellows and greens, here with tori as the find.</p>
+      </div></article>
+      <article class="item"><img src="explainer/canes.jpg" alt="Cobalt and amber sea glass with white-threaded latticino canes and an amber ring." loading="lazy"><div>
+        <h3>Cobalt &amp; Amber</h3><p>Canes with white spiral threads inside, an amber ring, frosted white shards.</p>
+      </div></article>
+      <article class="item"><img src="explainer/necks.jpg" alt="Jewel-toned sea glass with green and red bottle necks." loading="lazy"><div>
+        <h3>Bottle necks</h3><p>Collars traced inside like the tori, their squarer section a superellipse.</p>
+      </div></article>
+    </div>
+  </section>
+
+  <footer class="col">
+    <div class="meta">
+      <span><b>three.js</b> r187</span><span>WebGL2</span><span>layered screen-space glass</span><span>traced tori</span><span>signed distance contacts</span><span>made in <b>Claude Code</b> with Opus 5.5</span>
+    </div>
+    Day 19 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/19/">spite.github.io/codevember-2026/19</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/19">19/ of the codevember-2026 repository</a>. The backdrop pipeline is described in <a href="../modules/pipeline/explainer.html">the shared pipeline's explainer</a>. HDRIs from Poly Haven (CC0); sounds from freesound.org, credited in the day's README (the grinding strokes are CC BY-NC 4.0, the rest CC0).
+  </footer>
+</main>
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+  const TAU = Math.PI * 2;
+  const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1, W = 0, H = 0;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      W = canvas.clientWidth || 600; H = Math.round(W * (typeof aspect === "function" ? aspect(W) : aspect));
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, W, H);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    new MutationObserver(() => fit(true)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return { redraw: () => fit(true), paint: () => draw(ctx, W, H) };
+  }
+  function animate(canvas, step) {
+    let on = false, last = 0;
+    new IntersectionObserver(([e]) => { on = e.isIntersecting; if (on) { last = performance.now(); requestAnimationFrame(loop); } }).observe(canvas);
+    function loop(now) {
+      if (!on) return;
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      step(dt);
+      requestAnimationFrame(loop);
+    }
+  }
+  const bind = (id, out, fmt, fn) => { const el = $(id); const o = $(out); const show = () => { if (o) o.textContent = fmt(+el.value); }; el.addEventListener("input", () => { show(); fn(); }); show(); return el; };
+  const stage = (ctx, W, H) => { ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H); };
+  const palette = () => [css("--accent"), css("--cobalt"), css("--amber"), css("--green"), css("--sea"), css("--accent2")];
+
+  // Tables
+  const KINDS = [
+    ["pebbles", "worn chunks of thick glass", 7], ["bottle shards", "curved bottle walls", 5], ["shards", "flat window and jar glass", 5],
+    ["bowl shards", "rims of dishes and bowls", 4], ["pressed glass", "fluted tableware", 2], ["marbles", "toy marbles, swirled", 0.35],
+    ["stoppers", "bottle stoppers", 0.3], ["canes", "latticino rod, white threads", 0.25], ["bottle necks", "collars and lips", 0.15], ["tori", "glass rings", 0.15],
+  ];
+  const total = KINDS.reduce((a, k) => a + k[2], 0);
+  $("kinds").innerHTML = KINDS.map(([k, w, v]) => `<tr><td>${k}</td><td>${w}</td><td class="num">${v}</td><td><span class="bar" style="width:${Math.max(2, (v / total) * 260)}px"></span> ${((v / total) * 100).toFixed(1)}%</td></tr>`).join("");
+  const COSTS = [["glass shading", 1.28], ["blur pyramids (scissored)", 0.35], ["thickness", 0.13], ["layer copies (scissored)", 0.05], ["backdrop, bloom, final pass", 0.15]];
+  $("costs").innerHTML = COSTS.map(([k, v]) => `<tr><td>${k}</td><td class="num">${v.toFixed(2)}</td><td><span class="bar" style="width:${v * 150}px"></span></td></tr>`).join("");
+
+  // Broken to worn
+  {
+    const N = 160;
+    let raw, worn, ribs;
+    const make = (seed) => {
+      const r = mulberry(seed);
+      // A fracture outline: a few straight breaks with jitter
+      const corners = 5 + Math.floor(r() * 3);
+      const pts = [];
+      const angles = Array.from({ length: corners }, () => r() * TAU).sort((a, b) => a - b);
+      const radii = angles.map(() => 0.7 + r() * 0.35);
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * TAU;
+        let k = angles.findIndex((x) => x > a); if (k < 0) k = 0;
+        const j = (k - 1 + corners) % corners;
+        let a0 = angles[j], a1 = angles[k]; if (a1 < a0) a1 += TAU; let aa = a < a0 ? a + TAU : a;
+        const t = (aa - a0) / (a1 - a0);
+        const p0 = [Math.cos(a0) * radii[j], Math.sin(a0) * radii[j] * 0.55], p1 = [Math.cos(a1) * radii[k], Math.sin(a1) * radii[k] * 0.55];
+        const jit = (r() - 0.5) * 0.03 - (Math.sin(i * 0.9 + seed) > 0.95 ? 0.05 : 0);
+        pts.push([p0[0] + (p1[0] - p0[0]) * t + jit, p0[1] + (p1[1] - p0[1]) * t + jit]);
+      }
+      raw = pts;
+      // Worn: the raw outline low-passed and pulled in
+      worn = raw.map((p) => p.slice());
+      for (let it = 0; it < 400; it++) {
+        const next = worn.map((p, i) => { const a = worn[(i - 1 + N) % N], b = worn[(i + 1) % N]; return [(a[0] + b[0] + p[0] * 2) / 4, (a[1] + b[1] + p[1] * 2) / 4]; });
+        worn = next;
+      }
+      worn = worn.map((p) => [p[0] * 0.94, p[1] * 0.9]);
+      ribs = raw.map((p, i) => (Math.sin((i / N) * TAU * 9) > 0.55 && p[1] < 0 ? 0.06 : 0));
+    };
+    let seed = 7;
+    make(seed);
+    const fig = setup($("erodeFig"), (W) => (W < 520 ? 0.75 : 0.5), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const e = +$("eE").value, pw = +$("eP").value;
+      const s = Math.min(W, H * 1.6) * 0.36, cx = W / 2, cy = H / 2;
+      const P = (p) => [cx + p[0] * s, cy - p[1] * s];
+      const normalAt = (pts, i) => { const a = pts[(i - 1 + N) % N], b = pts[(i + 1) % N]; const dx = b[0] - a[0], dy = b[1] - a[1]; const l = Math.hypot(dx, dy) || 1; return [dy / l, -dx / l]; };
+      ctx.setLineDash([4, 4]); ctx.strokeStyle = css("--stage-ink"); ctx.lineWidth = 1;
+      ctx.beginPath(); raw.forEach((p, i) => { const n = normalAt(raw, i); const q = P([p[0] + n[0] * ribs[i], p[1] + n[1] * ribs[i]]); i ? ctx.lineTo(...q) : ctx.moveTo(...q); }); ctx.closePath(); ctx.stroke();
+      ctx.setLineDash([]);
+      const cur = raw.map((p, i) => [p[0] + (worn[i][0] - p[0]) * e, p[1] + (worn[i][1] - p[1]) * e]);
+      ctx.beginPath();
+      cur.forEach((p, i) => { const n = normalAt(cur, i); const rb = ribs[i] * (1 - pw); const q = P([p[0] + n[0] * rb, p[1] + n[1] * rb]); i ? ctx.lineTo(...q) : ctx.moveTo(...q); });
+      ctx.closePath();
+      ctx.fillStyle = css("--sea") + "55"; ctx.fill();
+      ctx.strokeStyle = css("--sea"); ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = css("--muted"); ctx.font = font(12);
+      ctx.fillText("raw pose (dashed)", 12, 20); ctx.fillText(`drawn: erosion ${e.toFixed(2)}, ribs × ${(1 - pw).toFixed(2)}`, 12, 38);
+    });
+    bind("eE", "eEo", (v) => v.toFixed(2), fig.redraw);
+    bind("eP", "ePo", (v) => v.toFixed(2), fig.redraw);
+    $("eNew").addEventListener("click", () => { make(++seed); fig.redraw(); });
+  }
+
+  // Greedy layers
+  {
+    let seed = 3;
+    const fig = setup($("layerFig"), (W) => (W < 520 ? 0.8 : 0.48), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const r = mulberry(seed), n = +$("lN").value, cols = palette();
+      const items = Array.from({ length: n }, () => {
+        const ang = r() * TAU, rad = Math.sqrt(r()) * 0.3;
+        return { x: W / 2 + Math.cos(ang) * rad * H * 1.25, y: H / 2 + Math.sin(ang) * rad * H * 1.25, r: (0.06 + r() * 0.06) * H, depth: r() };
+      }).sort((a, b) => b.depth - a.depth);
+      const layers = []; let cur = [];
+      for (const it of items) {
+        if (cur.some((o) => Math.hypot(it.x - o.x, it.y - o.y) < it.r + o.r)) { layers.push(cur); cur = [it]; } else cur.push(it);
+      }
+      if (cur.length) layers.push(cur);
+      layers.forEach((L, li) => L.forEach((it) => { it.layer = li; }));
+      items.forEach((it, i) => {
+        ctx.beginPath(); ctx.arc(it.x, it.y, it.r, 0, TAU);
+        ctx.fillStyle = cols[it.layer % cols.length] + "88"; ctx.fill();
+        ctx.strokeStyle = cols[it.layer % cols.length]; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.fillStyle = css("--ink"); ctx.font = font(11, 600); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(String(i + 1), it.x, it.y);
+      });
+      ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+      $("lRead").innerHTML = `<span>pieces <b>${n}</b></span><span>layers <b>${layers.length}</b></span><span>largest layer <b>${Math.max(...layers.map((l) => l.length))}</b></span>`;
+    });
+    bind("lN", "lNo", (v) => v, fig.redraw);
+    $("lNew").addEventListener("click", () => { seed++; fig.redraw(); });
+  }
+
+  // Frost and the pyramid
+  {
+    const scene = document.createElement("canvas");
+    const paintScene = (w, h) => {
+      scene.width = w; scene.height = h;
+      const c = scene.getContext("2d");
+      const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "#c9d3e2"); g.addColorStop(0.55, "#f6d9c6"); g.addColorStop(1, "#bfa596");
+      c.fillStyle = g; c.fillRect(0, 0, w, h);
+      const sun = c.createRadialGradient(w * 0.66, h * 0.4, 0, w * 0.66, h * 0.4, h * 0.45); sun.addColorStop(0, "#fff7e8"); sun.addColorStop(1, "#fff7e800");
+      c.fillStyle = sun; c.fillRect(0, 0, w, h);
+      const r = mulberry(11), cols = ["#3a68c8", "#d0525a", "#e2a03c", "#4f9a54", "#3f9c9a"];
+      for (let i = 0; i < 9; i++) { c.beginPath(); c.ellipse(r() * w, h * (0.2 + r() * 0.6), h * (0.06 + r() * 0.08), h * (0.04 + r() * 0.06), r() * 3, 0, TAU); c.fillStyle = cols[i % 5]; c.fill(); }
+    };
+    const fig = setup($("frostFig"), (W) => (W < 520 ? 1.05 : 0.62), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const pad = 8, cols = W < 520 ? 3 : 6, tw = (W - pad * (cols + 1)) / cols, th = tw * 0.62;
+      const rowH = th + 22;
+      const rows = Math.ceil(6 / cols);
+      paintScene(240, 150);
+      for (let i = 0; i < 6; i++) {
+        const x = pad + (i % cols) * (tw + pad), y = pad + Math.floor(i / cols) * rowH;
+        ctx.save(); ctx.filter = `blur(${i === 0 ? 0 : Math.pow(2, i - 1) * 1.2}px)`;
+        ctx.drawImage(scene, x, y, tw, th); ctx.restore();
+        ctx.fillStyle = css("--muted"); ctx.font = font(11); ctx.fillText(i === 0 ? "full" : `1/${1 << i}`, x, y + th + 14);
+      }
+      const top = pad + rows * rowH + 6, bh = H - top - pad;
+      ctx.drawImage(scene, pad, top, W - pad * 2, bh);
+      const f = +$("fF").value, t = +$("fT").value;
+      const cx = W / 2, cy = top + bh / 2, R = Math.min(bh * 0.42, W * 0.3);
+      // Thicker in the middle: the level grows from edge to centre
+      for (let k = 6; k >= 0; k--) {
+        const rr = R * (0.35 + 0.65 * (k / 6));
+        const thick = (1 - k / 6) * t;
+        const level = clamp(f * 3.2 + thick * 2.2, 0, 5);
+        ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, rr, 0, TAU); ctx.clip();
+        ctx.filter = `blur(${level < 0.05 ? 0 : Math.pow(2, level) * 0.9}px)`;
+        ctx.drawImage(scene, pad - (cx - W / 2) * 0.1 - 6, top + 4, W - pad * 2, bh);
+        ctx.filter = "none";
+        ctx.fillStyle = `rgba(80, 180, 175, ${0.12 + 0.35 * thick})`; ctx.fillRect(cx - rr, cy - rr, rr * 2, rr * 2);
+        ctx.restore();
+      }
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 1.5; ctx.stroke();
+    });
+    bind("fF", "fFo", (v) => v.toFixed(2), fig.redraw);
+    bind("fT", "fTo", (v) => v.toFixed(2), fig.redraw);
+  }
+
+  // Signed distance contact
+  {
+    const G = 22;
+    let t = 0, paused = false;
+    const shapeA = (x, y, e) => {
+      // Signed distance of a shard (raw: a sharp quad, worn: a rounded ellipse), blended by erosion
+      const box = Math.max(Math.abs(x * 0.9 + y * 0.25) - 0.62, Math.abs(y * 1.1 - x * 0.15) - 0.32);
+      const ell = Math.hypot(x / 0.6, y / 0.34) - 1;
+      return box + (ell * 0.34 - box) * e;
+    };
+    const fig = setup($("collideFig"), (W) => (W < 520 ? 0.85 : 0.5), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const e = +$("cE").value;
+      const s = Math.min(W / 2.4, H / 1.6), cx = W / 2, cy = H / 2;
+      const cell = 2.2 / G;
+      for (let i = 0; i < G; i++) for (let j = 0; j < G; j++) {
+        const x = -1.1 + (i + 0.5) * cell, y = -0.75 + (j + 0.5) * cell * 0.68;
+        const d = shapeA(x, y, e);
+        const a = d < 0 ? 0.55 : clamp(0.25 - d * 0.6, 0.02, 0.25);
+        ctx.fillStyle = d < 0 ? `color-mix(in srgb, ${css("--sea")} ${Math.round(a * 100)}%, transparent)` : `color-mix(in srgb, ${css("--stage-ink")} ${Math.round(a * 100)}%, transparent)`;
+        ctx.fillRect(cx + (x - cell / 2) * s, cy - (y + cell * 0.34) * s, cell * s - 1, cell * 0.68 * s - 1);
+      }
+      // The other piece's surface points
+      const bx = Math.cos(t * 0.6) * 0.95, by = Math.sin(t * 0.9) * 0.35, rot = t * 0.4;
+      let deepest = null, inside = 0;
+      const M = 40;
+      for (let k = 0; k < M; k++) {
+        const a = (k / M) * TAU;
+        const lx = Math.cos(a) * 0.32, ly = Math.sin(a) * 0.2;
+        const x = bx + lx * Math.cos(rot) - ly * Math.sin(rot), y = by + lx * Math.sin(rot) + ly * Math.cos(rot);
+        const d = shapeA(x, y, e);
+        if (d < 0) { inside++; if (!deepest || d < deepest.d) deepest = { x, y, d }; }
+        ctx.beginPath(); ctx.arc(cx + x * s, cy - y * s, d < 0 ? 4 : 2.5, 0, TAU);
+        ctx.fillStyle = d < 0 ? css("--accent") : css("--ink"); ctx.fill();
+      }
+      if (deepest) {
+        const h = 0.01;
+        let gx = (shapeA(deepest.x + h, deepest.y, e) - shapeA(deepest.x - h, deepest.y, e)) / (2 * h);
+        let gy = (shapeA(deepest.x, deepest.y + h, e) - shapeA(deepest.x, deepest.y - h, e)) / (2 * h);
+        const l = Math.hypot(gx, gy) || 1; gx /= l; gy /= l;
+        const x0 = cx + deepest.x * s, y0 = cy - deepest.y * s, x1 = x0 + gx * 50, y1 = y0 - gy * 50;
+        ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+        const ang = Math.atan2(y1 - y0, x1 - x0);
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - 8 * Math.cos(ang - 0.4), y1 - 8 * Math.sin(ang - 0.4)); ctx.lineTo(x1 - 8 * Math.cos(ang + 0.4), y1 - 8 * Math.sin(ang + 0.4)); ctx.closePath(); ctx.fillStyle = css("--accent"); ctx.fill();
+      }
+      $("cRead").innerHTML = `<span>points inside <b>${inside}</b> / ${M}</span><span>deepest <b>${deepest ? deepest.d.toFixed(3) : "—"}</b></span><span>${deepest ? "contact" : "apart"}</span>`;
+    });
+    bind("cE", "cEo", (v) => v.toFixed(2), fig.paint);
+    $("cPause").addEventListener("click", () => { paused = !paused; $("cPause").textContent = paused ? "play" : "pause"; });
+    animate($("collideFig"), (dt) => { if (!paused) { t += dt; fig.paint(); } });
+  }
+
+  // Sweep timeline
+  {
+    let clock = 0;
+    const plan = () => {
+      const rec = $("sRec").checked, pace = rec ? 1.8 : 1, hold = rec ? 0.6 : 1.5, erode = rec ? 4 : 9;
+      const outStart = (i, n) => (i / n) * (0.8 / pace), outDur = 2.2 / pace;
+      const leaveEnd = 0.8 / pace + outDur;
+      const inStart = Math.max(leaveEnd, 2.6 / pace);
+      return { pace, hold, erode, outStart, outDur, inStart, inStag: 0.9 / pace, inDur: 2.4 / pace };
+    };
+    const fig = setup($("sweepFig"), (W) => (W < 520 ? 0.95 : 0.5), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const p = plan(), n = 8;
+      const end = p.inStart + p.inStag + p.inDur + p.hold + p.erode + 0.5;
+      const L = 12, R = W - 12, x = (t) => L + (t / end) * (R - L);
+      const top = 44, rowH = (H - top - 34) / (n * 2);
+      ctx.font = font(11); ctx.fillStyle = css("--muted");
+      // Generation and settle
+      ctx.fillStyle = css("--stage-ink") + "66"; ctx.fillRect(x(0), 14, x(1.2 / p.pace) - x(0), 8);
+      ctx.fillStyle = css("--stage-ink"); ctx.fillRect(x(1.2 / p.pace), 14, x(p.inStart) - x(1.2 / p.pace), 8);
+      ctx.fillStyle = css("--muted"); ctx.fillText("generate · settle 360 steps", x(0), 36);
+      const cols = palette();
+      for (let i = 0; i < n; i++) {
+        const y = top + i * rowH;
+        const s = p.outStart(i, n);
+        ctx.fillStyle = css("--stage-ink"); ctx.fillRect(x(s), y, x(s + p.outDur) - x(s), rowH * 0.7);
+        const a = p.inStart + (i / n) * p.inStag;
+        const yy = top + (n + i) * rowH;
+        ctx.fillStyle = cols[i % cols.length]; ctx.globalAlpha = 0.45; ctx.fillRect(x(a), yy, x(a + p.inDur) - x(a), rowH * 0.7);
+        ctx.globalAlpha = 0.85; ctx.fillRect(x(a + p.inDur), yy, x(a + p.inDur + p.hold) - x(a + p.inDur), rowH * 0.7);
+        const e0 = a + p.inDur + p.hold;
+        const grad = ctx.createLinearGradient(x(e0), 0, x(e0 + p.erode), 0); grad.addColorStop(0, cols[i % cols.length]); grad.addColorStop(1, css("--frost"));
+        ctx.globalAlpha = 1; ctx.fillStyle = grad; ctx.fillRect(x(e0), yy, x(e0 + p.erode) - x(e0), rowH * 0.7);
+      }
+      ctx.globalAlpha = 1;
+      // Sounds
+      const mark = (t, label, row) => { ctx.strokeStyle = css("--accent"); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x(t), top - 4); ctx.lineTo(x(t), H - 26); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = css("--accent"); ctx.fillText(label, Math.min(x(t) + 4, W - 90), H - 12 - row * 0); };
+      mark(0, "wave in", 0);
+      mark(p.inStart, "backwash", 0);
+      const g0 = p.inStart + p.inDur + p.hold;
+      ctx.fillStyle = css("--cobalt"); ctx.globalAlpha = 0.12; ctx.fillRect(x(g0), top + n * rowH - 4, x(g0 + p.erode + p.inStag) - x(g0), n * rowH + 4); ctx.globalAlpha = 1;
+      ctx.fillStyle = css("--cobalt"); ctx.fillText("grind + water", Math.min(x(g0) + 4, W - 100), top + n * rowH - 4);
+      // Playhead
+      const ph = clock % (end + 1);
+      ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x(ph), 10); ctx.lineTo(x(ph), H - 26); ctx.stroke();
+      ctx.fillStyle = css("--muted"); ctx.fillText(`${ph.toFixed(1)} s`, Math.min(x(ph) + 4, W - 40), 10 + 0);
+      ctx.fillText("old set", 14, top + rowH * 0.6);
+      ctx.fillText("new set", 14, top + n * rowH + rowH * 0.6);
+    });
+    $("sRec").addEventListener("change", () => { clock = 0; fig.redraw(); });
+    $("sPlay").addEventListener("click", () => { clock = 0; });
+    animate($("sweepFig"), (dt) => { clock += dt; fig.paint(); });
+  }
+
+  // Contact sounds
+  {
+    let t = 0, nextAt = 0;
+    const contacts = [];
+    let budget = 2, budgetT = 0, played = 0, dropped = 0, grinds = 0;
+    const ringing = [];
+    const r = mulberry(5);
+    const span = 8;
+    const fig = setup($("soundFig"), (W) => (W < 520 ? 0.7 : 0.36), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const x = (tt) => W - 12 - ((t - tt) / span) * (W - 24);
+      const lanes = 6, laneH = (H - 30) / lanes;
+      for (const c of contacts) {
+        const y = 10 + c.lane * laneH;
+        const endT = c.done ? c.start + c.len : t;
+        ctx.fillStyle = css("--stage-ink"); ctx.globalAlpha = 0.5; ctx.fillRect(x(c.start), y + laneH * 0.3, Math.max(2, x(endT) - x(c.start)), laneH * 0.4); ctx.globalAlpha = 1;
+        for (const ev of c.events) {
+          ctx.beginPath(); ctx.arc(x(ev.t), y + laneH * 0.5, ev.kind === "click" ? 5 : 4, 0, TAU);
+          ctx.fillStyle = ev.kind === "click" ? css("--accent") : ev.kind === "dropped" ? css("--stage-ink") : css("--cobalt");
+          ctx.fill();
+        }
+      }
+      ctx.fillStyle = css("--muted"); ctx.font = font(11); ctx.fillText(`last ${span} s`, 12, H - 8);
+    });
+    const step = (dt) => {
+      t += dt;
+      budget = Math.min(2, budget + dt * 1.6);
+      const rate = +$("kR").value;
+      if (t >= nextAt) {
+        const long = r() < 0.25;
+        contacts.push({ start: t, len: long ? 0.6 + r() * 2.6 : 0.03 + r() * 0.1, lane: Math.floor(r() * 6), events: [], done: false, nextGrind: 0.15, hard: r() < 0.15 });
+        nextAt = t - Math.log(1 - r()) / rate;
+      }
+      for (let i = ringing.length - 1; i >= 0; i--) if (ringing[i] < t) ringing.splice(i, 1);
+      for (const c of contacts) {
+        if (c.done) continue;
+        const age = t - c.start;
+        if (c.len >= 0.15 && age >= c.nextGrind && age < c.len) { c.events.push({ t, kind: "grind" }); grinds++; c.nextGrind = c.nextGrind === 0.15 ? 0.5 : c.nextGrind + 1.1; }
+        if (age >= c.len) {
+          c.done = true;
+          if (c.len < 0.15) {
+            const last = contacts.reduce((m, o) => Math.max(m, ...o.events.filter((e) => e.kind === "click").map((e) => e.t)), -1);
+            if ((budget >= 1 || c.hard) && ringing.length < 2 && t - last >= 0.09) { budget = Math.max(0, budget - 1); ringing.push(t + 0.29); c.events.push({ t, kind: "click" }); played++; }
+            else { c.events.push({ t, kind: "dropped" }); dropped++; }
+          }
+        }
+      }
+      while (contacts.length && contacts[0].done && t - (contacts[0].start + contacts[0].len) > span) contacts.shift();
+      $("kRead").innerHTML = `<span>clicks played <b>${played}</b></span><span>dropped <b>${dropped}</b></span><span>grind sounds <b>${grinds}</b></span>`;
+      fig.paint();
+    };
+    bind("kR", "kRo", (v) => v, () => {});
+    const paint0 = fig.paint;
+    fig.paint = () => {};
+    for (let i = 0; i < 160; i++) step(0.05);
+    fig.paint = paint0;
+    fig.redraw();
+    animate($("soundFig"), step);
+  }
+
+  // Camera fit
+  {
+    let seed = 2;
+    const fig = setup($("viewFig"), (W) => (W < 520 ? 0.9 : 0.5), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const aspect = +$("vA").value;
+      const maxW = W - 24, maxH = H - 40;
+      let fw = maxW, fh = fw / aspect; if (fh > maxH) { fh = maxH; fw = fh * aspect; }
+      const fx = (W - fw) / 2, fy = 12 + (maxH - fh) / 2;
+      const r = mulberry(seed);
+      const pts = Array.from({ length: 24 }, () => { const a = r() * TAU, d = Math.pow(r(), 0.7) * (r() < 0.08 ? 1.9 : 1); return { x: Math.cos(a) * d, y: Math.sin(a) * d * 0.8, s: 0.12 + r() * 0.1 }; });
+      const reach = pts.map((p) => Math.hypot(p.x, p.y) + p.s).sort((a, b) => a - b);
+      const p90 = reach[Math.floor(reach.length * 0.9)];
+      const narrow = Math.min(fw, fh) / 2;
+      const scale = narrow / (p90 * 1.2);
+      const cx = fx + fw / 2, cy = fy + fh / 2;
+      ctx.save(); ctx.beginPath(); ctx.rect(fx, fy, fw, fh); ctx.clip();
+      ctx.fillStyle = css("--panel"); ctx.fillRect(fx, fy, fw, fh);
+      const cols = palette();
+      pts.forEach((p, i) => { ctx.beginPath(); ctx.ellipse(cx + p.x * scale, cy + p.y * scale, p.s * scale, p.s * scale * 0.7, i, 0, TAU); ctx.fillStyle = cols[i % cols.length] + "cc"; ctx.fill(); });
+      ctx.setLineDash([5, 5]); ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, p90 * scale, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = css("--accent"); ctx.beginPath(); ctx.arc(cx, cy, p90 * 1.2 * scale, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]); ctx.restore();
+      ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1.5; ctx.strokeRect(fx, fy, fw, fh);
+      ctx.fillStyle = css("--muted"); ctx.font = font(11);
+      ctx.fillText(`fitted to the ${fw >= fh ? "height" : "width"} · p90 reach dashed, ×1.2 margin red`, 12, H - 10);
+    });
+    bind("vA", "vAo", (v) => v.toFixed(2), fig.redraw);
+    $("vNew").addEventListener("click", () => { seed++; fig.redraw(); });
+  }
+})();
+</script>
+</body>
+</html>

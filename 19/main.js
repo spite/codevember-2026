@@ -226,7 +226,6 @@ showHint(
   "Drag a piece through the cluster · drag space to orbit · R for a new mix",
   "Drag a piece · drag space to orbit · tap {randomize} for a new mix",
 );
-gui.show();
 
 const sound = createSound({ onProgress: load.sound.set, ambience: params.shore() * 0.6 });
 const soundButton = addActionButton("../assets/sound.svg", "Sound", () => toggleSound());
