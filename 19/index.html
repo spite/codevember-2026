@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>Erosion · Codevember 2026 #19</title>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <!-- Share tags: crawlers don't run JS, so they are static, with absolute urls. Fill them in when the day is finished. -->
+    <meta name="description" content="Wave-tumbled beach glass: shards, marbles, stoppers and fluted remnants eroded smooth, frosted by sand and lit from within. Day 19 of Codevember 2026." />
+    <meta name="author" content="Jaume Sanchez Elias" />
+    <meta name="theme-color" content="#e8e3d9" />
+    <link rel="canonical" href="https://spite.github.io/codevember-2026/19/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Codevember 2026" />
+    <meta property="og:title" content="Erosion · Codevember 2026 #19" />
+    <meta property="og:description" content="Wave-tumbled beach glass: shards, marbles, stoppers and fluted remnants eroded smooth, frosted by sand and lit from within. Day 19 of Codevember 2026." />
+    <meta property="og:url" content="https://spite.github.io/codevember-2026/19/" />
+    <meta property="og:image" content="https://spite.github.io/codevember-2026/screenshots/19-social.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Frosted, jewel-toned pieces of sea glass floating against a soft studio backdrop." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@thespite" />
+    <meta name="twitter:creator" content="@thespite" />
+    <meta name="twitter:title" content="Erosion · Codevember 2026 #19" />
+    <meta name="twitter:description" content="Wave-tumbled beach glass: shards, marbles, stoppers and fluted remnants eroded smooth, frosted by sand and lit from within. Day 19 of Codevember 2026." />
+    <meta name="twitter:image" content="https://spite.github.io/codevember-2026/screenshots/19-social.jpg" />
+    <meta name="twitter:image:alt" content="Frosted, jewel-toned pieces of sea glass floating against a soft studio backdrop." />
+    <link rel="stylesheet" type="text/css" href="../css/styles.css" />
+    <link rel="stylesheet" type="text/css" href="../css/gui.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "maf": "../modules/maf.js",
+          "guspira": "../third_party/guspira.js",
+          "common": "../modules/common.js",
+          "easings": "../modules/easings.js",
+          "three": "../third_party/three.module.js",
+          "three/": "../third_party/",
+          "third_party/": "../third_party/",
+          "shaders/": "../shaders/",
+          "modules/": "../modules/"
+        }
+      }
+    </script>
+    <script type="module" src="main.js"></script>
+  </head>
+  <body>
+    <!-- The day's backdrop colour, and its prompt as a verb: Folding…, Shattering… -->
+    <div id="loading" style="--loading-background: #e8e3d9"><span>Eroding…</span></div>
+    <div id="main-gui">
+      <div id="randomize-button" class="button" title="Randomize">
+        <img src="../assets/randomize.svg" alt="Randomize" />
+      </div>
+      <div id="pause-button" class="button action" title="Pause">
+        <img src="../assets/pause.svg" alt="Pause" />
+      </div>
+      <div id="gui-container"></div>
+    </div>
+  </body>
+</html>
