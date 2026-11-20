@@ -33,6 +33,12 @@ import { brdf } from "shaders/pipeline/brdf.js";
 import { shGLSL } from "modules/pipeline/studio.js";
 import { globalUniforms } from "modules/pipeline/uniforms.js";
 
+// Limits a target's draws to a pixel rect [x0, y0, x1, y1], or lifts the limit (null)
+function setScissor(target, rect) {
+  target.scissorTest = !!rect;
+  if (rect) target.scissor.set(rect[0], rect[1], rect[2] - rect[0], rect[3] - rect[1]);
+}
+
 const PYRAMID_LEVELS = 6; // full, 1/2, 1/4, 1/8, 1/16, 1/32
 
 const blurFragment = /* glsl */ `
@@ -907,6 +913,10 @@ export class GlassCompositeRenderer {
     this.traceReady = false;
     this.layerScene = new Scene();
     this._camFwd = new Vector3();
+    this._corner = new Vector3();
+    this._key = [];
+    this._lastKey = [];
+    this._lastOut = null;
     this._camRight = new Vector3();
     this._camUp = new Vector3();
     this._proj = new Vector3();
@@ -959,6 +969,7 @@ export class GlassCompositeRenderer {
   }
 
   disposeTargets() {
+    this._lastOut = null;
     this.accumA?.dispose();
     this.accumB?.dispose();
     this.sharedDepth?.dispose();
@@ -969,26 +980,66 @@ export class GlassCompositeRenderer {
     this.blurTemp.length = 0;
   }
 
-  buildPyramid(renderer, sourceTex) {
+  // dirty: the full-res pixel rect [x0, y0, x1, y1] that changed since the last build, or null to rebuild it all. Each
+  // level then redoes only that rect, grown by its blur's reach (the targets keep the rest from the last build).
+  buildPyramid(renderer, sourceTex, dirty = null) {
     this.pyramid[0] = { texture: sourceTex };
+    let rect = dirty;
     for (let i = 1; i < PYRAMID_LEVELS; i++) {
       const dst = this.pyramid[i];
       const tmp = this.blurTemp[i];
       const prev = this.pyramid[i - 1];
+      if (rect) {
+        rect = [Math.floor(rect[0] / 2) - 10, Math.floor(rect[1] / 2) - 10, Math.ceil(rect[2] / 2) + 10, Math.ceil(rect[3] / 2) + 10];
+        rect = [Math.max(0, rect[0]), Math.max(0, rect[1]), Math.min(dst.width, rect[2]), Math.min(dst.height, rect[3])];
+        if (rect[2] <= rect[0] || rect[3] <= rect[1]) return;
+      }
       const texelX = 1 / dst.width;
       const texelY = 1 / dst.height;
 
       this.blurMat.uniforms.tSource.value = prev.texture;
       this.blurMat.uniforms.texel.value.set(texelX, texelY);
       this.blurMat.uniforms.dir.value.set(1, 0);
+      setScissor(tmp, rect);
       renderer.setRenderTarget(tmp);
       renderer.render(this.blurScene, this.quadCam);
 
       this.blurMat.uniforms.tSource.value = tmp.texture;
       this.blurMat.uniforms.dir.value.set(0, 1);
+      setScissor(dst, rect);
       renderer.setRenderTarget(dst);
       renderer.render(this.blurScene, this.quadCam);
+      setScissor(tmp, null);
+      setScissor(dst, null);
     }
+  }
+
+  // Full-res pixel rect [x0, y0, x1, y1] (bottom-left origin) covering the pieces, or null when one reaches behind
+  // the camera: the projected corners of a camera-aligned box around each piece's bounding sphere.
+  screenRect(pieces) {
+    const r = [Infinity, Infinity, -Infinity, -Infinity];
+    const c = this._corner;
+    const e = this._viewProj.elements;
+    for (const p of pieces) {
+      const R = p.visualRadius * 1.05;
+      for (let k = 0; k < 8; k++) {
+        c.copy(p.pos)
+          .addScaledVector(this._camRight, k & 1 ? R : -R)
+          .addScaledVector(this._camUp, k & 2 ? R : -R)
+          .addScaledVector(this._camFwd, k & 4 ? R : -R);
+        const w = e[3] * c.x + e[7] * c.y + e[11] * c.z + e[15];
+        if (w <= 0.05) return null;
+        const x = ((e[0] * c.x + e[4] * c.y + e[8] * c.z + e[12]) / w) * 0.5 + 0.5;
+        const y = ((e[1] * c.x + e[5] * c.y + e[9] * c.z + e[13]) / w) * 0.5 + 0.5;
+        r[0] = Math.min(r[0], x);
+        r[1] = Math.min(r[1], y);
+        r[2] = Math.max(r[2], x);
+        r[3] = Math.max(r[3], y);
+      }
+    }
+    const x0 = Math.max(0, Math.floor(r[0] * this.width) - 2);
+    const y0 = Math.max(0, Math.floor(r[1] * this.height) - 2);
+    return [x0, y0, Math.max(x0, Math.min(this.width, Math.ceil(r[2] * this.width) + 2)), Math.max(y0, Math.min(this.height, Math.ceil(r[3] * this.height) + 2))];
   }
 
   // Partition back-to-front sorted pieces into layers where no two pieces in the same layer overlap on screen.
@@ -1035,9 +1086,47 @@ export class GlassCompositeRenderer {
     return layers;
   }
 
+  // Everything the composite reads, flattened; an unchanged key (paused, view still) reuses the last image.
+  stateKey(hdrTexture, camera, width, height, pieces) {
+    const k = this._key;
+    k.length = 0;
+    const push = (v) => {
+      if (typeof v === "number" || typeof v === "boolean") k.push(+v);
+      else if (Array.isArray(v) || ArrayBuffer.isView(v)) for (const x of v) push(x);
+      else if (v?.isTexture) k.push(v.id, v.version);
+      else if (v?.elements) for (const x of v.elements) k.push(x);
+      else if (v?.toArray) k.push(...v.toArray());
+      else if (v?.isWebGLRenderTarget || v?.isRenderTarget) k.push(v.texture.id);
+      else k.push(v ? 1 : 0);
+    };
+    push(width);
+    push(height);
+    push(hdrTexture);
+    push(camera.matrixWorld);
+    push(camera.projectionMatrix);
+    push(this.traceReady);
+    for (const v of Object.values(this.settings)) push(v);
+    for (const [name, u] of Object.entries(globalUniforms)) if (name !== "frame") push(u.value);
+    for (const u of Object.values(envFadeUniforms)) push(u.value);
+    for (const p of pieces) {
+      push(p.mesh.geometry.id);
+      push(p.mesh.matrixWorld);
+      push(p.color);
+      push(p.look.erosion);
+      push(p.patternErosion);
+      for (const key of GLASS_KEYS) k.push(p.look[key][0], p.look[key][1]);
+    }
+    return k;
+  }
+
   render(renderer, hdrTexture, { camera, width, height }, pieces) {
     if (!pieces.length) return hdrTexture;
     this.ensureSize(width, height);
+    const key = this.stateKey(hdrTexture, camera, width, height, pieces);
+    const last = this._lastKey;
+    // The solid backdrop comes from the pipeline's own frame, which this key can't see, so only the HDR backdrop reuses
+    if (this._lastOut && this.settings.envMix >= 0.999 && last.length === key.length && key.every((v, i) => v === last[i])) return this._lastOut;
+    [this._key, this._lastKey] = [last, key];
 
     const prevAutoClear = renderer.autoClear;
     renderer.getClearColor(this._clearColor);
@@ -1089,18 +1178,26 @@ export class GlassCompositeRenderer {
     this.thickMat.uniforms.cameraPos.value.copy(camera.position);
     this.thickMat.uniforms.refDist.value = camera.position.length();
 
+    // What the previous layer drew over: the only part of the image (and pyramid) that changed since
+    let dirty = null;
+    let first = true;
     for (const layer of layers) {
+      const rect = this.screenRect(layer);
       // 1. Blur pyramid of everything behind this layer
-      this.buildPyramid(renderer, currAccum.texture);
+      this.buildPyramid(renderer, currAccum.texture, first ? null : dirty);
 
       // 2. Additive total optical thickness for this layer's pieces (zero internal edges)
+      setScissor(this.thickTarget, rect);
       renderer.setRenderTarget(this.thickTarget);
       renderer.setClearColor(0x000000, 0);
       renderer.clear(true, false, false);
-      for (const p of layer) this.drawPiece(renderer, camera, p, this.thickMat);
+      for (const p of layer) this.drawThickness(renderer, camera, p);
+      setScissor(this.thickTarget, null);
 
       // 3. Start the layer from everything so far, with earlier layers' depth
-      this.beginLayer(renderer, currAccum, nextAccum);
+      this.beginLayer(renderer, currAccum, nextAccum, first ? null : dirty);
+      dirty = rect;
+      first = false;
 
       // 4. Shade each piece's outer surface against the blurred pyramid and its thickness
       this.setPyramidUniforms();
@@ -1117,6 +1214,7 @@ export class GlassCompositeRenderer {
     this.layerScene.children.length = 0;
     renderer.autoClear = prevAutoClear;
     renderer.setClearColor(this._clearColor, prevClearAlpha);
+    this._lastOut = currAccum.texture;
     return currAccum.texture;
   }
 
@@ -1127,10 +1225,14 @@ export class GlassCompositeRenderer {
   }
 
   // Starts a layer's target from everything so far; the shared depth already holds the earlier layers'.
-  beginLayer(renderer, source, target) {
+  // Only `dirty` (the last layer's rect) differs between the two, or everything when it is null.
+  beginLayer(renderer, source, target, dirty = null) {
     this.copyMat.uniforms.tInput.value = source.texture;
+    setScissor(target, dirty);
     renderer.setRenderTarget(target);
     renderer.render(this.copyScene, this.quadCam);
+    setScissor(target, null);
+    renderer.setRenderTarget(target);
   }
 
   // One piece with a pass material, at its own erosion (pieces each carry their look).
@@ -1141,6 +1243,10 @@ export class GlassCompositeRenderer {
     this.layerScene.children.length = 0;
     this.layerScene.children.push(p.mesh);
     renderer.render(this.layerScene, camera);
+  }
+
+  drawThickness(renderer, camera, p) {
+    this.drawPiece(renderer, camera, p, this.thickMat);
   }
 
   shadePiece(renderer, camera, p) {

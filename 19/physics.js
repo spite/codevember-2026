@@ -254,22 +254,23 @@ export class GlassCluster {
   // direction), staggered from the leading edge; once they are gone and the new set is generated, the new pieces come
   // back in from the same side to their places, starting in their broken shape and eroding once they land.
   // onSweep("in") fires as the old set goes, onSweep("out") as the new one comes.
-  startSweep({ count, paletteName, seed, detail, look, dir, drift = 0.5, erodeTime = 9, hold = 1.5 }) {
+  // pace > 1 runs the comings and goings faster (recordings)
+  startSweep({ count, paletteName, seed, detail, look, dir, drift = 0.5, erodeTime = 9, hold = 1.5, pace = 1 }) {
     const view = this.view;
     if (!view) return;
     const leaving = this.pieces.filter((p) => p.anim?.mode !== "out");
     const along = (p) => p.pos.dot(dir);
     leaving.sort((a, b) => along(b) - along(a));
     leaving.forEach((p, i) => {
-      const delay = (i / Math.max(1, leaving.length)) * 0.8;
-      p.anim = { mode: "out", t: -delay, dur: 2.2, from: p.pos.clone(), to: this._offScreen(p.pos, dir, view, p.visualRadius) };
+      const delay = (i / Math.max(1, leaving.length)) * (0.8 / pace);
+      p.anim = { mode: "out", t: -delay, dur: 2.2 / pace, from: p.pos.clone(), to: this._offScreen(p.pos, dir, view, p.visualRadius) };
       if (this.grabbed === p) this.grabbed = null;
     });
     // A sweep replaces any one-by-one replacement still under way
     this._gen = null;
     this._ready = this._leaveQueue = null;
     const palette = PALETTES[paletteName] ?? PALETTES["Sea glass"];
-    const sweep = { phase: "out", t: 0, dir: dir.clone(), erodeTime, hold, look: copyLook(look), arrivals: [], done: false };
+    const sweep = { phase: "out", t: 0, dir: dir.clone(), erodeTime, hold, pace, look: copyLook(look), arrivals: [], done: false };
     const self = this;
     sweep.gen = (function* () {
       const rng = mulberry32(seed);
@@ -309,23 +310,24 @@ export class GlassCluster {
     if (sweep.phase === "out") {
       const gone = !this.pieces.some((p) => p.anim?.mode === "out" || p.anim?.mode === "coast");
       // The backwash of the sweep's wave starts about 2.6 s in
-      if (!gone || sweep.gen || sweep.t < 2.6) return;
+      if (!gone || sweep.gen || sweep.t < 2.6 / sweep.pace) return;
       sweep.phase = "in";
       const view = this.view;
       // Farthest places first, so later arrivals cross empty space rather than the pieces already landed
       const along = (p) => p.pos.dot(sweep.dir);
       sweep.arrivals.sort((a, b) => along(a) - along(b));
       sweep.arrivals.forEach((p, i) => {
-        const delay = (i / Math.max(1, sweep.arrivals.length)) * 0.9;
+        const delay = (i / Math.max(1, sweep.arrivals.length)) * (0.9 / sweep.pace);
+        const dur = 2.4 / sweep.pace;
         const to = p.pos.clone();
         const from = this._offScreen(to, sweep.dir, view, p.visualRadius);
         p.pos.copy(from);
         p.prevPos.copy(from);
         p.vel.set(0, 0, 0);
-        p.anim = { mode: "in", t: -delay, dur: 2.4, from, to };
+        p.anim = { mode: "in", t: -delay, dur, from, to };
         p.lookTarget.erosion = sweep.look.erosion;
         // Broken pieces rest a beat after landing before the sea starts wearing them down
-        p.erode = { t: -(delay + 2.4 + sweep.hold), duration: sweep.erodeTime };
+        p.erode = { t: -(delay + dur + sweep.hold), duration: sweep.erodeTime };
         p.mesh.position.copy(from);
         p.mesh.updateMatrixWorld();
         this.pieces.push(p);

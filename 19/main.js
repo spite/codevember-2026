@@ -17,6 +17,7 @@ import {
   showSoundHint,
   onPause,
   isRunning,
+  loadSeed,
 } from "common";
 import { GUI } from "guspira";
 import { Scene, Vector2, Vector3, Color, Raycaster, Plane, MathUtils, Quaternion } from "three";
@@ -242,8 +243,8 @@ showSoundHint(() => !sound.running);
 const SHORT = 0.15;
 const contactState = new Map();
 const soundPoint = new Vector3();
-const CLICK_RATE = 2.5;
-const CLICK_BURST = 4;
+const CLICK_RATE = 1.6;
+const CLICK_BURST = 2;
 const GRIND_RATE = 1;
 const GRIND_BURST = 2;
 let clickBudget = CLICK_BURST;
@@ -266,7 +267,8 @@ function contactSounds() {
   for (const [key, c] of contactState) {
     soundPoint.copy(c.point).project(camera);
     const pan = Math.max(-1, Math.min(1, soundPoint.x)) * 0.8;
-    const near = Math.min(1.3, Math.max(0.45, 7.2 / camera.position.distanceTo(c.point)));
+    // Loudness by distance relative to the framed view, so a farther fit for a bigger set doesn't quieten everything
+    const near = Math.min(1.3, Math.max(0.45, (0.8 * (fit.distance || 9)) / camera.position.distanceTo(c.point)));
     const length = c.seen - c.start;
     // A contact ends once it hasn't been seen for a few frames
     if (now - c.seen > 0.06) {
@@ -284,12 +286,12 @@ function contactSounds() {
     const level = Math.min(1, Math.max(c.impact, c.slide) / 0.25);
     if (c.grinds === 0) {
       grindBudget -= 1;
-      sound.play("scrape", { gain: (0.12 + 0.25 * level) * near, pan, rate: 0.9 + 0.3 * level });
+      sound.play("scrape", { gain: (0.17 + 0.35 * level) * near, pan, rate: 0.9 + 0.3 * level });
       c.grinds++;
       c.nextGrind = c.start + 0.5;
     } else if (c.slide > 0.04) {
       grindBudget -= 1;
-      sound.play("grind", { gain: (0.1 + 0.25 * level) * near, pan, rate: 0.9 + 0.3 * level, duration: 1 });
+      sound.play("grind", { gain: (0.15 + 0.35 * level) * near, pan, rate: 0.9 + 0.3 * level, duration: 1 });
       c.grinds++;
       c.nextGrind = now + 1.1;
     }
@@ -317,6 +319,26 @@ const bgTarget = bgColor.clone();
 
 const START_DISTANCE = 9;
 camera.position.set(0, 0.8, START_DISTANCE);
+
+// Framing: the cluster's centre and radius (90th-percentile piece reach, so one stray piece doesn't zoom out), and
+// the distance that fits that radius in the narrower of the two angles of view
+const FIT_MARGIN = 1.2;
+const fit = { center: new Vector3(), radius: 0, distance: 0, ready: false };
+const fitCenter = new Vector3();
+function measureCluster() {
+  const settled = cluster.pieces.filter((p) => !p.anim);
+  if (settled.length < 3) return false;
+  fitCenter.set(0, 0, 0);
+  for (const p of settled) fitCenter.add(p.pos);
+  fitCenter.divideScalar(settled.length);
+  const reach = settled.map((p) => p.pos.distanceTo(fitCenter) + p.visualRadius).sort((a, b) => a - b);
+  return reach[Math.min(reach.length - 1, Math.floor(reach.length * 0.9))];
+}
+function fitDistance(radius) {
+  const half = MathUtils.degToRad(camera.fov) / 2;
+  const narrow = Math.min(half, Math.atan(Math.tan(half) * camera.aspect));
+  return (radius * FIT_MARGIN) / Math.sin(narrow);
+}
 // The shared orbit locks at the poles; this one turns the camera's up with it, so it orbits freely over and under the
 // floating glass.
 sharedControls.dispose();
@@ -392,8 +414,11 @@ function sweepIn(seed) {
     detail: meshDetail(),
     look: currentLook(),
     dir,
+    ...sweepTiming,
   });
 }
+// How fast a sweep runs and how long the new set rests and wears down (recordings speed these up)
+const sweepTiming = { pace: 1, hold: 1.5, erodeTime: 9 };
 let appliedWeights = JSON.stringify(typeWeights());
 let weightsChangedAt = 0;
 let sweepPan = 0;
@@ -489,7 +514,17 @@ await selectEnvironment(params.environment());
 {
   const sun = globalUniforms.lightDirection.value;
   const away = new Vector3(-sun.x, 0, -sun.z);
-  if (away.lengthSq() > 1e-6) camera.position.copy(away.normalize().multiplyScalar(START_DISTANCE)).setY(0.8);
+  const radius = measureCluster();
+  if (radius) {
+    fit.center.copy(fitCenter);
+    fit.radius = radius;
+    fit.ready = true;
+    controls.target.copy(fit.center);
+  }
+  const distance = fit.ready ? fitDistance(fit.radius) : START_DISTANCE;
+  fit.distance = distance;
+  if (away.lengthSq() < 1e-6) away.set(0, 0, 1);
+  camera.position.copy(away.normalize()).setY(0.09).normalize().multiplyScalar(distance).add(controls.target);
   camera.lookAt(controls.target);
 }
 lastEnv = params.environment();
@@ -500,7 +535,29 @@ await load.compile.track(
   3,
 );
 
-window.app = { canvas: renderer.domElement, scene, params, pipeline, camera, controls, cluster, composite, sound };
+window.app = {
+  canvas: renderer.domElement,
+  scene,
+  params,
+  pipeline,
+  camera,
+  controls,
+  cluster,
+  composite,
+  sound,
+  sweepTiming,
+  // Recordings: every asset a set can use, and a jump to a seed (its set comes in with a wave)
+  preload: () => Promise.all([sound.decoded, ...Object.keys(BEACHES).map(loadBeach)]),
+  nextLook: (pick) => loadSeed(pick?.seed ?? String(Math.floor(nativeRandom() * 1e9))),
+  // For tools/perf: the glass composite's stages as their own segments
+  perfSegments: (wrap) => {
+    wrap(composite, "render", "post.composite");
+    wrap(composite, "buildPyramid", "post.pyramid");
+    wrap(composite, "beginLayer", "post.copy");
+    wrap(composite, "drawThickness", "post.thick");
+    wrap(composite, "shadePiece", "post.glass");
+  },
+};
 // Fetch the beach HDRIs into the cache once the page is up, so choosing one never waits on the network
 setTimeout(() => Object.values(BEACHES).forEach(({ url }) => fetch(url).catch(() => {})), 2000);
 
@@ -602,6 +659,32 @@ render(({ time, dt }) => {
     turn.setFromAxisAngle(driftRight.crossVectors(camera.up, offset).normalize(), before.pitch - after.pitch);
     offset.applyQuaternion(turn).multiplyScalar(after.distance / before.distance);
     camera.position.copy(offset).add(controls.target);
+  }
+
+  // Follow the cluster: ease its centre and fitted distance over a few seconds, applied as the change since last frame
+  // so the visitor's own orbit and zoom stay on top
+  {
+    // Holds while a set is coming or going, so a half-arrived set doesn't pull the view in
+    const radius = cluster.replacing ? 0 : measureCluster();
+    if (radius) {
+      if (!fit.ready) {
+        fit.center.copy(fitCenter);
+        fit.radius = radius;
+        fit.ready = true;
+        fit.distance = camera.position.distanceTo(controls.target);
+      }
+      const k = 1 - Math.exp(-wallDt / 2.5);
+      const shift = fitCenter.sub(fit.center).multiplyScalar(k);
+      fit.center.add(shift);
+      fit.radius += (radius - fit.radius) * k;
+      // A resize changes the fitted distance at once
+      const after = fitDistance(fit.radius);
+      const offset = camera.position.sub(controls.target).multiplyScalar(after / fit.distance);
+      fit.distance = after;
+      controls.target.add(shift);
+      camera.position.copy(offset).add(controls.target);
+      controls.maxDistance = Math.max(14, after * 1.8);
+    }
   }
 
   controls.update();
