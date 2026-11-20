@@ -22,17 +22,21 @@ footer > .meta { margin-bottom: 12px; }
 .hero .live { display: inline-flex; align-self: flex-start; align-items: center; gap: 9px; padding: 12px 16px; border-radius: 3px; font: 600 13px/1 var(--mono, monospace); letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none; color: var(--bg, #fff); background: var(--accent, var(--candy, var(--ink, #000))); transition: background 0.2s ease; }
 .hero .live:hover, .hero .live:focus-visible { background: var(--ink, #000); }
 .hero .live:focus-visible { outline: 2px solid var(--accent, var(--candy, currentColor)); outline-offset: 2px; }
-.hero figure img { cursor: zoom-in; }
-.lightbox { position: fixed; inset: 0; z-index: 1000; background: rgb(12 12 12 / 0.94); overflow: hidden; opacity: 0; transition: opacity 0.25s ease; cursor: zoom-in; touch-action: pan-x pan-y; overscroll-behavior: contain; }
-.lightbox.open { opacity: 1; }
-.lightbox.zoomed { overflow: auto; cursor: grab; scrollbar-width: none; }
+.hero figure img, .zoomable { cursor: zoom-in; }
+.lightbox { position: fixed; inset: 0; z-index: 1000; overflow: hidden; cursor: zoom-out; touch-action: none; overscroll-behavior: contain; }
+.lightbox::before { content: ""; position: fixed; inset: 0; background: rgb(14 14 16 / 0.62); -webkit-backdrop-filter: blur(18px) saturate(1.2); backdrop-filter: blur(18px) saturate(1.2); opacity: 0; transition: opacity 0.35s ease; }
+.lightbox.open::before { opacity: 1; }
+.lightbox.zoomed { overflow: auto; touch-action: pan-x pan-y; cursor: grab; scrollbar-width: none; }
 .lightbox::-webkit-scrollbar { display: none; }
 .lightbox.dragging { cursor: grabbing; }
-.lightbox .frame { min-width: 100%; min-height: 100%; display: grid; place-items: center; }
-.fade-images .lightbox img, .lightbox img { opacity: 1; display: block; max-width: none; border-radius: 0; user-select: none; -webkit-user-drag: none; }
-.lightbox button { position: fixed; top: 14px; right: 14px; width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgb(255 255 255 / 0.12); color: #fff; font: 400 24px/1 sans-serif; cursor: pointer; }
-.lightbox button:hover, .lightbox button:focus-visible { background: rgb(255 255 255 / 0.25); }
-@media (prefers-reduced-motion: reduce) { .lightbox { transition: none; } }`;
+.lightbox .frame { position: relative; min-width: 100%; min-height: 100%; display: grid; place-items: center; }
+.fade-images .lightbox img, .lightbox img { opacity: 1; display: block; max-width: none; border-radius: 8px; box-shadow: 0 2px 6px rgb(0 0 0 / 0.18), 0 24px 70px rgb(0 0 0 / 0.42); cursor: zoom-in; user-select: none; -webkit-user-drag: none; transform-origin: 0 0; will-change: transform; }
+.lightbox.zoomed img { cursor: inherit; }
+.lightbox.moving img { transition: transform 0.42s cubic-bezier(0.2, 0.9, 0.25, 1), clip-path 0.42s cubic-bezier(0.2, 0.9, 0.25, 1); }
+.lightbox button { position: fixed; top: 14px; right: 14px; width: 40px; height: 40px; border: 1px solid rgb(255 255 255 / 0.18); border-radius: 50%; background: rgb(30 30 34 / 0.5); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: #fff; font: 300 24px/1 sans-serif; cursor: pointer; opacity: 0; transition: opacity 0.3s ease, background 0.2s ease; }
+.lightbox.open button { opacity: 1; }
+.lightbox button:hover, .lightbox button:focus-visible { background: rgb(60 60 66 / 0.7); }
+@media (prefers-reduced-motion: reduce) { .lightbox::before, .lightbox button, .lightbox.moving img { transition: none; } }`;
   const style = document.createElement("style");
   style.textContent = css;
   document.head.append(style);
@@ -86,23 +90,25 @@ footer > .meta { margin-bottom: 12px; }
     nodes.forEach(highlightText);
   }
 
-  // Click the hero image to see it full screen; click again for a closer look, drag to pan.
-  function lightbox(src, alt) {
+  // Click the hero image (or any image on an explainer) to see it floating as large as it fits; click again for a closer look, drag to pan.
+  function lightbox(thumb) {
     const box = document.createElement("div");
     box.className = "lightbox";
     box.setAttribute("role", "dialog");
     box.setAttribute("aria-modal", "true");
-    box.setAttribute("aria-label", alt);
+    box.setAttribute("aria-label", thumb.alt);
     box.innerHTML = `<div class="frame"><img alt=""></div><button type="button" aria-label="Close">×</button>`;
-    const img = box.querySelector("img"), frame = box.querySelector(".frame"), close = box.querySelector("button");
-    img.alt = alt;
-    let zoomed = false;
+    const img = box.querySelector("img"), close = box.querySelector("button");
+    img.alt = thumb.alt;
+    let zoomed = false, closing = false;
+    const margin = () => (innerWidth < 600 ? 12 : 40);
     const layout = (cx, cy) => {
-      const w = img.naturalWidth || 1, h = img.naturalHeight || 1, pad = innerWidth < 600 ? 0 : 32;
+      const w = img.naturalWidth || thumb.naturalWidth || 1, h = img.naturalHeight || thumb.naturalHeight || 1, pad = margin();
       const fit = Math.min((innerWidth - pad * 2) / w, (innerHeight - pad * 2) / h);
       const scale = zoomed ? Math.max(1, fit * 2) : fit;
-      const fx = cx === undefined ? 0.5 : (cx - img.getBoundingClientRect().left) / img.getBoundingClientRect().width;
-      const fy = cy === undefined ? 0.5 : (cy - img.getBoundingClientRect().top) / img.getBoundingClientRect().height;
+      const before = img.getBoundingClientRect();
+      const fx = cx === undefined ? 0.5 : (cx - before.left) / before.width;
+      const fy = cy === undefined ? 0.5 : (cy - before.top) / before.height;
       img.style.width = `${w * scale}px`;
       img.style.height = `${h * scale}px`;
       box.classList.toggle("zoomed", zoomed);
@@ -112,19 +118,45 @@ footer > .meta { margin-bottom: 12px; }
         box.scrollTop += r.top + fy * r.height - (cy ?? innerHeight / 2);
       }
     };
+    // Transform and clip that put the floating image over the thumbnail, cropped the way the thumbnail is.
+    const fromThumb = () => {
+      const t = thumb.getBoundingClientRect(), f = img.getBoundingClientRect();
+      const s = Math.max(t.width / f.width, t.height / f.height);
+      const ix = (f.width - t.width / s) / 2, iy = (f.height - t.height / s) / 2;
+      const radius = parseFloat(getComputedStyle(thumb).borderRadius) / s || 0;
+      img.style.transform = `translate(${t.left - f.left - ix * s}px, ${t.top - f.top - iy * s}px) scale(${s})`;
+      img.style.clipPath = `inset(${iy}px ${ix}px round ${radius}px)`;
+    };
+    const settle = () => {
+      img.style.transform = "";
+      img.style.clipPath = "inset(0 round 8px)";
+    };
     const shut = () => {
-      box.classList.remove("open");
+      if (closing) return;
+      closing = true;
       removeEventListener("keydown", key);
       removeEventListener("resize", onResize);
       removeEventListener("pointerup", up);
-      document.documentElement.style.overflow = "";
-      setTimeout(() => box.remove(), 250);
+      box.classList.remove("open");
+      if (zoomed) {
+        zoomed = false;
+        layout();
+      }
+      box.classList.add("moving");
+      fromThumb();
+      setTimeout(() => {
+        thumb.style.visibility = "";
+        box.remove();
+      }, 420);
     };
     const key = (e) => {
       if (e.key === "Escape") shut();
+      else if (!zoomed && [" ", "ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"].includes(e.key) && !(e.key === " " && e.target === close)) e.preventDefault();
     };
     const onResize = () => layout();
     let drag = null;
+    // The page keeps its scrollbar (hiding it shifts the layout), so the page under the lightbox mustn't scroll.
+    box.addEventListener("wheel", (e) => !zoomed && e.preventDefault(), { passive: false });
     box.addEventListener("pointerdown", (e) => {
       if (e.target === close || e.pointerType !== "mouse") return;
       drag = { x: e.clientX, y: e.clientY, sl: box.scrollLeft, st: box.scrollTop, moved: false };
@@ -141,29 +173,35 @@ footer > .meta { margin-bottom: 12px; }
     const up = () => setTimeout(() => ((drag = null), box.classList.remove("dragging")));
     addEventListener("pointerup", up);
     box.addEventListener("click", (e) => {
-      if (e.target === close || drag?.moved) return;
+      if (e.target === close || drag?.moved || closing) return;
       if (e.target !== img && !zoomed) return shut();
+      box.classList.remove("moving");
       zoomed = !zoomed;
       layout(e.clientX, e.clientY);
     });
     close.addEventListener("click", shut);
     addEventListener("keydown", key);
     addEventListener("resize", onResize);
-    img.addEventListener("load", () => layout(), { once: true });
-    img.src = src;
-    if (img.complete) layout();
-    document.documentElement.style.overflow = "hidden";
+    img.addEventListener("load", () => !closing && layout(), { once: true });
+    img.src = thumb.currentSrc || thumb.src;
     document.body.append(box);
-    requestAnimationFrame(() => box.classList.add("open"));
+    layout();
+    fromThumb();
+    thumb.style.visibility = "hidden";
+    box.getBoundingClientRect();
+    box.classList.add("open", "moving");
+    settle();
     close.focus({ preventScroll: true });
   }
 
   const zoomable = () => {
-    for (const img of document.querySelectorAll(".hero figure img")) {
+    const explainer = /\/explainer(\.html)?$/.test(location.pathname);
+    for (const img of document.querySelectorAll(explainer ? "img:not(a img)" : ".hero figure img")) {
+      img.classList.add("zoomable");
       img.tabIndex = 0;
       img.setAttribute("role", "button");
       img.title = "View full size";
-      const open = () => lightbox(img.currentSrc || img.src, img.alt);
+      const open = () => lightbox(img);
       img.addEventListener("click", open);
       img.addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), open()));
     }
