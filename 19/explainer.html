@@ -98,6 +98,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .item > div { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 10px; }
 .item h3 { font-size: 20px; }
 .item p { font-size: 15px; line-height: 1.55; color: var(--muted); }
+.pieces { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.piece { background: var(--panel); border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; margin: 0; }
+.piece .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+.piece .pair div { position: relative; }
+.piece img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; background: var(--stage); }
+.piece .pair span { position: absolute; left: 8px; bottom: 8px; font: 600 10.5px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: #fff; background: rgb(20 24 28 / 0.45); padding: 5px 7px; border-radius: 2px; pointer-events: none; }
+.piece figcaption { padding: 12px 16px 14px; display: flex; flex-direction: column; gap: 4px; }
+.piece b { font: 700 17px/1.2 var(--display); }
+.piece figcaption span { font-size: 14px; line-height: 1.45; color: var(--muted); }
 .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
 .fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .fact b { font: 700 15px/1.2 var(--display); }
@@ -179,6 +188,51 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <p>Every piece starts from an icosphere, cached per detail level, whose every vertex is mapped into its kind: a pebble squashed and lumpy, a bottle shard a slab of cylinder wall wrapping 75° to 130°, a bowl shard a doubly curved dish patch with an optional rolled lip, pressed glass with one of four flute styles (bottle base, panelled wall, hobnails, jar lip), a marble a sphere whose swirl veins wear faster or slower than the glass around them, a stopper lathed on its side with a faceted finial and collar, a bottle neck a collar of rounded-rectangle section around a wide hole, a torus a wobbly ring with a thread, a cane a rod with white spiral threads inside. Shards, pebbles and pressed glass also get chips scooped out of them. The detail and the count follow the quality tier: 32 subdivisions and 28 pieces when capturing, 20 and 24 on high, 14 and 18 on medium, 12 and 12 on low. Building a set takes tens of milliseconds a piece, so it is a generator stepped a few milliseconds per frame.</p>
       <p>The key is that each piece is generated <em>twice</em>, from the same vertices. The <b>raw</b> pose is the glass as it broke: fracture faces, sharp rims, the full relief of whatever pattern it carries (flutes, threads, ribs). The <b>worn</b> pose is that shape after the sea, computed from the same vertex by the same formulas with softer settings: the fracture outline blended towards an organic one, the slab's profile raised to a gentler power (the edge rounds instead of breaking off), the relief shallower. Both are then run through Taubin smoothing (a shrink-free low-pass over the mesh, on cached adjacency), which wears off creases and steps the mesh is too coarse to resolve. Both live in the same geometry as attributes (<code>position</code> and <code>aRawPos</code>, their normals, plus the pattern's offset in each pose as <code>aPatternE</code> / <code>aPatternR</code>), so erosion is a blend in the vertex shader: no rebuild, no pop, any value between 0 and 1. The pattern blends on its own amount, "Pattern wear", so the flutes of pressed glass can outlast its rim, or go first.</p>
+    </div>
+    <div class="col prose">
+      <p>Here is every kind on its own, in both poses: erosion 0 on the left, as it lands from the backwash, and erosion 1 on the right, after its 9 seconds in the surf. The frost thickens with the wear too: a fresh fracture carries 45% of the frost a fully worn face does, so the broken pieces read glassier and the worn ones milkier.</p>
+    </div>
+    <div class="pieces">
+      <figure class="piece"><div class="pair">
+        <div><img src="explainer/pieces/pebble-broken.jpg" width="720" height="720" alt="Broken: a squashed, lumpy green chunk with chipped faces." loading="lazy"><span>broken</span></div>
+        <div><img src="explainer/pieces/pebble-worn.jpg" width="720" height="720" alt="Worn: the same green chunk rounded smooth." loading="lazy"><span>worn</span></div>
+      </div><figcaption><b>Pebble</b><span>A lumpy chunk of thick glass: its chipped faces and broken edges melt into one soft, round stone.</span></figcaption></figure>
+      <figure class="piece"><div class="pair">
+        <div><img src="explainer/pieces/shard-broken.jpg" width="720" height="720" alt="Broken: a flat teal slab with sharp fracture faces and stepped edges." loading="lazy"><span>broken</span></div>
+        <div><img src="explainer/pieces/shard-worn.jpg" width="720" height="720" alt="Worn: the same teal slab worn into a soft rounded lozenge." loading="lazy"><span>worn</span></div>
+      </div><figcaption><b>Shard</b><span>Flat window or jar glass: a slab with straight fracture faces and stepped edges, worn to a rounded lozenge.</span></figcaption></figure>
+      <figure class="piece"><div class="pair">
+        <div><img src="explainer/pieces/bottle-broken.jpg" width="720" height="720" alt="Broken: a curved brown bottle shard with ribs and a jagged edge." loading="lazy"><span>broken</span></div>
+        <div><img src="explainer/pieces/bottle-worn.jpg" width="720" height="720" alt="Worn: the same brown shard with a rounded rim and softened ribs." loading="lazy"><span>worn</span></div>
+      </div><figcaption><b>Bottle shard</b><span>A piece of curved bottle wall with its moulded ribs; the rim rounds off and the ribs flatten to soft bands.</span></figcaption></figure>
+      <figure class="piece"><div class="pair">
+        <div><img src="explainer/pieces/bowl-broken.jpg" width="720" height="720" alt="Broken: a curved lilac dish fragment with sharp corners." loading="lazy"><span>broken</span></div>
+        <div><img src="explainer/pieces/bowl-worn.jpg" width="720" height="720" alt="Worn: the same lilac fragment worn into a soft curved pebble." loading="lazy"><span>worn</span></div>
+      </div><figcaption><b>Bowl shard</b><span>A doubly curved patch of a dish, sharp cornered as it broke, worn to a soft curved pebble.</span></figcaption></figure>
+      <figure class="piece"><div class="pair">
+        <div><img src="explainer/pieces/fluted-broken.jpg" width="720" height="720" alt="Broken: an amber pressed-glass fragment with hobnails and flutes and sharp edges." loading="lazy"><span>broken</span></div>
+        <div><img src="explainer/pieces/fluted-worn.jpg" width="720" height="720" alt="Worn: the same amber fragment with rounded edges, its hobnails and flutes still showing." loading="lazy"><span>worn</span></div>
+      </div><figcaption><b>Pressed glass</b><span>Tableware with a moulded pattern (here hobnails and flutes). Pattern wear decides whether the relief outlasts the rim.</span></figcaption></figure>
+      <figure class="piece"><div class="pair">
+        <div><img src="explainer/pieces/marble-broken.jpg" width="720" height="720" alt="Broken: a smooth blue marble with a pale swirl." loading="lazy"><span>broken</span></div>
+        <div><img src="explainer/pieces/marble-worn.jpg" width="720" height="720" alt="Worn: the same marble with its swirl veins worn into raised bands." loading="lazy"><span>worn</span></div>
+      </div><figcaption><b>Marble</b><span>A toy marble whose swirl veins wear at their own rate: whole, it is smooth; worn, the veins stand as ribs or sink as channels.</span></figcaption></figure>
+      <figure class="piece"><div class="pair">
+        <div><img src="explainer/pieces/stopper-broken.jpg" width="720" height="720" alt="Broken: a pink bottle stopper with a faceted head, collar and tapered plug." loading="lazy"><span>broken</span></div>
+        <div><img src="explainer/pieces/stopper-worn.jpg" width="720" height="720" alt="Worn: the same stopper with its facets worn into a smooth knob." loading="lazy"><span>worn</span></div>
+      </div><figcaption><b>Stopper</b><span>A bottle stopper lathed on its side, faceted finial and collar; the facets wear away into a soft knob.</span></figcaption></figure>
+      <figure class="piece"><div class="pair">
+        <div><img src="explainer/pieces/ring-broken.jpg" width="720" height="720" alt="Broken: a pale aqua bottle-neck collar with squared edges." loading="lazy"><span>broken</span></div>
+        <div><img src="explainer/pieces/ring-worn.jpg" width="720" height="720" alt="Worn: the same collar with its edges rounded." loading="lazy"><span>worn</span></div>
+      </div><figcaption><b>Bottle neck</b><span>The collar of a bottle, a rounded-rectangle section around a wide hole; its squarer corners round off.</span></figcaption></figure>
+      <figure class="piece"><div class="pair">
+        <div><img src="explainer/pieces/torus-broken.jpg" width="720" height="720" alt="Broken: a wobbly red glass ring with a raised thread." loading="lazy"><span>broken</span></div>
+        <div><img src="explainer/pieces/torus-worn.jpg" width="720" height="720" alt="Worn: the same red ring worn into an even, smooth torus." loading="lazy"><span>worn</span></div>
+      </div><figcaption><b>Torus</b><span>A wobbly glass ring with a thread around it, rounded into an even, softer ring.</span></figcaption></figure>
+      <figure class="piece"><div class="pair">
+        <div><img src="explainer/pieces/rod-broken.jpg" width="720" height="720" alt="Broken: a clear cane fragment with white spiral threads and broken ends." loading="lazy"><span>broken</span></div>
+        <div><img src="explainer/pieces/rod-worn.jpg" width="720" height="720" alt="Worn: the same cane with rounded ends, its white threads still inside." loading="lazy"><span>worn</span></div>
+      </div><figcaption><b>Cane</b><span>A latticino rod with white spiral threads inside: the broken ends round off, the threads stay inside.</span></figcaption></figure>
     </div>
     <div class="fig">
       <div class="fig-head"><h3>Broken to worn</h3>
