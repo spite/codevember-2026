@@ -1,0 +1,993 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Bolt Strikes Glass</title>
+<meta name="description" content="How Codevember 2026 day 21, Bolt, sphere-traces a glass object from distance fields, grows a Lichtenberg figure inside it by space colonisation in a worker, reveals it as the discharge runs out, throws caustics from rays traced in a vertex shader, builds the lightning from midpoint-displaced cards and a plasma-ball charge from arcs of circles, and scores it with CC0 recordings.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* A grey studio with a cool key and a warm lamp; the diagrams are the room with the lights down. */
+:root {
+  --bg: #eef0f3;
+  --panel: #f8f9fb;
+  --ink: #16181d;
+  --muted: #5c6470;
+  --line: #dce0e6;
+  --accent: #3459cf;
+  --accent2: #d9873c;
+  --stage: #23262c;
+  --stage-ink: #9aa3b1;
+  --stage-line: #363a42;
+  --glass: #c9d3e0;
+  --figure: #f3f6fb;
+  --bolt: #a9c4ff;
+  --lamp: #f0a35a;
+  --red: #c4503a;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --text: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111317; --panel: #191c21; --ink: #e9edf3; --muted: #99a2af; --line: #2a2e36;
+    --accent: #84a6ff; --accent2: #f2a764; --stage: #0b0d10; --stage-ink: #7f8896; --stage-line: #22262d;
+    --glass: #8e9bb0; --figure: #eef2f8; --bolt: #a9c4ff; --lamp: #f5ad66; --red: #e8735c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111317; --panel: #191c21; --ink: #e9edf3; --muted: #99a2af; --line: #2a2e36;
+  --accent: #84a6ff; --accent2: #f2a764; --stage: #0b0d10; --stage-ink: #7f8896; --stage-line: #22262d;
+  --glass: #8e9bb0; --figure: #eef2f8; --bolt: #a9c4ff; --lamp: #f5ad66; --red: #e8735c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--text); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .glow { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .glow { background: linear-gradient(100deg, var(--accent) 10%, var(--accent2) 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; background: var(--stage); }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; border-radius: 3px; background: var(--stage); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+.controls select { font: 400 13px/1 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 5px 6px; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+input[type="checkbox"] { accent-color: var(--accent); }
+button { font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px; padding: 9px 14px; cursor: pointer; }
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: pre; }
+.formula .c { color: var(--muted); }
+.table-wrap { overflow-x: auto; background: var(--panel); border-radius: 4px; }
+table { border-collapse: collapse; width: 100%; font: 400 14px/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+td.num, th.num { text-align: right; }
+td.wrap { white-space: normal; min-width: 260px; }
+tr:last-child td { border-bottom: 0; }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 21</b> · Bolt</div>
+      <h1>How Bolt strikes <span class="glow">glass</span></h1>
+      <p class="lede">A clear glass object stands on a concrete slab in a grey studio. Click it and charge gathers where you clicked, crawling over the glass in arcs; a bolt comes down; and the discharge runs out through the glass, leaving a Lichtenberg figure frozen in it, lit warm from a lamp in the slab. Here is how the glass is traced, how the figure is grown and revealed, how the light gets through and round it, and how the lightning is drawn.</p>
+      <a class="live" href="./">See it live <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M3 1.8v8.4c0 .5.5.8.9.5l6.6-4.2a.6.6 0 0 0 0-1L3.9 1.3c-.4-.3-.9 0-.9.5z" fill="currentColor"/></svg></a>
+    </div>
+    <figure>
+      <img src="../screenshots/21.jpg" width="1080" height="1080" alt="A glass torus on a concrete slab in a hazy grey studio, a white branching Lichtenberg figure frozen inside it, glowing warm at the bottom." fetchpriority="high" decoding="async">
+      <figcaption>A struck torus, the figure lit from behind by the key and from below by the lamp in the slab.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>A discharge, frozen</h2>
+      <p>Fire an electron beam into a block of acrylic and the charge stays trapped inside it. Tap the block with a grounded point and the charge leaves all at once, in a few nanoseconds, melting a branching tree of channels on its way to the point: a Lichtenberg figure. The sketch tells a version of that story with lightning. The charge gathers where the visitor clicks, a bolt comes down from above the frame and strikes there, and the figure runs out through the glass from that spot. It glows blue for a moment and then is white fractures, lit from behind by a cool key and from below by a warm lamp set into the slab.</p>
+      <p>Everything about the glass is computed per pixel from a distance field: there is no glass mesh. The figure is grown on the CPU in a worker and handed to the GPU as two 3D textures. The bolt is a few hundred camera-facing cards drawn into a buffer of its own. The page is the shared photographic pipeline (studio, soft shadows, AO, GI, AgX) with one full-screen pass of the day's own laid over its lit frame, through the pipeline's <code>composite</code> hook.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>One object, struck once</b><span>A clear object can be struck once. <code>C</code> clears the figure, <code>R</code> brings another shape (never the same one), <code>S</code> strikes somewhere visible.</span></div>
+      <div class="fact"><b>Ten shapes</b><span>Sphere, block, cube, cylinder, bottle, octahedron, dodecahedron, icosahedron, torus and Suzanne, at 1.15× their distance field's units.</span></div>
+      <div class="fact"><b>About three seconds</b><span>1.1 s of charge, 0.08 s for the leader, a quarter of a second of strokes, 1.1 s for the figure to run out, 2.2 s for the blue to fade.</span></div>
+    </div>
+  </section>
+
+  <!-- 2. The glass -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The glass · <b>glass.js, shapes.js</b></div>
+      <h2>Glass that is only a distance</h2>
+      <p>Each shape is a signed distance function: negative inside, positive outside, and its magnitude a safe step. For every pixel, the camera ray is taken into the object's own space (its pose is a turn about the vertical and a scale of 1.15), clipped to the field's box of ±1.12 less one cell, and <em>sphere-traced</em>: step forward by the distance to the surface, which can never overshoot it, and repeat, at most 96 times, until the distance is under 0.0015. A ray that misses but came within a pixel's angle of the surface still covers part of the pixel, and that part shows the room mirrored, as glass does at grazing angles; that is the silhouette's antialiasing.</p>
+      <p>At the hit, the normal is the field's gradient, by central differences. The ray splits by Fresnel (Schlick's approximation, <code>f₀ = ((n − 1)/(n + 1))²</code>, 4% at the default index of 1.5): the reflected share shows the studio's environment map, and the rest is refracted in. Inside, the ray crosses the glass (through the figure, if there is one; next sections) and meets the far side, where it splits again. What leaves is bent out and shows whatever is behind: the lit frame of the pipeline, looked up at the point 1.5 units along the bent ray, or the environment where that is off screen. What stays in, when it is more than 3% of it, is reflected and crosses the object a second time before leaving whichever way it can. That second crossing is where a block's mirrored copies of its own figure come from, and why a sphere shows a second, smaller figure in its lower half.</p>
+      <p>Light crossing glass is absorbed a little by distance, more in red than blue: <code>exp(−(0.1, 0.06, 0.05) · path)</code>, so thick glass goes faintly green-blue, as real soda-lime glass does.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A ray through the glass</h3>
+        <div class="controls">
+          <label>shape <select id="gS"><option value="sphere">sphere</option><option value="cube">cube</option><option value="ico">icosahedron (slice)</option></select></label>
+          <label>ray <input id="gY" type="range" min="-1" max="1" step="0.005" value="0.42"><output id="gYo"></output></label>
+          <label>index <input id="gN" type="range" min="1.1" max="2" step="0.01" value="1.5"><output id="gNo"></output></label>
+        </div>
+      </div>
+      <canvas id="glassFig" aria-label="A 2D slice of a glass shape with a ray from the eye: the sphere-tracing steps as circles, the refracted path inside, and the Fresnel split at each surface."></canvas>
+      <div class="readout" id="gR"></div>
+      <p class="fig-cap">A slice through the shape, the eye on the left. The circles are the sphere-tracing steps: each is as big as the distance field says is empty, so the ray never steps through the surface. At the hit the ray splits: a reflection (its share by Fresnel), the refracted ray in, and at the far side the light that leaves and the light reflected back for a second crossing, each drawn as bright as its share. Push the ray toward the edge to see the second crossing take over, and raise the index to see total internal reflection trap it.</p>
+    </div>
+    <div class="col prose">
+      <p>The shapes come in two kinds. Nine are exact functions, evaluated in the shader as they are in JavaScript: a sphere of radius 0.9, a rounded box for the block (0.6 × 0.72 × 0.42 half-extents) and the cube (0.56), rounded cylinders for the cylinder and the two parts of the bottle (blended by a smooth minimum of 0.25), a torus standing on its rim (ring radius 0.6, tube 0.33), and three polyhedra cut by pairs of planes. A grid of trilinear samples cannot hold a crease (a polyhedron traced from one has wavy edges and dimpled faces), so the polyhedra are always computed exactly. Their edges are rounded by a soft maximum over all of their planes at once:</p>
+    </div>
+    <div class="formula"><span class="c">// a polyhedron: planes at r from the centre, normals nᵢ (half of them; the rest are their opposites)</span>
+top  = maxᵢ (|p·nᵢ| − r)
+d    = top + k · log Σᵢ exp((|p·nᵢ| − r − top) / k)        <span class="c">// k = edge / 2: log-sum-exp, every plane alike</span>
+d'   = d + (ball(p) − d) · 0.6 · inflate               <span class="c">// "Inflate": swell toward a ball of about its size</span></div>
+    <div class="col prose">
+      <p>Folding a two-way smooth maximum over the planes one by one rounds each edge well but leaves creases round a vertex, where five faces meet and the order of the folds shows; the log-sum-exp treats them all alike. Octahedron (four plane pairs at 0.566), dodecahedron (six at 0.72) and icosahedron (ten at 0.74) all take the panel's <em>Edges</em> and <em>Inflate</em>, as do the block and the cube.</p>
+      <p>Suzanne has no formula. She comes from the 96³ grid day 7 baked from Blender's mesh, as half floats (1.7 MB), cell size 2.24 / 96 = 0.0233. The grid stores her nose down, so on load she is resampled into a new grid turned −0.37 radians about x, as day 7 does: tilted back, she sits on her chin and looks ahead rather than standing on her nose. Her field is a 3D texture in the shader, read with hardware trilinear filtering; outside its box the distance is at least the distance to the box.</p>
+      <p>Every shape is also baked to a 96³ grid on the CPU, whatever its kind. The grid is what the click is found in (the same sphere trace, in JavaScript), what the figure grows in, what the plinth's shadows are walked through, and what the charge's arcs are put back onto. The lowest inside cell gives the object's foot, which is lifted onto the slab.</p>
+    </div>
+  </section>
+
+  <!-- 3. Growing the figure -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The figure · <b>grow.worker.js</b></div>
+      <h2>A tree that goes looking for charge</h2>
+      <p>A real Lichtenberg figure is a dielectric breakdown: the channel grows where the field across its tip is strongest, which is where the most charge is still waiting nearby. The worker grows it the way plants are often grown in graphics, by <em>space colonisation</em> (Runions et al.), which has the same economy: charge is scattered through the glass as points, each point pulls the node of the tree nearest to it, and a point is spent once a branch comes within reach of it. The tree stops when it has been everywhere, and its branches end up about one spacing apart wherever they are: the whole volume, with clear glass between.</p>
+      <p>The panel's <em>Density</em> sets how many points the object holds, <code>120 + 560 × density</code> (400 at the default), which is about how many branches the figure ends up with. The spacing follows from the volume, <code>∛(volume / points)</code>, so a small object is no busier than a large one: about 0.2 units in the sphere.</p>
+      <p>The points come in two lots. A sparse lot first, on a grid 2.6 times the spacing, which draws a few long fronds right across the object; then, once those are grown, a fine lot on the spacing itself, which the fronds answer with side branches all along their length. That order is what gives the figure its hierarchy, and the hierarchy is what keeps a dense one legible. A point is placed at random in each grid cell if that is inside the glass, at least 0.05 in where the glass is thick, and (half of them) anywhere past 0.006 where it is thin, so that thin parts such as Suzanne's ears, at most 0.024 thick, get some.</p>
+      <p>Each round, every point still waiting adds its unit direction to its nearest node's pull. Each pulled node grows one step of 0.034 toward the sum, plus two terms of the day's own. <code>FAN = 0.7</code> pushes it away from the entry, as the field would push the discharge, so the fronds fan out from where the bolt went in, side by side, as they do in the photographs. And <em>Wander</em> adds a random vector of up to 1.4 × wander, from straight frost to gnarled. A node pulled evenly both ways (a sum shorter than 0.25) would dither on the spot and is skipped, a node that has forked three times has done its part, and a step that would leave the glass is pushed back inside along the surface's gradient, so a branch can follow a thin part instead of dying at it. A round where nothing can move lets the stuck points go. The growth stops at 400 rounds per lot, 9,000 nodes or two seconds, since a bolt is waiting on it.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Space colonisation, in a slice</h3>
+        <div class="controls">
+          <label>fan <input id="tF" type="range" min="0" max="1.6" step="0.05" value="0.7"><output id="tFo"></output></label>
+          <label>wander <input id="tW" type="range" min="0" max="1.4" step="0.05" value="0.7"><output id="tWo"></output></label>
+          <label>density <input id="tD" type="range" min="0" max="1" step="0.05" value="0.5"><output id="tDo"></output></label>
+          <label><input id="tS" type="checkbox" checked> straighten</label>
+          <label><input id="tH" type="checkbox" checked> hairs</label>
+          <button class="ghost" id="tGo">grow again</button>
+        </div>
+      </div>
+      <canvas id="treeFig" aria-label="A disc of glass with charge points scattered in it, and a tree growing from an entry point on its rim toward them, fanning out away from the entry."></canvas>
+      <div class="readout" id="tR"></div>
+      <p class="fig-cap">The same algorithm in a 2D disc, the entry at the top left. The sparse lot of points (larger) is grown first and draws the long fronds; the fine lot then fills in side branches. Points fade as they are spent. Set fan to 0 to see plain space colonisation, which grows toward the nearest charge in every direction; with fan the fronds run away from the entry and lie side by side. "Straighten" and "hairs" are the two passes made before drawing, below.</p>
+    </div>
+    <div class="col prose">
+      <p>Two passes shape the tree before it is drawn. The lattice of short steps wiggles, where a crack runs straight and kinks. So only some nodes keep their place: the forks, the tips and every fifth node along a run; the ones between are put on the straight line between those. Then each piece's thickness is set by how much of the tree it feeds: its radius is <code>0.6 + 1.4 · √(feeds / nodes)</code> voxels, so the trunk out of the entry is the thickest and the tips are hairlines.</p>
+      <p>The feathering in the photographs is a fuzz of hairline cracks on every branch. Each piece gets three: from a random point along it, raked forward the way the discharge went (0.6 to 1.2 of the piece's direction) and set round it at a random roll like a bottle brush, so a frond is feathered from wherever it is seen. A hair is 0.4 to 1.3 steps long plus seven times the piece's share, longest off the main branches, and 0.55 voxels thick: anything thinner falls between the texture's samples. The hairs stop at three seconds, half the growth's budget again.</p>
+    </div>
+  </section>
+
+  <!-- 4. The texture -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Into the GPU · <b>grow.worker.js, band.js</b></div>
+      <h2>A field of distances to the channels</h2>
+      <p>The tree goes to the GPU as a T³ grid of bytes, T = 320 on desktops (32.8 MB), 288 on phones and 192 at the low tier. Each piece is drawn into it as a capsule, but what a voxel stores is not whether it is in the channel: it is the distance to the channel's wall, within <code>BAND = 3</code> voxels either way, as <code>0.5 + (r − d) / 6</code>, clamped and scaled to a byte, keeping the larger value where pieces overlap. Read back, that is a distance field of its own, negative inside a channel and known out to three voxels (0.021 units at T = 320). The glass shader sphere-traces it like the glass itself: through clear glass the march strides by what the field says is clear, up to three of its base step of 0.012, and slows to half a voxel only beside a channel. That is how a figure of thousands of hairline branches is marched without missing them.</p>
+      <p>Beside that grid the worker writes a second, at half the resolution (160³ at T = 320, 4.1 MB): <em>when</em> the discharge reaches each place. Every node's distance along the tree from the entry is summed down the tree; each voxel near a channel takes the arrival of the nearest piece, interpolated along it, scaled so the farthest tip is at 0.94 of a byte's range; a hair arrives a moment after the point it leaves. It is read with nearest filtering, since a blend between two branches' arrivals would be neither.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The discharge running out</h3>
+        <div class="controls">
+          <button class="ghost" id="rPlay">play</button>
+          <label>time <input id="rT" type="range" min="0" max="1.6" step="0.01" value="0.45"><output id="rTo"></output></label>
+          <label>slow <input id="rS" type="range" min="1" max="8" step="1" value="3"><output id="rSo"></output></label>
+        </div>
+      </div>
+      <canvas id="revealFig" aria-label="The grown tree from the previous figure, drawn only where the discharge has reached by the time on the slider, with a hot blue front at the tips."></canvas>
+      <p class="fig-cap">The tree from the figure above, revealed by its arrival times. The front runs out over 1.1 s, fast at first and slowing as it spreads (<code>1 − (1 − t / 1.1)^1.8</code>), white-hot and blue where it has just arrived and cooling behind it. Played slower than life by the factor on the slider.</p>
+    </div>
+    <div class="formula"><span class="c">// in the glass shader, per sample along the ray</span>
+since = grown − arrival(q)                               <span class="c">// grown: 0 → 1 over 1.1 s after the stroke</span>
+if (since &lt; 0) the channel is not there yet             <span class="c">// clear glass</span>
+front = (0.4, 0.58, 1) · 14 · exp(−22 · since)           <span class="c">// hot at the front, cooling behind it</span></div>
+  </section>
+
+  <!-- 5. Shading the figure -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The figure's light · <b>glass.js</b></div>
+      <h2>Shattered glass, lit from behind and below</h2>
+      <p>A channel in a real figure is not a clean tube: it is a run of shattered glass, a hard core in a haze of finer cracks, and the core's wall is broken into facets that each catch the light their own way. The march draws both as it crosses the field.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>The haze</b><span>Within 2 voxels of a channel, an opacity <code>1 − exp(−close² · grain³ · 0.22 · step / voxel)</code>, where <code>close</code> rises toward the wall and <code>grain</code> is value noise at 0.7 voxels: many fine cracks rather than a glow. It passes 20% less light behind it for every bit it adds.</span></div>
+      <div class="fact"><b>The chipped wall</b><span>The wall is pushed in and out by noise at 1.5 voxels (up to 0.9 voxel). Where the ray meets it, the normal is the field's gradient plus a random tilt per 1.1-voxel cell (2.2 strong), so each chip is a facet, with a glint <code>(R·L)²⁰</code> toward the key. Opacity 0.3 at the skin to 0.92 a voxel and a half deep.</span></div>
+      <div class="fact"><b>The lamp</b><span>A point just above the object's foot, warm <code>(1, 0.62, 0.3)</code> × 4 × the panel's <em>Lamp</em> (0.6), falling off as <code>1 / (0.03 + d²)</code>: the hot spot low in the glass, and more where a chip faces it.</span></div>
+      <div class="fact"><b>Specks</b><span>Seed bubbles: one cell in 400 of a 1/22-unit grid holds one, 0.004 units in radius, lit by the key and the lamp. They are there before the strike too.</span></div>
+      <div class="fact"><b>Afterglow</b><span>For 2.2 s after the stroke the figure glows, from a pale <code>(0.3, 0.55, 1)</code> to a deep <code>(0.12, 0.25, 1)</code> as it fades, and lights the slab.</span></div>
+      <div class="fact"><b>Gain</b><span>All of it is scaled by 0.2 against the key, so the figure reads as white glass lit from outside, not as a light of its own.</span></div>
+    </div>
+    <div class="col prose">
+      <p>The key comes from behind and to the left (<code>(−0.8, 0.65, −0.45)</code>), tinted cool, so from the default camera the figure is backlit against the dark of the glass, as in the photographs of acrylic blocks on a light box. The lamp is the warm counterpart from below. The real objects are often shown on lit stands, and this is what gives the figure the warm-and-cool look of the reference the day was aimed at.</p>
+    </div>
+  </section>
+
+  <!-- 6. Caustics -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Caustics · <b>caustics.js</b></div>
+      <h2>Rays traced in a vertex shader</h2>
+      <p>Glass on a lit floor throws a bright, focused pool where it gathers the light and a dark shadow round it. The pipeline's shadow map knows nothing of glass (there is no glass mesh), so the day traces its own light. A square grid of rays leaves the key, 512 × 512 of them on desktops (384² on phones, 256² at low), jittered in their cells so they do not land in rings and moiré, over a square ±1.25 of the object's units across. Each ray is one vertex of a <code>Points</code> draw, and its vertex shader does the whole trace: sphere-trace to the glass, refract in, cross, and at the far side refract out, or, where the angle is too steep to leave, reflect back in and cross again, up to three times. Its Fresnel losses go into its weight. Then it lands on a level plane, and the vertex is placed in clip space at that point of a map of the plane.</p>
+      <p>Each landing is a 5-pixel splat with a Gaussian <code>exp(−4r²)</code>, added. Its weight is the share of the beam the ray stands for over the area of a texel, divided by the splat's own total of 4.9, so the map holds irradiance in units of the key's: 1 in the open, more where the glass focuses, less where it spreads. Two maps are made, for the slab's top and the floor, 768² each, centred where the ray through the object's centre lands; the slab's top blocks rays on their way to the floor. A separable 9-texel Gaussian blur takes off the grain of a quarter of a million jittered rays.</p>
+      <p>Once struck, each ray is also walked along the figure's own field as it crosses, striding over clear glass by the field's distance, and loses half its light at every channel it meets: the channels scatter it, to nowhere in particular. So a struck object throws its figure's shadow into its caustic, branch by branch. The maps are redrawn whenever anything they depend on changes: the shape, its turn (so every frame while it spins), the figure and the index of refraction.</p>
+      <p>The slab and the floor read them in their own shading, through the pipeline's <code>surface()</code> hook. The key's light that would have come straight through the glass is taken away first. The key's ray from the point is walked through the object's field, 44 steps of 0.06, and the thickness of glass it crosses turns into a shadow. Then the map's light is added back, <code>albedo · key · map / π</code>, on up-facing surfaces.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A slice of the caustic</h3>
+        <div class="controls">
+          <label>index <input id="cN" type="range" min="1.1" max="2" step="0.01" value="1.5"><output id="cNo"></output></label>
+          <label>key angle <input id="cA" type="range" min="-40" max="40" step="1" value="-22"><output id="cAo"></output></label>
+          <label><input id="cF" type="checkbox"> struck</label>
+        </div>
+      </div>
+      <canvas id="causticFig" aria-label="Parallel rays falling on a glass disc above a floor, refracted through it and landing; below, the irradiance they pile up on the floor."></canvas>
+      <p class="fig-cap">Parallel rays from the key fall through a glass disc standing on the floor. Below, the irradiance their splats pile up, against 1 for unobstructed light (dashed). The disc focuses the light it catches into a bright line inside a dark shadow; when struck, every channel a ray crosses takes half of it, and the pool turns mottled.</p>
+    </div>
+  </section>
+
+  <!-- 7. The set -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The set · <b>main.js</b></div>
+      <h2>A grey studio with a haze in it</h2>
+      <p>The object stands on a slab of cast concrete 2.4 units square and 0.22 high, about as wide as the glass, on a darker recessed foot 2.1 square and 0.08 high, on a seamless cyc: a floor disc of radius 9 that sweeps up into a round wall over a quarter circle of radius 4. The studio has the cool key behind and to the left (intensity 6, a soft box 0.5 wide) and a warm fill (<code>#ff9850</code> at 0.2) from the other side, so the room goes warm to the right and cool to the left without either wall being painted.</p>
+      <p>The concrete is mottled by four octaves of value noise, each on a lattice turned and offset from the last (<code>mat3</code> rotation, ×2.13, +7.31) so that no grid shows through, at ±10% of the albedo; a fine grain of ±4%; and sparse pits at 35% darker. The roughness follows the mottle.</p>
+      <p>Since the glass's shadow is computed by the receivers themselves (above), their shadow value is overridden, and that also throws away the pipeline's own shadow of the slab on the floor. The floor puts it back from the slab's boxes: a soft shadow traced through their distance field toward the key, the darkest of <code>h / (0.12 t)</code> over 32 steps, the classic trick in which a ray that passes close to an occluder far away is in its penumbra.</p>
+      <p>The air has a little haze, laid over the frame in the glass pass: the room's light scattered toward the eye along the way, <code>mix(colour, environment · 0.12, 1 − exp(−0.03 · distance))</code>, measured to the glass where it is hit (it is not in the depth buffer) and to the room beyond it where not. The figure's light scatters too, as a halo round the glass. The halo is the integral along the ray of a light falling off as one over distance squared, <code>(atan((d − t꜀)/h) + atan(t꜀/h)) / h</code>, where <code>h</code> is how close the ray passes to the object's centre. A point light there peaks without limit as <code>h</code> goes to 0, which showed as a glowing ball inside a torus's hole, where nothing hides the centre. The light comes from all of the figure, so the source is taken as half a unit across: <code>h = √(h² + 0.25)</code>.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The halo across the object</h3>
+        <div class="controls"><label>source size <input id="hR" type="range" min="0" max="1" step="0.01" value="0.5"><output id="hRo"></output></label></div>
+      </div>
+      <canvas id="haloFig" aria-label="The haze's in-scattered light along a line across the object, for a point source and for a source of a given size."></canvas>
+      <p class="fig-cap">The in-scattered light along a line through the object's centre, 5.6 units from the camera, for a point source (dashed, clamped only at 0.05) and for a source of the size on the slider. At 0.5 the peak is a gentle swell; as a point it spikes wherever the centre can be seen.</p>
+    </div>
+  </section>
+
+  <!-- 8. The charge -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The charge · <b>bolt.js</b></div>
+      <h2>A plasma ball where it will land</h2>
+      <p>For 1.1 seconds before the bolt, and for as long after as the figure takes to grow, the charge gathers where the visitor clicked. It is drawn as the filaments of a plasma ball: each one leaves the impact and bows out through the air in an arc of a circle to a spot on the glass nearby, and that spot wanders, so the arc sweeps round with it.</p>
+      <p>There are up to twelve, each with its own angle round the impact, two phases and speeds for its wandering, a bulge and a reach. As the charge grows, <code>3 + 9 × charge</code> of them are drawn, reaching further: the landing is <code>(0.07 + 0.22 × charge) × reach</code> from the impact (reach 0.6 to 1.2, breathing by a quarter), at an angle that drifts by <code>0.9 sin(ω₁t + φ₁) + 0.4 sin(ω₂t + φ₂)</code>, with ω₁ from 0.6 to 1.8 and ω₂ from 1.3 to 3.3 radians a second. The landing is put back on the glass: four Newton steps in the baked grid along its gradient, lifted 0.004 units off it. Its normal there and the normal at the impact, summed, say which way is out.</p>
+      <p>The arc is a true arc of a circle through the impact and the landing, bowed out by a sagitta of 0.3 to 0.65 of its chord (shimmering by ±10%): the circle's radius is <code>(L²/4 + h²)/2h</code> and the points are its start vector turned toward the end about the circle's axis, in 40 pieces. Along it run two ripples, one each way across, <code>L · (0.07 sin(15s − 26t) + 0.02 sin(37s + 37t))</code>, faded to nothing at both ends so the start and landing stay put. Each piece flickers every 25 ms; the ends are brighter (<code>0.55 + 0.45 max(1 − 4s, s²)</code>); a spot of light marks each landing and a corona the impact. The whole set is rebuilt on the CPU every frame, about 500 pieces.</p>
+      <p>The arcs light the room: a blue lamp at the impact, flickering, at <code>5 × charge</code>, and the bloom rises by 0.12 × charge. When the stroke lands they flare to 2.5 times and die away over about half a second (<code>2.5 e^(−t/0.22)</code>), so the charge runs on into the strike rather than being cut off.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Filaments over the glass</h3>
+        <div class="controls">
+          <label>charge <input id="fC" type="range" min="0" max="1" step="0.01" value="0.8"><output id="fCo"></output></label>
+          <label><input id="fR" type="checkbox" checked> ripples</label>
+          <label><input id="fA" type="checkbox"> grow</label>
+        </div>
+      </div>
+      <canvas id="filFig" aria-label="The top of a glass object in section with arcs of electricity from one point on it, landing on the glass nearby and sweeping about."></canvas>
+      <p class="fig-cap">In section: the glass's surface, the impact at its top, and the filaments from it, each an arc of a circle bowed out from the glass to a landing that wanders round the impact. "Grow" plays the 1.1 s of charge on a loop. Without ripples the arcs are clean bows; with them, waves run along each one, and pass through each other.</p>
+    </div>
+  </section>
+
+  <!-- 9. The bolt -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The bolt · <b>bolt.js</b></div>
+      <h2>A channel jagged at every scale</h2>
+      <p>The channel starts 6.5 units above the impact, up to a unit to either side and toward the back, and comes down to it by <em>midpoint displacement</em>: each piece's midpoint is pushed off its chord, across it, by a share of its length, and the two halves are displaced in turn, seven times, for 128 pieces. The share is 0.1 for the first two levels and 0.28 after, so the channel comes down more or less straight and wanders in the small scales, which is how lightning looks: the same jaggedness at every size below a certain one.</p>
+      <p>Eight to twelve branches leave it, four of them in the lower part of the channel that the frame shows. Each grows downward and outward (a direction turned 0.4 to 1 radian off the channel, and never climbing) for up to 2.8 units, displaced the same way, thinning to half and dimming to 30% toward its tip, and forking again at 11% of its points (7% a level down, two levels at most). Every piece records when the leader reaches it (its share of the way down, a branch arriving later as it grows as fast as the leader does), how far up the channel it is, its width and its brightness at each end.</p>
+      <p>The timing follows lightning's. The leader comes down in 26 steps over 80 ms: the newest step flashes at 2.5, the two behind it at 0.9, decaying in 45 ms, and what it has laid glows at 0.25. It holds one step short of the glass, pulsing, until the stroke. The return stroke then runs <em>up</em> the channel in 12 ms, a bright front <code>1.2 · e^(−22|up − wave|)</code> over the channel behind it at 45 times a leader step, lighting each branch as it passes where it leaves. One to three restrikes follow down the same channel, 40 to 90 ms apart at 0.3 to 0.8 of the first, each a spike <code>e^(−t/0.022)</code> plus a current that keeps flowing, <code>0.06 e^(−t/0.1)</code>; the branches go dark in about 50 ms. From 30 ms after the last stroke the channel breaks into beads over 150 ms, and 0.4 s after it, it is gone.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The strike, slowed down</h3>
+        <div class="controls">
+          <button class="ghost" id="bPlay">play</button>
+          <label>time <input id="bT" type="range" min="-0.1" max="0.55" step="0.001" value="0.02"><output id="bTo"></output></label>
+          <label>levels <input id="bL" type="range" min="0" max="7" step="1" value="7"><output id="bLo"></output></label>
+          <label><input id="bP" type="checkbox"> per-piece levels</label>
+          <button class="ghost" id="bNew">new bolt</button>
+        </div>
+      </div>
+      <canvas id="boltFig" aria-label="A lightning bolt from the top of the frame to a point at the bottom, with branches, lit by the timeline: leader steps, the return stroke climbing, restrikes and the beaded afterglow."></canvas>
+      <div class="readout" id="bR"></div>
+      <p class="fig-cap">The bolt in 2D with the page's timing, played 40 times slower than life (time is in real seconds from the first stroke; before 0 is the leader's dash). "Levels" is how many times the channel was halved and displaced. "Per-piece levels" draws each piece at one brightness, as the page first did: in the dim afterglow neighbouring pieces then step against each other and the channel reads as a chain of sticks. Drawn with brightness and width interpolated from end to end, and any noise taken from the joints' places, they agree where they meet.</p>
+    </div>
+    <div class="col prose">
+      <p>Each piece is a card: an instanced quad in screen space, spanning the piece and as wide as its glow. Its fragment shader draws the distance to the segment, so the card is a capsule; it is never seen as a rectangle because every term falls to zero at the card's edge. The glow's radius at each end is a world size (0.14 × width), never less than 14 pixels so the core never falls between pixels, and is interpolated along the card, as is the brightness. Brightness depends on where along the channel each end is and on a hash of the end's position, so the two cards meeting at a joint agree there.</p>
+      <p>Inside the card the detail is drawn procedurally, from where along the channel in the world this is, so it runs on across the joints and is sharp at any size: the white-hot core wanders inside its glow by up to 0.11 of the radius (value noise at 12 per unit), a fainter second strand splits off and rejoins (noise at 20 per unit), and the glow is fibrous (±20%, noise at 34). The cards go into a half-float target of their own with <code>MAX</code> blending, not added: where two overlap at a joint the brighter wins, so joints do not glow double. The target holds three things the glass pass colours: the light, the core's share of it (white), and a wide blue glow, which comes out as a saturated blue so that the tone mapper does not turn the halo white.</p>
+      <p>The bolt lights the room. Three lamps up the channel (just above the glass, 18% and 55% of the way up the channel, strengths 30, 70 and 130 times its light) light the slab and the floor, with the glass's shadow thrown hard away from the channel (26 steps through the field), and the bolt shows in the glass's reflections by how squarely a reflected ray looks at the channel. The air along the channel glows, the first stroke whites the frame out for 40 ms, the frame is pushed up to nearly three times its brightness at the peak, and the bloom rises by up to 0.36.</p>
+    </div>
+  </section>
+
+  <!-- 10. Timeline -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">One strike · <b>main.js</b></div>
+      <h2>Three seconds, in order</h2>
+      <p>A strike starts with a click on the glass (the same sphere trace on the CPU finds the point and its normal) or with <code>S</code>, which tries up to 40 points in the visible upper part and takes the highest. The worker is sent the grid, the entry, its normal and a seed, and works to its deadline; the charge gathers for at least 1.1 s and until the figure is ready; the leader dashes down in 80 ms; the stroke lands and the figure starts to run out. Everything after the click runs on scene time, which a pause stops: a strike on its way is called off by a pause, and the worker is replaced rather than left to finish.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The timeline</h3>
+        <div class="controls"><button class="ghost" id="lNew">new strokes</button></div>
+      </div>
+      <canvas id="timeFig" aria-label="A graph over three seconds of one strike: the charge, the leader, the strokes' light, the white-out, the figure's growth and its afterglow, with the sounds marked."></canvas>
+      <p class="fig-cap">From the click: charge (filaments and hum), the leader's dash, the strokes' light (log scale, one spike per stroke), the white-out, the figure's growth and its blue afterglow, with the sounds as ticks along the top.</p>
+    </div>
+  </section>
+
+  <!-- 11. Sound -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Sound · <b>sound.js</b></div>
+      <h2>Recordings, scheduled on the strike</h2>
+      <p>Seven CC0 recordings from freesound.org, trimmed and levelled (the long ones to −16 LUFS, the short ones to their peak), about 380 kB in all, are fetched as a loading step and decoded before the first frame, so the first strike never waits for one. They go through one compressor that holds the crack. Variation comes from the unseeded random, so the seeded layout is never shifted by a sound.</p>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>when</th><th>what</th><th>source</th></tr></thead>
+      <tbody>
+        <tr><td>the charge</td><td class="wrap">A Tesla coil's hum, looped, swelling in 80 ms and rising from 0.85 to 1.15 of its pitch as its low-pass opens from 2.5 to 9 kHz; and snaps of a zap, quicker and louder as the charge gathers, cut off by the stroke.</td><td>"S16-18 Tesla coil sparking and humming" by craigsmith; "ELECTRIC_ZAP_001" by JoelAudio</td></tr>
+        <tr><td>the stroke</td><td class="wrap">A close crack (one of two, at ±6% of its pitch), its rumble 0.35 s later through a 900 Hz low-pass, and a snap for each restrike.</td><td>"Thunderstorm lightning strike" by foad; "Closeup Thunder Strike 01" by loganzsound; "Thunder Clap And Rumble #9" by Kinoton</td></tr>
+        <tr><td>the figure</td><td class="wrap">Ice crackling while the front runs, fading from 0.66 s as it slows; then four ticks as it cools, 0.4 to 1.8 s apart.</td><td>"ice grinding cracking freezing designed" by kyles; "Ice Crack 1" by j_p_higgins</td></tr>
+      </tbody>
+    </table></div>
+    <div class="col prose">
+      <p>For a recording the same calls go to an <code>OfflineAudioContext</code> timed by the page's clock, which the recorder steps frame by frame, and the result is rendered to a WAV that is muxed with the frames, so the sound lands on the frame the stroke does.</p>
+    </div>
+  </section>
+
+  <!-- 12. Kiosk and camera -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Left alone · <b>main.js</b></div>
+      <h2>It strikes itself, and turns to look</h2>
+      <p>Like every day, a page left open keeps showing new things. Each object gets the panel's <em>Change every</em> seconds, 12 by default. If nobody has struck it five seconds before the end (or at 60% of the time, if that is shorter), it strikes itself; and any strike, by hand or not, holds off the next object for at least six seconds, so there is always time to watch the figure form. Any interaction starts the count over. The hold is a small opt-in addition to the shared kiosk module, <code>hold(seconds)</code>; days that do not call it are unchanged.</p>
+      <p>After four seconds with no pointer, wheel or key input, the camera comes round by itself to where the strike shows best: in front of the glass, so the key backlights the figure; low, at a polar angle of 1.63 (looking slightly up at the object); 5.6 units out; and a little to one side, 0.1 to 0.45 radians, a different side for each object. It eases there with a time constant of 1.6 s and then sways, 0.1 radians round and 0.03 up and down, so the glass never sits dead still. Any input hands it back at once. Recordings (<code>?capture</code>) drive their own camera, so it is off there.</p>
+    </div>
+  </section>
+
+  <!-- 13. Cost -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Cost</div>
+      <h2>What a frame does</h2>
+      <p>The glass pass is the costly one: up to 96 steps to find the glass and up to 320 across it, twice where light stays in, every pixel the object covers. The rest scales with the pipeline's quality tier:</p>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>tier</th><th class="num">figure grid</th><th class="num">arrival grid</th><th class="num">caustic rays</th><th class="num">caustic maps</th></tr></thead>
+      <tbody>
+        <tr><td>high, capture</td><td class="num">320³ · 32.8 MB</td><td class="num">160³ · 4.1 MB</td><td class="num">512² = 262,144</td><td class="num">2 × 768²</td></tr>
+        <tr><td>medium (phones)</td><td class="num">288³ · 23.9 MB</td><td class="num">144³ · 3.0 MB</td><td class="num">384² = 147,456</td><td class="num">2 × 512²</td></tr>
+        <tr><td>low</td><td class="num">192³ · 7.1 MB</td><td class="num">96³ · 0.9 MB</td><td class="num">256² = 65,536</td><td class="num">2 × 384²</td></tr>
+      </tbody>
+    </table></div>
+    <div class="col prose">
+      <p>The bolt is at most 2,560 cards, 640 of them kept for the charge's filaments, drawn only while it lasts. The worker's growth and drawing take a few hundred milliseconds on a laptop, inside the 1.1 s the charge takes anyway.</p>
+    </div>
+  </section>
+
+  <footer class="col">
+    <div class="meta">
+      <span><b>three.js</b> r187</span><span>WebGL2</span><span>sphere-traced SDF glass</span><span>space colonisation in a worker</span><span>vertex-shader caustics</span><span>CC0 recordings</span>
+    </div>
+    Day 21 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/21/">spite.github.io/codevember-2026/21</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/21">21/ of the codevember-2026 repository</a>. The studio, shadows, AO and GI are described in <a href="../modules/pipeline/explainer.html">the shared pipeline's explainer</a>. Suzanne's distance field comes from <a href="../7/explainer.html">day 7</a>.
+  </footer>
+</main>
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+  const TAU = Math.PI * 2;
+  const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const rgb = (hex) => { const c = document.createElement("canvas").getContext("2d"); c.fillStyle = hex; const s = c.fillStyle; if (s[0] === "#") return [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16)); return s.match(/\d+/g).slice(0, 3).map(Number); };
+  const rgba = (hex, a) => `rgba(${rgb(hex).join(",")},${a})`;
+
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1, W = 0, H = 0;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      W = canvas.clientWidth || 600; H = Math.round(W * (typeof aspect === "function" ? aspect(W) : aspect));
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, W, H);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    new MutationObserver(() => fit(true)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return { redraw: () => fit(true), paint: () => draw(ctx, W, H), size: () => [W, H] };
+  }
+  function animate(canvas, step) {
+    let on = false, last = 0;
+    new IntersectionObserver(([e]) => { on = e.isIntersecting; if (on) { last = performance.now(); requestAnimationFrame(loop); } }).observe(canvas);
+    function loop(now) {
+      if (!on) return;
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      step(dt);
+      requestAnimationFrame(loop);
+    }
+  }
+  const bind = (id, out, fmt, fn) => { const el = $(id); const o = $(out); const show = () => { if (o) o.textContent = fmt(+el.value); }; el.addEventListener("input", () => { show(); fn(); }); show(); return el; };
+  const stage = (ctx, W, H) => { ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H); };
+  const label = (ctx, text, x, y, color = css("--stage-ink"), size = 11) => { ctx.fillStyle = color; ctx.font = font(size); ctx.fillText(text, x, y); };
+
+  // ---- 2D vector helpers ----
+  const add = (a, b) => [a[0] + b[0], a[1] + b[1]];
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
+  const mul = (a, s) => [a[0] * s, a[1] * s];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1];
+  const len = (a) => Math.hypot(a[0], a[1]);
+  const norm = (a) => { const l = len(a) || 1; return [a[0] / l, a[1] / l]; };
+  const refract = (I, N, eta) => { const c = dot(N, I); const k = 1 - eta * eta * (1 - c * c); if (k < 0) return null; return sub(mul(I, eta), mul(N, eta * c + Math.sqrt(k))); };
+  const reflect = (I, N) => sub(I, mul(N, 2 * dot(I, N)));
+  const schlick = (cos, n) => { let f0 = (n - 1) / (n + 1); f0 *= f0; return f0 + (1 - f0) * Math.pow(1 - clamp(cos, 0, 1), 5); };
+
+  // ---- 1. A ray through the glass ----
+  {
+    const shapes = {
+      sphere: (p) => len(p) - 0.9,
+      cube: (p) => { const r = 0.05, q = [Math.abs(p[0]) - 0.56 + r, Math.abs(p[1]) - 0.56 + r]; return len([Math.max(q[0], 0), Math.max(q[1], 0)]) + Math.min(Math.max(q[0], q[1]), 0) - r; },
+      ico: (p) => {
+        const k = 0.025; let top = -1e9; const ns = [];
+        for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI + 0.1; ns.push([Math.cos(a), Math.sin(a)]); }
+        for (const n of ns) top = Math.max(top, Math.abs(dot(p, n)) - 0.74);
+        let s = 0; for (const n of ns) s += Math.exp((Math.abs(dot(p, n)) - 0.74 - top) / k);
+        return top + k * Math.log(s);
+      },
+    };
+    const grad = (f, p) => { const e = 0.001; return norm([f([p[0] + e, p[1]]) - f([p[0] - e, p[1]]), f([p[0], p[1] + e]) - f([p[0], p[1] - e])]); };
+    const fig = setup($("glassFig"), (W) => (W < 520 ? 0.85 : 0.5), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const f = shapes[$("gS").value], n = +$("gN").value, yy = +$("gY").value;
+      const sc = Math.min(W / 5.2, H / 2.6), ox = W * 0.56, oy = H / 2;
+      const P = (p) => [ox + p[0] * sc, oy - p[1] * sc];
+      // the shape, as a filled field
+      const img = ctx.createImageData(Math.ceil(W), Math.ceil(H)), g = rgb(css("--glass")), st = rgb(css("--stage"));
+      for (let j = 0; j < img.height; j += 1) for (let i = 0; i < img.width; i += 1) {
+        const p = [(i - ox) / sc, (oy - j) / sc]; const d = f(p); const o = (j * img.width + i) * 4;
+        const a = d < 0 ? 0.14 + 0.4 * clamp(1 + d / 0.02, 0, 1) : clamp(1 - d * sc / 1.2, 0, 1) * 0.55;
+        for (let c = 0; c < 3; c++) img.data[o + c] = st[c] + (g[c] - st[c]) * a;
+        img.data[o + 3] = 255;
+      }
+      ctx.putImageData(img, 0, 0);
+      const eye = [-2.6, 0];
+      const line = (a, b, w, color) => { ctx.strokeStyle = color; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(...P(a)); ctx.lineTo(...P(b)); ctx.stroke(); };
+      const bolt = css("--bolt"), lamp = css("--lamp"), fig2 = css("--figure");
+      // eye
+      ctx.fillStyle = fig2; ctx.beginPath(); ctx.arc(...P(eye), 5, 0, TAU); ctx.fill();
+      label(ctx, "eye", P(eye)[0] - 10, P(eye)[1] + 20);
+      let d0 = norm(sub([0, yy], eye)), p = eye.slice(), t = 0, hit = false, steps = 0;
+      ctx.strokeStyle = rgba(css("--stage-ink"), 0.55); ctx.lineWidth = 1;
+      for (let i = 0; i < 96; i++) {
+        const q = add(eye, mul(d0, t)); const d = f(q); steps = i + 1;
+        if (d < 0.0015) { p = q; hit = true; break; }
+        if (d < 3) { ctx.beginPath(); ctx.arc(...P(q), d * sc, 0, TAU); ctx.stroke(); }
+        t += Math.max(d, 0.002); if (t > 6) { p = q; break; }
+      }
+      const parts = [];
+      if (!hit) {
+        line(eye, add(eye, mul(d0, 6)), 2, fig2);
+        $("gR").innerHTML = `<span>missed after <b>${steps}</b> steps</span>`;
+        return;
+      }
+      line(eye, p, 2, fig2);
+      const N = grad(f, p);
+      const F1 = schlick(-dot(d0, N), n);
+      line(p, add(p, mul(reflect(d0, N), 1.4)), 1 + 3 * F1, rgba(lamp, 0.35 + F1));
+      let dir = refract(d0, N, 1 / n), a = sub(p, mul(N, 0.004)), carry = 1 - F1;
+      let second = 0, leave1 = 0;
+      for (let bounce = 0; bounce < 3 && dir && carry > 0.01; bounce++) {
+        let s = 0; for (let i = 0; i < 400; i++) { const d = f(add(a, mul(dir, s))); if (d > 0) break; s += Math.max(-d, 0.004); }
+        const e = add(a, mul(dir, s)); line(a, e, 1 + 3 * carry, rgba(bolt, 0.4 + 0.6 * carry));
+        const M = grad(f, e); const out = refract(dir, mul(M, -1), n);
+        const leave = out ? 1 - schlick(dot(out, M), n) : 0;
+        if (bounce === 0) leave1 = leave;
+        if (out) line(e, add(e, mul(out, 2)), 1 + 3 * carry * leave, rgba(fig2, 0.25 + 0.75 * carry * leave));
+        if (bounce === 1) second = carry;
+        carry *= 1 - leave; dir = reflect(dir, mul(M, -1)); a = sub(e, mul(M, 0.004));
+        ctx.fillStyle = bolt; ctx.beginPath(); ctx.arc(...P(e), 3, 0, TAU); ctx.fill();
+      }
+      ctx.fillStyle = lamp; ctx.beginPath(); ctx.arc(...P(p), 4, 0, TAU); ctx.fill();
+      $("gR").innerHTML = `<span>hit in <b>${steps}</b> steps</span><span>reflected <b>${Math.round(F1 * 100)}%</b></span><span>leaves at the far side <b>${Math.round(leave1 * 100)}%</b> of what went in</span><span>second crossing <b>${Math.round(second * 100)}%</b></span>`;
+    });
+    bind("gY", "gYo", (v) => v.toFixed(2), fig.redraw); bind("gN", "gNo", (v) => v.toFixed(2), fig.redraw);
+    $("gS").addEventListener("change", fig.redraw);
+  }
+
+  // ---- 2. Space colonisation in a disc ----
+  let tree = null; const treeListeners = [];
+  {
+    const R = 1, STEP = 0.034 * 1.6, entryAngle = (Math.PI * 3) / 4;
+    const entry = [Math.cos(entryAngle) * R, Math.sin(entryAngle) * R];
+    let state = null;
+    const inside = (x, y, m) => Math.hypot(x, y) < R - m;
+    function start() {
+      const fan = +$("tF").value, wander = +$("tW").value * 1.4, density = +$("tD").value, random = mulberry(7 + Math.floor(Math.random() * 1e6));
+      const points = 40 + 160 * density;
+      const spacing = Math.sqrt((Math.PI * R * R) / points);
+      const s = { fan, wander, random, spacing, charge: [], nearest: [], nearestD: [], spent: [], coarse: [], pos: [], parent: [], children: [], lot: 0, round: 0, reach: 0, done: false, root: [entry[0] * 0.97, entry[1] * 0.97] };
+      s.add = (x, y, from) => {
+        const i = s.parent.length; s.pos.push(x, y); s.parent.push(from); s.children.push(0); if (from >= 0) s.children[from]++;
+        for (let p = 0; p < s.spent.length; p++) { if (s.spent[p]) continue; const d = Math.hypot(s.charge[p * 2] - x, s.charge[p * 2 + 1] - y); if (d < s.reach) s.spent[p] = 1; else if (d < s.nearestD[p]) { s.nearestD[p] = d; s.nearest[p] = i; } }
+        return i;
+      };
+      s.scatter = (gap, coarse) => {
+        s.reach = gap * 0.75;
+        for (let y = -R; y < R; y += gap) for (let x = -R; x < R; x += gap) {
+          const px = x + s.random() * gap, py = y + s.random() * gap;
+          if (!inside(px, py, 0.04)) continue;
+          let best = Infinity, at = 0;
+          for (let i = 0; i < s.parent.length; i++) { const d = Math.hypot(px - s.pos[i * 2], py - s.pos[i * 2 + 1]); if (d < best) { best = d; at = i; } }
+          if (best < s.reach) continue;
+          s.charge.push(px, py); s.nearest.push(at); s.nearestD.push(best); s.spent.push(0); s.coarse.push(coarse);
+        }
+      };
+      s.add(s.root[0], s.root[1], -1);
+      s.scatter(spacing * 2.6, 1);
+      state = s; tree = null;
+    }
+    function round(s) {
+      const pull = new Map();
+      for (let p = 0; p < s.spent.length; p++) {
+        if (s.spent[p]) continue; const n = s.nearest[p];
+        let v = pull.get(n); if (!v) pull.set(n, (v = [0, 0]));
+        const dx = s.charge[p * 2] - s.pos[n * 2], dy = s.charge[p * 2 + 1] - s.pos[n * 2 + 1], d = Math.hypot(dx, dy) || 1;
+        v[0] += dx / d; v[1] += dy / d;
+      }
+      if (!pull.size) return false;
+      let grew = 0;
+      for (const [n, v] of pull) {
+        const l = Math.hypot(v[0], v[1]); if (l < 0.25 || s.children[n] >= 3) continue;
+        const ox = s.pos[n * 2] - s.root[0], oy = s.pos[n * 2 + 1] - s.root[1], ol = Math.hypot(ox, oy) || 1;
+        let dx = v[0] / l + (ox / ol) * s.fan + (s.random() - 0.5) * s.wander, dy = v[1] / l + (oy / ol) * s.fan + (s.random() - 0.5) * s.wander;
+        const dl = Math.hypot(dx, dy) || 1;
+        let x = s.pos[n * 2] + (dx / dl) * STEP, y = s.pos[n * 2 + 1] + (dy / dl) * STEP;
+        if (!inside(x, y, 0.006)) { const r = Math.hypot(x, y); x *= (R - 0.012) / r; y *= (R - 0.012) / r; }
+        s.add(x, y, n); grew++;
+      }
+      if (!grew) { let dropped = 0; for (let p = 0; p < s.spent.length; p++) if (!s.spent[p] && pull.has(s.nearest[p])) { s.spent[p] = 1; dropped++; } if (!dropped) return false; }
+      return true;
+    }
+    function finish(s) {
+      const count = s.parent.length, feeds = new Float32Array(count).fill(1), depth = new Float32Array(count), kids = new Uint16Array(count), child = new Int32Array(count).fill(-1);
+      for (let i = count - 1; i > 0; i--) feeds[s.parent[i]] += feeds[i];
+      for (let i = 1; i < count; i++) { depth[i] = depth[s.parent[i]] + 1; kids[s.parent[i]]++; child[s.parent[i]] = i; }
+      const raw = Float32Array.from(s.pos), straight = Float32Array.from(s.pos);
+      straight[0] = entry[0]; straight[1] = entry[1]; raw[0] = entry[0]; raw[1] = entry[1];
+      const fixed = (i) => i === 0 || kids[i] !== 1 || depth[i] % 5 === 0;
+      const above = new Int32Array(count), below = new Int32Array(count);
+      for (let i = 1; i < count; i++) above[i] = fixed(s.parent[i]) ? s.parent[i] : above[s.parent[i]];
+      for (let i = count - 1; i > 0; i--) if (!fixed(i)) below[i] = fixed(child[i]) ? child[i] : below[child[i]];
+      for (let i = 1; i < count; i++) { if (fixed(i)) continue; const a = above[i], b = below[i], t = (depth[i] - depth[a]) / (depth[b] - depth[a]); for (let k = 0; k < 2; k++) straight[i * 2 + k] = raw[a * 2 + k] + (raw[b * 2 + k] - raw[a * 2 + k]) * t; }
+      const along = new Float32Array(count); let longest = 0;
+      for (let i = 1; i < count; i++) { const p = s.parent[i]; along[i] = along[p] + Math.hypot(straight[i * 2] - straight[p * 2], straight[i * 2 + 1] - straight[p * 2 + 1]); longest = Math.max(longest, along[i]); }
+      const hr = mulberry(99), hairs = [];
+      for (let i = 1; i < count; i++) {
+        const p = s.parent[i], share = Math.sqrt(feeds[i] / count);
+        const ax = straight[p * 2], ay = straight[p * 2 + 1], bx = straight[i * 2], by = straight[i * 2 + 1];
+        const fx = bx - ax, fy = by - ay, fl = Math.hypot(fx, fy) || 1;
+        for (let k = 0; k < 3; k++) {
+          const t = hr(), side = hr() < 0.5 ? -1 : 1, rake = 0.6 + hr() * 0.6;
+          const ox = ax + fx * t, oy = ay + fy * t;
+          const dx = (fx / fl) * rake - (fy / fl) * side, dy = (fy / fl) * rake + (fx / fl) * side, dl = Math.hypot(dx, dy);
+          const l = (STEP * (0.4 + hr() * 0.9 + share * 7) * 0.6) / dl;
+          hairs.push({ ax: ox, ay: oy, bx: ox + dx * l, by: oy + dy * l, at: (along[p] + fl * t) / longest + 0.01, at1: (along[p] + fl * t + l * dl) / longest + 0.01 });
+        }
+      }
+      tree = { raw, straight, parent: s.parent, feeds, count, along, longest, hairs };
+      for (const f of treeListeners) f();
+    }
+    const fig = setup($("treeFig"), (W) => (W < 520 ? 1 : 0.62), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const sc = Math.min(W, H) * 0.44, cx = W / 2, cy = H / 2;
+      const P = (x, y) => [cx + x * sc, cy - y * sc];
+      ctx.fillStyle = rgba(css("--glass"), 0.12); ctx.strokeStyle = rgba(css("--glass"), 0.55); ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(cx, cy, R * sc, 0, TAU); ctx.fill(); ctx.stroke();
+      const s = state; if (!s) return;
+      const ink = css("--stage-ink"), accent = css("--accent2"), figc = css("--figure");
+      for (let p = 0; p < s.spent.length; p++) {
+        ctx.fillStyle = s.spent[p] ? rgba(ink, 0.18) : rgba(s.coarse[p] ? accent : ink, 0.9);
+        const [x, y] = P(s.charge[p * 2], s.charge[p * 2 + 1]); ctx.beginPath(); ctx.arc(x, y, s.coarse[p] ? 3.2 : 1.8, 0, TAU); ctx.fill();
+      }
+      const pos = tree ? ($("tS").checked ? tree.straight : tree.raw) : s.pos;
+      ctx.strokeStyle = figc; ctx.lineCap = "round";
+      for (let i = 1; i < s.parent.length; i++) {
+        const p = s.parent[i]; ctx.lineWidth = tree ? 0.6 + 2.6 * Math.sqrt(tree.feeds[i] / tree.count) : 1;
+        ctx.beginPath(); ctx.moveTo(...P(pos[p * 2], pos[p * 2 + 1])); ctx.lineTo(...P(pos[i * 2], pos[i * 2 + 1])); ctx.stroke();
+      }
+      if (tree && $("tH").checked) {
+        ctx.strokeStyle = rgba(figc, 0.45); ctx.lineWidth = 0.6;
+        for (const h of tree.hairs) { ctx.beginPath(); ctx.moveTo(...P(h.ax, h.ay)); ctx.lineTo(...P(h.bx, h.by)); ctx.stroke(); }
+      }
+      ctx.fillStyle = css("--bolt"); ctx.beginPath(); ctx.arc(...P(entry[0], entry[1]), 5, 0, TAU); ctx.fill();
+      label(ctx, "entry", P(entry[0], entry[1])[0] - 50, P(entry[0], entry[1])[1] - 8);
+      const left = s.spent.reduce((a, b) => a + (b ? 0 : 1), 0);
+      $("tR").innerHTML = `<span>lot <b>${s.lot ? "fine" : "sparse"}</b></span><span>nodes <b>${s.parent.length}</b></span><span>points <b>${s.spent.length}</b>, waiting <b>${left}</b></span><span>spacing <b>${s.spacing.toFixed(3)}</b></span>${tree ? `<span>hairs <b>${tree.hairs.length}</b></span>` : ""}`;
+    });
+    start();
+    animate($("treeFig"), () => {
+      const s = state; if (!s || s.done) return;
+      for (let k = 0; k < 2; k++) {
+        const more = round(s) && s.round++ < 400;
+        if (!more) {
+          if (s.lot === 0) { s.lot = 1; s.round = 0; s.scatter(s.spacing, 0); }
+          else { s.done = true; finish(s); break; }
+        }
+      }
+      fig.paint();
+    });
+    const regrow = () => { start(); fig.paint(); };
+    bind("tF", "tFo", (v) => v.toFixed(2), regrow); bind("tW", "tWo", (v) => v.toFixed(2), regrow); bind("tD", "tDo", (v) => v.toFixed(2), regrow);
+    $("tS").addEventListener("change", () => { fig.paint(); for (const f of treeListeners) f(); }); $("tH").addEventListener("change", fig.paint);
+    $("tGo").addEventListener("click", regrow);
+  }
+
+  // ---- 3. The reveal ----
+  {
+    let playing = false;
+    const ease = (t) => { const x = t / 1.1; return x < 1 ? 1 - Math.pow(1 - x, 1.8) : x; };
+    const fig = setup($("revealFig"), (W) => (W < 520 ? 1 : 0.55), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const sc = Math.min(W, H) * 0.44, cx = W / 2, cy = H / 2;
+      const P = (x, y) => [cx + x * sc, cy - y * sc];
+      ctx.strokeStyle = rgba(css("--glass"), 0.45); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(cx, cy, sc, 0, TAU); ctx.stroke();
+      if (!tree) { label(ctx, "growing…", 14, H - 14); return; }
+      const grown = ease(+$("rT").value);
+      const pos = tree.straight, white = rgb(css("--figure")), blue = [120, 165, 255];
+      const draw = (ax, ay, bx, by, at, width) => {
+        const since = grown - at; if (since < 0) return;
+        const heat = Math.exp(-since * 22);
+        const c = white.map((w, i) => Math.round(w + (blue[i] - w) * heat * 0.8));
+        ctx.strokeStyle = `rgba(${c.join(",")},${0.55 + 0.45 * heat})`; ctx.lineWidth = width * (1 + heat * 1.5);
+        ctx.beginPath(); ctx.moveTo(...P(ax, ay)); ctx.lineTo(...P(bx, by)); ctx.stroke();
+      };
+      ctx.lineCap = "round";
+      ctx.globalCompositeOperation = "lighter";
+      for (let i = 1; i < tree.count; i++) { const p = tree.parent[i]; draw(pos[p * 2], pos[p * 2 + 1], pos[i * 2], pos[i * 2 + 1], tree.along[i] / (tree.longest * 1.06), 0.6 + 2.6 * Math.sqrt(tree.feeds[i] / tree.count)); }
+      for (const h of tree.hairs) draw(h.ax, h.ay, h.bx, h.by, h.at / 1.06, 0.6);
+      ctx.globalCompositeOperation = "source-over";
+      label(ctx, `t = ${(+$("rT").value).toFixed(2)} s · grown ${Math.min(1, grown).toFixed(2)}`, 14, H - 14);
+    });
+    treeListeners.push(fig.redraw);
+    bind("rT", "rTo", (v) => `${v.toFixed(2)} s`, fig.redraw); bind("rS", "rSo", (v) => `×${v}`, () => {});
+    const btn = $("rPlay");
+    btn.addEventListener("click", () => { playing = !playing; btn.textContent = playing ? "pause" : "play"; if (playing && +$("rT").value >= 1.59) $("rT").value = 0; });
+    animate($("revealFig"), (dt) => { if (!playing) return; const el = $("rT"); el.value = Math.min(1.6, +el.value + dt / +$("rS").value); el.dispatchEvent(new Event("input")); if (+el.value >= 1.6) { playing = false; btn.textContent = "play"; } });
+  }
+
+  // ---- 4. Caustics ----
+  {
+    let channels = [];
+    const make = () => { const r = mulberry(5); channels = []; for (let k = 0; k < 26; k++) { const a = r() * TAU, d = Math.sqrt(r()) * 0.8; const x = Math.cos(a) * d, y = Math.sin(a) * d, b = r() * TAU, l = 0.12 + r() * 0.3; channels.push([x, y, x + Math.cos(b) * l, y + Math.sin(b) * l]); } };
+    make();
+    const crossings = (a, b) => { let n = 0; for (const [x1, y1, x2, y2] of channels) { const d = (b[0] - a[0]) * (y2 - y1) - (b[1] - a[1]) * (x2 - x1); if (Math.abs(d) < 1e-9) continue; const t = ((x1 - a[0]) * (y2 - y1) - (y1 - a[1]) * (x2 - x1)) / d, u = ((x1 - a[0]) * (b[1] - a[1]) - (y1 - a[1]) * (b[0] - a[0])) / d; if (t >= 0 && t <= 1 && u >= 0 && u <= 1) n++; } return n; };
+    const fig = setup($("causticFig"), (W) => (W < 520 ? 1 : 0.6), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const n = +$("cN").value, ang = (+$("cA").value * Math.PI) / 180, struck = $("cF").checked;
+      const C = [0, 0.95], RAD = 0.9, floor = 0;
+      const sc = Math.min(W / 5, H / 3.3), ox = W / 2, oy = H * 0.68;
+      const P = (p) => [ox + p[0] * sc, oy - p[1] * sc];
+      const L = [Math.sin(ang), -Math.cos(ang)];
+      const circle = (o, d) => { const oc = sub(o, C); const b = dot(oc, d), c = dot(oc, oc) - RAD * RAD, h = b * b - c; if (h < 0) return -1; return -b - Math.sqrt(h); };
+      // floor and disc
+      ctx.strokeStyle = css("--stage-line"); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, P([0, floor])[1]); ctx.lineTo(W, P([0, floor])[1]); ctx.stroke();
+      ctx.fillStyle = rgba(css("--glass"), 0.13); ctx.strokeStyle = rgba(css("--glass"), 0.6); ctx.beginPath(); ctx.arc(...P(C), RAD * sc, 0, TAU); ctx.fill(); ctx.stroke();
+      if (struck) { ctx.strokeStyle = css("--figure"); ctx.lineWidth = 1.4; for (const [x1, y1, x2, y2] of channels) { ctx.beginPath(); ctx.moveTo(...P([C[0] + x1, C[1] + y1])); ctx.lineTo(...P([C[0] + x2, C[1] + y2])); ctx.stroke(); } }
+      const BINS = 220, x0 = -2.4, x1 = 2.4, hist = new Float32Array(BINS);
+      const RAYS = 1400, width = 2 * 1.25, perp = [-L[1], L[0]];
+      const lamp = css("--lamp");
+      for (let r = 0; r < RAYS; r++) {
+        const s = (r + 0.5) / RAYS * width - width / 2;
+        let o = add(add(C, mul(perp, s)), mul(L, -3)), d = L, w = width / RAYS;
+        const t = circle(o, d); let path = [o];
+        if (t > 0) {
+          const p = add(o, mul(d, t)); path.push(p);
+          const N = norm(sub(p, C)); w *= 1 - schlick(-dot(d, N), n);
+          let dir = refract(d, N, 1 / n), a = p, ok = false;
+          for (let b = 0; b < 3 && dir; b++) {
+            const oc = sub(a, C), bb = dot(oc, dir), cc = dot(oc, oc) - RAD * RAD, tt = -bb + Math.sqrt(Math.max(0, bb * bb - cc));
+            const e = add(a, mul(dir, tt));
+            if (struck) w *= Math.pow(0.5, crossings(sub(a, C), sub(e, C)));
+            path.push(e);
+            const M = norm(sub(e, C)), out = refract(dir, mul(M, -1), n);
+            if (out) { w *= 1 - schlick(dot(out, M), n); d = out; o = e; ok = true; break; }
+            dir = reflect(dir, mul(M, -1)); a = e;
+          }
+          if (!ok) continue;
+        }
+        if (d[1] > -0.02) continue;
+        const land = add(o, mul(d, (floor - o[1]) / d[1]));
+        path.push(land);
+        if (r % 28 === 0) { ctx.strokeStyle = rgba(lamp, 0.28); ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(...P(path[0])); for (const q of path.slice(1)) ctx.lineTo(...P(q)); ctx.stroke(); }
+        const bin = (land[0] - x0) / (x1 - x0) * BINS;
+        for (let k = -3; k <= 3; k++) { const b = Math.floor(bin) + k; if (b >= 0 && b < BINS) hist[b] += w * Math.exp(-4 * ((b + 0.5 - bin) / 3) ** 2); }
+      }
+      // irradiance: per unit of floor, against unobstructed light (which lands at w = cos-weighted spacing)
+      let kernel = 0; for (let k = -3; k <= 3; k++) kernel += Math.exp(-4 * (k / 3) ** 2);
+      const binW = (x1 - x0) / BINS, unit = Math.abs(L[1]) * binW * kernel;
+      const base = H - 8, gh = H * 0.2;
+      ctx.strokeStyle = rgba(css("--stage-ink"), 0.6); ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(0, base - gh / 3); ctx.lineTo(W, base - gh / 3); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = rgba(lamp, 0.85); ctx.beginPath(); ctx.moveTo(P([x0, 0])[0], base);
+      for (let b = 0; b < BINS; b++) { const v = hist[b] / unit; const x = P([x0 + (b + 0.5) * binW, 0])[0]; ctx.lineTo(x, base - clamp(v, 0, 3) * gh / 3); }
+      ctx.lineTo(P([x1, 0])[0], base); ctx.closePath(); ctx.fill();
+      label(ctx, "1 = open light", 10, base - gh / 3 - 5);
+    });
+    bind("cN", "cNo", (v) => v.toFixed(2), fig.redraw); bind("cA", "cAo", (v) => `${v}°`, fig.redraw); $("cF").addEventListener("change", fig.redraw);
+  }
+
+  // ---- 5. Halo ----
+  {
+    const fig = setup($("haloFig"), (W) => (W < 520 ? 0.6 : 0.3), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const r0 = +$("hR").value, D = 5.6, far = 12;
+      const f = (x, size, floor) => { const h = Math.max(Math.sqrt(x * x + size * size), floor); return (Math.atan((far - D) / h) + Math.atan(D / h)) / h; };
+      const xs = 1.6, pad = 24, gx = (x) => pad + ((x + xs) / (2 * xs)) * (W - 2 * pad);
+      const peak = f(0, r0, 0.05), top = Math.max(peak, f(0, 0, 0.05) * 0.25);
+      const gy = (v) => H - 22 - (v / top) * (H - 40);
+      ctx.strokeStyle = css("--stage-line"); ctx.beginPath(); ctx.moveTo(pad, H - 22); ctx.lineTo(W - pad, H - 22); ctx.stroke();
+      const curve = (size, floor, color, dash) => { ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash(dash); ctx.beginPath(); for (let i = 0; i <= 200; i++) { const x = -xs + (2 * xs * i) / 200; const y = gy(f(x, size, floor)); i ? ctx.lineTo(gx(x), Math.max(4, y)) : ctx.moveTo(gx(x), Math.max(4, y)); } ctx.stroke(); ctx.setLineDash([]); };
+      curve(0, 0.05, rgba(css("--stage-ink"), 0.8), [5, 4]);
+      curve(r0, 0.05, css("--lamp"), []);
+      label(ctx, "across the object, units from its centre →", pad, H - 6);
+      label(ctx, `point source: peak ×${(f(0, 0, 0.05) / f(0, r0, 0.05)).toFixed(0)} the sized one (clipped)`, pad, 16);
+    });
+    bind("hR", "hRo", (v) => v.toFixed(2), fig.redraw);
+  }
+
+  // ---- 6. Filaments ----
+  {
+    const r = mulberry(21);
+    const fil = Array.from({ length: 12 }, () => ({ angle: (r() - 0.5) * 2.4, phase: [r() * 6.3, r() * 6.3, r() * 6.3, r() * 6.3], speed: [0.6 + r() * 1.2, 1.3 + r() * 2, 0.5 + r() * 1.2], bulge: 0.3 + r() * 0.35, reach: 0.6 + r() * 0.6 }));
+    let time = 0, growT = 0;
+    const fig = setup($("filFig"), (W) => (W < 520 ? 0.8 : 0.45), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const charge = $("fA").checked ? Math.min(1, growT / 1.1) : +$("fC").value, ripple = $("fR").checked;
+      const RG = 1.0, sc = Math.min(W / 1.3, H / 0.62), cx = W / 2, cy = H * 0.12 + RG * sc;
+      const P = (p) => [cx + p[0] * sc, cy - p[1] * sc];
+      ctx.fillStyle = rgba(css("--glass"), 0.12); ctx.strokeStyle = rgba(css("--glass"), 0.6); ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.arc(cx, cy, RG * sc, 0, TAU); ctx.fill(); ctx.stroke();
+      const hit = [0, RG], count = Math.round(3 + charge * 9);
+      ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round";
+      const glow = css("--bolt"), core = css("--figure");
+      for (let k = 0; k < count; k++) {
+        const f = fil[k];
+        // in section the landing moves along the glass: an angle round the circle from the impact
+        const wander = 0.9 * Math.sin(time * f.speed[0] + f.phase[0]) + 0.4 * Math.sin(time * f.speed[1] + f.phase[1]);
+        const reach = (0.07 + 0.22 * charge) * f.reach * (0.75 + 0.25 * Math.sin(time * f.speed[2] + f.phase[2])) * 1.6;
+        const side = Math.sign(Math.sin(f.angle + wander * 0.6)) || 1;
+        const a = Math.PI / 2 - side * (reach / RG) * (0.5 + 0.5 * Math.abs(Math.cos(f.angle + wander)));
+        const end = [Math.cos(a) * RG, Math.sin(a) * RG];
+        const chord = sub(end, hit), L = len(chord); if (L < 1e-3) continue;
+        const cd = mul(chord, 1 / L), up = norm(add(norm(hit), norm(end)));
+        const upP = norm(sub(up, mul(cd, dot(up, cd))));
+        const h = L * f.bulge * (0.9 + 0.1 * Math.sin(time * 7 + f.phase[3]));
+        const Rr = (L * L * 0.25 + h * h) / (2 * h);
+        const centre = add(add(hit, mul(cd, L / 2)), mul(upP, h - Rr));
+        const from = sub(hit, centre), to = sub(end, centre);
+        let span = Math.atan2(from[0] * to[1] - from[1] * to[0], dot(from, to));
+        const pts = [];
+        for (let i = 0; i <= 40; i++) {
+          const s = i / 40, an = span * s, c = Math.cos(an), sn = Math.sin(an);
+          let p = add(centre, [from[0] * c - from[1] * sn, from[0] * sn + from[1] * c]);
+          if (ripple) { const w = L * (0.07 * Math.sin(s * 15 - time * 26 + f.phase[3]) + 0.02 * Math.sin(s * 37 + time * 37 + f.phase[0])) * Math.sin(Math.PI * s); const tan = norm(sub(p, centre)); p = add(p, mul(tan, w)); }
+          pts.push(P(p));
+        }
+        for (const [wd, col, al] of [[7, glow, 0.12], [3, glow, 0.35], [1.1, core, 0.9]]) {
+          ctx.strokeStyle = rgba(col, al * (0.6 + 0.4 * charge)); ctx.lineWidth = wd; ctx.beginPath(); pts.forEach((q, i) => (i ? ctx.lineTo(...q) : ctx.moveTo(...q))); ctx.stroke();
+        }
+        ctx.fillStyle = rgba(glow, 0.6); ctx.beginPath(); ctx.arc(...pts[40], 2.6, 0, TAU); ctx.fill();
+      }
+      const g = ctx.createRadialGradient(...P(hit), 0, ...P(hit), 22); g.addColorStop(0, rgba(core, 0.9)); g.addColorStop(1, rgba(glow, 0));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(...P(hit), 22, 0, TAU); ctx.fill();
+      ctx.globalCompositeOperation = "source-over";
+      label(ctx, `charge ${charge.toFixed(2)} · ${count} filaments`, 12, H - 12);
+    });
+    bind("fC", "fCo", (v) => v.toFixed(2), fig.redraw);
+    animate($("filFig"), (dt) => { time += dt; growT = (growT + dt) % 1.6; fig.paint(); });
+  }
+
+  // ---- 7. The bolt ----
+  {
+    let seed = 3, bolt = null, playing = false;
+    function displaced(from, to, levels, amount, random) {
+      let pts = [from, to];
+      for (let l = 0; l < levels; l++) {
+        const next = [pts[0]];
+        for (let i = 1; i < pts.length; i++) {
+          const a = pts[i - 1], b = pts[i], c = sub(b, a), L = len(c), n = [-c[1] / (L || 1), c[0] / (L || 1)];
+          const share = typeof amount === "function" ? amount(l) : amount;
+          const rr = (0.4 + 0.6 * random()) * L * share * (random() < 0.5 ? -1 : 1);
+          next.push(add(mul(add(a, b), 0.5), mul(n, rr)), b);
+        }
+        pts = next;
+      }
+      return pts;
+    }
+    function build() {
+      const random = mulberry(seed), levels = +$("bL").value;
+      const hit = [0, 0], top = [(random() - 0.5) * 1.4, 6.5];
+      const main = displaced(top, hit, levels, (l) => (l < 2 ? 0.1 : 0.28), random);
+      const last = main.length - 1; let total = 0;
+      for (let i = 1; i <= last; i++) total += len(sub(main[i], main[i - 1]));
+      const pieces = [];
+      for (let i = 1; i <= last; i++) pieces.push({ a: main[i - 1], b: main[i], arrival: i / last, kind: 0, hA: (i - 1) / last, hB: i / last, wA: 1, wB: 1, lA: 1, lB: 1 });
+      const lean = (way, angle) => { const side = random() < 0.5 ? -1 : 1, c = Math.cos(angle), s = Math.sin(angle) * side; let out = [way[0] * c - way[1] * s, way[0] * s + way[1] * c]; if (out[1] > -0.15) out[1] = -0.15 - random() * 0.3; return norm(out); };
+      const branch = (from, dir, length, u, width, level, depth) => {
+        const path = displaced(from, add(from, mul(dir, length)), Math.max(0, Math.min(levels, length > 1.4 ? 5 : length > 0.6 ? 4 : 3)), (l) => (l < 1 ? 0.16 : 0.24), random);
+        let run = 0;
+        for (let i = 1; i < path.length; i++) {
+          const piece = len(sub(path[i], path[i - 1])), t = i / (path.length - 1), t0 = (i - 1) / (path.length - 1); run += piece;
+          const arrival = u + (run / total) * 1.15;
+          pieces.push({ a: path[i - 1], b: path[i], arrival, kind: 1, hA: u - (arrival - u) * 0.5, hB: u - (arrival - u) * 0.5, wA: width * (1 - 0.5 * t0), wB: width * (1 - 0.5 * t), lA: level * (1 - 0.7 * t0), lB: level * (1 - 0.7 * t), u });
+          if (depth < 2 && i > 2 && i < path.length - 2 && random() < (depth ? 0.07 : 0.11)) branch(path[i], lean(norm(sub(path[i], path[i - 1])), 0.35 + random() * 0.5), length * (1 - t) * (0.4 + random() * 0.5), arrival, width * (1 - 0.5 * t) * 0.75, level * (1 - 0.7 * t) * 0.7, depth + 1);
+        }
+      };
+      if (last >= 2) {
+        const nb = 8 + Math.floor(random() * 5);
+        for (let k = 0; k < nb; k++) {
+          const u = k < 4 ? 0.62 + 0.3 * random() : 0.25 + 0.67 * random();
+          const i = Math.max(1, Math.min(last - 1, Math.round(u * last)));
+          branch(main[i], lean(norm(sub(main[i + 1], main[i - 1])), 0.4 + random() * 0.6), Math.min(2.8, (1 - u) * total * (0.35 + random() * 0.75) + 0.25), i / last, 0.7, 0.55, 0);
+        }
+      }
+      const strokes = [{ at: 0, level: 1 }]; const more = 1 + Math.floor(random() * 3);
+      for (let k = 0, at = 0; k < more; k++) strokes.push({ at: (at += 0.04 + random() * 0.05), level: 0.3 + random() * 0.5 });
+      bolt = { pieces, strokes };
+    }
+    const hash = (p) => { const s = Math.sin(p[0] * 12.9898 + p[1] * 78.233) * 43758.5453; return s - Math.floor(s); };
+    const glow = (age) => Math.exp(-age / 0.022) + 0.06 * Math.exp(-age / 0.1);
+    function uniforms(e) {
+      if (e < 0) return { struck: false, head: Math.min(24, Math.floor(((e + 0.1) / 0.08) * 26)), age: ((e + 0.1) % (0.08 / 26)) };
+      let k = 0, white = 0; const S = bolt.strokes;
+      S.forEach((s, i) => { if (e >= s.at) { k = i; white = Math.max(white, (i ? s.level * 0.6 : 1) * Math.exp(-(e - s.at) / 0.04)); } });
+      const now = S[k], since = e - now.at, end = e - S[S.length - 1].at;
+      return { struck: true, wave: since / 0.012, wave1: e / 0.012, levelNow: 45 * now.level * glow(since), levelBefore: k ? 45 * S[k - 1].level * 0.06 * Math.exp(-(e - S[k - 1].at) / 0.1) : 0.25, branchLevel: 45 * (Math.exp(-e / 0.05) + 0.04 * Math.exp(-e / 0.25)), bead: clamp((end - 0.03) / 0.15, 0, 1), gone: end > 0.4, white };
+    }
+    function levelAt(pc, u, taper, height, p, time) {
+      const noise = hash(p);
+      if (!u.struck) {
+        const age = u.head - Math.floor(pc.arrival * 26);
+        if (age < 0) return 0;
+        return (0.25 + (age < 0.5 ? 2.5 : age < 2.5 ? 0.9 : 0) * Math.exp(-u.age / 0.045)) * taper;
+      }
+      const up = 1 - height; let level;
+      if (pc.kind === 0) { level = up <= u.wave ? u.levelNow : u.levelBefore; level += u.levelNow * 1.2 * Math.exp(-Math.abs(up - u.wave) * 22) * (u.wave <= 1.15 ? 1 : 0); }
+      else level = pc.arrival > 0.985 ? 0 : u.branchLevel * taper * (up <= u.wave1 ? 1 : 0);
+      return level * (1 + (0.35 + 1.3 * noise * noise - 1) * u.bead) * (0.88 + 0.12 * Math.sin(time * 150 + noise * 60));
+    }
+    const tone = (v) => 1 - Math.exp(-v * 0.6);
+    const fig = setup($("boltFig"), (W) => (W < 520 ? 1.3 : 0.7), (ctx, W, H) => {
+      stage(ctx, W, H);
+      if (!bolt) build();
+      const e = +$("bT").value, u = uniforms(e), per = $("bP").checked;
+      const sc = (H - 30) / 6.7, ox = W / 2, oy = H - 18;
+      const P = (p) => [ox + p[0] * sc, oy - p[1] * sc];
+      ctx.fillStyle = rgba(css("--glass"), 0.14); ctx.strokeStyle = rgba(css("--glass"), 0.55); ctx.beginPath(); ctx.arc(ox, oy + 0.9 * sc, 0.9 * sc, Math.PI, TAU); ctx.fill(); ctx.stroke();
+      if (u.white) { ctx.fillStyle = rgba(css("--figure"), Math.min(0.35, u.white * u.white * 0.35)); ctx.fillRect(0, 0, W, H); }
+      if (u.gone) { label(ctx, "gone: 0.4 s after the last stroke", 12, H - 8); $("bR").innerHTML = ""; return; }
+      ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round";
+      const core = rgb(css("--figure")), halo = rgb(css("--bolt"));
+      let lit = 0;
+      for (const pc of bolt.pieces) {
+        let lA = levelAt(pc, u, pc.lA, pc.hA, pc.a, e), lB = levelAt(pc, u, pc.lB, pc.hB, pc.b, e);
+        if (per) { const n = hash([pc.a[0] + pc.b[0] * 3.1, pc.a[1] + pc.b[1] * 1.7]); const one = levelAt({ ...pc }, { ...u }, pc.lB, pc.hB, [n * 91, n * 37], e); lA = lB = one; }
+        if (Math.max(lA, lB) < 0.004) continue;
+        lit++;
+        const a = P(pc.a), b = P(pc.b), wA = pc.wA * 2.2, wB = pc.wB * 2.2;
+        for (const [k, col, al] of [[3.2, halo, 0.22], [1, core, 1]]) {
+          const g = ctx.createLinearGradient(...a, ...b);
+          g.addColorStop(0, `rgba(${col.join(",")},${al * tone(lA)})`); g.addColorStop(1, `rgba(${col.join(",")},${al * tone(lB)})`);
+          ctx.strokeStyle = g; ctx.lineWidth = Math.max(0.6, (k * (wA + wB)) / 2); ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke();
+        }
+      }
+      ctx.globalCompositeOperation = "source-over";
+      label(ctx, e < 0 ? `leader: step ${u.head + 1} of 26` : `stroke ${bolt.strokes.filter((s) => e >= s.at).length} of ${bolt.strokes.length}`, 12, H - 8);
+      $("bR").innerHTML = `<span>pieces <b>${bolt.pieces.length}</b>, lit <b>${lit}</b></span><span>strokes at <b>${bolt.strokes.map((s) => (s.at * 1000).toFixed(0) + " ms").join(", ")}</b></span>${u.struck ? `<span>beading <b>${Math.round(u.bead * 100)}%</b></span>` : ""}`;
+    });
+    const tIn = bind("bT", "bTo", (v) => `${(v * 1000).toFixed(0)} ms`, fig.redraw);
+    bind("bL", "bLo", (v) => `${v}`, () => { build(); fig.redraw(); });
+    $("bP").addEventListener("change", fig.redraw);
+    $("bNew").addEventListener("click", () => { seed++; build(); fig.redraw(); });
+    const btn = $("bPlay");
+    btn.addEventListener("click", () => { playing = !playing; btn.textContent = playing ? "pause" : "play"; if (playing && +tIn.value >= 0.549) tIn.value = -0.1; });
+    animate($("boltFig"), (dt) => { if (!playing) return; tIn.value = Math.min(0.55, +tIn.value + dt / 40); tIn.dispatchEvent(new Event("input")); if (+tIn.value >= 0.55) { playing = false; btn.textContent = "play"; } });
+  }
+
+  // ---- 8. Timeline ----
+  {
+    let seed = 11;
+    const fig = setup($("timeFig"), (W) => (W < 520 ? 0.9 : 0.42), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const r = mulberry(seed), strokes = [{ at: 0, level: 1 }], more = 1 + Math.floor(r() * 3);
+      for (let k = 0, at = 0; k < more; k++) strokes.push({ at: (at += 0.04 + r() * 0.05), level: 0.3 + r() * 0.5 });
+      const CH = 1.1, DASH = 0.08, S0 = CH + DASH, T = 4.6, pad = 34;
+      const x = (t) => pad + (t / T) * (W - pad - 12);
+      const lanes = ["charge", "leader", "light", "white", "figure", "glow"], lh = (H - 46) / lanes.length;
+      const ink = css("--stage-ink"), line = css("--stage-line");
+      ctx.strokeStyle = line; ctx.lineWidth = 1;
+      for (let s = 0; s <= 4; s++) { ctx.beginPath(); ctx.moveTo(x(s), 24); ctx.lineTo(x(s), H - 18); ctx.stroke(); label(ctx, `${s} s`, x(s) + 3, H - 6); }
+      lanes.forEach((n, i) => label(ctx, n, 4, 30 + lh * i + lh * 0.55, ink, 10));
+      const plot = (i, f, color, fill = true) => {
+        const y0 = 24 + lh * (i + 1) - 6, hh = lh - 12;
+        ctx.strokeStyle = color; ctx.fillStyle = rgba(color, 0.25); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(x(0), y0);
+        for (let k = 0; k <= 600; k++) { const t = (k / 600) * T; ctx.lineTo(x(t), y0 - clamp(f(t), 0, 1) * hh); }
+        ctx.lineTo(x(T), y0); if (fill) ctx.fill(); ctx.stroke();
+      };
+      const bolt = css("--bolt"), lamp = css("--lamp"), fig2 = css("--figure");
+      plot(0, (t) => (t < S0 ? Math.min(1, t / CH) : 2.5 * Math.exp(-(t - S0) / 0.22) / 2.5 * (t >= S0 ? 1 : 0)), bolt);
+      plot(1, (t) => (t >= CH && t < S0 ? 0.8 : 0), bolt);
+      const g = (age) => Math.exp(-age / 0.022) + 0.06 * Math.exp(-age / 0.1);
+      plot(2, (t) => { const e = t - S0; if (e < 0) return 0; let l = 0; for (const s of strokes) if (e >= s.at) l += s.level * g(e - s.at); return Math.log10(1 + l * 45) / Math.log10(46); }, fig2);
+      plot(3, (t) => { const e = t - S0; if (e < 0) return 0; let w = 0; strokes.forEach((s, i) => { if (e >= s.at) w = Math.max(w, (i ? s.level * 0.6 : 1) * Math.exp(-(e - s.at) / 0.04)); }); return w * w; }, fig2);
+      plot(4, (t) => { const e = t - S0; if (e < 0) return 0; const xx = e / 1.1; return xx < 1 ? 1 - Math.pow(1 - xx, 1.8) : 1; }, fig2);
+      plot(5, (t) => { const e = t - S0; return e < 0 ? 0 : Math.exp(-e / 2.2); }, bolt);
+      // sounds
+      const mark = (t, txt, col) => { ctx.fillStyle = col; ctx.fillRect(x(t) - 1, 8, 2, 10); label(ctx, txt, x(t) + 4, 16, col, 10); };
+      mark(0, "hum + sparks", bolt); mark(S0, "crack", lamp); mark(S0 + 0.35, "rumble", lamp);
+      strokes.slice(1).forEach((s) => { ctx.fillStyle = lamp; ctx.fillRect(x(S0 + s.at) - 1, 8, 2, 10); });
+      mark(S0 + 0.03 + 0.7, "crackle", ink);
+      for (let k = 0, at = 1.1 + 0.3; k < 4; k++, at += 0.4 + r() * 1.4) { ctx.fillStyle = ink; ctx.fillRect(x(S0 + at) - 1, 10, 2, 6); }
+      label(ctx, "ticks", x(S0 + 1.4) + 4, 16, ink, 10);
+    });
+    $("lNew").addEventListener("click", () => { seed++; fig.redraw(); });
+  }
+})();
+</script>
+</body>
+</html>

@@ -52,7 +52,7 @@ function createAutoChange({ enabled, every, gui, min = 5, max = 60, ready = () =
       pill.root.classList.toggle("waiting", held || !ready());
       if (shown) {
         pill.set(held ? "Waiting…" : !ready() ? "Randomizing…" : `${pill.prefix} ${Math.max(1, Math.ceil(every() - elapsed))} s`);
-        pill.root.style.setProperty("--left", Math.max(0, 1 - elapsed / every()));
+        pill.root.style.setProperty("--left", Math.min(1, Math.max(0, 1 - elapsed / every())));
       }
     }
   }
@@ -60,6 +60,8 @@ function createAutoChange({ enabled, every, gui, min = 5, max = 60, ready = () =
   return {
     update,
     restart,
+    // Leaves at least `seconds` before the next change (opt-in: a day that wants time to show something it just did).
+    hold: (seconds) => (elapsed = Math.min(elapsed, every() - seconds)),
     get remaining() {
       return on() ? Math.max(0, every() - elapsed) : Infinity;
     },
