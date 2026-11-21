@@ -20,7 +20,6 @@ const LAMP_COLOR = new Color("#ffd9a8");
 const defaults = {
   style: "Studio",
   clip: "samba",
-  silk: 1,
   thickness: 0.02,
   floss: 0.6,
   lamp: 1,
@@ -111,8 +110,6 @@ function toggleSound() {
   sound.setMuted(!sound.muted);
   soundButton.querySelector("img").src = `../assets/${sound.muted ? "sound-off" : "sound"}.svg`;
 }
-const toggleSilk = () => params.silk.set(params.silk() > 0.5 ? 0 : 1);
-addActionButton("assets/unwrap.svg", "Unwrap or rewrap", toggleSilk);
 showSoundHint(() => !sound.running);
 let running = true;
 onPause((r) => {
@@ -120,7 +117,6 @@ onPause((r) => {
   sound.setPaused(!r);
 });
 // Before the panel is built, so they are listed in its key help.
-addKey("KeyC", "unwrap or rewrap", toggleSilk);
 addKey("KeyM", "toggle sound", toggleSound);
 
 const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
@@ -129,7 +125,6 @@ gui.addSelect("Motion", params.clip, CLIPS);
 // Where the cocoon is in its life, in words.
 const state = signal("");
 gui.addMonitor("Cocoon", state);
-gui.addSlider("Silk", params.silk, 0, 1, 0.01, { randomizable: false });
 gui.addSlider("Thickness", params.thickness, 0.005, 0.05, 0.001);
 gui.addSlider("Floss", params.floss, 0, 1, 0.01);
 gui.addSlider("Lamp", params.lamp, 0, 2, 0.01, { randomizable: false });
@@ -242,11 +237,11 @@ function startOver(fuzz) {
   closedWith = tint;
 }
 
-const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTime, gui, ready: () => !hatch && wrapped >= params.silk() });
+const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTime, gui, ready: () => !hatch && wrapped >= 1 });
 pipeline.addGUI(gui);
 gui.addSeparator();
 gui.addText(keysHelp());
-showHint("Drag to orbit · scroll to zoom · C to unwrap · R to hatch a new one", "Drag to orbit · tap the cocoon to unwrap · tap {randomize} to hatch a new one");
+showHint("Drag to orbit · scroll to zoom · R to hatch a new one", "Drag to orbit · tap {randomize} to hatch a new one");
 gui.show();
 
 const HOME_TARGET = new Vector3(0, 0.95, 0);
@@ -423,7 +418,6 @@ render(({ time, dt }) => {
   // The silk goes on, or comes off, at its own pace.
   // (Real time even at a low frame rate: only a long stall is cut short.)
   const before = wrapped;
-  const goal = params.silk();
   const frameStep = running ? Math.min(0.5, (now - lastFrame) / 1000) : 0;
   lastFrame = now;
   if (hatch) {
@@ -435,9 +429,8 @@ render(({ time, dt }) => {
     }
   } else {
     const wrapStep = frameStep / WRAP_SECONDS;
-    wrapped = wrapped < goal ? Math.min(goal, wrapped + wrapStep) : Math.max(goal, wrapped - wrapStep);
-    // As the cocoon closes the figure changes colour, out of sight, so it never comes out the colour it went in,
-    // whether it hatches or is unwound.
+    wrapped = Math.min(1, wrapped + wrapStep);
+    // As the cocoon closes the figure changes colour, out of sight, so it never comes out the colour it went in.
     if (before < CLOSED && wrapped >= CLOSED && tint === closedWith) {
       tint = tintAfter(nativeRandom());
       figure.setBodyColors(tint);
@@ -445,7 +438,7 @@ render(({ time, dt }) => {
     if (wrapped < 0.3) closedWith = tint;
   }
   // A closed cocoon, all but still, hatches by itself after a few seconds (kiosk mode only).
-  closedFor = !hatch && params.auto() && goal >= CLOSED && wrapped >= CLOSED ? closedFor + frameStep : 0;
+  closedFor = !hatch && params.auto() && wrapped >= CLOSED ? closedFor + frameStep : 0;
   if (closedFor > HOLD_SECONDS) {
     closedFor = 0;
     randomize();
@@ -454,7 +447,7 @@ render(({ time, dt }) => {
   const share = (v) => `${Math.round(v * 100)}%`;
   const says = hatch
     ? hatch < STRAIN_SHARE ? "straining" : `hatching ${share((hatch - STRAIN_SHARE) / (1 - STRAIN_SHARE))}`
-    : wrapped >= CLOSED && wrapped >= goal ? "complete: randomize to hatch" : wrapped < goal ? `winding ${share(wrapped)}` : wrapped > goal ? `unwinding ${share(wrapped)}` : wrapped > 0 ? `held at ${share(wrapped)}` : "bare";
+    : wrapped >= 1 ? "complete: randomize to hatch" : `winding ${share(wrapped)}`;
   if (says !== state.peek()) state.set(says);
   // The silk rustles as the wound body moves: one every 6–12 cm it travels, as loud as it is fast and as the silk is
   // thick, so a fast move is a quick, loud run of them and a body held still is silent. Winding, the silk going on

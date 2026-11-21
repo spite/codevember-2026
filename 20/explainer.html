@@ -237,7 +237,7 @@ inside = max(width − |fract(turn₁) − ½| · 2,  0.8 · width − |fract(tu
     <div class="col prose">
       <div class="eyebrow">Winding · <b>main.js</b></div>
       <h2>The silk holds it still</h2>
-      <p>The silk goes on or comes off at a constant rate: ten seconds from bare to finished, on the wall clock, so it takes the same time at any frame rate (only a stall longer than half a second is cut short). It stops while the page is paused. The "Silk" slider sets where it is going; <code>C</code> or the cocoon button sends it to 0 or 1.</p>
+      <p>The silk goes on at a constant rate: ten seconds from bare to finished, on the wall clock, so it takes the same time at any frame rate (only a stall longer than half a second is cut short). It stops while the page is paused.</p>
       <p>The animation's time step is multiplied by a pace. It is 1 until the silk is 60% on, then falls with the square of how far it has got toward closed, down to 0.03 at 87%:</p>
     </div>
     <div class="formula">pace = 1 − 0.97 · clamp((wrapped − 0.6) / (0.87 − 0.6), 0, 1)²
@@ -368,7 +368,7 @@ lit   = albedo / π · (direct + (1, 0.86, 0.7) · left · phase · (1 − direc
     </div>
     <div class="col prose">
       <p>A hole in a shell that stands off the skin would show the gap under it, hollow. So in the 0.4 s before its patch breaks, the silk there sinks onto the body, and the shell round every hole slopes down to the skin, as a band's edge does.</p>
-      <p>At the end of the hatch the cocoon starts over: no silk, new fuzz, and the figure in the colour it took on in the cocoon. That colour changes the moment the cocoon closes over the head, out of sight, so the figure never comes out the colour it went in, whether it hatches or is unwound. It is one of eight hues an eighth of a turn apart, always at least two steps (90°) round from the last, with alternate steps a little lighter, so consecutive figures are clearly different. Its new motion and look were drawn by the randomize that started the hatch, and wait for it to end, so nothing visible changes under a breaking shell.</p>
+      <p>At the end of the hatch the cocoon starts over: no silk, new fuzz, and the figure in the colour it took on in the cocoon. That colour changes the moment the cocoon closes over the head, out of sight, so the figure never comes out the colour it went in. It is one of eight hues an eighth of a turn apart, always at least two steps (90°) round from the last, with alternate steps a little lighter, so consecutive figures are clearly different. Its new motion and look were drawn by the randomize that started the hatch, and wait for it to end, so nothing visible changes under a breaking shell.</p>
     </div>
   </section>
 
