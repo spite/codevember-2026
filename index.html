@@ -261,7 +261,7 @@
         [18, "How Pendulum Swings"],
         [19, "How Erosion Wears Glass Smooth"],
         [20, "How Cocoon Winds and Hatches"],
-        [21, "How Bolt Strikes Glass"],
+        [21, "How Bolt Strikes"],
       ]
         .filter(([day]) => days[day - 1].title)
         .map(([day, title]) => ({ small: `Day ${day} · ${days[day - 1].prompt}`, title, href: `./${day}/explainer.html`, thumb: `screenshots/${day}.jpg` }));
