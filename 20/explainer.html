@@ -1,0 +1,884 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Cocoon Winds and Hatches</title>
+<meta name="description" content="How Codevember 2026 day 20, Cocoon, skins a dancing figure inside the shared pipeline, winds a second skin of felted silk round it in crossing bands, lights it through from a circling lamp with two depth maps, grows floss that trails on springs, spins webs and wisps, breaks the shell into a swirl of chips that bounce off the body when it hatches, and scores it all with cloth foley.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Raw silk under a warm lamp; dark is the studio with the lights down. */
+:root {
+  --bg: #f4efe6;
+  --panel: #fbf8f2;
+  --ink: #1f1c19;
+  --muted: #6e655c;
+  --line: #e4dbcd;
+  --accent: #c2661f;
+  --accent2: #e8ac5c;
+  --stage: #ece5d9;
+  --stage-ink: #8a7f72;
+  --silk: #f1ebdf;
+  --body: #4a4f58;
+  --red: #b8432e;
+  --blue: #4a72b8;
+  --green: #5c9a5a;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --text: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14120f; --panel: #1d1a16; --ink: #efe9df; --muted: #a39887; --line: #2f2a23;
+    --accent: #f0904a; --accent2: #f5c27c; --stage: #221e19; --stage-ink: #8f8473;
+    --silk: #e6dccb; --body: #8b93a0; --red: #e06a52; --blue: #7d9fe0; --green: #85c282;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14120f; --panel: #1d1a16; --ink: #efe9df; --muted: #a39887; --line: #2f2a23;
+  --accent: #f0904a; --accent2: #f5c27c; --stage: #221e19; --stage-ink: #8f8473;
+  --silk: #e6dccb; --body: #8b93a0; --red: #e06a52; --blue: #7d9fe0; --green: #85c282;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--text); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .glow { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .glow { background: linear-gradient(100deg, var(--accent) 10%, var(--accent2) 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; background: var(--stage); }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; border-radius: 3px; background: var(--stage); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+input[type="checkbox"] { accent-color: var(--accent); }
+button { font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px; padding: 9px 14px; cursor: pointer; }
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+.items { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.item { background: var(--panel); border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.item img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--stage); }
+.item > div { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 10px; }
+.item h3 { font-size: 20px; }
+.item p { font-size: 15px; line-height: 1.55; color: var(--muted); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: pre; }
+.formula .c { color: var(--muted); }
+.table-wrap { overflow-x: auto; background: var(--panel); border-radius: 4px; }
+table { border-collapse: collapse; width: 100%; font: 400 14px/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+td.num, th.num { text-align: right; }
+tr:last-child td { border-bottom: 0; }
+.bar { display: inline-block; height: 8px; border-radius: 2px; background: var(--accent2); vertical-align: middle; }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 20</b> · Cocoon</div>
+      <h1>How Cocoon winds and <span class="glow">hatches</span></h1>
+      <p class="lede">A figure dances while silk winds round it, feet first, until a felted shell holds it still. A small lamp circles it and the shell glows from inside, with the body a shadow in it. Ask for a new one and the figure breaks out in a new colour, scattering the shell as flakes. Here is how the silk is put on a moving body, how light gets through it, what the floss, webs and wisps are, and how the shell comes apart.</p>
+      <a class="live" href="./">See it live <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M3 1.8v8.4c0 .5.5.8.9.5l6.6-4.2a.6.6 0 0 0 0-1L3.9 1.3c-.4-.3-.9 0-.9.5z" fill="currentColor"/></svg></a>
+    </div>
+    <figure>
+      <img src="../screenshots/20.jpg" width="1080" height="1080" alt="A figure wrapped head to foot in white felted silk with a halo of loose floss, glowing warm where the lamp behind it shines through." fetchpriority="high" decoding="async">
+      <figcaption>A finished cocoon, samba held all but still, with the lamp passing behind it.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>A life in four parts</h2>
+      <p>A silkworm spins its cocoon round itself while it moves, and it moves less as the wall closes in. The sketch follows the same arc with a person: a figure dancing on a studio cyc is wound in silk over ten seconds, slows as the bands close, and stands nearly still in a finished shell. A small lamp circles at about chest height, so every twelve seconds or so the cocoon passes from lit felt to a glowing lantern with a body inside it. A finished cocoon holds for three and a half seconds and hatches (or at once, on <code>R</code>), and the figure comes out in another colour and another dance, to be wound again.</p>
+      <p>Nothing here is simulated in the physical sense. The silk is a second skin with a pattern cut into it, the light through it is read off two depth maps, and the flakes follow spirals written down in closed form. All of it is driven by a few numbers per frame: how much silk is on (<code>wrapped</code>, 0 to 1), how far the hatching has got (<code>hatch</code>, 0 to 1), and the lamp's position.</p>
+    </div>
+    <div class="items">
+      <article class="item"><img src="explainer/winding-30.jpg" alt="A green figure dancing with crossing white silk bands wound round its legs and hips." loading="lazy"><div>
+        <h3>Winding</h3><p>Two sets of bands go on feet first and widen. At 30% they reach the hips; the figure still dances at full pace.</p></div></article>
+      <article class="item"><img src="explainer/winding-60.jpg" alt="The figure mostly covered in silk, with gaps at the chest and head, lamp behind it." loading="lazy"><div>
+        <h3>Closing</h3><p>Past 60% the silk starts to hold the body back. The head is the last place the bands close, at 87%.</p></div></article>
+      <article class="item"><img src="explainer/complete-front.jpg" alt="A white felted cocoon of a figure lit from the front by a small lamp, crouched mid-step." loading="lazy"><div>
+        <h3>Lit from the front</h3><p>The lamp lights the felt directly, wrapping a little past the terminator, red furthest.</p></div></article>
+      <article class="item"><img src="explainer/complete-behind.jpg" alt="The same cocoon lit from behind: its outline glows warm and the limbs show darker inside." loading="lazy"><div>
+        <h3>Lit from behind</h3><p>What crosses only silk comes out amber; what crosses the body comes out a dull red, so the limbs read as shadows.</p></div></article>
+      <article class="item"><img src="explainer/strain.jpg" alt="A cocoon lit red from behind, swelling in patches as the figure pushes from inside." loading="lazy"><div>
+        <h3>Straining</h3><p>For the first 22% of the hatch nothing tears: the shell swells in patches, four pushes, each quicker and harder.</p></div></article>
+      <article class="item"><img src="explainer/hatch-40.jpg" alt="The shell breaking into hundreds of flakes, a purple figure showing underneath." loading="lazy"><div>
+        <h3>Breaking</h3><p>The split opens at the breastbone, runs over the head and works round to the back and out along the limbs.</p></div></article>
+      <article class="item"><img src="explainer/hatch-70.jpg" alt="A pink figure dancing out of the last of its shell, flakes spiralling round it." loading="lazy"><div>
+        <h3>Out</h3><p>Each chip winds outward on its own spiral, sinking, turning over and shrinking away before the floor; the ones a limb meets bounce off it.</p></div></article>
+    </div>
+  </section>
+
+  <!-- 2. The figure -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The figure · <b>figure.js</b></div>
+      <h2>A dancer in a pipeline that knows nothing of bones</h2>
+      <p>The figure is three.js's Xbot example model: a Mixamo character of two skinned meshes, the body and its joints (15,901 and 12,473 vertices, 49,112 triangles together), on one 67-bone skin. Its file brings a walk, a run and two poses, of which <code>sneak_pose</code> is used. Eight more motions are dances retargeted to its skeleton offline (the samba from three's Michelle example): samba, salsa, swing, house, hip hop, wave, belly and capoeira, 254 to 382 frames each.</p>
+      <p>Those eight are not glTF files. Each is a small JSON (frame count, bone names) and a raw <code>Float32Array</code>: the frame times, then the hips' position track, then one quaternion track per bone, 65 of them. At 274 frames that is 274 × (1 + 3 + 65 × 4) floats, 289 kB for the samba, read straight into <code>VectorKeyframeTrack</code> and <code>QuaternionKeyframeTrack</code> with no parsing beyond a slice. Eleven motions are offered: the ten clips, plus "sneak", which is the walk with a pose laid over it. The pose is made additive and cut down to its last frame (frames 2–3 at 30 fps), then eased in and out at 5 per second, so changing between walk and sneak bends the same gait rather than restarting it. A randomize that would follow a gait (walk, run, sneak) with another gait picks a dance instead, so a cocoon never opens on a figure that just walks on.</p>
+      <p>Changing motion cross-fades over half a second. Three's cross-fade can also <em>warp</em>, matching the two clips' speeds through the fade so the feet stay in step. That is right between a one-second walk and a run, and badly wrong between a one-second walk and an eighteen-second dance, which it would play at nineteen times its speed for the length of the fade. So the warp is used only when the two durations are within a factor of two.</p>
+      <p>The shared <code>PipelineMaterial</code> has no skinning. It does have a <code>displace()</code> hook that runs in every variant (colour, prepass, shadow), so the skinning is written there by hand, using three's own bone texture and <code>bindMatrix</code> uniforms, which three uploads for any material drawn on a <code>SkinnedMesh</code>:</p>
+    </div>
+    <div class="formula"><span class="c">// skin space → world, blended over four bones</span>
+mat4 B = skinWeight.x * getBoneMatrix(skinIndex.x) + … + skinWeight.w * getBoneMatrix(skinIndex.w);
+p = (bindMatrixInverse * (B * (bindMatrix * vec4(p, 1.0)))).xyz;
+n = normalize(mat3(bindMatrixInverse) * (mat3(B) * (mat3(bindMatrix) * n)));</div>
+    <div class="col prose">
+      <p>The pipeline's prepass writes a velocity buffer, which its temporally accumulated AO and GI reproject through. It finds the previous position by running <code>displace()</code> a second time with <code>pipelinePrevPose</code> set. Fed the current bones both times, a dancing body would have no velocity at all and its AO would smear behind every move. So before the mixer advances, the figure copies the bone matrices of the pose just drawn into a texture of the same layout (20 × 20 texels for 67 bones), and the prev-pose run reads that instead. While paused the two are the same and the velocity is zero.</p>
+    </div>
+  </section>
+
+  <!-- 3. The silk -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The silk · <b>figure.js</b></div>
+      <h2>A second skin, cut into bands</h2>
+      <p>The silk is the body's own geometry drawn a second time: a new <code>SkinnedMesh</code> on the same <code>BufferGeometry</code>, bound to the same skeleton. It is skinned exactly like the body and then pushed out along the normal, so it fits in every pose with no cloth simulation and no collisions. Two meshes, body and joints, get one each.</p>
+      <p>Pushing out along the model's own normals would tear it at every seam, where vertices at one place carry different normals (the UV and hard-edge splits). So each vertex also gets <code>aSmooth</code>: the sum of the normals of every vertex at the same place, rounded to 0.1 mm, normalised. Vertices that share a place then move together.</p>
+      <p>How far out is <code>uThick × lift</code>. The panel's thickness (0.5 to 5 cm, 2 cm by default) is scaled by <code>0.25 + 0.75 × wrapped</code>, so the first turns lie on the skin and the wall builds as more goes on. <code>lift</code> runs from 0.08 at a band's edge to 1 a third of the way in, so each band comes down to the body at its sides: a closed strip lying on it, not a sheet held off it that can be seen under.</p>
+      <p>Where the silk is comes from the rest pose, so the pattern stays put on the moving body. Each point gets two turn counts, from its height <code>y</code>, its angle round the upright axis <code>θ</code> (in turns) and its distance from that axis <code>r</code>. The <code>r</code> term makes the bands spiral along outstretched arms as well as round the trunk.</p>
+    </div>
+    <div class="formula"><span class="c">// how far the silk has got at a height: feet first, the head last</span>
+coverAt(y) = clamp(1.6 · cover − 0.6 · y / height, 0, 1)
+turn₁ = 9y + θ + 4r + 0.6 · noise(3p)
+turn₂ = 6y − 2θ − 3r + 0.9 · noise(3p) + 0.37
+width = 1.3 · coverAt(y) · (0.8 + 0.4 · noise(7p))
+inside = max(width − |fract(turn₁) − ½| · 2,  0.8 · width − |fract(turn₂) − ½| · 2)   <span class="c">// silk where > 0</span></div>
+    <div class="fig">
+      <div class="fig-head"><h3>The bands, unrolled</h3>
+        <div class="controls">
+          <label>silk on <input id="bC" type="range" min="0" max="1" step="0.01" value="0.45"><output id="bCo"></output></label>
+          <label><input id="bT2" type="checkbox" checked> second set</label>
+        </div>
+      </div>
+      <canvas id="bandFig" aria-label="The silk pattern on a cylinder unrolled flat: angle across, height up, with bands that widen from the feet as the slider rises."></canvas>
+      <p class="fig-cap">The trunk as a cylinder of radius 15 cm, cut down the back and laid flat (front in the middle, height up). The first set of bands climbs nine turns per metre, the second set six turns per metre the other way and twice round. Both widen with <code>coverAt</code>, which is 1.6 × cover at the feet and 0.6 less at the top of the head, so the head closes last: at a cover of 0.87, the value the page calls "closed".</p>
+    </div>
+  </section>
+
+  <!-- 4. Felt -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The felt · <b>figure.js</b></div>
+      <h2>Domes over a scatter of points</h2>
+      <p>Close up, a cocoon is felt: a mat of tiny bumps. Each is drawn as a dome over the nearest of a scatter of points, one point per cell, searched over the 27 cells round the sample (a Worley lookup). The search returns the offset to the nearest point as well as its distance, and for a dome <code>1 − d²</code> that offset is the slope, so the bump's normal costs nothing more than the lookup. Two scales are layered: 45 cells per metre for the bumps (about 2 cm), and 100 per metre for a grain on them, tilting the normal by 0.45 and 0.25 of their offsets.</p>
+      <p>The lookups are made in the rest pose, so the relief stays on the body, and the offsets are turned to the world by the bones' own rotation (three axes passed down as varyings). Before the lookup the point is bent by 1.4 cm of noise so the cells are not visibly round. The albedo darkens to 74% between domes and 92% between grains, carries a thread along the first set of bands (seven stripes per turn) and dims to 80% at a band's edge, where the silk is thin.</p>
+      <p>In the shadow and depth variants all of this is skipped: they only need to know whether the silk is there, and the felt is two 27-cell searches per pixel, in two shadow passes a frame.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Two scales of domes</h3>
+        <div class="controls">
+          <label>light angle <input id="fA" type="range" min="0" max="360" step="1" value="135"><output id="fAo"></output></label>
+          <label>grain <input id="fG" type="range" min="0" max="1" step="0.01" value="0.25"><output id="fGo"></output></label>
+        </div>
+      </div>
+      <canvas id="feltFig" aria-label="A square patch of felt shaded from the slopes of two layers of Worley domes, lit from an adjustable angle."></canvas>
+      <p class="fig-cap">A patch about 9 cm across, shaded only from the slopes the cell search returns: the coarse domes tilt the normal by 0.45 of their offset, the fine ones by the grain amount (0.25 in the sketch). The albedo uses the same domes, darker in the creases between them.</p>
+    </div>
+    <div class="col prose">
+      <p>The silk also scatters the studio's key light. Past the key's terminator, where a hard surface would go dark, a band of light that went in nearby comes back out (<code>through</code>, from N·L of −0.7 up to 0.55), and a rim at grazing angles is stronger when the eye looks toward the light. The material turns on the pipeline's soft terminator and a sheen lobe of 0.6 at roughness 0.6, and AO gets the multi-bounce brightening for white materials, so the hollows between arm and body fill with light bounced inside them rather than going grey.</p>
+    </div>
+  </section>
+
+  <!-- 5. Pace -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Winding · <b>main.js</b></div>
+      <h2>The silk holds it still</h2>
+      <p>The silk goes on or comes off at a constant rate: ten seconds from bare to finished, on the wall clock, so it takes the same time at any frame rate (only a stall longer than half a second is cut short). It stops while the page is paused. The "Silk" slider sets where it is going; <code>C</code> or the cocoon button sends it to 0 or 1.</p>
+      <p>The animation's time step is multiplied by a pace. It is 1 until the silk is 60% on, then falls with the square of how far it has got toward closed, down to 0.03 at 87%:</p>
+    </div>
+    <div class="formula">pace = 1 − 0.97 · clamp((wrapped − 0.6) / (0.87 − 0.6), 0, 1)²
+paceₑ += (pace − paceₑ) · (1 − e^(−4·Δt))      <span class="c">// eased on the wall clock</span></div>
+    <div class="fig">
+      <div class="fig-head"><h3>Winding and pace</h3>
+        <div class="controls"><button class="ghost" id="pPlay">play</button><label>t <input id="pT" type="range" min="0" max="12" step="0.05" value="7"><output id="pTo"></output></label></div>
+      </div>
+      <canvas id="paceFig" aria-label="A graph over twelve seconds of how much silk is on, the coverage at the feet, waist and head, and the animation pace."></canvas>
+      <p class="fig-cap">Over the ten seconds of winding: silk on (the straight ramp), the coverage it gives at the feet, the waist and the top of the head, and the pace the clip plays at. The feet are fully covered at 62% of the way, the head only at 100%; the pace has all but stopped by the time the head closes.</p>
+    </div>
+  </section>
+
+  <!-- 6. The lamp -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The lamp · <b>main.js, figure.js</b></div>
+      <h2>Light through silk, read off two depth maps</h2>
+      <p>The lamp is a 3 cm sphere on a circle of 1.1 m round the figure, at 1.05 m rising and falling 35 cm, once round every 12.6 seconds at the default orbit. It is not one of the pipeline's lights: every material that should see it adds it to its emissive term itself, with a warm colour (<code>#ffd9a8</code> × 90) and a falloff of <code>1 / (1 + 0.6 r²)</code>. As the lamp comes up the pipeline's exposure comes down by 75%, so the studio steps back and what the lamp sends through the silk is what is seen.</p>
+      <p>What the lamp needs to know at any point is how much of the figure its light crossed to get there. Each frame the scene is drawn twice from the lamp, with a 110° perspective camera looking at the figure's chest, into two 512 × 512 float targets, using the materials' own shadow variants (they write depth as colour):</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Everything</b><span><code>uLampDepth</code>: body and silk, everything that casts a shadow. Where the lamp's light first meets the figure.</span></div>
+      <div class="fact"><b>The body alone</b><span><code>uLampBody</code>: only the meshes marked <code>userData.body</code>. Whether the body itself stood in the way.</span></div>
+      <div class="fact"><b>Not in either</b><span>Floss, webs and wisps (too fine), the backdrop, and the flakes: a chip near a small light would throw a huge hard streak where its real shadow is too soft to see.</span></div>
+    </div>
+    <div class="col prose">
+      <p>A point's distance from the lamp, minus the depth the lamp saw at it, is how far the light went inside the figure. It is averaged over 12 taps on a golden-angle disc of 1.4% of the map (about 7 texels), which softens it and thins it toward an outline as scattering would, and the axial depth difference is scaled by <code>r / w</code> to be measured along the ray. The same 12 taps in the body map say what share of that light met the body.</p>
+    </div>
+    <div class="formula"><span class="c">// a point on the silk that the lamp does not see directly</span>
+left  = exp(−crossed · (0.8 + 0.4 · (1 − dome)) · mix((2.5, 5, 9), (12, 26, 48), body))   <span class="c">// per channel: blue lost first</span>
+phase = 0.35 + 1.2 · max(−V·l, 0)⁴ + 0.5 · edge²                                       <span class="c">// toward an eye that looks at the lamp, and at the outline</span>
+lit   = albedo / π · (direct + (1, 0.86, 0.7) · left · phase · (1 − direct))</div>
+    <div class="fig">
+      <div class="fig-head"><h3>A slice through the cocoon</h3>
+        <div class="controls">
+          <label>lamp <input id="lA" type="range" min="0" max="360" step="1" value="200"><output id="lAo"></output></label>
+          <label><input id="lB" type="checkbox" checked> body inside</label>
+        </div>
+      </div>
+      <canvas id="lampFig" aria-label="A horizontal slice through a cocoon: an outer silk ring with a body inside and a lamp outside; the ring is coloured by the light that reaches each point."></canvas>
+      <p class="fig-cap">A horizontal slice at chest height: the silk ring (drawn thick), the body inside, the lamp outside. Each point on the ring is coloured by what the formulas give it. On the lamp's side it is lit directly, wrapping past the terminator by 0.55, 0.3 and 0.15 in red, green and blue. On the far side it gets what is left after crossing the cocoon: amber through silk alone, a dull red where the body was in the way.</p>
+    </div>
+    <div class="col prose">
+      <p>The direct term has its own softening: the wrap is per channel, so past the terminator red carries on furthest, as light that went in nearby comes back out. It also follows the felt's bent normal, so the domes catch the lamp. The floss uses the same crossing test with steeper coefficients (9, 20, 38 per metre) and is lit as fibres: brightest square to the light, and with a strong forward lobe, so hairs against the lamp blaze. The body under the silk sees the lamp only where nothing crossed (a smoothstep from 2 to 6 cm), and the flakes are lit from either face.</p>
+      <p>The cyc behind the figure gets the lamp too, and the figure's shadow in it. That is a share of taps rather than a thickness: 16 taps on a disc of 2% of the map, each blocked if the lamp saw something more than 5 cm nearer. The wall is metres away, where any thickness would saturate at once and show the depth map's texels as steps; the share of a disc gives a soft edge instead.</p>
+    </div>
+  </section>
+
+  <!-- 7. Floss -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The floss · <b>figure.js</b></div>
+      <h2>Thousands of hairs that ride the bones</h2>
+      <p>A cocoon's outline is fuzzy: loose floss stands off it. That fuzz is real geometry, built once per cocoon from a seeded generator, so the panel can thicken or thin the same one. Each hair is a three-sided tube that tapers to nothing at its ends, rooted at a point spread over the skin by area (a running total of the triangle areas, binary-searched for a random share of it).</p>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>kind</th><th class="num">count at floss 1</th><th>segments</th><th>reach</th><th>width</th><th>trails by</th></tr></thead>
+      <tbody>
+        <tr><td>nap</td><td class="num">2,500 + 9,000 × floss</td><td>3</td><td>0.4–2.4 cm</td><td>0.7–1.4 mm</td><td>¼ s²</td></tr>
+        <tr><td>frizz, free end (55%)</td><td class="num" rowspan="2">400 + 2,600 × floss</td><td rowspan="2">5–28</td><td>1–9 cm</td><td rowspan="2">1–2.4 mm</td><td>s<sup>1.5</sup></td></tr>
+        <tr><td>frizz, loop (45%)</td><td>0.4–4.4 cm</td><td>½ sin πs</td></tr>
+      </tbody>
+    </table></div>
+    <div class="col prose">
+      <p>A hair walks over the skin as it rises: each step (3–9 mm for the nap, 6–18 mm for the frizz) turns by a curl that drifts, with a 6% chance of a sharp kink. A free hair rises by <code>reach · s<sup>0.7</sup></code> and droops by 0.3 reach toward its end; a loop rises and lands again, <code>reach · sin(πs)</code>. Every vertex carries the four bone weights of its root's nearest corner, so the whole hair is skinned with it, and is pushed out by the silk's thickness so it grows from the silk, not the body. A hair appears once the silk at its root's height has passed its own lateness (0.35 to 0.95), so the fuzz grows in after the bands, not with them.</p>
+      <p>At the default floss of 0.6 that is about 7,900 nap hairs and 2,000 frizz, some 160,000 vertices. They are blended and kept out of the prepass and both shadow maps: hair this fine would only be noise in any of them. Medium quality builds 60% of them and low 35%, and dragging the slider rebuilds once it rests for 150 ms rather than on every step.</p>
+      <p>Longer hairs trail and swing. Every bone has a point that follows it on a spring (stiffness 90, damping 7, stepped at no more than 1/30 s), and how far that point is behind its bone, clamped to 7 cm, goes to the GPU as one texel per bone. A hair's vertices are carried by that lag, blended over their four bones, times a share that grows along the hair: all of it at a free end, a quarter at most for the nap, the middle of a loop. The springs run on real time, not the animation's: a closing cocoon slows the dance to 3%, and on the animation's clock the hairs would freeze mid-swing. On real time they settle onto the still body in about a second. The wisps and chips in the air go by the same clock.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A bone and its follower</h3>
+        <div class="controls"><label>speed <input id="sS" type="range" min="0.2" max="3" step="0.05" value="1.4"><output id="sSo"></output></label><label><input id="sC" type="checkbox" checked> clamp at 7 cm</label></div>
+      </div>
+      <canvas id="springFig" aria-label="A bone moving along a figure eight with a follower point on a spring behind it, and hairs on the bone whose free ends are carried by the lag."></canvas>
+      <p class="fig-cap">The bone (solid) moves along a figure eight; its follower (hollow) is pulled toward it at 90 per second² and damped at 7, so it lags on the way and swings past when the bone turns. The hairs' tips are carried by the gap, free ends fully and loops by their middle. Without the 7 cm clamp a fast spin flings them far off the body.</p>
+    </div>
+  </section>
+
+  <!-- 8. Webs and wisps -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Webs and wisps · <b>figure.js</b></div>
+      <h2>Silk that is not on the body</h2>
+      <p>When two parts of a wound body come close (a hand to a hip, a knee to a knee), silk sticks them together; as they part it stretches into a sheet of filaments, necks and tears. To find those moments, 300 places are picked on the skin, evenly through its vertex list, each with its nearest neighbour more than 2 cm away at rest. Each frame those 300 are skinned on the CPU, and 100 of them are checked against all the others, round-robin. A web is made between two places that are within 14 cm of each other now but were more than 20 cm apart at rest (so not two points of one forearm), both wound, at most four new webs a frame and 40 at once.</p>
+      <p>A web is a ribbon of nine steps whose two long edges run between the pair and between their neighbours, so it is a sheet with a width. Its length when it was made is its rest length. If the two ends come closer it hangs slack, its middle dropping by <code>½ √(L² − d²)</code>; if they part it necks, its width at the middle cut by <code>0.2 + 0.6 · min(1, d / 25 cm)</code>, and it thins. Past 40 cm, or once either end is no longer wound, it tears and fades. In the shader it is mostly separate filaments with a little between them, from a beating sine across it.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A web as its ends part</h3>
+        <div class="controls"><label>apart <input id="wD" type="range" min="0.03" max="0.45" step="0.005" value="0.18"><output id="wDo"></output></label><label>made at <input id="wL" type="range" min="0.05" max="0.14" step="0.005" value="0.1"><output id="wLo"></output></label></div>
+      </div>
+      <canvas id="webFig" aria-label="A ribbon between two pairs of points that sags when they are closer than its rest length and necks when they are further apart, tearing past 40 centimetres."></canvas>
+      <p class="fig-cap">Closer than it was made, a web sags; further, it necks and fades toward 60% of its opacity, and at 40 cm it is gone.</p>
+    </div>
+    <div class="col prose">
+      <p>A place on the wound skin moving faster than 1.6 m/s, as seen (its distance moved over the real frame time), throws off a wisp now and then: a fixed curl of nine points a few centimetres long, given half the place's velocity, slowed by the air (<code>e<sup>−2.5 t</sup></code>), sinking at 0.2 m/s², wandering and turning, gone in 1.2–2.4 s. Up to 60 are in the air at once and at most two are born a frame. Each one is also a rustle in the sound, outside a hatch.</p>
+    </div>
+  </section>
+
+  <!-- 9. Hatching -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Hatching · <b>figure.js, main.js</b></div>
+      <h2>Breaking out</h2>
+      <p>A finished cocoon (at least 87% on) hatches 3.5 s after it closes, or at once when randomized; the hatch takes nine seconds. Its first 22% is the strain: the figure, all but still, pushes at the shell. The silk swells by up to 5 cm in noise patches, in four pushes, each quicker and harder than the last, <code>s · sin²(4.5π s²)</code> over the strain share <code>s</code>. Nothing tears and no wisps fly. Then the animation breaks into its new motion at 1.8 times its pace, settling back to 1 over 30% of the hatch, while the shell comes apart.</p>
+      <p>The shell is divided into patches, a Voronoi cell of nine per metre in the rest pose. Each patch has its moment, worked out once on the CPU for every vertex of the silk, every hair and every flake, so nothing is searched for in the shaders:</p>
+    </div>
+    <div class="formula">when = 0.22 + 0.2 · round + 0.13 · |y − 0.72 h| / 0.72 h + 0.1 · min(1, |x| / 0.8) + 0.05 · random
+<span class="c">// round: 0 at the front, 1 at the back · 0.72 h: chest height · |x|: out from the trunk</span></div>
+    <div class="col prose">
+      <p>So the split opens at the breastbone, runs up over the head and down, works round to the back and out along the limbs. When a patch's moment comes, the silk there goes from a scatter of holes in 0.3 s (fine noise below a rising threshold), the hairs rooted in it shrink away, the webs fade, and its chips are let go.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>When each patch goes</h3>
+        <div class="controls"><button class="ghost" id="hPlay">play</button><label>hatch <input id="hT" type="range" min="0" max="1" step="0.005" value="0.45"><output id="hTo"></output></label></div>
+      </div>
+      <canvas id="hatchFig" aria-label="The trunk unrolled flat and divided into Voronoi patches shaded by when they break; the patches past the hatch time are gone."></canvas>
+      <p class="fig-cap">The trunk unrolled as before, front in the middle, split into patches nine to the metre, darker the later they go. Past the slider's moment they are gone. Nothing goes in the first 22%; the last patches (the back of the legs and the far side) go at about 70%.</p>
+    </div>
+    <div class="col prose">
+      <p>The chips are 900 small quads, placed over the skin by area (or most would come off the hands and feet, where the mesh is finest), each with its patch's moment plus up to 1.2% of jitter. Released, a chip's place on the skin becomes a position on a spiral round where the hips stood when the hatch began: an angle, a distance out and a height. It eases out to its own distance (0.35 to 1.45 m), goes round at <code>1.2–2.8 / (0.6 + distance)</code> radians a second, so slower further out, and sinks at 12 to 42 cm/s after a first lift off the body. It bobs, turns over round two axes of its own, and shrinks to nothing at the end of its 3 to 6 seconds, or sooner near the floor. The shape is a ragged disc cut out of the quad by noise, felt on both faces and yellowed inside. Chips are solid and cast the key light's shadow.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Chips on their spirals, from above</h3>
+        <div class="controls"><button class="ghost" id="cNew">hatch again</button></div>
+      </div>
+      <canvas id="chipFig" aria-label="A top view of chips released round a figure, each winding outward on a spiral and shrinking away."></canvas>
+      <p class="fig-cap">Seen from above, with the release order of a real hatch: front first, then round to the back. Each chip winds outward at its own rate, slower the further out, and shrinks away; colour shows height, paler higher.</p>
+    </div>
+    <div class="col prose">
+      <p>A hole in a shell that stands off the skin would show the gap under it, hollow. So in the 0.4 s before its patch breaks, the silk there sinks onto the body, and the shell round every hole slopes down to the skin, as a band's edge does.</p>
+      <p>At the end of the hatch the cocoon starts over: no silk, new fuzz, and the figure in the colour it took on in the cocoon. That colour changes the moment the cocoon closes over the head, out of sight, so the figure never comes out the colour it went in, whether it hatches or is unwound. It is one of eight hues an eighth of a turn apart, always at least two steps (90°) round from the last, with alternate steps a little lighter, so consecutive figures are clearly different. Its new motion and look were drawn by the randomize that started the hatch, and wait for it to end, so nothing visible changes under a breaking shell.</p>
+    </div>
+  </section>
+
+  <!-- 9b. Collisions -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Bumping into the body · <b>figure.js, main.js</b></div>
+      <h2>Sixteen capsules</h2>
+      <p>Two things have to stay out of the body: the chips, which otherwise drift straight through a swinging arm, and the lamp, whose circle would sometimes pass through a hand. Neither needs the skin itself. The body is sixteen capsules between bones: the trunk in two (hips to mid-spine, mid-spine to neck, 13 cm), the neck and the head (6 and 10 cm), and on each side the upper arm, forearm and hand (5.5, 4.5, 4.5 cm), thigh, shin and foot (7.5, 5.5, 5 cm). Every sampled point of the skin lies within 8 cm of one, in the walk and in the capoeira. Each frame their ends are read off the bones, and how fast each end moved, in real time.</p>
+      <p>A chip a quarter of a second out of the shell (so not the ones still leaving it) that finds itself inside a capsule is put back on its surface, 1.5 cm out. Its velocity relative to the limb there loses what pointed into it and bounces back 40% of that, is damped to 70%, and is added to the limb's own velocity: a kick bats the chips away, an arm swept through them carries them. That knock is added to the chip's spiral position every step and fades in the air (<code>e<sup>−2.5 t</sup></code>); the spiral simply continues from where the chip has got to, with its distance out raised if it was knocked further, so nothing pulls it back. Halfway through a capoeira hatch, 131 of the 865 chips in the air were riding a knock.</p>
+      <p>The lamp keeps its circle but steps round the body. Where the circle passes within 18 cm of a capsule, the point it would be at is pushed out to 18 cm, and the lamp eases toward that offset at a rate of 8 per second, so it glides round a hand instead of jumping. A last push holds it at least 10 cm off whatever the easing has not caught up with. Over 25 s of capoeira it came no closer than 9 cm to any capsule.</p>
+    </div>
+  </section>
+
+  <!-- 9c. Camera -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The camera · <b>main.js</b></div>
+      <h2>Facing the dancer, inside the studio</h2>
+      <p>The dances turn: left alone, the samba drifts round until the figure has its back to the camera. So after three seconds without a drag, a scroll or a touch, the camera takes over, easing in over three more. It goes back to the opening framing: 4.5 m out, 12° to the side of the figure's front and 4.5° above level, looking at its chest. The front is the direction square to the line from the right hip and shoulder to the left ones, smoothed over three seconds so a spin does not drag the camera round with it. The camera turns toward it at a rate of 0.4 per second but never faster than 20° a second, and sways there: ±11° and ±3° round the figure on slow cycles of 27 and 10 seconds, and ±3° up and down over 37. Any touch hands it back at once; it stops while paused, and stays off for recordings, which can turn it back on.</p>
+      <p>Wherever it is moved, by hand or by itself, the camera is kept inside the cyc. In distance from the axis and height, the cyc is a floor out to 4.2 m and then a cove of radius 2.8 m curving up into the wall. The camera is held at least 25 cm above the floor and 25 cm inside the cove and the wall, under 6 m, and no further than 6 m from what it looks at, which itself is kept within the studio. So it cannot go under the floor or out past the backdrop's edge.</p>
+    </div>
+  </section>
+
+  <!-- 10. Looks, kiosk, seeds -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Looks and kiosk · <b>looks.js, main.js</b></div>
+      <h2>Four studios, and a cocoon every twenty seconds</h2>
+      <p>Each look is a studio (wall, background, exposure, fill and key) and a silk colour: Studio's neutral grey and white silk, Raw silk's dark umber and honey-coloured silk, Amber's deep brown and apricot silk, Nocturne's blue-black and cool silk. The studios are all baked in the background once the page is up, so a change never waits for one. A change of look blends everything it lights with over two seconds, from where it is: wall, backdrop, exposure, silk colour, the studio's spherical-harmonic fill and its key light. Only the reflection map swaps, at the halfway point; on surfaces as rough as felt and the cyc the two hardly differ. The blend runs on the wall clock, so it shows even while paused.</p>
+    </div>
+    <div class="items">
+      <article class="item"><img src="explainer/look-raw-silk.jpg" alt="A cocoon in the Raw silk look: honey-coloured silk lit warm from behind against a dark umber studio." loading="lazy"><div><h3>Raw silk</h3><p>Dark umber studio, silk <code>#e8d6be</code>.</p></div></article>
+      <article class="item"><img src="explainer/look-amber.jpg" alt="A cocoon in the Amber look: apricot silk glowing orange against a deep brown studio." loading="lazy"><div><h3>Amber</h3><p>Deep brown studio, silk <code>#f2c894</code>.</p></div></article>
+      <article class="item"><img src="explainer/look-nocturne.jpg" alt="A cocoon in the Nocturne look: cool white silk against a blue-black studio, the lamp to its right." loading="lazy"><div><h3>Nocturne</h3><p>Blue-black studio, silk <code>#d8dce6</code>.</p></div></article>
+    </div>
+    <div class="col prose">
+      <p>Left alone, the page keeps going. The bands close at 8.7 s, the figure all but still from then on; 3.5 s later the cocoon hatches by itself, for nine seconds. So a full cycle is about twenty-one seconds, every part of it moving. The usual auto change, counting ten seconds while the cocoon is ready, is still there, but the hold comes first. Turning auto change off keeps a finished cocoon for as long as it is wanted.</p>
+      <p>Every randomize draws, right after the panel, the seed of the next fuzz (and, when a page loads with a seed, the figure's colour), whether or not this randomize starts a hatch, so the seeded sequence never depends on how long the page has been open. Loading a url with <code>?seed=</code> replays that randomize before anything is built, and starts with the cocoon it hatched. The effects drawn every frame (wisps, chips, their shapes, the colour picked as a cocoon closes) use the unseeded generator so they never shift it.</p>
+    </div>
+  </section>
+
+  <!-- 11. Sound -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Sound · <b>sound.js</b></div>
+      <h2>Cloth, a heartbeat, a rip</h2>
+      <p>The sound is recorded foley, all CC0 from freesound.org, cut, band-limited and levelled into 26 short files (380 kB). Every file is levelled to the same loudness (the rustles to −23 dB RMS, the rip a little louder), so the gains in the code are the mix, and a gentle compressor (−20 dB threshold, 3:1) holds overlapping sounds together.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Rustle</b><span>22 cuts of cotton and denim movement (khenshom, 481075 and 481081). One plays every 6–12 cm the wound body travels, and while the silk goes on, louder and brighter the faster it moves and the thicker the silk; at half volume under a hatch. At most three at once, 80 ms apart. A held cocoon is silent.</span></div>
+      <div class="fact"><b>Heartbeat</b><span>One beat (Lunardrive, 22440), muffled by the shell, at the height of each of the shoves while the figure strains: each louder, brighter and a touch quicker than the last.</span></div>
+      <div class="fact"><b>Rip</b><span>Cloth tearing (Rudmer_Rotteveel, 591525), slowed to 0.55–0.7× and darkened to sit with the cloth, cut to under a second. A full one as the shell splits, then softer ones every 0.5–0.9 s while chips break off fast (the rate measured against 300 a second).</span></div>
+      <div class="fact"><b>Flutter and fall</b><span>Paper thrown into the air (RossBell, 389441) once the chips fill it, and papers falling (EmiLeigh, 205911) as the hatch ends.</span></div>
+    </div>
+    <div class="col prose">
+      <p>For the video the same calls are scheduled on an offline audio context, timed by the recording's virtual clock, and the soundtrack is rendered once the frames are done: nothing is heard while it records.</p>
+    </div>
+  </section>
+
+  <!-- 12. Cost -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Cost</div>
+      <h2>What a frame draws</h2>
+      <p>The figure is drawn more often than it looks. Every frame the skinned meshes go through the pipeline's shadow map, the two lamp depth maps, the prepass and the main pass; the floss and ribbons only through the main pass.</p>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>pass</th><th>what</th><th>size</th></tr></thead>
+      <tbody>
+        <tr><td>key shadow</td><td>body, joints, silk ×2, chips</td><td>pipeline shadow map</td></tr>
+        <tr><td>lamp depth</td><td>body, joints, silk ×2</td><td>512 × 512, R32F</td></tr>
+        <tr><td>lamp body</td><td>body, joints</td><td>512 × 512, R32F</td></tr>
+        <tr><td>prepass</td><td>body, joints, silk ×2, chips, cyc</td><td>screen, normals + velocity + depth</td></tr>
+        <tr><td>main</td><td>all, floss blended (~160k vertices at floss 0.6)</td><td>screen, MSAA</td></tr>
+        <tr><td>CPU</td><td>300 skinned samples, 100 × 300 distance checks, 16 capsules, up to 900 chips against them</td><td>per frame</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <footer class="col">
+    <div class="meta">
+      <span><b>three.js</b> r187</span><span>WebGL2</span><span>hand-written skinning</span><span>lamp depth maps</span><span>skinned floss on springs</span><span>CC0 foley</span><span>started in <b>Antigravity</b> with Fable 5.2, finished in <b>Claude Code</b> with Opus 5.5</span>
+    </div>
+    Day 20 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/20/">spite.github.io/codevember-2026/20</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/20">20/ of the codevember-2026 repository</a>. The studio, shadows, AO and GI are described in <a href="../modules/pipeline/explainer.html">the shared pipeline's explainer</a>. The figure is three.js's Xbot example model, a Mixamo character.
+  </footer>
+</main>
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const fract = (x) => x - Math.floor(x);
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+  const TAU = Math.PI * 2;
+  const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const hash3 = (x, y, z, k = 0) => { let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 1440662683) ^ Math.imul(k + 1, 1274126177); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+  const noise3 = (x, y, z) => {
+    const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+    let fx = x - ix, fy = y - iy, fz = z - iz;
+    fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy); fz = fz * fz * (3 - 2 * fz);
+    const h = (a, b, c) => hash3(ix + a, iy + b, iz + c);
+    const l = (a, b, t) => a + (b - a) * t;
+    return l(l(l(h(0, 0, 0), h(1, 0, 0), fx), l(h(0, 1, 0), h(1, 1, 0), fx), fy), l(l(h(0, 0, 1), h(1, 0, 1), fx), l(h(0, 1, 1), h(1, 1, 1), fx), fy), fz);
+  };
+  const rgb = (hex) => { const c = document.createElement("canvas").getContext("2d"); c.fillStyle = hex; const s = c.fillStyle; if (s[0] === "#") return [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16)); return s.match(/\d+/g).slice(0, 3).map(Number); };
+
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1, W = 0, H = 0;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      W = canvas.clientWidth || 600; H = Math.round(W * (typeof aspect === "function" ? aspect(W) : aspect));
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, W, H);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    new MutationObserver(() => fit(true)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return { redraw: () => fit(true), paint: () => draw(ctx, W, H), size: () => [W, H] };
+  }
+  function animate(canvas, step) {
+    let on = false, last = 0;
+    new IntersectionObserver(([e]) => { on = e.isIntersecting; if (on) { last = performance.now(); requestAnimationFrame(loop); } }).observe(canvas);
+    function loop(now) {
+      if (!on) return;
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      step(dt);
+      requestAnimationFrame(loop);
+    }
+  }
+  const bind = (id, out, fmt, fn) => { const el = $(id); const o = $(out); const show = () => { if (o) o.textContent = fmt(+el.value); }; el.addEventListener("input", () => { show(); fn(); }); show(); return el; };
+  const stage = (ctx, W, H) => { ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H); };
+  const pct = (v) => `${Math.round(v * 100)}%`;
+
+  // The bands, unrolled: the trunk as a cylinder of radius R, 0..1.8 m high.
+  const R = 0.15, HEIGHT = 1.8;
+  {
+    const fig = setup($("bandFig"), (W) => (W < 520 ? 0.9 : 0.42), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const cover = +$("bC").value, two = $("bT2").checked;
+      const pad = 28, w = W - pad - 8, h = H - 30;
+      const img = ctx.createImageData(Math.ceil(w), Math.ceil(h));
+      const silk = rgb(css("--silk")), body = rgb(css("--body")), edge = rgb(css("--accent2"));
+      for (let j = 0; j < img.height; j++) {
+        const y = HEIGHT * (1 - j / img.height);
+        for (let i = 0; i < img.width; i++) {
+          const ang = (i / img.width - 0.5); // turns, front at 0
+          const a = ang * TAU + Math.PI / 2;
+          const p = [Math.cos(a) * R, y, Math.sin(a) * R];
+          const wander = noise3(p[0] * 3, p[1] * 3, p[2] * 3);
+          const t1 = y * 9 + ang + R * 4 + wander * 0.6;
+          const t2 = y * 6 - 2 * ang - R * 3 + wander * 0.9 + 0.37;
+          const cov = clamp(cover * 1.6 - 0.6 * clamp(y / HEIGHT, 0, 1), 0, 1);
+          const width = cov * 1.3 * (0.8 + 0.4 * noise3(p[0] * 7 + 3, p[1] * 7 + 3, p[2] * 7 + 3));
+          const in1 = width - Math.abs(fract(t1) - 0.5) * 2;
+          const in2 = two ? 0.8 * width - Math.abs(fract(t2) - 0.5) * 2 : -1;
+          const inside = Math.max(in1, in2);
+          const k = (j * img.width + i) * 4;
+          const c = inside > 0 ? (inside < 0.05 ? edge : silk) : body;
+          const shade = inside > 0 ? 0.8 + 0.2 * smooth(0, 0.2, inside) : 1;
+          img.data[k] = c[0] * shade; img.data[k + 1] = c[1] * shade; img.data[k + 2] = c[2] * shade; img.data[k + 3] = 255;
+        }
+      }
+      const off = document.createElement("canvas"); off.width = img.width; off.height = img.height; off.getContext("2d").putImageData(img, 0, 0);
+      ctx.drawImage(off, pad, 0, w, h);
+      ctx.fillStyle = css("--muted"); ctx.font = font(11);
+      ctx.fillText("back", pad + 2, H - 10); ctx.fillText("front", pad + w / 2 - 16, H - 10); ctx.fillText("back", pad + w - 30, H - 10);
+      ctx.save(); ctx.translate(12, h / 2 + 30); ctx.rotate(-Math.PI / 2); ctx.fillText("height 0 → 1.8 m", 0, 0); ctx.restore();
+      // How high the silk reaches: coverAt > 0 below 1.6 · cover / 0.6 of the height.
+      const reach = clamp(((cover * 1.6) / 0.6) * HEIGHT, 0, HEIGHT);
+      const ry = h * (1 - reach / HEIGHT);
+      ctx.strokeStyle = css("--accent"); ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(pad, ry); ctx.lineTo(pad + w, ry); ctx.stroke(); ctx.setLineDash([]);
+    });
+    bind("bC", "bCo", pct, fig.redraw);
+    $("bT2").addEventListener("change", fig.redraw);
+  }
+
+  // Felt
+  {
+    const cellsAt = (x, y, seed) => {
+      const ix = Math.floor(x), iy = Math.floor(y);
+      let best = 8, bx = 0, by = 0;
+      for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) {
+        const gx = ix + a, gy = iy + b;
+        const rx = a + hash3(gx, gy, seed, 0) - (x - ix), ry = b + hash3(gx, gy, seed, 1) - (y - iy);
+        const d = rx * rx + ry * ry;
+        if (d < best) (best = d), (bx = rx), (by = ry);
+      }
+      return [bx, by, best];
+    };
+    const fig = setup($("feltFig"), (W) => (W < 520 ? 1 : 0.5), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const ang = (+$("fA").value * Math.PI) / 180, grainW = +$("fG").value;
+      const L = [Math.cos(ang) * 0.75, Math.sin(ang) * 0.75, 0.66];
+      const silk = rgb(css("--silk"));
+      const S = Math.min(W, H) - 20, x0 = (W - S) / 2, y0 = 10;
+      const N = Math.min(320, Math.round(S));
+      const img = ctx.createImageData(N, N);
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        const u = (i / N) * 0.09, v = (j / N) * 0.09; // metres
+        const bu = u + 0.014 * noise3(u * 13, v * 13, 0), bv = v + 0.014 * noise3(u * 13, v * 13, 7);
+        const c = cellsAt(bu * 45, bv * 45, 1), f = cellsAt(bu * 100 + 3.7, bv * 100 + 3.7, 2);
+        const tx = c[0] * 0.45 + f[0] * grainW, ty = c[1] * 0.45 + f[1] * grainW;
+        let nx = tx, ny = ty, nz = 1; const len = Math.hypot(nx, ny, nz); nx /= len; ny /= len; nz /= len;
+        const dome = 1 - Math.min(c[2], 1), grain = 1 - Math.min(f[2], 1);
+        const alb = (0.74 + 0.26 * dome) * (0.92 + 0.08 * grain);
+        const ndl = Math.max(0, nx * L[0] + ny * L[1] + nz * L[2]);
+        const lit = alb * (0.25 + 0.85 * ndl);
+        const k = (j * N + i) * 4;
+        img.data[k] = Math.min(255, silk[0] * lit); img.data[k + 1] = Math.min(255, silk[1] * lit); img.data[k + 2] = Math.min(255, silk[2] * lit); img.data[k + 3] = 255;
+      }
+      const off = document.createElement("canvas"); off.width = N; off.height = N; off.getContext("2d").putImageData(img, 0, 0);
+      ctx.imageSmoothingEnabled = true; ctx.drawImage(off, x0, y0, S, S);
+      ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2; ctx.beginPath();
+      const cx = x0 + S / 2, cy = y0 + S / 2; ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ang) * S * 0.18, cy + Math.sin(ang) * S * 0.18); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx + Math.cos(ang) * S * 0.18, cy + Math.sin(ang) * S * 0.18, 4, 0, TAU); ctx.fillStyle = css("--accent"); ctx.fill();
+    });
+    bind("fA", "fAo", (v) => `${v}°`, fig.redraw);
+    bind("fG", "fGo", (v) => v.toFixed(2), fig.redraw);
+  }
+
+  // Pace
+  {
+    const T = 12, WRAP = 10;
+    const paceOf = (w) => 1 - 0.97 * clamp((w - 0.6) / (0.87 - 0.6), 0, 1) ** 2;
+    const covAt = (c, y) => clamp(c * 1.6 - 0.6 * y, 0, 1);
+    let playing = false;
+    const fig = setup($("paceFig"), (W) => (W < 520 ? 0.8 : 0.4), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const t = +$("pT").value;
+      const l = 40, r = W - 16, top = W < 520 ? 44 : 28, bot = H - 32;
+      const X = (s) => l + ((r - l) * s) / T, Y = (v) => bot - (bot - top) * v;
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
+      for (let v = 0; v <= 1; v += 0.25) { ctx.beginPath(); ctx.moveTo(l, Y(v)); ctx.lineTo(r, Y(v)); ctx.stroke(); }
+      ctx.fillStyle = css("--muted"); ctx.font = font(11);
+      for (let s = 0; s <= T; s += 2) ctx.fillText(`${s}s`, X(s) - 6, H - 12);
+      ctx.fillText("0", l - 14, Y(0) + 4); ctx.fillText("1", l - 14, Y(1) + 4);
+      const plot = (f, col, wdt = 2, dash = []) => { ctx.strokeStyle = col; ctx.lineWidth = wdt; ctx.setLineDash(dash); ctx.beginPath(); for (let i = 0; i <= 240; i++) { const s = (i / 240) * T; const v = f(s); i ? ctx.lineTo(X(s), Y(v)) : ctx.moveTo(X(s), Y(v)); } ctx.stroke(); ctx.setLineDash([]); };
+      const wr = (s) => Math.min(1, s / WRAP);
+      // eased pace, integrated at 4/s
+      const eased = []; let pe = 1; for (let i = 0; i <= 240; i++) { const s = (i / 240) * T; pe += (paceOf(wr(s)) - pe) * (1 - Math.exp(-4 * (T / 240))); eased.push(pe); }
+      plot((s) => covAt(wr(s), 0), css("--green"), 1.5, [3, 3]);
+      plot((s) => covAt(wr(s), 0.55), css("--blue"), 1.5, [3, 3]);
+      plot((s) => covAt(wr(s), 1), css("--red"), 1.5, [3, 3]);
+      plot(wr, css("--ink"), 2);
+      plot((s) => eased[Math.round((s / T) * 240)], css("--accent"), 2.5);
+      ctx.strokeStyle = css("--stage-ink"); ctx.beginPath(); ctx.moveTo(X(t), top); ctx.lineTo(X(t), bot); ctx.stroke();
+      const w = wr(t);
+      const legend = [["silk on " + pct(w), css("--ink")], ["feet " + pct(covAt(w, 0)), css("--green")], ["waist " + pct(covAt(w, 0.55)), css("--blue")], ["head " + pct(covAt(w, 1)), css("--red")], ["pace " + eased[Math.round((t / T) * 240)].toFixed(2), css("--accent")]];
+      let lx = l + 8, ly = top + 9;
+      legend.forEach(([s, c]) => {
+        const wd = ctx.measureText(s).width + 30;
+        if (lx + wd > r) (lx = l + 8), (ly += 16);
+        ctx.fillStyle = c; ctx.fillRect(lx, ly - 5, 10, 3); ctx.fillStyle = css("--ink"); ctx.fillText(s, lx + 14, ly);
+        lx += wd;
+      });
+    });
+    const tIn = bind("pT", "pTo", (v) => `${v.toFixed(1)} s`, fig.redraw);
+    $("pPlay").addEventListener("click", () => { playing = !playing; $("pPlay").textContent = playing ? "pause" : "play"; if (playing && +tIn.value >= T) tIn.value = 0; });
+    animate($("paceFig"), (dt) => { if (!playing) return; tIn.value = Math.min(T, +tIn.value + dt); tIn.dispatchEvent(new Event("input")); if (+tIn.value >= T) { playing = false; $("pPlay").textContent = "play"; } });
+  }
+
+  // Lamp slice: shell of outer radius RO, thickness TH, body ellipse inside.
+  {
+    const RO = 0.2, TH = 0.03, BX = 0.15, BY = 0.1, LR = 1.1;
+    const inBody = (x, y) => (x / BX) ** 2 + (y / BY) ** 2 <= 1;
+    const fig = setup($("lampFig"), (W) => (W < 520 ? 0.9 : 0.5), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const a = (+$("lA").value * Math.PI) / 180, body = $("lB").checked;
+      const lamp = [Math.cos(a) * LR, Math.sin(a) * LR];
+      const sc = Math.min(W / 0.62, H / 0.42), cx = W / 2, cy = H / 2;
+      const silk = rgb(css("--silk"));
+      // Body
+      if (body) { ctx.fillStyle = css("--body"); ctx.beginPath(); ctx.ellipse(cx, cy, BX * sc, BY * sc, 0, 0, TAU); ctx.fill(); }
+      // The ring, point by point
+      const N = 260;
+      for (let i = 0; i < N; i++) {
+        const t = (i / N) * TAU;
+        const rr = RO - TH / 2;
+        const px = Math.cos(t) * rr, py = Math.sin(t) * rr * 0.72;
+        const nx0 = Math.cos(t) / 1, ny0 = Math.sin(t) / 0.72, nl = Math.hypot(nx0, ny0), nx = nx0 / nl, ny = ny0 / nl;
+        const lx = lamp[0] - px, ly = lamp[1] - py, r = Math.hypot(lx, ly), ux = lx / r, uy = ly / r;
+        // march from the lamp to the point: what was crossed before reaching it
+        let crossed = 0, bodyHit = 0; const steps = 200;
+        for (let k = 0; k < steps; k++) {
+          const s = (k + 0.5) / steps * (r - TH * 0.6);
+          const qx = lamp[0] - ux * s, qy = lamp[1] - uy * s;
+          if (Math.hypot(qx, qy / 0.72) <= RO) crossed += (r - TH * 0.6) / steps;
+          if (body && inBody(qx, qy)) bodyHit = 1;
+        }
+        const facing = nx * ux + ny * uy;
+        const seen = 1 - smooth(0.01, 0.06, crossed);
+        const wrapBy = [0.55, 0.3, 0.15];
+        const col = [0, 1, 2].map((c) => {
+          const wrap = clamp((facing + wrapBy[c]) / (1 + wrapBy[c]), 0, 1);
+          const direct = wrap * wrap * seen;
+          const k = [2.5, 5, 9][c] + ([12, 26, 48][c] - [2.5, 5, 9][c]) * bodyHit;
+          const left = Math.exp(-crossed * k);
+          const tint = [1, 0.86, 0.7][c];
+          const lampCol = [1, 0.85, 0.66][c];
+          return (silk[c] / 255) * lampCol * (direct + tint * left * 0.9 * (1 - direct)) * 2.2 / (1 + 0.6 * r * r);
+        });
+        ctx.fillStyle = `rgb(${col.map((v) => Math.round(255 * Math.min(1, v / (1 + v)) * 1.6)).join(",")})`;
+        const t2 = ((i + 1) / N) * TAU;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, RO * sc, RO * 0.72 * sc, 0, t, t2 + 0.01);
+        ctx.ellipse(cx, cy, (RO - TH) * sc, (RO - TH) * 0.72 * sc, 0, t2 + 0.01, t, true);
+        ctx.closePath(); ctx.fill();
+      }
+      // lamp, drawn on the edge if it is outside the view
+      const lxp = cx + lamp[0] * sc, lyp = cy + lamp[1] * sc;
+      const ex = clamp(lxp, 12, W - 12), ey = clamp(lyp, 12, H - 12);
+      ctx.strokeStyle = css("--accent"); ctx.setLineDash([3, 4]); ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(cx, cy); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = css("--accent"); ctx.beginPath(); ctx.arc(ex, ey, 7, 0, TAU); ctx.fill();
+      ctx.fillStyle = css("--muted"); ctx.font = font(11);
+      ctx.fillText(ex !== lxp || ey !== lyp ? "lamp (1.1 m out)" : "lamp", ex + (ex > W / 2 ? -110 : 10), ey + (ey > H / 2 ? -10 : 18));
+    });
+    bind("lA", "lAo", (v) => `${v}°`, fig.redraw);
+    $("lB").addEventListener("change", fig.redraw);
+  }
+
+  // Spring follower
+  {
+    let t = 0, bone = [0, 0], f = [0, 0], v = [0, 0], ready = false;
+    const fig = setup($("springFig"), (W) => (W < 520 ? 0.8 : 0.42), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const sc = Math.min(W, H) * 1.6, cx = W / 2, cy = H / 2;
+      const P = (p) => [cx + p[0] * sc, cy + p[1] * sc];
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1; ctx.beginPath();
+      for (let i = 0; i <= 200; i++) { const s = (i / 200) * TAU; const q = P([0.22 * Math.sin(s), 0.1 * Math.sin(2 * s)]); i ? ctx.lineTo(...q) : ctx.moveTo(...q); } ctx.stroke();
+      const lag = [f[0] - bone[0], f[1] - bone[1]];
+      const b = P(bone);
+      // hairs: rooted round the bone, out radially, tips carried by the lag
+      for (let k = 0; k < 14; k++) {
+        const a = (k / 14) * TAU, free = k % 3 !== 0;
+        const root = [bone[0] + Math.cos(a) * 0.03, bone[1] + Math.sin(a) * 0.03];
+        ctx.strokeStyle = css(free ? "--accent2" : "--stage-ink"); ctx.lineWidth = 1.4; ctx.beginPath();
+        for (let i = 0; i <= 12; i++) {
+          const s = i / 12, reach = 0.06;
+          const share = free ? s ** 1.5 : 0.5 * Math.sin(Math.PI * s);
+          const lift = free ? reach * s ** 0.7 : reach * 0.5 * Math.sin(Math.PI * s);
+          const q = P([root[0] + Math.cos(a) * lift + lag[0] * share, root[1] + Math.sin(a) * lift + lag[1] * share]);
+          i ? ctx.lineTo(...q) : ctx.moveTo(...q);
+        }
+        ctx.stroke();
+      }
+      ctx.fillStyle = css("--ink"); ctx.beginPath(); ctx.arc(...b, 6, 0, TAU); ctx.fill();
+      const fp = P(f); ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(...fp, 6, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(...b); ctx.lineTo(...fp); ctx.stroke();
+      ctx.fillStyle = css("--muted"); ctx.font = font(11);
+      ctx.fillText(`lag ${(Math.hypot(...lag) * 100).toFixed(1)} cm`, 12, H - 12);
+    });
+    const sIn = bind("sS", "sSo", (x) => `${x.toFixed(2)}×`, () => {});
+    animate($("springFig"), (dt) => {
+      t += dt * +sIn.value * 2.2;
+      bone = [0.22 * Math.sin(t), 0.1 * Math.sin(2 * t)];
+      if (!ready) { f = bone.slice(); ready = true; }
+      const h = Math.min(dt, 1 / 30);
+      for (let a = 0; a < 2; a++) { v[a] += ((bone[a] - f[a]) * 90 - v[a] * 7) * h; f[a] += v[a] * h; }
+      if ($("sC").checked) { const d = Math.hypot(f[0] - bone[0], f[1] - bone[1]) || 1, keep = Math.min(1, 0.07 / d); for (let a = 0; a < 2; a++) f[a] = bone[a] + (f[a] - bone[a]) * keep; }
+      fig.paint();
+    });
+  }
+
+  // Web
+  {
+    const fig = setup($("webFig"), (W) => (W < 520 ? 0.6 : 0.32), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const d = +$("wD").value, L = +$("wL").value;
+      const sc = (W - 80) / 0.5, cy = H * 0.38, cx = W / 2;
+      const A = [-d / 2, 0], B = [d / 2, 0], A2 = [-d / 2 - 0.01, 0.035], B2 = [d / 2 + 0.01, 0.035];
+      const gone = d > 0.4;
+      const slack = d < L ? 0.5 * Math.sqrt(L * L - d * d) : 0;
+      const neck = 0.2 + 0.6 * Math.min(1, d / 0.25);
+      const opacity = gone ? 0 : Math.max(0.6, Math.min(1, L / d));
+      const P = (p) => [cx + p[0] * sc, cy + p[1] * sc];
+      const top = [], bot = [];
+      for (let i = 0; i <= 8; i++) {
+        const s = i / 8, bow = Math.sin(Math.PI * s);
+        const a = [A[0] + (B[0] - A[0]) * s, A[1] + (B[1] - A[1]) * s], b = [A2[0] + (B2[0] - A2[0]) * s, A2[1] + (B2[1] - A2[1]) * s];
+        const c = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + slack * bow];
+        const e = [(b[0] - a[0]) * 0.8 * (1 - neck * bow), (b[1] - a[1]) * 0.8 * (1 - neck * bow)];
+        top.push(P([c[0] - e[0], c[1] - e[1]])); bot.push(P([c[0] + e[0], c[1] + e[1]]));
+      }
+      if (!gone) {
+        ctx.globalAlpha = opacity * 0.35; ctx.fillStyle = css("--silk"); ctx.beginPath(); top.forEach((p, i) => (i ? ctx.lineTo(...p) : ctx.moveTo(...p))); [...bot].reverse().forEach((p) => ctx.lineTo(...p)); ctx.fill();
+        ctx.globalAlpha = opacity; ctx.strokeStyle = css("--ink"); ctx.lineWidth = 0.8;
+        for (let f = 0; f <= 6; f++) { const u = f / 6; ctx.beginPath(); top.forEach((p, i) => { const q = [p[0] + (bot[i][0] - p[0]) * u, p[1] + (bot[i][1] - p[1]) * u]; i ? ctx.lineTo(...q) : ctx.moveTo(...q); }); ctx.stroke(); }
+        ctx.globalAlpha = 1;
+      }
+      ctx.fillStyle = css("--body");
+      for (const p of [A, B, A2, B2]) { ctx.beginPath(); ctx.arc(...P(p), 5, 0, TAU); ctx.fill(); }
+      ctx.fillStyle = css("--muted"); ctx.font = font(11);
+      ctx.fillText(gone ? "torn: past 40 cm" : `${d < L ? "sags " + (slack * 100).toFixed(1) + " cm" : "necks to " + Math.round((1 - neck) * 100) + "% width"} · opacity ${opacity.toFixed(2)}`, 12, H - 12);
+    });
+    bind("wD", "wDo", (v) => `${Math.round(v * 100)} cm`, fig.redraw);
+    bind("wL", "wLo", (v) => `${Math.round(v * 100)} cm`, fig.redraw);
+  }
+
+  // Hatch patches on the unrolled trunk.
+  {
+    const PATCHES = 9, ST = 0.22;
+    const when = (x, y, z) => {
+      const qx = x * PATCHES + 11, qy = y * PATCHES + 11, qz = z * PATCHES + 11;
+      const ix = Math.floor(qx), iy = Math.floor(qy), iz = Math.floor(qz);
+      let least = Infinity, m = [0, 0, 0], c = [0, 0, 0];
+      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let k = -1; k <= 1; k++) {
+        const sx = ix + a + hash3(ix + a, iy + b, iz + k, 0), sy = iy + b + hash3(ix + a, iy + b, iz + k, 1), sz = iz + k + hash3(ix + a, iy + b, iz + k, 2);
+        const d = (sx - qx) ** 2 + (sy - qy) ** 2 + (sz - qz) ** 2;
+        if (d < least) (least = d), (m = [sx, sy, sz]), (c = [ix + a, iy + b, iz + k]);
+      }
+      const [mx, my, mz] = m.map((v) => (v - 11) / PATCHES);
+      const round = Math.atan2(Math.abs(mx), mz) / Math.PI;
+      return [ST + 0.2 * round + 0.13 * Math.min(1, Math.abs(my - 0.72 * HEIGHT) / (0.72 * HEIGHT)) + 0.1 * Math.min(1, Math.abs(mx) / 0.8) + 0.05 * hash3(c[0], c[1], c[2], 3), c.join(",")];
+    };
+    let map = null, mw = 0, mh = 0;
+    const build = (w, h) => {
+      mw = w; mh = h; map = new Float32Array(w * h); const ids = new Array(w * h);
+      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+        const ang = i / w - 0.5, a = ang * TAU, y = HEIGHT * (1 - j / h);
+        const [t, id] = when(Math.sin(a) * R, y, Math.cos(a) * R);
+        map[j * w + i] = t; ids[j * w + i] = id;
+      }
+      map.edges = new Uint8Array(w * h);
+      for (let j = 1; j < h; j++) for (let i = 1; i < w; i++) if (ids[j * w + i] !== ids[j * w + i - 1] || ids[j * w + i] !== ids[(j - 1) * w + i]) map.edges[j * w + i] = 1;
+    };
+    let playing = false;
+    const fig = setup($("hatchFig"), (W) => (W < 520 ? 0.9 : 0.42), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const t = +$("hT").value;
+      const w = Math.round(Math.min(360, W - 20)), h = Math.round(Math.min(220, (H - 30) * 0.9));
+      if (!map || mw !== w || mh !== h) build(w, h);
+      const silk = rgb(css("--silk")), body = rgb(css("--body")), acc = rgb(css("--accent"));
+      const img = ctx.createImageData(w, h);
+      for (let k = 0; k < w * h; k++) {
+        const wt = map[k], o = k * 4;
+        let c;
+        if (wt <= t) c = body;
+        else { const s = 0.62 + 0.38 * (1 - (wt - ST) / 0.5); c = silk.map((v) => v * s); }
+        if (map.edges[k] && wt > t) c = c.map((v) => v * 0.82);
+        if (wt > t && wt - t < 0.012) c = acc;
+        img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255;
+      }
+      const off = document.createElement("canvas"); off.width = w; off.height = h; off.getContext("2d").putImageData(img, 0, 0);
+      const dw = W - 20, dh = H - 30;
+      ctx.imageSmoothingEnabled = false; ctx.drawImage(off, 10, 6, dw, dh);
+      ctx.fillStyle = css("--muted"); ctx.font = font(11);
+      ctx.fillText("back", 14, H - 10); ctx.fillText("front", W / 2 - 16, H - 10); ctx.fillText("back", W - 44, H - 10);
+      ctx.fillText(t < ST ? "straining: nothing torn" : `${pct((t - ST) / (1 - ST))} of the breaking`, W / 2 + 40, H - 10);
+    });
+    const hIn = bind("hT", "hTo", (v) => `${v.toFixed(2)} · ${(v * 9).toFixed(1)} s`, fig.redraw);
+    $("hPlay").addEventListener("click", () => { playing = !playing; $("hPlay").textContent = playing ? "pause" : "play"; if (playing && +hIn.value >= 0.99) hIn.value = 0; });
+    animate($("hatchFig"), (dt) => { if (!playing) return; hIn.value = Math.min(1, +hIn.value + dt / 9); hIn.dispatchEvent(new Event("input")); if (+hIn.value >= 1) { playing = false; $("hPlay").textContent = "play"; } });
+  }
+
+  // Chips from above
+  {
+    let chips = [], clock = 0, seed = 1;
+    const start = () => {
+      const r = mulberry(seed++);
+      chips = Array.from({ length: 220 }, () => {
+        const a = r() * TAU, rad = 0.12 + 0.06 * r();
+        const round = Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) / Math.PI; // 0 front (+y down the screen), 1 back
+        const y = 0.1 + r() * 1.6;
+        const at = 0.22 + 0.2 * round + 0.13 * Math.min(1, Math.abs(y - 1.3) / 1.3) + 0.05 * r();
+        return { at: at * 9, a, d: rad + 0.03, h: y, out: 0.35 + 1.1 * r() ** 1.5, turn: 1.2 + 1.6 * r(), sink: 0.12 + 0.3 * r(), span: 3 + 3 * r(), size: 0.018 + 0.03 * r() ** 2, age: -1 };
+      });
+      clock = 0;
+    };
+    start();
+    const fig = setup($("chipFig"), (W) => (W < 520 ? 0.9 : 0.45), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const sc = Math.min(W, H) / 3.4, cx = W / 2, cy = H / 2;
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
+      for (const rr of [0.5, 1, 1.5]) { ctx.beginPath(); ctx.arc(cx, cy, rr * sc, 0, TAU); ctx.stroke(); }
+      ctx.fillStyle = css("--body"); ctx.beginPath(); ctx.ellipse(cx, cy, 0.17 * sc, 0.11 * sc, 0, 0, TAU); ctx.fill();
+      const silk = rgb(css("--silk")), ink = rgb(css("--stage-ink"));
+      for (const c of chips) {
+        if (c.age < 0 || c.age > c.span) continue;
+        const k = clamp(c.h / 1.8, 0, 1);
+        const col = silk.map((v, i) => Math.round(ink[i] + (v - ink[i]) * (0.35 + 0.65 * k)));
+        const scale = Math.min(1, c.age * 10) * Math.min(1, (c.span - c.age) / 1.2) * Math.min(1, c.h / 0.25);
+        const s = c.size * sc * scale * 1.6;
+        ctx.fillStyle = `rgb(${col.join(",")})`;
+        ctx.beginPath(); ctx.ellipse(cx + Math.cos(c.a) * c.d * sc, cy + Math.sin(c.a) * c.d * sc, Math.max(0.5, s), Math.max(0.5, s * (0.4 + 0.6 * Math.abs(Math.sin(c.age * 3 + c.turn)))), c.age * 2 + c.turn, 0, TAU); ctx.fill();
+      }
+      ctx.fillStyle = css("--muted"); ctx.font = font(11);
+      ctx.fillText(`t = ${clock.toFixed(1)} s · rings at 0.5, 1 and 1.5 m`, 12, H - 12);
+      ctx.fillText("front", cx - 16, H - 28);
+    });
+    animate($("chipFig"), (dt) => {
+      clock += dt;
+      for (const c of chips) {
+        if (c.age < 0) { if (clock >= c.at) c.age = 0; else continue; }
+        c.age += dt;
+        c.d += (c.out - c.d) * (1 - Math.exp(-0.9 * dt));
+        c.a += (c.turn / (0.6 + c.d)) * dt;
+        c.h = Math.max(0.03, c.h + (0.5 * Math.exp(-3 * c.age) - c.sink) * dt);
+      }
+      if (clock > 16) start();
+      fig.paint();
+    });
+    $("cNew").addEventListener("click", start);
+  }
+})();
+</script>
+</body>
+</html>
