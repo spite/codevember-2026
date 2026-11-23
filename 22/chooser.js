@@ -22,7 +22,7 @@ const css = `
 `;
 
 const CHOICES = [
-  { mode: "mic", title: "With my voice", text: "Say hello, shout or clap: every sound you make sends an echo. Uses the microphone." },
+  { mode: "mic", title: "With my voice", text: "Say hello, shout or clap: every sound you make sends an echo. Uses the microphone; wear headphones, or the echoes from your speakers can feed back into it." },
   { mode: "click", title: "Click to shout", touchTitle: "Tap to shout", text: "No microphone: you call out with a click.", touchText: "No microphone: you call out with a tap." },
   { mode: "watch", title: "Just watch", text: "Sit back: it finds its own way through the back rooms, calling out as it goes." },
 ];
@@ -31,7 +31,7 @@ function instructions(mode, touch) {
   const look = touch ? "Drag to look around · hold to walk" : "WASD or the arrow keys to walk · the first click grabs the mouse to look around, Esc lets go";
   const tired = "Your voice tires: let it rest when the VOICE meter runs low";
   const change = touch ? "Tap the mic button to change how you play" : "V to change how you play";
-  if (mode === "mic") return ["Say hello, shout or clap to send an echo; louder carries further", look, change];
+  if (mode === "mic") return ["Say hello, shout or clap to send an echo; louder carries further", "Use headphones: through speakers, your echoes reach the mic again and can feed back", look, change];
   if (mode === "click") return [touch ? "Tap to shout" : "Click to shout", look, tired, change];
   return ["Relax: it walks, stops at forks to listen, and calls out on its own", touch ? "Tap the mic button to take over" : "V to take over"];
 }
