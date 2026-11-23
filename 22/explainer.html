@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Echo Listens</title>
+<meta name="description" content="How Codevember 2026 day 22, Echo, builds an endless back-rooms maze, sees it only through ray-traced echoes that leave dots where they land, plays those echoes back in 3D, walks it like someone afraid of it, and films it all on a simulated camcorder tape shown on a simulated CRT.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Yellowed wallpaper in the dark, a camcorder's blue and its red REC. */
+:root {
+  --bg: #f1eee4;
+  --panel: #faf8f1;
+  --ink: #1c1a14;
+  --muted: #6a6556;
+  --line: #e0dbcb;
+  --accent: #2f55c9;
+  --accent2: #cf3d31;
+  --stage: #0d0c09;
+  --stage-ink: #9a9482;
+  --stage-line: #2a2820;
+  --dot: #e3cf7c;
+  --dot2: #a9ad62;
+  --wall: #4a4535;
+  --ray: #f4efe0;
+  --heard: #2b2818;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --text: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121109; --panel: #1b1a12; --ink: #ece8da; --muted: #a39d89; --line: #2d2a1f;
+    --accent: #7f9cff; --accent2: #f06a5c; --stage: #070604; --stage-ink: #8a8473; --stage-line: #24221a;
+    --dot: #e8d482; --dot2: #b3b86a; --wall: #3e3a2c; --ray: #f4efe0; --heard: #24211a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121109; --panel: #1b1a12; --ink: #ece8da; --muted: #a39d89; --line: #2d2a1f;
+  --accent: #7f9cff; --accent2: #f06a5c; --stage: #070604; --stage-ink: #8a8473; --stage-line: #24221a;
+  --dot: #e8d482; --dot2: #b3b86a; --wall: #3e3a2c; --ray: #f4efe0; --heard: #24211a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--text); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .glow { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .glow { background: linear-gradient(100deg, var(--accent) 10%, var(--accent2) 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; background: var(--stage); }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.live { font: 600 14px/1 var(--mono); display: inline-flex; gap: 8px; align-items: center; text-decoration: none; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; border-radius: 3px; background: var(--stage); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+.controls select { font: 400 13px/1 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 5px 6px; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+button { font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px; padding: 9px 14px; cursor: pointer; }
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: pre; }
+.formula .c { color: var(--muted); }
+.table-wrap { overflow-x: auto; background: var(--panel); border-radius: 4px; }
+table { border-collapse: collapse; width: 100%; font: 400 14px/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+td.num, th.num { text-align: right; }
+td.wrap { white-space: normal; min-width: 260px; }
+tr:last-child td { border-bottom: 0; }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 22</b> · Echo</div>
+      <h1>How Echo <span class="glow">listens</span></h1>
+      <p class="lede">An endless maze of yellowed back rooms, completely dark. You call out, and for a few seconds you can see what the sound reached: a scatter of dots on the walls, the floor, a sculpture on a plinth, something blue standing across the room. Here is how the maze is built, how a call becomes dots and echoes, how it walks itself when you just watch, and how it ends up looking like a camcorder tape played on an old television.</p>
+      <a class="live" href="./">See it live <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M3 1.8v8.4c0 .5.5.8.9.5l6.6-4.2a.6.6 0 0 0 0-1L3.9 1.3c-.4-.3-.9 0-.9.5z" fill="currentColor"/></svg></a>
+    </div>
+    <figure>
+      <img src="../screenshots/22.jpg" width="1080" height="1080" alt="A back-rooms hall drawn in glowing dots: sculptures on plinths, a red sphere and a blue presence, seen through VHS noise on a CRT." fetchpriority="high" decoding="async">
+      <figcaption>Three calls into a room 47 m in: plinths, a red sphere, and a presence.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>Seeing with your ears</h2>
+      <p>Echolocation works because sound takes time. A click comes back from a wall 3 m away 17 ms later and from one 10 m away after 58 ms, and a brain that has learnt the trick hears the shape of a room in that spread. The sketch does it the other way round: every call sends out thousands of rays that travel at the speed of sound (slowed to 14 m/s so the eye can follow it) and, where each one lands, leaves a dot coloured by the surface it hit. The dots fade after ten seconds, so the maze is only ever what your last few calls reached. Everything else is black.</p>
+      <p>The place is the back rooms, the internet's endless office of damp yellow wallpaper and buzzing carpet: corridors that never end, rooms that should not be there, and the feeling of being watched. Deeper in it goes wrong. Rooms lose their ceilings, floors break into platforms, shapes are sunk half into the walls, and figures stand in the distance that you only notice by the hole they leave in the echoes. It is filmed on a camcorder: the whole frame is run through a model of a VHS signal and then drawn as a CRT draws it.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Three ways in</b><span>With your voice (the microphone, and only it, calls), clicking to shout (a recorded hello), or just watching while it walks itself.</span></div>
+      <div class="fact"><b>4,000 rays a call</b><span>200 traced at once for the sound, the rest over the next frames; two bounces each, a dot wherever one lands.</span></div>
+      <div class="fact"><b>A ten-minute tape</b><span>When it runs out the camcorder stops, rewinds, and starts a fresh one in a new maze.</span></div>
+    </div>
+  </section>
+
+  <!-- 2. The maze -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The maze · <b>world.js</b></div>
+      <h2>A maze that never ends</h2>
+      <p>The floor plan is a grid of 2.4 m cells, grouped into chunks of 8×8. A chunk is generated from nothing but the seed and its own coordinates, so any chunk can be built at any time and always comes out the same; the seven chunks either side of the one you stand in are kept, 7×7 in all, and the rest are dropped. Inside a chunk a randomised depth-first search carves a spanning tree, so every cell can reach every other. Then rooms are knocked through: two to five rectangles of 2 to 7 cells a side lose their inner walls. A few extra walls are opened at random to make loops, three of them near the start and up to thirteen deep in, because a perfect maze has exactly one way between two points and that reads as a puzzle rather than a place.</p>
+      <p>Chunks must agree where they meet. Each shared side is opened in two places, plus about one in eight of its other cells, chosen by a hash of the side itself rather than of either chunk, so both neighbours compute the same openings without ever talking to each other.</p>
+      <p>Everything strange grows with <em>weirdness</em>, a number that is 0 for the first 18 m from where you start and climbs linearly to 1 at 128 m. It sets how many rooms there are and how big, the chance a room loses its ceiling (35% × w) or has one raised up to 7 m higher, the chance a floor cell becomes a platform up to 2.4 m tall (45% × w, with its ceiling raised to keep 2.7 m of headroom), how many shapes are sunk into the walls, how wrong the sculptures go, and whether a presence stands in the chunk.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>One chunk at a given depth</h3>
+        <div class="controls">
+          <label>depth <input id="mzD" type="range" min="0" max="140" step="1" value="10"><output id="mzDo"></output></label>
+          <button id="mzN" class="ghost">another chunk</button>
+        </div>
+      </div>
+      <canvas id="mazeFig" aria-label="A top-down 8 by 8 cell maze chunk: walls as lines, rooms shaded, platforms lighter and ceilingless rooms hatched, changing with the depth slider."></canvas>
+      <div class="readout" id="mzR"></div>
+      <p class="fig-cap">The chunk generator, as in <code>world.js</code>: spanning tree, rooms, loops, the two openings per side. Rooms are shaded; lighter cells are raised platforms and hatched ones have no ceiling. Drag the depth up and the rooms multiply, grow and lose their ceilings.</p>
+    </div>
+    <div class="col prose">
+      <p>The walls are real slabs 0.2 m thick, with square posts wherever walls meet, built per chunk into a single black mesh. They are drawn black on purpose: the maze is never lit, it only hides the dots behind it. Each room gets a plinth in its middle with a sculpture on it (a sphere, polyhedron, torus, box or Suzanne), and deeper in the sculptures float above the plinth, tilt, and crowd two or three to a plinth. Shapes are sunk into walls, floors and ceilings at random, up to seven a chunk at full weirdness. A presence, a large glowing shape, stands in some chunks and takes one step towards you every time you call, at most one every 1.5 seconds.</p>
+    </div>
+  </section>
+
+  <!-- 3. Rays -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Seeing · <b>scan.js, world.js</b></div>
+      <h2>A call is four thousand rays</h2>
+      <p>A call starts at the mouth, 12 cm ahead of the eyes and 11 cm below them, and sends out 4,000 rays (scaled by the call's strength: a shout up to 1.5×, a whisper half). Their directions are uniform over the sphere and then pulled toward where you face by adding 0.55 of the view direction and renormalising, so most of the rays go ahead but some always go behind. Each ray is traced on the CPU through the cell grid with a digital differential analyser: step from cell to cell along the ray and, in each cell, test only what is in it. Walls and posts are axis-aligned boxes, so they are slab tests; floors and ceilings are planes at the cell's own heights; objects are meshes, tested with three.js's raycaster only when the ray passes near them; and bodies are capsules. Rays go at most 40 m.</p>
+      <p>A ray does not draw itself instantly. It is a dash that leaves at the call's time and travels at the speed of sound; when it has gone as far as its hit, it lands: it leaves a dot there and, if it has bounces left, sets off again, reflected about the surface with a random wobble of ±0.175 per axis and 55% of its energy, until it has bounced twice or its energy falls under 0.06. Nothing draws the dashes themselves (they are invisible): you see the front of the call only as the dots appearing in order of distance.</p>
+      <p>The first 200 rays are traced the moment you call, because their distances set the sound you hear; the other 3,800 are traced at up to 600 a frame over the next frames, keeping the call's start time so they land exactly when they would have. That keeps a call to a few milliseconds of tracing.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A call in a slice of the maze</h3>
+        <div class="controls">
+          <label>time <input id="rcT" type="range" min="0" max="2.5" step="0.01" value="0.9"><output id="rcTo"></output></label>
+          <label>focus <input id="rcF" type="range" min="0" max="1.5" step="0.05" value="0.55"><output id="rcFo"></output></label>
+          <button id="rcP" class="ghost">play</button>
+        </div>
+      </div>
+      <canvas id="rayFig" aria-label="A top-down slice of corridors: a listener with a view direction, rays fanning out from it, and dots appearing where rays have reached walls by the time on the slider, then bounces."></canvas>
+      <div class="readout" id="rcR"></div>
+      <p class="fig-cap">In 2D, 600 rays at 14 m/s with two bounces. The ring is how far sound has gone; dots appear as rays reach walls, dimmer after each bounce. Raise the focus and the call leans forward, as it does by 0.55 in the sketch.</p>
+    </div>
+    <div class="col prose">
+      <p>Each dot is a small disc lying on the surface it hit (its normal is stored with it), 6 cm across, grown just enough to stay about a pixel wide far away. Its colour is the surface's: wallpaper, carpet, ceiling tile or the light panels, which go from yellow to olive, brown and dried-blood red with depth, with a brick-like pattern on walls and tiles on floors so a scan has texture. A dot flashes five times brighter as it lands and fades over 0.17 s to its colour, then away with a time constant of 10 s. All dots live in one ring buffer of 400,000 instances (160,000 on phones), written in place as they land and uploaded only in the range that changed; a draw covers only as many instances as have been written.</p>
+      <p>Your own body is in the world too: a set of capsules where you stand, which casts a sound shadow behind you. And the <em>watchers</em> are the same body placed 9 to 16 m away with a clear line to you, facing you: they are drawn black and block rays, so you never see one directly, only a person-shaped hole in the dots on the wall behind it. Come within 7 m and it is somewhere else.</p>
+    </div>
+  </section>
+
+  <!-- 4. Sound -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Hearing · <b>audio.js</b></div>
+      <h2>What comes back</h2>
+      <p>The sound of a call is built from the 200 rays traced at once. Their hit distances are sorted, and eight echoes are taken at evenly spaced places in that list, the 1/9th to the 8/9ths of the way, so the echoes follow the room: a corridor gives a tight bunch of early echoes, a big room a spread of late ones. Each echo is the call itself, delayed by its distance over the speed of sound, at a gain of <code>0.9 / (1 + 0.25 d)</code>, low-passed at 3.2 kHz for the first three and 2 kHz after, and sent into a short convolution reverb. At most ten are scheduled, never closer than 55 ms apart.</p>
+      <p>Each echo plays from its direction around your head: the direction to the surface that returned it, turned into the head's own frame, fed to an HRTF panner, which models how a sound reaches each ear, so behind and above read differently from in front. With headphones, a corridor ahead sounds ahead.</p>
+      <p>Tight spaces ring. The share of hits within 1.4 m sets a flutter: a feedback delay of 11 to 16 ms (a round trip between walls about 2 m apart) with 35 to 65% feedback, darkened by a 2.6 kHz low-pass on every pass, fed by the call and its first echoes. Deeper in, the echoes go wrong with weirdness w: they come back up to 14% lower and slower, wobble in pitch by up to 60 cents at 3 to 7 Hz like a stretched tape, one in a call comes back reversed (up to 35% of calls), and past halfway a different take sometimes answers, late, quiet and muffled, from somewhere behind you (up to 45% of calls).</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The same call, heard</h3>
+        <div class="controls"><label>weirdness <input id="snW" type="range" min="0" max="1" step="0.01" value="0"><output id="snWo"></output></label></div>
+      </div>
+      <canvas id="soundFig" aria-label="A timeline of a call's echoes: the call at zero, then eight echoes at the delays of the sampled hit distances, their heights their gains, darker for later ones; with weirdness, stretched echoes, a reversed one and a late answer."></canvas>
+      <p class="fig-cap">The echoes of the call in the figure above, at its final time: delay is distance over 14 m/s, height is gain, colour darkens with order. With weirdness, the stretch, the reversed echo (striped) and the late answer (red) appear as they would.</p>
+    </div>
+    <div class="col prose">
+      <p>The calls are one synthetic voice saying hello, generated with Gemini Flash 3.8's text-to-speech: eight shouted takes and nine plain ones, each trimmed when it loads so its first vowel lands exactly 60 ms in, in step with the rays leaving. A strong call picks a shouted take. Takes from a set play in shuffled order, every one before any repeats and never the same twice in a row. Breaths come from the same generated recording: light ones, deep ones (more likely deeper in, while walking, and when your voice is spent) and a gasp when it runs out.</p>
+      <p>With the microphone, your voice is the only thing that calls: footsteps stop sending rays. A rise in level over the room's noise floor is a call, its strength the level, at most one every 280 ms. Your own voice is the echo: the microphone runs through a 120 ms delay all the time, and each call opens a 1.3 s gate on it into one delay line per echo, so the echoes include the instant before the call was detected. The page then ignores the microphone until its echoes are over, so they do not call again, though through speakers your echoes can still ring; hence the advice to wear headphones.</p>
+    </div>
+  </section>
+
+  <!-- 5. Walking -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Watching · <b>walk.js</b></div>
+      <h2>Walking it like someone afraid of it</h2>
+      <p>When you just watch, it walks itself, and the aim was a person: someone lost and nervous who keeps to the walls. It picks a destination and goes for it. The destination comes from a breadth-first search from where it stands that only passes through cells it has <em>heard</em> (cells some ray has hit), up to 900 of them: the unheard cells at the edge of that search are the candidates, scored by how far they are (best between 3 and 14 cells), how much they lie ahead (<code>1.3 + cos</code> of the angle to the heading), how much further from the start they are (<code>exp(0.15 Δr / 2.4)</code>), and a random factor between 0.7 and 1.3. Because the route only crosses heard cells, it can never walk into a dead end it has already heard; when there is nothing unheard in reach, it heads for the heard cell farthest out.</p>
+      <p>The route is a list of cells, turned into waypoints that keep to a wall: each one sits 0.6 m off the cell's centre toward a wall beside the path (about 10 cm from it), on the same side as before when it can. At a corner, the waypoint is pushed into the corner's outer side, so the turn is taken wide and comes out along the outer wall. At forks and rooms, at most every third cell and three times in four, it stops: puts its back to a wall if one is within a small turn, calls, looks down each way out from left to right (not the way it came), and then plans again from what that call has just revealed, which is when it may change its mind.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A route through what it has heard</h3>
+        <div class="controls"><button id="wkN" class="ghost">another walk</button></div>
+      </div>
+      <canvas id="walkFig" aria-label="A maze with the heard cells shaded, the walker, the destination ring at the edge of the heard region, and the route as waypoints hugging the walls and swinging wide at corners, with the eye's chosen direction as a fan."></canvas>
+      <p class="fig-cap">Heard cells are shaded; the candidates are the unheard cells at their edge; the ring is the chosen destination. The waypoints keep 0.6 m off the centre toward a wall and swing wide through each corner's outer side.</p>
+    </div>
+    <div class="col prose">
+      <p>The body turns like a body: its turn rate is a critically damped spring toward the direction of the route (stiffness 2.6, damping 3.2, at most 0.9 rad/s), always the short way round unless the turn is within 9° of a full half-turn, where it keeps going the way it already turns. It slows into turns and walks at about 1.1 m/s with a little wander in pace. A step every 0.72 m bobs, sways and rolls the head and plays a footstep, which also lights the floor round the foot with 90 rays of its own. The breath is a slow cycle, quicker deeper in and while walking.</p>
+      <p>The eyes rest on where it is going, but never on a wall. Four times a second it finds the farthest point of the route it can see, then sweeps 17 rays across ±0.8 rad around it at eye height and looks along the longest clear one, weighted toward the route; the head can turn up to 85° from the body to do it. It glances back over a shoulder at whatever is most open behind it, six times in ten as it sets off after a stop and half the time four cells into a long corridor.</p>
+    </div>
+  </section>
+
+  <!-- 6. Tape -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The tape · <b>vhs.js</b></div>
+      <h2>A camcorder recording, as a signal</h2>
+      <p>The look of a VHS tape is not a filter laid over a picture; it is what happens to a signal. So the frame is turned into one, following <a href="https://github.com/valadaptive/ntsc-rs">ntsc-rs</a>, the open-source simulator of the NTSC and VHS chain, and run through it on the GPU at the signal's own resolution: 360 lines a frame, 640 samples per picture height, 4 samples per cycle of the colour subcarrier. (A real field has 240 lines; the extra half is a deliberate gain in definition, and every wobble and tear is scaled up to keep its size on screen.) Five passes, each a full-screen draw into a small half-float target:</p>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>pass</th><th class="wrap">what happens</th></tr></thead>
+      <tbody>
+        <tr><td>1 camera</td><td class="wrap">The lit frame averaged over each sample's footprint, the highlights compressed (<code>c / (1 + 0.6 c)</code> after a gain of 1.4, the camera's knee), gamma-encoded at 1/2.2, low-light sensor noise added (strongest in the dark), the camcorder's display burned in, then converted to YIQ.</td></tr>
+        <tr><td>2 encode</td><td class="wrap">I and Q band-limited to 1.3 and 0.6 MHz, modulated onto the subcarrier (its phase flipping every line and every field) and added to luma: one composite number per sample. Then what happens to that signal: noise, snow (short decaying ringing bursts), the last six lines skewed right by up to 54 samples where the video heads switch, and now and then a band of torn lines rolling up the frame. A displaced line shifts the subcarrier's phase too, so its colour goes wrong, as on a real tape.</td></tr>
+        <tr><td>3 decode</td><td class="wrap">A notch at the subcarrier frequency gives luma; what it removed is demodulated back into I and Q (the subcarrier leaking through the notch is the dot crawl and rainbows). Tape noise is added: fine in luma, blotchy in chroma; a small random hue error per line; and one line in about 700 loses its colour.</td></tr>
+        <tr><td>4 tape</td><td class="wrap">The VHS record and playback filters: luma low-passed at 2.4 MHz then sharpened twice (the ringing halos beside edges), chroma low-passed at 320 kHz, arriving 4 samples late; every line displaced by the edge wave.</td></tr>
+        <tr><td>5 output</td><td class="wrap">Chroma averaged with the line above (the playback comb filter) and back to gamma-encoded RGB, with the lifted, slightly green blacks of a worn tape.</td></tr>
+      </tbody>
+    </table></div>
+    <div class="col prose">
+      <p>ntsc-rs's filters are IIR filters: each output depends on the previous outputs, which is cheap on a CPU running along a line but has no direct GPU form. Here each filter's impulse response is computed once in JavaScript by running its difference equation on a unit impulse, the cascades are convolved together, and the result is run as a causal FIR filter: every sample sums its 19 to 115 predecessors in a float texture of kernels. Causal is the point: a real tape smears only forward in time, which is why VHS colour trails to the right of what it belongs to. The kernels are designed at the true sample rate, 14.318 MHz (ntsc-rs designs them at four times that, which spreads every filter over four times as many samples).</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>One line through the tape</h3>
+        <div class="controls">
+          <label>signal <select id="tpS"><option value="edge">an edge</option><option value="dots">two dots</option><option value="bar">a bar</option></select></label>
+          <label>VHS <input id="tpA" type="range" min="0" max="1" step="0.01" value="1"><output id="tpAo"></output></label>
+        </div>
+      </div>
+      <canvas id="tapeFig" aria-label="Plots of one line of signal: the input in grey, the luma after the tape's filters with ringing beside edges, and the chroma after its much narrower low-pass, trailing to the right."></canvas>
+      <p class="fig-cap">The kernels as <code>vhs.js</code> designs them, applied to one line of 160 samples. Luma (light) keeps edges but rings beside them; chroma (yellow, here the I channel of a yellow input) is smeared over about 20 samples and lags to the right. The VHS amount blends each filter toward a straight line through it at the filter's own delay, so a partial amount softens the smear instead of showing two copies.</p>
+    </div>
+    <div class="col prose">
+      <p>The edge wave is noise over lines and time that changes shape rather than travelling: four octaves of value noise, a strength that wanders between calm and wobbly over several seconds, a little jitter per line every field, and now and then a jolt that kinks a few lines sharply, as when the tape snags. The tracking trouble comes and goes on two slow sines, about one band every half minute, crawling up the frame at 6% of its height a second.</p>
+    </div>
+  </section>
+
+  <!-- 7. CRT -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The screen · <b>crt.js</b></div>
+      <h2>Played on a television</h2>
+      <p>The tape's signal is then drawn the way a CRT draws it, after <a href="https://github.com/libretro/slang-shaders/tree/master/crt/shaders/guest/advanced">crt-guest-advanced</a>, the libretro shader. The signal is linearised (gamma 2.4) and each of its lines is an electron beam: across the line, the beam's brightness falls off as <code>2^(−shape · (f · width)² · sat)</code>, where f is the distance from the beam's centre in lines, the shape goes from 6 at the centre to 8 at the edges, and the width runs from 1.3 for dark beams (narrow) to 1.0 for bright ones (wide): bright lines swell and nearly meet, dark ones leave black gaps. Saturated channels get thinner beams still (sat up to 1.75), which is why pure colours look striped on a real set. Each pixel sums the two nearest beams and is never allowed above full.</p>
+      <p>Along the line, the beam's spot is a Gaussian over four samples (<code>2^(−2.4 d²)</code>), red landing 0.3 samples to one side and blue to the other (misconvergence). Over it all is an aperture grille: vertical stripes of red, green and blue phosphor, one screen pixel each (magenta and green pairs on narrow screens), strong in the dark and weaker on bright beams (strength 1.0 to 0.35), with the light it removes given back. A blurred copy of the picture at a quarter of the signal's size adds glow (3%) and halation (6%, through the mask). The face is slightly curved and zoomed to fill the view, with no frame.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Beams and mask</h3>
+        <div class="controls"><label>brightness <input id="crB" type="range" min="0.02" max="1" step="0.01" value="0.35"><output id="crBo"></output></label></div>
+      </div>
+      <canvas id="crtFig" aria-label="Left, the vertical profile across three scanlines for the chosen brightness, beams widening as it rises; right, a magnified patch of screen with scanlines and RGB stripes."></canvas>
+      <p class="fig-cap">Left: brightness across three lines, from the formula above; at low brightness the gaps between lines are deep, at full brightness the beams almost merge. Right: a magnified patch of the screen, beams times the aperture grille.</p>
+    </div>
+  </section>
+
+  <!-- 8. OSD -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The display · <b>osdfont.js, vhs.js</b></div>
+      <h2>REC, a dying battery, the date</h2>
+      <p>A camcorder burns its display into the picture before it records it, so the display here is drawn into the camera pass and goes through the tape like everything else: smeared to the right, its red REC bleeding. It is drawn on a canvas only 112 pixels tall, in a 5×7 bitmap font of its own, with every pixel either fully on or off and a one-pixel dark edging under everything, then sampled without filtering, which is what a character generator's blocky letters are. The layout is a viewfinder's: brackets in the corners; top left a red REC with a blinking dot and a battery about to die; top right SP ▶, a counter with frames and the minutes of tape left; bottom left the VOICE meter, the time and the date.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The character generator</h3>
+        <div class="controls"><label>text <select id="osT"><option>REC</option><option>0:02:45:28</option><option>23. NOV. 2026</option><option>TAPE END</option><option>◀◀ REW</option><option>STBY</option></select></label></div>
+      </div>
+      <canvas id="osdFig" aria-label="The chosen text in the camcorder's 5 by 7 bitmap font, magnified, each lit pixel a square with its dark edging."></canvas>
+    </div>
+    <div class="col prose">
+      <p>Before you choose how to play, the camcorder is on standby: the picture is its flat blue screen, the display says STBY and the counter stands at zero; nothing runs behind the start screen. Choosing cuts to the picture and starts the counter. The tape is ten minutes long; when it runs out the display shows STOP and a blinking TAPE END for three seconds, then ◀◀ REW for three more, with the counter running back to zero, the picture rolling vertically past a black blanking bar under heavy tracking noise, and the whirr of the motor and the hiss of the tape. Then a fresh tape goes in: a new maze, back to the start screen, or straight on when watching.</p>
+    </div>
+  </section>
+
+  <!-- 9. Voice and modes -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Playing · <b>main.js, chooser.js</b></div>
+      <h2>A voice that tires</h2>
+      <p>Clicking to shout would be too easy if it were free, so the voice tires. Each call spends <code>0.085 × strength</code> of it, a call needs half a second after the last one, and the voice comes back at 7% a second once it has rested 0.8 s. A tired voice is weaker: the call's strength is scaled by <code>0.2 + 0.8 × voice</code>, so fewer rays go out and the hello is quieter and slightly lower. Spend it all and it is gone: a gasp, and nothing for five seconds and until a whole bar has come back. When watching, it rests its voice by itself. With the microphone none of this applies; your real voice is limit enough.</p>
+    </div>
+    <div class="formula"><span class="c">// per call</span>
+strength  ×= 0.2 + 0.8 · voice
+voice      = max(0, voice − 0.085 · asked)
+<span class="c">// per frame, after 0.8 s without a call</span>
+voice      = min(1, voice + 0.07 · dt)
+<span class="c">// spent: no calls until</span>
+5 s since the last one  and  voice ≥ 0.1</div>
+  </section>
+
+  <!-- 10. Recording -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Recording · <b>record.js</b></div>
+      <h2>A walk you can play back</h2>
+      <p>The video of this day is someone's own walk. <code>K</code> records it: the camera's position and orientation every frame, and every call (with its strength), footstep and breath, all in scene time. A take starts from a fresh state of the maze (nothing heard, everyone where they began), so playing it back reproduces it: the camera follows the recorded poses, interpolated, and the calls fire at their moments, so the dots land the same way and the presences step the same. Only the rays' random scatter and the watchers' placement differ. A take is about 15 kB a second.</p>
+      <p>For a video, the recorder drives the page on a virtual clock at a fixed 60 frames a second, however slowly each frame renders. The sound cannot be recorded from the speakers on that clock, so it is rendered offline: from the moment the capture starts, every sound goes to an offline audio context scheduled on the page's clock, and at the end it is rendered in one go and muxed with the frames. A 140-second take at 1440×1080 takes about half an hour to capture.</p>
+    </div>
+  </section>
+
+  <!-- 11. Cost -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Cost</div>
+      <h2>What a frame does</h2>
+      <p>The scene itself is cheap to draw: black walls and a few hundred thousand small discs. The ray tracing is on the CPU, a few milliseconds per call spread over frames. The rest is the post chain, all at the signal's small size except the last pass:</p>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>pass</th><th class="num">size</th><th class="num">work per pixel</th></tr></thead>
+      <tbody>
+        <tr><td>fisheye (lens.js)</td><td class="num">screen</td><td class="num">1 tap</td></tr>
+        <tr><td>camera</td><td class="num">640·aspect × 360</td><td class="num">6 taps</td></tr>
+        <tr><td>encode</td><td class="num">same</td><td class="num">19 + 29 + 56 taps</td></tr>
+        <tr><td>decode</td><td class="num">same</td><td class="num">19 + 3 × 21 taps</td></tr>
+        <tr><td>tape</td><td class="num">same</td><td class="num">19 + 106 + 115 taps</td></tr>
+        <tr><td>output</td><td class="num">same</td><td class="num">2 taps</td></tr>
+        <tr><td>glow (2 passes)</td><td class="num">¼ signal</td><td class="num">17 taps</td></tr>
+        <tr><td>CRT</td><td class="num">screen</td><td class="num">24 + 1 taps</td></tr>
+      </tbody>
+    </table></div>
+    <div class="col prose">
+      <p>On a laptop the whole chain costs well under a millisecond at 1080p. Phones get the pipeline's medium quality and 160,000 dots instead of 400,000.</p>
+    </div>
+  </section>
+
+  <footer class="col">
+    <div class="meta">
+      <span><b>three.js</b> r187</span><span>WebGL2</span><span>CPU ray tracing</span><span>HRTF Web Audio</span><span>NTSC/VHS signal model after ntsc-rs</span><span>CRT after crt-guest-advanced</span><span>started in <b>Antigravity</b> with Neon, finished in <b>Claude Code</b> with Opus 5.5</span><span>voices by <b>Gemini Flash 3.8 TTS</b></span>
+    </div>
+    Day 22 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/22/">spite.github.io/codevember-2026/22</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/22">22/ of the codevember-2026 repository</a>. The tape follows <a href="https://github.com/valadaptive/ntsc-rs">ntsc-rs</a> by valadaptive; the screen follows <a href="https://github.com/libretro/slang-shaders/tree/master/crt/shaders/guest/advanced">crt-guest-advanced</a> by guest(r). Suzanne comes from <a href="../7/explainer.html">day 7</a>.
+  </footer>
+</main>
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+  const TAU = Math.PI * 2;
+  const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const rgb = (hex) => { const c = document.createElement("canvas").getContext("2d"); c.fillStyle = hex; const s = c.fillStyle; if (s[0] === "#") return [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16)); return s.match(/\d+/g).slice(0, 3).map(Number); };
+  const rgba = (hex, a) => `rgba(${rgb(hex).join(",")},${a})`;
+
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1, W = 0, H = 0;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      W = canvas.clientWidth || 600; H = Math.round(W * (typeof aspect === "function" ? aspect(W) : aspect));
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, W, H);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    new MutationObserver(() => fit(true)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return { redraw: () => fit(true) };
+  }
+  const bind = (id, out, fmt, fn) => { const el = $(id); const o = $(out); const show = () => { if (o) o.textContent = fmt(+el.value); }; el.addEventListener("input", () => { show(); fn(); }); show(); return el; };
+  const stage = (ctx, W, H) => { ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H); };
+  const label = (ctx, text, x, y, color = css("--stage-ink"), size = 11) => { ctx.fillStyle = color; ctx.font = font(size); ctx.fillText(text, x, y); };
+
+  // ---- The chunk generator (as world.js) ----
+  const N = 8;
+  function chunk(seed, w) {
+    const rand = mulberry(seed);
+    const id = (x, z) => z * N + x;
+    const wallE = new Array(N * N).fill(true), wallS = new Array(N * N).fill(true);
+    const floor = new Array(N * N).fill(0), ceil = new Array(N * N).fill(2.7), room = new Array(N * N).fill(false);
+    const seen = new Array(N * N).fill(false);
+    const stack = [[Math.floor(rand() * N), Math.floor(rand() * N)]];
+    seen[id(...stack[0])] = true;
+    while (stack.length) {
+      const [x, z] = stack[stack.length - 1];
+      const next = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dz]) => [x + dx, z + dz]).filter(([a, b]) => a >= 0 && b >= 0 && a < N && b < N && !seen[id(a, b)]);
+      if (!next.length) { stack.pop(); continue; }
+      const [a, b] = next[Math.floor(rand() * next.length)];
+      if (a !== x) wallE[id(Math.min(x, a), z)] = false; else wallS[id(x, Math.min(z, b))] = false;
+      seen[id(a, b)] = true; stack.push([a, b]);
+    }
+    const roomCount = 2 + Math.floor(rand() * (2 + w * 1.5));
+    let rooms = 0;
+    for (let r = 0; r < roomCount; r++) {
+      const rw = 2 + Math.floor(rand() * (3 + w * 3)), rh = 2 + Math.floor(rand() * (3 + w * 3));
+      const x0 = Math.floor(rand() * Math.max(1, N - rw)), z0 = Math.floor(rand() * Math.max(1, N - rh));
+      const height = rand() < w * 0.35 ? 40 : 2.7 + (rand() < w ? rand() * w * 7 : 0);
+      rooms++;
+      for (let z = z0; z < Math.min(N, z0 + rh); z++) for (let x = x0; x < Math.min(N, x0 + rw); x++) {
+        if (x < x0 + rw - 1 && x < N - 1) wallE[id(x, z)] = false;
+        if (z < z0 + rh - 1 && z < N - 1) wallS[id(x, z)] = false;
+        ceil[id(x, z)] = Math.max(ceil[id(x, z)], height);
+        room[id(x, z)] = true;
+        if (rand() < w * 0.45) floor[id(x, z)] = Math.round(rand() * (1 + w * 5)) * 0.4;
+      }
+    }
+    let loops = 0;
+    for (let k = 0; k < 3 + w * 10; k++) {
+      const x = Math.floor(rand() * N), z = Math.floor(rand() * N);
+      if (rand() < 0.5 && x < N - 1) wallE[id(x, z)] = false; else if (z < N - 1) wallS[id(x, z)] = false;
+      loops++;
+    }
+    // Two openings per outer side (east and south shown).
+    for (const side of ["E", "S"]) {
+      const a = Math.floor(rand() * N), b = Math.floor(rand() * N);
+      for (let k = 0; k < N; k++) {
+        const open = k === a || k === b || rand() < 0.12;
+        if (side === "E") wallE[id(N - 1, k)] = !open; else wallS[id(k, N - 1)] = !open;
+      }
+    }
+    return { wallE, wallS, floor, ceil, room, rooms, loops, id };
+  }
+
+  // ---- 1. The maze ----
+  {
+    let seed = 7;
+    const fig = setup($("mazeFig"), (W) => (W < 520 ? 1 : 0.62), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const d = +$("mzD").value, w = clamp((d - 18) / 110, 0, 1);
+      const c = chunk(seed * 131 + 1, w);
+      const s = Math.min((W - 40) / N, (H - 40) / N), ox = (W - s * N) / 2, oy = (H - s * N) / 2;
+      const dot = css("--dot"), wall = css("--dot2");
+      let voids = 0, plats = 0;
+      for (let z = 0; z < N; z++) for (let x = 0; x < N; x++) {
+        const i = c.id(x, z);
+        if (c.room[i]) { ctx.fillStyle = rgba(dot, 0.12); ctx.fillRect(ox + x * s, oy + z * s, s, s); }
+        if (c.floor[i] > 0) { plats++; ctx.fillStyle = rgba(dot, 0.12 + c.floor[i] * 0.12); ctx.fillRect(ox + x * s + 2, oy + z * s + 2, s - 4, s - 4); }
+        if (c.ceil[i] >= 40) {
+          voids++;
+          ctx.save(); ctx.beginPath(); ctx.rect(ox + x * s, oy + z * s, s, s); ctx.clip();
+          ctx.strokeStyle = rgba(css("--accent"), 0.5); ctx.lineWidth = 1;
+          for (let k = -2; k < 4; k++) { ctx.beginPath(); ctx.moveTo(ox + x * s + (k * s) / 2, oy + z * s + s); ctx.lineTo(ox + x * s + ((k + 2) * s) / 2, oy + z * s); ctx.stroke(); }
+          ctx.restore();
+        }
+      }
+      ctx.strokeStyle = rgb(wall) && dot; ctx.lineWidth = Math.max(2, s * 0.083); ctx.lineCap = "square";
+      ctx.beginPath();
+      ctx.moveTo(ox, oy); ctx.lineTo(ox + N * s, oy); ctx.moveTo(ox, oy); ctx.lineTo(ox, oy + N * s);
+      for (let z = 0; z < N; z++) for (let x = 0; x < N; x++) {
+        const i = c.id(x, z);
+        if (c.wallE[i]) { ctx.moveTo(ox + (x + 1) * s, oy + z * s); ctx.lineTo(ox + (x + 1) * s, oy + (z + 1) * s); }
+        if (c.wallS[i]) { ctx.moveTo(ox + x * s, oy + (z + 1) * s); ctx.lineTo(ox + (x + 1) * s, oy + (z + 1) * s); }
+      }
+      ctx.stroke();
+      label(ctx, "2.4 m", ox, oy - 8);
+      $("mzR").innerHTML = `<span>weirdness <b>${w.toFixed(2)}</b></span><span>rooms <b>${c.rooms}</b></span><span>loops opened <b>${c.loops}</b></span><span>platform cells <b>${plats}</b></span><span>ceilingless cells <b>${voids}</b></span>`;
+    });
+    bind("mzD", "mzDo", (v) => `${v} m`, fig.redraw);
+    $("mzN").addEventListener("click", () => { seed++; fig.redraw(); });
+  }
+
+  // ---- A small fixed map for the slice figures: 1 = wall cell ----
+  const MAP = [
+    "################",
+    "#......#.......#",
+    "#.####.#.#####.#",
+    "#.#....#.....#.#",
+    "#.#.######.#.#.#",
+    "#...#......#...#",
+    "###.#.####.###.#",
+    "#...#.#......#.#",
+    "#.###.#.####.#.#",
+    "#.....#....#...#",
+    "################",
+  ];
+  const MW = MAP[0].length, MH = MAP.length;
+  const solid = (x, y) => x < 0 || y < 0 || x >= MW || y >= MH || MAP[y][x] === "#";
+  // DDA through the map in cell units: distance and wall normal of the first solid cell.
+  function cast(ox, oy, dx, dy, maxT = 40) {
+    let x = Math.floor(ox), y = Math.floor(oy);
+    const sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1;
+    const tdx = Math.abs(1 / dx), tdy = Math.abs(1 / dy);
+    let tx = dx > 0 ? (x + 1 - ox) * tdx : (ox - x) * tdx, ty = dy > 0 ? (y + 1 - oy) * tdy : (oy - y) * tdy;
+    for (let i = 0; i < 200; i++) {
+      let n;
+      if (tx < ty) { x += sx; if (solid(x, y)) return { t: tx, nx: -sx, ny: 0 }; tx += tdx; }
+      else { y += sy; if (solid(x, y)) return { t: ty, nx: 0, ny: -sy }; ty += tdy; }
+      if (Math.min(tx, ty) > maxT) return null;
+    }
+    return null;
+  }
+  const CELLM = 2.4, SPEED = 14;
+  const listener = [5.5, 5.5], facing = [1, 0];
+  function shoot(count, focus, seed) {
+    const rand = mulberry(seed);
+    const rays = [];
+    for (let i = 0; i < count; i++) {
+      const a = rand() * TAU;
+      let dx = Math.cos(a) + facing[0] * focus, dy = Math.sin(a) + facing[1] * focus;
+      const l = Math.hypot(dx, dy); dx /= l; dy /= l;
+      // up to 3 segments: the ray and two bounces
+      const segs = [];
+      let ox = listener[0], oy = listener[1], e = 1, t0 = 0;
+      for (let b = 0; b < 3 && e > 0.06; b++) {
+        const h = cast(ox, oy, dx, dy);
+        if (!h) break;
+        const hx = ox + dx * h.t, hy = oy + dy * h.t;
+        segs.push({ ox, oy, dx, dy, t: h.t, t0, e, hx, hy });
+        t0 += (h.t * CELLM) / SPEED;
+        // reflect with a wobble
+        const dn = dx * h.nx + dy * h.ny;
+        dx = dx - 2 * dn * h.nx + (rand() - 0.5) * 0.35; dy = dy - 2 * dn * h.ny + (rand() - 0.5) * 0.35;
+        const l2 = Math.hypot(dx, dy); dx /= l2; dy /= l2;
+        ox = hx + h.nx * 0.01; oy = hy + h.ny * 0.01; e *= 0.55;
+      }
+      rays.push(segs);
+    }
+    return rays;
+  }
+
+  // ---- 2. Rays ----
+  let lastRays = null;
+  {
+    const fig = setup($("rayFig"), (W) => (W < 520 ? 0.8 : 0.55), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const t = +$("rcT").value, focus = +$("rcF").value;
+      const rays = shoot(600, focus, 3);
+      lastRays = rays;
+      const s = Math.min(W / MW, H / MH), ox = (W - s * MW) / 2, oy = (H - s * MH) / 2;
+      const P = (x, y) => [ox + x * s, oy + y * s];
+      ctx.fillStyle = rgba(css("--wall"), 0.35);
+      for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) if (solid(x, y)) ctx.fillRect(ox + x * s, oy + y * s, s + 0.5, s + 0.5);
+      // sound front
+      const rr = ((t * SPEED) / CELLM) * s;
+      ctx.strokeStyle = rgba(css("--ray"), 0.25); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(...P(...listener), rr, 0, TAU); ctx.stroke();
+      const dot = rgb(css("--dot"));
+      let landed = 0;
+      for (const segs of rays) for (const g of segs) {
+        const land = g.t0 + (g.t * CELLM) / SPEED;
+        if (t >= land) {
+          landed++;
+          const age = t - land, flash = 1 + 4 * Math.exp(-age * 6), a = clamp(g.e * 0.55 * flash, 0, 1);
+          ctx.fillStyle = `rgba(${dot.join(",")},${a})`;
+          ctx.beginPath(); ctx.arc(...P(g.hx, g.hy), 1.8, 0, TAU); ctx.fill();
+        } else if (t > g.t0) {
+          const k = ((t - g.t0) * SPEED) / CELLM;
+          ctx.fillStyle = rgba(css("--ray"), 0.5 * g.e);
+          ctx.fillRect(...P(g.ox + g.dx * k, g.oy + g.dy * k), 1, 1);
+        }
+      }
+      ctx.fillStyle = css("--ray");
+      ctx.beginPath(); ctx.arc(...P(...listener), 5, 0, TAU); ctx.fill();
+      ctx.strokeStyle = css("--ray"); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(...P(...listener)); ctx.lineTo(...P(listener[0] + 0.9, listener[1])); ctx.stroke();
+      $("rcR").innerHTML = `<span>sound has gone <b>${(t * SPEED).toFixed(1)} m</b></span><span>dots landed <b>${landed}</b></span>`;
+    });
+    bind("rcT", "rcTo", (v) => `${v.toFixed(2)} s`, () => { fig.redraw(); soundFig?.redraw(); });
+    bind("rcF", "rcFo", (v) => v.toFixed(2), () => { fig.redraw(); soundFig?.redraw(); });
+    let playing = false;
+    $("rcP").addEventListener("click", () => {
+      if (playing) return; playing = true;
+      const el = $("rcT"); el.value = 0; let last = performance.now();
+      const step = (now) => {
+        const v = Math.min(2.5, +el.value + (now - last) / 1000); last = now;
+        el.value = v; el.dispatchEvent(new Event("input"));
+        if (v < 2.5) requestAnimationFrame(step); else playing = false;
+      };
+      requestAnimationFrame(step);
+    });
+  }
+
+  // ---- 3. Sound ----
+  var soundFig = setup($("soundFig"), (W) => (W < 520 ? 0.55 : 0.3), (ctx, W, H) => {
+    stage(ctx, W, H);
+    const w = +$("snW").value;
+    if (!lastRays) return;
+    const first = lastRays.slice(0, 200).map((s) => s[0]).filter(Boolean).map((g) => g.t * CELLM).sort((a, b) => a - b);
+    const echoes = [];
+    for (let k = 1; k <= 8; k++) { const d = first[Math.min(first.length - 1, Math.floor((k / 9) * first.length))]; echoes.push({ d, delay: d / SPEED, gain: 0.9 / (1 + d * 0.25), order: k < 4 ? 1 : 2 }); }
+    const rand = mulberry(11);
+    const tMax = 2.2, x0 = 30, x1 = W - 16, base = H - 28, top = 18;
+    const X = (t) => x0 + (t / tMax) * (x1 - x0);
+    ctx.strokeStyle = css("--stage-line"); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x0, base); ctx.lineTo(x1, base); ctx.stroke();
+    for (let t = 0; t <= tMax + 1e-6; t += 0.5) { label(ctx, `${t.toFixed(1)} s`, X(t) - 10, base + 16); }
+    const bar = (t, g, color, len, striped) => {
+      const h = (base - top) * g;
+      ctx.fillStyle = color;
+      ctx.fillRect(X(t), base - h, Math.max(2, (len / tMax) * (x1 - x0)), h);
+      if (striped) { ctx.strokeStyle = css("--stage"); ctx.lineWidth = 1; for (let k = 0; k < 8; k++) { const xx = X(t) + k * 4; ctx.beginPath(); ctx.moveTo(xx, base); ctx.lineTo(xx + 4, base - h); ctx.stroke(); } }
+    };
+    const clip = 0.5;
+    bar(0, 0.55, css("--ray"), clip, false);
+    label(ctx, "call", X(0) + 2, top + 2, css("--ray"));
+    const reverse = rand() < w * 0.35 ? 2 + Math.floor(rand() * 4) : -1;
+    let last = 0;
+    echoes.forEach((e, k) => {
+      const late = e.order > 1;
+      const speed = 1 - w * (0.04 + 0.1 * rand()) * (late ? 1.4 : 1);
+      const c = late ? css("--dot2") : css("--dot");
+      bar(e.delay, 0.45 * e.gain * (late ? 0.7 : 1), rgba(c, 0.85), clip / speed, k + 1 === reverse);
+      last = e.delay;
+    });
+    if (w > 0.5 && rand() < (w - 0.5) * 0.9 + 0.2) {
+      const at = Math.max(last, 0.3) + 0.5 + rand() * 0.9;
+      bar(at, 0.22, rgba(css("--accent2"), 0.9), clip / 0.9, false);
+      label(ctx, "an answer", X(at), base - (base - top) * 0.22 - 6, css("--accent2"));
+    }
+  });
+  bind("snW", "snWo", (v) => v.toFixed(2), soundFig.redraw);
+
+  // ---- 4. Walking ----
+  {
+    let seed = 5;
+    const fig = setup($("walkFig"), (W) => (W < 520 ? 0.8 : 0.55), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const s = Math.min(W / MW, H / MH), ox = (W - s * MW) / 2, oy = (H - s * MH) / 2;
+      const P = (x, y) => [ox + x * s, oy + y * s];
+      // heard cells: hit by a call from the walker
+      const rand = mulberry(seed);
+      const open = []; for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) if (!solid(x, y)) open.push([x, y]);
+      const start = open[Math.floor(rand() * open.length)];
+      const me = [start[0] + 0.5, start[1] + 0.5];
+      const heard = new Set([`${start[0]},${start[1]}`]);
+      for (let i = 0; i < 400; i++) {
+        const a = rand() * TAU, dx = Math.cos(a), dy = Math.sin(a);
+        const h = cast(me[0], me[1], dx, dy, 6 + rand() * 4);
+        const t = h ? h.t : 6;
+        for (let k = 0.2; k < t; k += 0.2) heard.add(`${Math.floor(me[0] + dx * k)},${Math.floor(me[1] + dy * k)}`);
+      }
+      for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+        if (solid(x, y)) { ctx.fillStyle = rgba(css("--wall"), 0.8); ctx.fillRect(ox + x * s, oy + y * s, s + 0.5, s + 0.5); }
+        else if (heard.has(`${x},${y}`)) { ctx.fillStyle = rgba(css("--dot"), 0.28); ctx.fillRect(ox + x * s, oy + y * s, s + 0.5, s + 0.5); }
+      }
+      // BFS through heard cells; candidates are unheard cells at the edge
+      const prev = new Map([[`${start[0]},${start[1]}`, null]]);
+      const q = [[start[0], start[1], 0]];
+      const cands = [];
+      for (let h = 0; h < q.length; h++) {
+        const [x, y, d] = q[h];
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = x + dx, ny = y + dy, k = `${nx},${ny}`;
+          if (solid(nx, ny) || prev.has(k)) continue;
+          prev.set(k, [x, y]);
+          if (heard.has(k)) q.push([nx, ny, d + 1]);
+          else {
+            const near = d + 1 < 3 ? 0.35 : d + 1 > 14 ? 0.6 : 1;
+            // In the sketch distance also scores through "ahead" and "outward"; here, a little further is better.
+            cands.push({ x: nx, y: ny, s: near * Math.min(d + 1, 8) * (0.7 + rand() * 0.6) });
+          }
+        }
+      }
+      for (const c of cands) { ctx.strokeStyle = rgba(css("--accent"), 0.55); ctx.lineWidth = 1; ctx.strokeRect(ox + c.x * s + 3, oy + c.y * s + 3, s - 6, s - 6); }
+      if (!cands.length) return;
+      cands.sort((a, b) => b.s - a.s);
+      const dest = cands[0];
+      const cells = [];
+      for (let c = [dest.x, dest.y]; c && (c[0] !== start[0] || c[1] !== start[1]); c = prev.get(`${c[0]},${c[1]}`)) cells.unshift(c);
+      // waypoints, hugging walls and swinging wide at corners
+      const HUG = 0.6 / CELLM;
+      let side = 1, last = start;
+      const pts = [me];
+      cells.forEach((c, k) => {
+        const hin = [c[0] - last[0], c[1] - last[1]], next = cells[k + 1];
+        const hout = next ? [next[0] - c[0], next[1] - c[1]] : hin;
+        let px = c[0] + 0.5, py = c[1] + 0.5;
+        if (hout[0] !== hin[0] || hout[1] !== hin[1]) {
+          if (solid(c[0] + hin[0], c[1] + hin[1])) { px += hin[0] * HUG; py += hin[1] * HUG; }
+          if (solid(c[0] - hout[0], c[1] - hout[1])) { px -= hout[0] * HUG; py -= hout[1] * HUG; }
+          side = -hout[1] === hin[0] && hout[0] === hin[1] ? 1 : -1;
+        } else {
+          for (const sd of [side, -side]) {
+            const wx = -hin[1] * sd, wy = hin[0] * sd;
+            if (solid(c[0] + wx, c[1] + wy)) { side = sd; px += wx * HUG; py += wy * HUG; break; }
+          }
+        }
+        pts.push([px, py]); last = c;
+      });
+      // the walk, smoothed: a Catmull-Rom curve through the waypoints
+      ctx.strokeStyle = css("--ray"); ctx.lineWidth = 2; ctx.beginPath();
+      ctx.moveTo(...P(...pts[0]));
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+        for (let t = 0.1; t <= 1.0001; t += 0.1) {
+          const t2 = t * t, t3 = t2 * t;
+          const f = (a, b, c, d) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
+          ctx.lineTo(...P(f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])));
+        }
+      }
+      ctx.stroke();
+      ctx.fillStyle = css("--dot");
+      for (const p of pts.slice(1)) { ctx.beginPath(); ctx.arc(...P(...p), 2.5, 0, TAU); ctx.fill(); }
+      ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2;
+      for (const r of [5, 9]) { ctx.beginPath(); ctx.arc(...P(dest.x + 0.5, dest.y + 0.5), r, 0, TAU); ctx.stroke(); }
+      // the eye: the most open direction toward the route
+      const toward = Math.atan2(pts[Math.min(3, pts.length - 1)][1] - me[1], pts[Math.min(3, pts.length - 1)][0] - me[0]);
+      let best = toward, bestS = -1;
+      for (let k = -8; k <= 8; k++) {
+        const a = toward + (k / 8) * 0.8; const h = cast(me[0], me[1], Math.cos(a), Math.sin(a), 14);
+        const d = h ? h.t : 14; const sc = Math.min(d, 12 / CELLM) * Math.exp(-(((a - toward) / 0.7) ** 2));
+        ctx.strokeStyle = rgba(css("--ray"), 0.12); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(...P(...me)); ctx.lineTo(...P(me[0] + Math.cos(a) * d, me[1] + Math.sin(a) * d)); ctx.stroke();
+        if (sc > bestS) { bestS = sc; best = a; }
+      }
+      const hb = cast(me[0], me[1], Math.cos(best), Math.sin(best), 14);
+      ctx.strokeStyle = css("--accent2"); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(...P(...me)); ctx.lineTo(...P(me[0] + Math.cos(best) * (hb ? hb.t : 14), me[1] + Math.sin(best) * (hb ? hb.t : 14))); ctx.stroke();
+      ctx.fillStyle = css("--ray"); ctx.beginPath(); ctx.arc(...P(...me), 5, 0, TAU); ctx.fill();
+      label(ctx, "red: where the eyes rest", 10, H - 10);
+    });
+    $("wkN").addEventListener("click", () => { seed++; fig.redraw(); });
+  }
+
+  // ---- 5. Tape filters (as vhs.js) ----
+  {
+    const FSC = 315e6 / 88, RATE = FSC * 4, KM = 256;
+    const impulse = (num, den, n = KM) => { const y = new Float64Array(n); for (let i = 0; i < n; i++) { let v = i < num.length ? num[i] : 0; for (let k = 0; k < den.length && i - 1 - k >= 0; k++) v -= den[k] * y[i - 1 - k]; y[i] = v; } return y; };
+    const conv = (a, b) => { const y = new Float64Array(KM); for (let i = 0; i < KM; i++) { if (!a[i]) continue; for (let j = 0; i + j < KM; j++) y[i + j] += a[i] * b[j]; } return y; };
+    const chain = (...ks) => ks.reduce((a, b) => conv(a, b));
+    const withScale = (h, s) => h.map((v, i) => s * v + (i === 0 ? 1 - s : 0));
+    const centroid = (h) => { let s = 0, w = 0; h.forEach((v, i) => { s += v * v * i; w += v * v; }); return w ? s / w : 0; };
+    const mixDelta = (h, a) => { const at = Math.round(centroid(h)); return h.map((v, i) => a * v + (i === at ? 1 - a : 0)); };
+    const lowpass = (cut) => { const dt = 1 / RATE, tau = 1 / (cut * TAU), al = dt / (tau + dt); return impulse([al], [-(1 - al)]); };
+    const lowpass3 = (cut) => chain(lowpass(cut), lowpass(cut), lowpass(cut));
+    const run = (x, k) => x.map((_, i) => { let s = 0; for (let j = 0; j < KM && j <= i; j++) s += k[j] * x[i - j]; for (let j = i + 1; j < KM; j++) s += k[j] * x[0]; return s; });
+    const fig = setup($("tapeFig"), (W) => (W < 520 ? 0.7 : 0.42), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const a = +$("tpA").value, kind = $("tpS").value;
+      const L = 160;
+      const x = new Array(L).fill(0.08).map((v, i) => {
+        if (kind === "edge") return i > 60 ? 0.85 : 0.08;
+        if (kind === "dots") return (i >= 50 && i < 53) || (i >= 100 && i < 103) ? 0.9 : 0.08;
+        return i >= 55 && i < 95 ? 0.85 : 0.08;
+      });
+      const tapeL = mixDelta(chain(lowpass3(2.4e6), withScale(lowpass(2.4e6), -1.6), withScale(lowpass3(2.4e6 * 4), -0.5)), a);
+      const tapeI = mixDelta(conv(lowpass3(320e3), lowpass3(1.3e6)), a);
+      const lag = centroid(tapeL) + 4 * a;
+      const shiftL = 0, shiftI = Math.round(centroid(tapeI) - lag);
+      const yl = run(x, tapeL), yi0 = run(x, tapeI);
+      const yi = yi0.map((_, i) => yi0[clamp(i + shiftI, 0, L - 1)]);
+      const x0 = 16, x1 = W - 16, top = 20, bot = H - 26;
+      const X = (i) => x0 + (i / (L - 1)) * (x1 - x0), Y = (v) => bot - v * (bot - top) * 0.85;
+      ctx.strokeStyle = css("--stage-line"); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, Y(0)); ctx.lineTo(x1, Y(0)); ctx.stroke();
+      const plot = (arr, color, w) => { ctx.strokeStyle = color; ctx.lineWidth = w; ctx.beginPath(); arr.forEach((v, i) => (i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v)))); ctx.stroke(); };
+      plot(x, rgba(css("--stage-ink"), 0.6), 1);
+      plot(yl, css("--ray"), 2);
+      plot(yi, css("--dot"), 2);
+      label(ctx, "input", x0, top - 4);
+      label(ctx, "luma", x0 + 60, top - 4, css("--ray"));
+      label(ctx, "chroma", x0 + 110, top - 4, css("--dot"));
+      label(ctx, `luma kernel ${tapeL.length && Math.round(centroid(tapeL))} samples late · chroma smeared over ~${Math.round(centroid(lowpass3(320e3)))} samples`, x0, H - 8);
+    });
+    bind("tpA", "tpAo", (v) => v.toFixed(2), fig.redraw);
+    $("tpS").addEventListener("change", fig.redraw);
+  }
+
+  // ---- 6. CRT ----
+  {
+    const beam = (f, c) => { const l = Math.pow(c, 1 / 2.4); const width = 1.3 + (1.0 - 1.3) * l; const shape = 6 + 2 * f; const ex = f * width; return Math.pow(2, -shape * ex * ex); };
+    const fig = setup($("crtFig"), (W) => (W < 520 ? 0.9 : 0.42), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const b = +$("crB").value;
+      const split = W < 520 ? H / 2 : W / 2;
+      // left: profile across three lines
+      const pw = W < 520 ? W : split - 12, ph = W < 520 ? split - 10 : H;
+      const lines = 3, x0 = 16, x1 = pw - 10, top = 16, bot = ph - 20;
+      const val = (y) => { const ly = y - 0.5, l0 = Math.floor(ly), f = ly - l0; let w1 = beam(f, b), w2 = beam(1 - f, b); const s = w1 + w2; if (s > 1) { w1 /= s; w2 /= s; } return b * (w1 + w2); };
+      ctx.strokeStyle = css("--dot"); ctx.lineWidth = 2; ctx.beginPath();
+      for (let i = 0; i <= 300; i++) { const y = (i / 300) * lines; const v = val(y); const X = x0 + (i / 300) * (x1 - x0), Y = bot - (v / 1) * (bot - top); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
+      ctx.stroke();
+      label(ctx, "across three lines", x0, ph - 4);
+      // right: a magnified patch
+      const qx = W < 520 ? 0 : split, qy = W < 520 ? split : 0, qw = W < 520 ? W : W - split, qh = W < 520 ? H - split : H;
+      const px = 3, rows = Math.floor(qh / px), cols = Math.floor(qw / px), linePx = 12;
+      const img = ctx.createImageData(cols, rows);
+      for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+        const y = j / linePx; const v = val(y + 0.5);
+        const stripe = i % 3; const strength = 1.0 + (0.35 - 1.0) * Math.pow(Math.min(1, v), 1 / 2.4);
+        const m = [stripe === 0 ? 1 : 1 - strength, stripe === 1 ? 1 : 1 - strength, stripe === 2 ? 1 : 1 - strength];
+        const avg = (1 + 2 * (1 - strength)) / 3;
+        const base = [0.95, 0.86, 0.55];
+        const o = (j * cols + i) * 4;
+        for (let c = 0; c < 3; c++) img.data[o + c] = clamp(Math.pow(v * base[c] * m[c] / avg, 1 / 2.2), 0, 1) * 255;
+        img.data[o + 3] = 255;
+      }
+      const tmp = document.createElement("canvas"); tmp.width = cols; tmp.height = rows; tmp.getContext("2d").putImageData(img, 0, 0);
+      ctx.imageSmoothingEnabled = false; ctx.drawImage(tmp, qx, qy, cols * px, rows * px); ctx.imageSmoothingEnabled = true;
+    });
+    bind("crB", "crBo", (v) => v.toFixed(2), fig.redraw);
+  }
+
+  // ---- 7. The character generator (as osdfont.js) ----
+  {
+    const G = {
+      0: [".###.", "#...#", "#..##", "#.#.#", "##..#", "#...#", ".###."], 1: ["..#..", ".##..", "..#..", "..#..", "..#..", "..#..", ".###."],
+      2: [".###.", "#...#", "....#", "...#.", "..#..", ".#...", "#####"], 3: ["#####", "...#.", "..#..", "...#.", "....#", "#...#", ".###."],
+      4: ["...#.", "..##.", ".#.#.", "#..#.", "#####", "...#.", "...#."], 5: ["#####", "#....", "####.", "....#", "....#", "#...#", ".###."],
+      6: ["..##.", ".#...", "#....", "####.", "#...#", "#...#", ".###."], 7: ["#####", "....#", "...#.", "..#..", ".#...", ".#...", ".#..."],
+      8: [".###.", "#...#", "#...#", ".###.", "#...#", "#...#", ".###."], 9: [".###.", "#...#", "#...#", ".####", "....#", "...#.", ".##.."],
+      A: [".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"], B: ["####.", "#...#", "#...#", "####.", "#...#", "#...#", "####."],
+      C: [".###.", "#...#", "#....", "#....", "#....", "#...#", ".###."], D: ["###..", "#..#.", "#...#", "#...#", "#...#", "#..#.", "###.."],
+      E: ["#####", "#....", "#....", "####.", "#....", "#....", "#####"], N: ["#...#", "#...#", "##..#", "#.#.#", "#..##", "#...#", "#...#"],
+      O: [".###.", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."], P: ["####.", "#...#", "#...#", "####.", "#....", "#....", "#...."],
+      R: ["####.", "#...#", "#...#", "####.", "#.#..", "#..#.", "#...#"], S: [".####", "#....", "#....", ".###.", "....#", "....#", "####."],
+      T: ["#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#.."], V: ["#...#", "#...#", "#...#", "#...#", "#...#", ".#.#.", "..#.."],
+      W: ["#...#", "#...#", "#...#", "#.#.#", "#.#.#", "##.##", "#...#"], Y: ["#...#", "#...#", ".#.#.", "..#..", "..#..", "..#..", "..#.."],
+      ":": [".....", ".##..", ".##..", ".....", ".##..", ".##..", "....."], ".": [".....", ".....", ".....", ".....", ".....", ".##..", ".##.."],
+      "◀": ["....#", "..###", ".####", "#####", ".####", "..###", "....#"], " ": [".....", ".....", ".....", ".....", ".....", ".....", "....."],
+    };
+    const fig = setup($("osdFig"), (W) => (W < 520 ? 0.35 : 0.2), (ctx, W, H) => {
+      ctx.fillStyle = "#1d3ea8"; ctx.fillRect(0, 0, W, H);
+      const text = $("osT").value;
+      const cells = text.length * 6, px = Math.max(2, Math.floor(Math.min((W - 24) / cells, (H - 16) / 8)));
+      const x0 = Math.round((W - cells * px) / 2), y0 = Math.round((H - 7 * px) / 2);
+      const red = text === "REC";
+      for (const pass of [0, 1]) {
+        ctx.fillStyle = pass ? (red ? "#ff3328" : "#eeeeea") : "rgba(0,0,0,0.8)";
+        const o = pass ? 0 : px;
+        [...text].forEach((ch, k) => (G[ch] || G[" "]).forEach((row, j) => { for (let i = 0; i < 5; i++) if (row[i] === "#") ctx.fillRect(x0 + (k * 6 + i) * px + o, y0 + j * px + o, px, px); }));
+      }
+    });
+    $("osT").addEventListener("change", fig.redraw);
+  }
+})();
+</script>
+</body>
+</html>

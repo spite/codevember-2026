@@ -49,7 +49,11 @@ starts again on a fresh one.
 - **Recordings** (`record.js`): K records the camera's pose and the calls, steps and breaths in scene time; a take plays
   back exactly (`?replay=<file>` or `window.app.playRecording`) for the video recorder, with its sound rendered offline.
 
+## Credits
+
+Started in Antigravity with Neon, finished in Claude Code with Opus 5.5.
+
 ## Sounds
 
-- The call: `hello-hello-hello-hello-hello.wav`, supplied by the author, cut into 8 shouted and 9 plain takes in `voice/`.
-- Breathing: the second half of the same file, cut into light and deep breaths and a gasp in `breath/`, keeping their relative levels.
+- The call: hellos generated with Gemini Flash 3.8 TTS (`hello-hello-hello-hello-hello.wav`), cut into 8 shouted and 9 plain takes in `voice/`.
+- Breathing: breaths and gasps from the same generated file (its second half), cut into light and deep breaths and a gasp in `breath/`, keeping their relative levels.
