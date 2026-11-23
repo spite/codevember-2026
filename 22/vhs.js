@@ -446,7 +446,8 @@ export function createVHS() {
   // The display, laid out like a camcorder's viewfinder: corner brackets; REC and the battery top left; tape
   // speed, the counter (with frames) and tape left top right; the voice meter, time and date bottom left.
   // state: "standby" (STBY), "rec", "stop" or "rewind" (REW); message: blinking in the middle (TAPE END).
-  function drawOSD(time, { voice = 1, hoarse = false, counter: counterTime = time, state = "rec", message = "", tapeMinutes = 60 } = {}) {
+  // hidden: no display at all (for clean stills).
+  function drawOSD(time, { voice = 1, hoarse = false, counter: counterTime = time, state = "rec", message = "", tapeMinutes = 60, hidden = false } = {}) {
     const standby = state === "standby";
     const now = new Date(openedAt + time * 1000);
     const blink = Math.floor(time * 1.4) % 2 === 0;
@@ -462,12 +463,16 @@ export function createVHS() {
     const segments = voice === null ? -1 : Math.ceil(voice * 10 - 1e-3);
     // Spent: blinking until a whole bar is back.
     const low = voice !== null && (hoarse || segments <= 2);
-    const key = `${state}|${message}|${osd.width}|${osd.height}|${blink}|${fastBlink}|${counter}|${left}|${clock}|${date}|${segments}|${low}`;
+    const key = `${hidden}|${state}|${message}|${osd.width}|${osd.height}|${blink}|${fastBlink}|${counter}|${left}|${clock}|${date}|${segments}|${low}`;
     if (key === lastKey) return;
     lastKey = key;
     const W = osd.width, H = osd.height;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, W, H);
+    if (hidden) {
+      osdTex.needsUpdate = true;
+      return;
+    }
     const m = 14, line = 10;
     // Drawn twice: a dark copy a pixel down and right (the character generator's edging), then the colours.
     for (const shadow of [true, false]) {

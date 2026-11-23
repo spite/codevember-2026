@@ -59,6 +59,7 @@ const defaults = {
   autoWalk: true,
   autoTime: 120,
   tape: 10,
+  display: true,
   pingTime: 2.5,
 };
 const params = fromDefaults(defaults);
@@ -177,6 +178,7 @@ gui.addSlider("Dot size (m)", params.dotSize, 0.008, 0.06, 0.001, { randomizable
 gui.addSlider("Fisheye", params.fisheye, 0, 1, 0.01, { randomizable: false });
 gui.addSlider("VHS", params.vhs, 0, 1, 0.01, { randomizable: false });
 gui.addSlider("CRT", params.crt, 0, 1, 0.01, { randomizable: false });
+gui.addCheckbox("Camcorder display", params.display, { randomizable: false });
 gui.addCheckbox("Body casts a sound shadow", params.body, { randomizable: false });
 gui.addCheckbox("Footsteps reveal the floor", params.footsteps, { randomizable: false });
 gui.addCheckbox("Watchers in the distance", params.watchers, { randomizable: false });
@@ -696,6 +698,7 @@ render(({ dt }) => {
       Object.assign(osd, { state: mode === "standby" ? "standby" : "rec", counter: 0 });
     }
   }
+  osd.hidden = !params.display();
   vhs.update(sceneTime, params.vhs(), osd, roll);
   crt.uniforms.uAmount.value = params.crt();
   updateFov();
