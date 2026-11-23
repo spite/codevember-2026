@@ -10,19 +10,19 @@ const css = `
   border-radius: 14px; padding: 22px 22px 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); backdrop-filter: blur(6px); }
 .echo-card h2 { margin: 0 0 4px; font-size: 19px; font-weight: 600; letter-spacing: 0.01em; }
 .echo-card p.sub { margin: 0 0 16px; font-size: 13px; opacity: 0.6; }
-.echo-card .icon { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8;
+.echo-card .icon { width: 32px; height: 32px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6;
   stroke-linecap: round; stroke-linejoin: round; }
 .echo-card h2 { display: flex; align-items: center; gap: 10px; }
-.echo-card h2 .icon { width: 24px; height: 24px; color: rgb(236, 210, 140); }
+.echo-card h2 .icon { width: 32px; height: 32px; color: rgb(236, 210, 140); }
 .echo-card button.choice { display: flex; gap: 14px; align-items: flex-start; width: 100%; text-align: left; margin: 0 0 10px; padding: 12px 14px; border-radius: 10px;
   border: 1px solid rgba(255, 240, 200, 0.14); background: rgba(255, 245, 215, 0.05); color: inherit; font: inherit; cursor: pointer; }
 .echo-card button.choice:hover, .echo-card button.choice:focus-visible { background: rgba(255, 235, 170, 0.13); border-color: rgba(255, 235, 170, 0.4); outline: none; }
-.echo-card button.choice .icon { margin-top: 1px; color: rgb(236, 210, 140); }
+.echo-card button.choice .icon { margin-top: 3px; color: rgb(236, 210, 140); }
 .echo-card button.choice b { display: block; font-size: 15px; font-weight: 600; margin-bottom: 2px; }
 .echo-card button.choice span { font-size: 13px; opacity: 0.65; }
 .echo-card ul { margin: 0 0 16px; padding: 0; list-style: none; font-size: 14px; line-height: 1.45; }
 .echo-card li { display: flex; gap: 11px; align-items: flex-start; margin: 0 0 9px; }
-.echo-card li .icon { width: 18px; height: 18px; margin-top: 1px; opacity: 0.75; }
+.echo-card li .icon { width: 24px; height: 24px; margin-top: -1px; opacity: 0.75; }
 .echo-card .note { font-size: 13px; color: rgb(255, 170, 120); margin: -6px 0 12px; }
 .echo-card button.go { padding: 9px 22px; border-radius: 999px; border: 0; background: rgb(236, 226, 190); color: rgb(20, 18, 12);
   font: inherit; font-weight: 600; cursor: pointer; }
