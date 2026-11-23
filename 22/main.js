@@ -168,7 +168,7 @@ addKey("KeyV", "choose how to play", () => chooser.open());
 addKey("KeyK", "record your motion for a video (again to stop)", () => toggleRecording());
 addKey("KeyE", "shout (click mode)", () => mode === "click" && ping(1));
 
-const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: true });
+const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
 gui.addSlider("Rays per call", params.rays, 200, 4000, 100, { randomizable: false });
 gui.addSlider("Bounces", params.bounces, 0, 3, 1, { randomizable: false });
 gui.addSlider("Sound speed (m/s)", params.speed, 3, 25, 0.5, { randomizable: false });
