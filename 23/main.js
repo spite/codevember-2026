@@ -14,6 +14,8 @@ import {
   getSeed,
   addKey,
   onPause,
+  addActionButton,
+  showSoundHint,
 } from "common";
 import { GUI } from "guspira";
 import { Scene, Mesh, Vector3, Color, Quaternion, DataTexture, RGBAFormat, HalfFloatType, LinearFilter, BufferGeometry, RawShaderMaterial, GLSL3, WebGLRenderTarget, OrthographicCamera } from "three";
@@ -36,6 +38,7 @@ import { createMorphUniforms } from "./lava.js";
 import { EmberSystem } from "./embers.js";
 import { EmberLight } from "./emberLight.js";
 import { VolumetricLavaGlow } from "./glow.js";
+import { createSoundtrack } from "./sound.js";
 
 const BACKDROPS = {
   Obsidian: "#0f0f12",
@@ -56,7 +59,7 @@ const QUALITY_MESH = {
 
 const defaults = {
   style: "Cracked Plates",
-  shape: "Sphere",
+  shape: "Torus",
   backdrop: "Obsidian",
   crust: 0.84,
   fluidFlow: 0.35,
@@ -68,7 +71,7 @@ const defaults = {
   glowSpread: 0.45,
   gloss: 0.26,
   flow: 0.40,
-  embers: 0.55,
+  embers: 1,
   spin: 0.10,
   auto: true,
   autoTime: 14,
@@ -97,6 +100,7 @@ const load = {
   bake: loadingStep(1, "Solidifying basalt crust…"),
   compile: loadingStep(3, "Compiling shaders…"),
   wrap: loadingStep(0.3, "Shaping Suzanne…"),
+  sound: loadingStep(1, "Loading the soundtrack…"),
 };
 
 const pipeline = new Pipeline(renderer, {
@@ -124,7 +128,7 @@ const studio = load.studio.track(
   }),
 );
 
-const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: true });
+const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
 gui.addSelect("Style", params.style, STYLES);
 gui.addSelect("Shape", params.shape, SHAPES);
 gui.addSlider("Crust", params.crust, 0, 1, 0.01);
@@ -194,9 +198,18 @@ smokeSlider("Ember light", params.smokeEmberLight, 0, 3);
 gui.endSection();
 pipeline.addGUI(gui);
 addKey("KeyW", "toggle wireframe", () => (pipeline.wireframe = !pipeline.wireframe));
+const sound = createSoundtrack({ url: new URL("./sounds/soundtrack.mp3", import.meta.url), onProgress: load.sound.set, silent: new URLSearchParams(location.search).has("capture") });
+load.sound.track(sound.loaded);
+const soundButton = addActionButton("../assets/sound.svg", "Sound", () => toggleSound());
+function toggleSound() {
+  sound.setEnabled(!sound.enabled);
+  soundButton.querySelector("img").src = `../assets/${sound.enabled ? "sound" : "sound-off"}.svg`;
+}
+addKey("KeyM", "toggle sound", toggleSound);
 gui.addSeparator();
 gui.addText(keysHelp("Drag to turn the rock · scroll to zoom"));
-showHint("Drag to turn the rock · scroll to zoom · R for a new rock", "Drag to turn the rock · pinch to zoom · tap {randomize} for a new rock");
+showHint("Drag to turn the rock · scroll to zoom · Space to pause · R for a new rock", "Drag to turn the rock · pinch to zoom · tap {randomize} for a new rock");
+showSoundHint(() => !sound.running);
 gui.show();
 
 const fluidSize = QUALITY_FLUID[pipeline.quality] ?? 384;
@@ -289,7 +302,8 @@ scene.add(magmaMesh);
 const embers = new EmberSystem(pipeline.quality);
 scene.add(embers.mesh);
 
-camera.position.set(0, 0.25, 5.1);
+// Far enough back that the rock sits clear of the edges with room for its smoke
+camera.position.set(0, 0.35, 7.4);
 sharedControls.dispose();
 const controls = new FreeOrbitControls(camera, renderer.domElement);
 controls.target.set(0, 0, 0);
@@ -444,17 +458,19 @@ const displacementAmount = (relief) => 0.04 + relief * 0.135;
 // Builds the mesh for the maps just baked; only the latest request is applied.
 // Its distance field goes to sdf.a when it is the rock on show, to sdf.b when it is a morph target.
 let buildSerial = 0;
+const meshOptions = (seed) => ({
+  radius: 1.36,
+  baker,
+  shape: params.shape(),
+  seed,
+  dispAmp: displacementAmount(params.relief()),
+  ...meshSettings(params.detail()),
+});
+
 async function buildMesh(seed = getSeed(), { target = "a" } = {}) {
   const serial = ++buildSerial;
   const detail = params.detail();
-  const opts = {
-    radius: 1.36,
-    baker,
-    shape: params.shape(),
-    seed,
-    dispAmp: displacementAmount(params.relief()),
-    ...meshSettings(detail),
-  };
+  const opts = meshOptions(seed);
   // The baked mesh info arrives asynchronously
   if (!(await baker.ready) || serial !== buildSerial) return false;
   const built = await meshBuilder.build(opts);
@@ -462,6 +478,11 @@ async function buildMesh(seed = getSeed(), { target = "a" } = {}) {
     built.geometry.dispose();
     return false;
   }
+  applyBuilt(built, target, detail);
+  return true;
+}
+
+function applyBuilt(built, target, detail) {
   magmaMesh.geometry.dispose();
   magmaMesh.geometry = built.geometry;
   if (!magmaMesh.visible) uploader.start(built.geometry);
@@ -477,7 +498,6 @@ async function buildMesh(seed = getSeed(), { target = "a" } = {}) {
   const extent = Math.min(SDF_BOUND, bs.center.length() + bs.radius + 0.1);
   if (target === "a") Object.assign(look, { radiusA: built.volumeRadius, extentA: extent });
   else Object.assign(look, { radiusB: built.volumeRadius, extentB: extent });
-  return true;
 }
 
 function changeLook(reDevelopFluid) {
@@ -685,7 +705,8 @@ onRandomize((seed) => {
   remap(params.relief, Math.max(0.45, profile.relief - 0.12), Math.min(0.96, profile.relief + 0.10));
   remap(params.heat, Math.max(0.58, profile.heat - 0.10), Math.min(0.95, profile.heat + 0.10));
   remap(params.gloss, Math.max(0.10, profile.gloss - 0.12), Math.min(0.92, profile.gloss + 0.12));
-  remap(params.embers, 0.3, 0.8);
+  // Embers from mid to max, weighted toward many
+  params.embers.set(Number((0.5 + 0.5 * Math.sqrt(params.embers())).toFixed(2)));
   if (initialized) changeLook(true);
 });
 
@@ -733,6 +754,7 @@ buildMesh(getSeed(), { target: "b" }).then((ok) => {
   if (ok) look.ready = true;
 });
 await studio;
+await sound.loaded;
 await load.compile.track(pipeline.compileAsync(scene, camera), 3);
 magmaMesh.visible = false;
 initialized = true;
@@ -765,8 +787,53 @@ function syncImmediate() {
   uniforms.uScale.value = eased.scale;
 }
 
+// Recording support: looks baked and built ahead, then shown at once; scene time held still; a fling of the rock
+const held = { frozen: false, lost: 0 };
+const prepared = new Map();
+
+function setLook({ style, shape, seed, ...overrides }) {
+  params.style.set(style);
+  params.shape.set(shape);
+  applyStylePreset(style);
+  for (const [key, value] of Object.entries(overrides)) params[key]?.set(value);
+  syncImmediate();
+}
+
+async function prepareLook(entry) {
+  setLook(entry);
+  bakeMaps(entry.seed, true);
+  await baker.ready;
+  prepared.set(entry, await meshBuilder.build(meshOptions(entry.seed)));
+}
+
+// Rebakes the look's maps in this frame and puts its prepared mesh on show, cooled
+function showLook(entry) {
+  setLook(entry);
+  bakeMaps(entry.seed, true);
+  buildSerial++;
+  magmaMesh.visible = true;
+  applyBuilt(prepared.get(entry), "a", params.detail());
+  Object.assign(look, { phase: "idle", melt: 0, march: 0, queued: false, fluid: false });
+  uniforms.uMelt.value = 0;
+  uniforms.uNeutral.value = 0;
+}
+
+// Waits for the opening rise to settle, prepares every look, then shows the first for warm seconds (smoke builds up)
+async function preload({ looks = [], warm = 0 } = {}) {
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  while (look.phase !== "idle") await wait(100);
+  for (const entry of looks) await prepareLook(entry);
+  if (looks.length) showLook(looks[0]);
+  await wait(warm * 1000);
+}
+
 window.app = {
   canvas: renderer.domElement,
+  preload,
+  prepareLook,
+  showLook,
+  freeze: (on) => (held.frozen = on),
+  fling: (x, y) => Object.assign(dragSpin, { x, y }),
   renderer,
   scene,
   params,
@@ -833,7 +900,14 @@ pipeline.composite = (hdr, ctx) => {
   });
 };
 
-render(({ time, dt }) => {
+render(({ time, dt, frame }) => {
+  // The music waits for the first frame, when the loading screen goes
+  if (frame === 0) sound.arm();
+  if (held.frozen) {
+    held.lost += dt;
+    dt = 0;
+  }
+  time -= held.lost;
   renderTime = time;
   const now = performance.now();
   const wallDt = Math.min(0.1, (now - lastWall) * 0.001);

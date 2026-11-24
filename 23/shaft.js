@@ -43,6 +43,7 @@ uniform sampler2D uNoise;
 uniform mat4 uInvProj;
 uniform mat4 uInvView;
 uniform mat4 uInvModel;
+uniform float uNearScale;
 uniform vec3 uLightWorld;
 uniform vec3 uCentre;
 uniform float uRadius;
@@ -226,7 +227,8 @@ void main() {
     // Shadow from the rock toward the light, only where the shaft reaches
     vec3 lp = (uInvModel * vec4(p, 1.0)).xyz;
     float lit = beam;
-    float near = morphFieldFast(lp);
+    // In world units, so a scaled rock lights and parts the smoke at its true size
+    float near = morphFieldFast(lp) * uNearScale;
 #ifdef SIM
     // None inside the rock or the liquid, and nothing behind the liquid (it isn't in the depth buffer)
     if (near < -0.08) break;
@@ -440,6 +442,7 @@ class LightShaft {
       uInvProj: { value: new Matrix4() },
       uInvView: { value: new Matrix4() },
       uInvModel: { value: this._invModel },
+      uNearScale: { value: 1 },
       uLightWorld: { value: new Vector3(0, 1, 0) },
       uCentre: { value: new Vector3() },
       uRadius: { value: 1.5 },
@@ -511,6 +514,7 @@ class LightShaft {
     mesh.updateMatrixWorld();
     this._invModel.copy(mesh.matrixWorld).invert();
     const u = this.shaftMat.uniforms;
+    u.uNearScale.value = mesh.scale.x;
     u.uDepth.value = depthTexture;
     u.uInvProj.value.copy(camera.projectionMatrixInverse);
     u.uInvView.value.copy(camera.matrixWorld);
@@ -553,6 +557,7 @@ class LightShaft {
     mesh.updateMatrixWorld();
     this._invModel.copy(mesh.matrixWorld).invert();
     const u = this.shaftMat.uniforms;
+    u.uNearScale.value = mesh.scale.x;
     u.uDepth.value = depthTexture;
     u.uInvProj.value.copy(camera.projectionMatrixInverse);
     u.uInvView.value.copy(camera.matrixWorld);
