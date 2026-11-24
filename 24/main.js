@@ -63,6 +63,8 @@ const defaults = {
 };
 
 const params = fromDefaults(defaults);
+// Reading shader logs on a program's first draw blocks on the driver (a hitch when a new pattern first appears).
+renderer.debug.checkShaderErrors = false;
 
 // The shared orbit locks at the poles; this one turns the camera's up with it, so it orbits over and under the doll.
 sharedControls.dispose();
