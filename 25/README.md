@@ -18,7 +18,10 @@ Ported from the skull example of FaceMeshFaceGeometry to the shared Pipeline.
 
 ## How it works
 
-- `tracker.js`: the webcam and MediaPipe (loaded from its CDN at run time), detecting in its own worker
+- `tracker.js`: the webcam and MediaPipe (loaded from its CDN at run time). Poses are played back along a Catmull-Rom
+  curve through the latest detections, by when each frame was captured, about a frame behind, so the skull moves
+  smoothly at the camera's 20–30 fps and when a detection comes back doesn't matter; misses under a third of a second
+  (fast moves blur frames) play on. Detection runs in its own worker
   (`tracker-worker.js`, on the CPU) so it never holds up a frame; the main thread is the fallback. The pose is smoothed with a One Euro filter on
   its position and a speed-dependent slerp on its rotation, then mirrored in the world and in the head's own space, so it
   stays a rotation.

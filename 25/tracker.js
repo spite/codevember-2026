@@ -39,8 +39,9 @@ class OneEuro {
 }
 
 const mirror = new Matrix4().makeScale(-1, 1, 1);
-// ?pose=jump shows each detection as it comes, like the original demo, instead of drawing between them.
+// ?pose=jump shows each detection as it comes, like the original demo, instead of playing them back smoothly.
 const jump = new URLSearchParams(location.search).get("pose") === "jump";
+const DROPOUT = 350;
 const _p = new Vector3();
 const _q = new Quaternion();
 const _s = new Vector3();
@@ -54,7 +55,7 @@ function createTracker() {
   const state = {
     status: "idle", // idle | asking | loading | running | denied | failed | off
     found: false,
-    // What's shown: drawn between the last two detections, which come at the camera's rate.
+    // What's shown: played back smoothly through the latest detections, which come at the camera's rate.
     pose: new Matrix4(),
     blendshapes: {},
     mirrored: true,
@@ -78,11 +79,12 @@ function createTracker() {
   const target = new Matrix4();
   const targetPosition = new Vector3();
   const targetRotation = new Quaternion();
-  // The detection before the latest, and when the latest came in: the skull is drawn between the two (see update).
-  const prevPosition = new Vector3();
-  const prevRotation = new Quaternion();
-  let arrival = 0;
-  let interval = 50;
+  // The latest detections, by when their frames were captured. The skull is played back along a smooth curve through
+  // them a little behind real time, so when a detection comes back doesn't matter, only when its frame was taken.
+  const samples = [];
+  let interval = 40; // between captured frames, ms
+  let latency = 30; // from capture to detection, ms
+  let delay = 80; // how far behind the pose is played back, ms
 
   async function loadLandmarker() {
     const vision = await import(`${VISION}/vision_bundle.mjs`);
@@ -183,6 +185,8 @@ function createTracker() {
   // A detection: filter the pose (One Euro on the position, a speed-dependent slerp on the rotation) into the target.
   function handle(found, matrix, shapes, time) {
     if (!found) {
+      // Fast moves blur a frame or two and the face is missed; under a third of a second, play on as if it were there.
+      if (state.found && time - lastTime < DROPOUT) return;
       state.found = false;
       position.reset();
       rotation = null;
@@ -204,23 +208,57 @@ function createTracker() {
     target.compose(_p, rotation, _s.set(1, 1, 1));
     // Mirrored in the world and in the head's own space, so the pose stays a rotation (the skull is symmetric).
     if (state.mirrored) target.premultiply(mirror).multiply(mirror);
-    prevPosition.copy(targetPosition);
-    prevRotation.copy(targetRotation);
     target.decompose(targetPosition, targetRotation, _s);
-    if (!state.found) {
-      prevPosition.copy(targetPosition);
-      prevRotation.copy(targetRotation);
-    }
-    const now = performance.now();
-    // How far apart the frames were captured, so the drawing between them takes as long.
-    if (state.found && dt > 0) interval += (Math.min(150, dt * 1000) - interval) * 0.3;
-    arrival = now;
+    if (!state.found) samples.length = 0;
+    const last = samples.at(-1);
+    // Same hemisphere as the last sample, so the curve between them takes the short way round.
+    if (last && last.q.dot(targetRotation) < 0) targetRotation.set(-targetRotation.x, -targetRotation.y, -targetRotation.z, -targetRotation.w);
+    samples.push({ t: time, p: targetPosition.clone(), q: targetRotation.clone() });
+    if (samples.length > 8) samples.shift();
+    if (state.found && dt > 0) interval += (Math.min(150, dt * 1000) - interval) * 0.2;
+    latency += (Math.min(200, Math.max(0, performance.now() - time)) - latency) * 0.2;
     for (const name in state.blendshapes) delete state.blendshapes[name];
     for (const [name, score] of shapes) state.blendshapes[name] = score;
     state.found = true;
   }
 
-  // Once a frame: hands a new video frame to the landmarker, and eases the shown pose toward the latest detection.
+  // The pose at time t (ms) into _p and _q: Catmull-Rom through the samples, held at either end.
+  function sample(t) {
+    const n = samples.length;
+    if (t <= samples[0].t || n === 1) return void (_p.copy(samples[0].p), _q.copy(samples[0].q));
+    if (t >= samples[n - 1].t) {
+      // Past the newest: carry on at the speed it had, for up to a frame and a half, rather than stop and jump.
+      const b = samples[n - 2];
+      const c = samples[n - 1];
+      const span = c.t - b.t;
+      const k = 1 + Math.min(t - c.t, 1.5 * interval) / Math.max(span, 1);
+      _p.lerpVectors(b.p, c.p, k);
+      _q.slerpQuaternions(b.q, c.q, k);
+      return;
+    }
+    let i = 0;
+    while (samples[i + 1].t <= t) i++;
+    const a = samples[Math.max(0, i - 1)];
+    const b = samples[i];
+    const c = samples[i + 1];
+    const d = samples[Math.min(n - 1, i + 2)];
+    const u = (t - b.t) / (c.t - b.t);
+    const u2 = u * u;
+    const u3 = u2 * u;
+    const w0 = -0.5 * u3 + u2 - 0.5 * u;
+    const w1 = 1.5 * u3 - 2.5 * u2 + 1;
+    const w2 = -1.5 * u3 + 2 * u2 + 0.5 * u;
+    const w3 = 0.5 * u3 - 0.5 * u2;
+    _p.set(0, 0, 0).addScaledVector(a.p, w0).addScaledVector(b.p, w1).addScaledVector(c.p, w2).addScaledVector(d.p, w3);
+    _q.set(
+      a.q.x * w0 + b.q.x * w1 + c.q.x * w2 + d.q.x * w3,
+      a.q.y * w0 + b.q.y * w1 + c.q.y * w2 + d.q.y * w3,
+      a.q.z * w0 + b.q.z * w1 + c.q.z * w2 + d.q.z * w3,
+      a.q.w * w0 + b.q.w * w1 + c.q.w * w2 + d.q.w * w3,
+    ).normalize();
+  }
+
+  // Once a frame: hands a new video frame to the landmarker, and plays the pose back.
   function update(dt) {
     counts.renders++;
     if (!video.requestVideoFrameCallback && video.currentTime !== lastVideoTime) {
@@ -257,11 +295,10 @@ function createTracker() {
       state.stats = `cam ${rate(counts.frames)}${max ? `/${Math.round(max)}` : ""} · ${detect} ms ${where} · ${rate(counts.renders)} fps`;
       Object.assign(counts, { frames: 0, results: 0, detect: 0, renders: 0, since: performance.now() });
     }
-    if (state.found) {
-      // One camera frame behind: from the detection before the latest to the latest, over the time between them.
-      const t = jump ? 1 : Math.min(1, (performance.now() - arrival) / interval);
-      _p.lerpVectors(prevPosition, targetPosition, t);
-      _q.slerpQuaternions(prevRotation, targetRotation, t);
+    if (state.found && samples.length) {
+      // Behind by the detection's latency and a bit over a frame, so there's nearly always a sample on either side.
+      delay += (latency + 1.3 * interval - delay) * Math.min(1, dt * 2);
+      sample(jump ? Infinity : performance.now() - delay);
       state.pose.compose(_p, _q, _s.set(1, 1, 1));
     }
     return state.found;
