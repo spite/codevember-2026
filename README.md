@@ -36,8 +36,17 @@ three.js r187.
 
 ## License
 
-Code is [MIT](LICENSE). Most of it was written with AI assistance (Claude), directed,
-reviewed and edited by the author.
+Code is [MIT](LICENSE). Most of it was written with AI assistance, directed, reviewed
+and edited by the author:
+
+- Assistants: [Claude Code](https://claude.com/claude-code) and
+  [Antigravity](https://antigravity.google).
+- Models: Claude Opus 5.5 and Claude Fable 5.2 (Anthropic), and Gemini 4 Carbon,
+  Gemini 4 Hydrogen and Gemini 4 Neon (Google). Some days were started in Antigravity
+  and finished in Claude Code; each day's explainer (or README, for days without one)
+  says which.
+- Day 22's voices were generated with Gemini Flash 3.8 TTS, and the soundtracks of days
+  13 and 23 with Lyria 3.5.
 
 Third-party libraries in `third_party/` (three.js, guspira, Ammo, ...) and assets
 (sounds, models, HDRIs) keep their own licenses, credited in each day's README. Some

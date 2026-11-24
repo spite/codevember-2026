@@ -121,7 +121,7 @@ and matching acoustic foley profiles:
 
 ## Sound
 
-Looping ambient kalimba, electric-piano and string soundtrack (`sounds/soundtrack.mp3`, made with Google's Lyria) on a dedicated Web Audio bus
+Looping ambient kalimba, electric-piano and string soundtrack (`sounds/soundtrack.mp3`, made with Google's Lyria 3.5) on a dedicated Web Audio bus
 that fades in gently on start and fades out to silence with a warm lowpass sweep as the old labyrinth sinks and shrinks
 on randomize before blooming back in as the new piece expands and raises its walls (adjustable via **Music**). Paired
 with sample-based foley (`sound.js`) cut and crossfaded from CC0 recordings on freesound.org: continuous speed- and

@@ -81,3 +81,4 @@ The Smoke section (not randomised, kept in the url, all live):
 ## Credits
 
 - Soundtrack (`sounds/soundtrack.mp3`) made with Lyria 3.5.
+- Code: started in Antigravity with Gemini 4 Neon, finished in Claude Code with Opus 5.5.
