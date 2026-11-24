@@ -371,7 +371,7 @@ let elapsed = 0;
 
 function frame(dt) {
   elapsed += dt;
-  const found = tracker.update() && params.followFace();
+  const found = tracker.update(dt) && params.followFace();
   const name = params.skull();
   if (!skulls[name]) prepareSkull(name);
   // A new skull: the old one drifts off first, and the new one comes back in its place.

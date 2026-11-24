@@ -43,7 +43,7 @@ const _p = new Vector3();
 const _q = new Quaternion();
 const _s = new Vector3();
 
-function createTracker({ onModelProgress } = {}) {
+function createTracker() {
   const video = document.createElement("video");
   video.muted = true;
   video.playsInline = true;
@@ -52,37 +52,33 @@ function createTracker({ onModelProgress } = {}) {
   const state = {
     status: "idle", // idle | asking | loading | running | denied | failed | off
     found: false,
+    // What's shown: eased every frame toward the latest detection, which comes at the camera's rate.
     pose: new Matrix4(),
     blendshapes: {},
     mirrored: true,
     error: "",
   };
-  let landmarker = null;
+  let worker = null;
+  let landmarker = null; // main-thread fallback
+  let busy = false;
   let stream = null;
   let lastVideoTime = -1;
   let lastTime = 0;
+  let snap = true;
   const position = new OneEuro(0.5, 0.5);
   let rotation = null;
   let rotationSpeed = 0;
+  const target = new Matrix4();
+  const targetPosition = new Vector3();
+  const targetRotation = new Quaternion();
+  const shownPosition = new Vector3();
+  const shownRotation = new Quaternion();
 
   async function loadLandmarker() {
     const vision = await import(`${VISION}/vision_bundle.mjs`);
-    const res = await fetch(MODEL);
-    const total = Number(res.headers.get("content-length")) || 0;
-    const reader = res.body.getReader();
-    const chunks = [];
-    let loaded = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      loaded += value.length;
-      if (total) onModelProgress?.(loaded / total);
-    }
-    const model = new Uint8Array(await new Blob(chunks).arrayBuffer());
     const fileset = await vision.FilesetResolver.forVisionTasks(`${VISION}/wasm`);
     const options = (delegate) => ({
-      baseOptions: { modelAssetBuffer: model, delegate },
+      baseOptions: { modelAssetPath: MODEL, delegate },
       runningMode: "VIDEO",
       numFaces: 1,
       outputFacialTransformationMatrixes: true,
@@ -94,6 +90,23 @@ function createTracker({ onModelProgress } = {}) {
       console.warn("FaceLandmarker: GPU delegate unavailable, using the CPU", e);
       return vision.FaceLandmarker.createFromOptions(fileset, options("CPU"));
     }
+  }
+
+  // The landmarker in its own worker; on the main thread if a worker can't run it.
+  function loadWorker() {
+    return new Promise((resolve, reject) => {
+      const w = new Worker(new URL("./tracker-worker.js", import.meta.url));
+      w.onmessage = ({ data }) => {
+        if (data.type === "ready") resolve(w);
+        else if (data.type === "error" && !worker) reject(new Error(data.message));
+        else if (data.type === "result") {
+          busy = false;
+          handle(data.found, data.matrix, data.shapes);
+        }
+      };
+      w.onerror = (e) => reject(new Error(e.message || "tracker worker failed"));
+      w.postMessage({ type: "init", vision: VISION, model: MODEL });
+    });
   }
 
   async function start() {
@@ -117,7 +130,14 @@ function createTracker({ onModelProgress } = {}) {
     await video.play().catch(() => {});
     state.status = "loading";
     try {
-      landmarker ??= await loadLandmarker();
+      if (!worker && !landmarker) {
+        try {
+          worker = await loadWorker();
+        } catch (e) {
+          console.warn("FaceLandmarker worker unavailable, detecting on the main thread", e);
+          landmarker = await loadLandmarker();
+        }
+      }
       state.status = stream ? "running" : "off";
     } catch (e) {
       console.error(e);
@@ -134,24 +154,20 @@ function createTracker({ onModelProgress } = {}) {
     state.found = false;
   }
 
-  // Runs the landmarker once per new video frame; returns whether a face is in view.
-  function update() {
-    if (state.status !== "running" || video.readyState < 2) return state.found;
-    if (video.currentTime === lastVideoTime) return state.found;
-    lastVideoTime = video.currentTime;
-    const now = performance.now();
-    const result = landmarker.detectForVideo(video, now);
-    const matrix = result.facialTransformationMatrixes?.[0];
-    if (!result.faceLandmarks?.[0] || !matrix) {
+  // A detection: filter the pose (One Euro on the position, a speed-dependent slerp on the rotation) into the target.
+  function handle(found, matrix, shapes) {
+    if (!found) {
       state.found = false;
       position.reset();
       rotation = null;
-      return false;
+      snap = true;
+      return;
     }
+    const now = performance.now();
     const dt = lastTime ? (now - lastTime) / 1000 : 0;
     lastTime = now;
-    state.pose.fromArray(matrix.data);
-    state.pose.decompose(_p, _q, _s);
+    target.fromArray(matrix);
+    target.decompose(_p, _q, _s);
     _p.fromArray(position.filter(_p.toArray(), dt));
     if (!rotation || !state.found) {
       rotation = _q.clone();
@@ -160,13 +176,41 @@ function createTracker({ onModelProgress } = {}) {
       rotationSpeed += smoothingFactor(dt, 1) * (rotation.angleTo(_q) / dt - rotationSpeed);
       rotation.slerp(_q, smoothingFactor(dt, 0.5 + 5 * rotationSpeed));
     }
-    state.pose.compose(_p, rotation, _s.set(1, 1, 1));
+    target.compose(_p, rotation, _s.set(1, 1, 1));
     // Mirrored in the world and in the head's own space, so the pose stays a rotation (the skull is symmetric).
-    if (state.mirrored) state.pose.premultiply(mirror).multiply(mirror);
+    if (state.mirrored) target.premultiply(mirror).multiply(mirror);
+    target.decompose(targetPosition, targetRotation, _s);
     for (const name in state.blendshapes) delete state.blendshapes[name];
-    for (const c of result.faceBlendshapes?.[0]?.categories ?? []) state.blendshapes[c.categoryName] = c.score;
+    for (const [name, score] of shapes) state.blendshapes[name] = score;
     state.found = true;
-    return true;
+  }
+
+  // Once a frame: hands a new video frame to the landmarker, and eases the shown pose toward the latest detection.
+  function update(dt) {
+    if (state.status === "running" && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+      if (worker && !busy) {
+        lastVideoTime = video.currentTime;
+        busy = true;
+        createImageBitmap(video).then(
+          (bitmap) => worker.postMessage({ type: "frame", bitmap, time: performance.now() }, [bitmap]),
+          () => (busy = false),
+        );
+      } else if (landmarker) {
+        lastVideoTime = video.currentTime;
+        const result = landmarker.detectForVideo(video, performance.now());
+        const matrix = result.facialTransformationMatrixes?.[0];
+        const found = !!(result.faceLandmarks?.[0] && matrix);
+        handle(found, found ? matrix.data : null, found ? (result.faceBlendshapes?.[0]?.categories ?? []).map((c) => [c.categoryName, c.score]) : []);
+      }
+    }
+    if (state.found) {
+      const k = snap ? 1 : 1 - Math.exp(-dt / 0.045);
+      snap = false;
+      shownPosition.lerp(targetPosition, k);
+      shownRotation.slerp(targetRotation, k);
+      state.pose.compose(shownPosition, shownRotation, _s.set(1, 1, 1));
+    }
+    return state.found;
   }
 
   return { state, video, start, stop, update };

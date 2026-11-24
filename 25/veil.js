@@ -280,6 +280,13 @@ class Veil {
     this.generation = 0;
     this.shownGeneration = -1;
     this.surface = new Float32Array(SURFACE_SIDE * SURFACE_SIDE * 3);
+    this.prevSurface = new Float32Array(this.surface.length);
+    this.normals = new Float32Array(this.surface.length);
+    this.prevNormals = new Float32Array(this.surface.length);
+    this.display = new Float32Array(this.surface.length);
+    // When the last surface came back, and how far apart they come (ms).
+    this.arrival = 0;
+    this.interval = 25;
     this.jawField = null;
     this.surfaceJawInverse = new Matrix4();
     this.sentJawInverse = new Matrix4();
@@ -386,14 +393,16 @@ class Veil {
     this.busy = false;
     // A surface from before the last drop goes back unseen: the old veil is already gone.
     if (data.generation !== this.generation) return;
-    const position = this.geometry.getAttribute("position");
-    const normal = this.geometry.getAttribute("normal");
+    // Kept with the one before, to draw between them: see present().
+    const first = this.shownGeneration !== data.generation;
+    this.prevSurface.set(first ? data.positions : this.surface);
+    this.prevNormals.set(first ? data.normals : this.normals);
     this.surface.set(data.positions);
+    this.normals.set(data.normals);
+    const now = performance.now();
+    if (!first) this.interval += (Math.min(100, now - this.arrival) - this.interval) * 0.25;
+    this.arrival = now;
     this.surfaceJawInverse.copy(this.sentJawInverse);
-    position.array.set(data.positions);
-    normal.array.set(data.normals);
-    position.needsUpdate = true;
-    normal.needsUpdate = true;
     this.shownGeneration = data.generation;
     this.ready = true;
   }
@@ -432,12 +441,32 @@ class Veil {
 
   // The surface comes back from the worker a frame or two late, shaped around where the jaw was then; the cloth on or
   // near the jaw is carried along with it to where it is now.
+  // The worker's surfaces come a few frames apart; the cloth is drawn between the last two, one surface behind, so it
+  // moves every frame.
+  present() {
+    const t = Math.min(1, Math.max(0, (performance.now() - this.arrival) / this.interval));
+    const { prevSurface, surface, prevNormals, normals, display } = this;
+    const normal = this.geometry.getAttribute("normal");
+    const n = normal.array;
+    for (let i = 0; i < display.length; i++) {
+      display[i] = prevSurface[i] + (surface[i] - prevSurface[i]) * t;
+      n[i] = prevNormals[i] + (normals[i] - prevNormals[i]) * t;
+    }
+    normal.needsUpdate = true;
+  }
+
   followJaw(jawMatrix) {
+    if (!this.ready) return;
+    this.present();
+    const { display: surface, gradient } = this;
     const field = this.jawField;
-    if (!field || !this.ready) return;
-    const { surface, gradient } = this;
     const position = this.geometry.getAttribute("position");
     const out = position.array;
+    if (!field) {
+      out.set(surface);
+      position.needsUpdate = true;
+      return;
+    }
     const a = this.surfaceJawInverse.elements;
     const b = jawMatrix.elements;
     for (let o = 0; o < surface.length; o += 3) {

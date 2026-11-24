@@ -18,7 +18,8 @@ Ported from the skull example of FaceMeshFaceGeometry to the shared Pipeline.
 
 ## How it works
 
-- `tracker.js`: the webcam and MediaPipe (loaded from its CDN at run time). The pose is smoothed with a One Euro filter on
+- `tracker.js`: the webcam and MediaPipe (loaded from its CDN at run time), detecting in its own worker
+  (`tracker-worker.js`, on the CPU) so it never holds up a frame; the main thread is the fallback. The pose is smoothed with a One Euro filter on
   its position and a speed-dependent slerp on its rotation, then mirrored in the world and in the head's own space, so it
   stays a rotation.
 - `skull.js`: the glTF heads have a two-bone skin; the jaw's weight goes to a vertex attribute and `displace()` swings it,
@@ -28,7 +29,8 @@ Ported from the skull example of FaceMeshFaceGeometry to the shared Pipeline.
   cranium and the jaw, and with itself.
 - `veil.js`: the far side of the cloth is drawn in the main pass and casts the veil's shadow (a checkerboard, half the
   light through). The near side is drawn in the Pipeline's composite hook, over a blurred copy of the lit scene with its
-  depth, so what's behind the cloth shows through diffused. Tattered veils (`tatter.js`, made in the worker) have ragged holes and rips running down the cloth, loose threads
+  depth, so what's behind the cloth shows through diffused. Surfaces come back from the worker a few frames apart, so the
+  cloth is drawn between the last two, one behind, and moves every frame. Tattered veils (`tatter.js`, made in the worker) have ragged holes and rips running down the cloth, loose threads
   hanging off edges that face down, sheer wear round the holes and toward the hem, and dirt: grime toward the hem and
   round the holes, water stains with darker tide lines, and mildew specks.
 
