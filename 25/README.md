@@ -34,6 +34,17 @@ Ported from the skull example of FaceMeshFaceGeometry to the shared Pipeline.
   hanging off edges that face down, sheer wear round the holes and toward the hem, and dirt: grime toward the hem and
   round the holes, water stains with darker tide lines, and mildew specks.
 
+## Performance
+
+- Frames go out on every Nth display refresh, at most ~120 fps, stepping down to the next even rate when frames keep
+  missing their refresh: uneven frame pacing shows as judder, and the cloth amplifies it. `?fps=` sets the most, `?fps=0`
+  draws every refresh.
+- The page renders at most at 1.5x pixel ratio (`?dpr=2` for full Retina); the 2x screenshot keeps its size.
+- The veil's composite fills only depth into its multisampled layer and lays the cloth over the frame in one pass; the
+  cloth's shadows use a fixed filter, and the jaw's field is sampled once per surface, not per frame.
+- The panel's Tracking line shows the camera's frame rate (and the most it says it can do), detection time and where it
+  runs, and the render rate. `?pose=jump` and `?tracker=main` switch to the original demo's behaviour, for comparison.
+
 ## Credits
 
 - Skull: based on ["Skull downloadable"](https://sketchfab.com/models/1a9db900738d44298b0bc59f68123393) by

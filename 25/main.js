@@ -487,7 +487,14 @@ controls.enableDamping = true;
 controls.enablePan = false;
 controls.minDistance = 3;
 controls.maxDistance = 16;
+// The pipeline at 1.5x costs about 40% less than at 2x, which a soft, dark scene doesn't show. Only the page's own pixel
+// ratio is capped: ?dpr= and the 2x screenshot keep theirs.
+const DPR_CAP = new URLSearchParams(location.search).has("dpr") ? Infinity : 1.5;
 onResize((w, h, dpr) => {
+  if (dpr === Math.min(window.devicePixelRatio, 2) && dpr > DPR_CAP) {
+    dpr = DPR_CAP;
+    renderer.setPixelRatio(dpr);
+  }
   pipeline.setSize(w, h, dpr);
   frameCamera(w, h);
 });
@@ -519,7 +526,46 @@ window.app = {
   preload: () => Promise.all(Object.keys(SKULLS).map((n) => prepareSkull(n))),
 };
 
-render(({ dt }) => {
+// Frames go out on every Nth refresh, at most ~120 fps: a frame that sometimes makes a refresh and sometimes doesn't
+// judders, and every jolt shows in the cloth. When frames keep missing their refresh, N goes up a step (an even, lower
+// rate). ?fps= sets the most, ?fps=0 draws every refresh.
+const FPS = Number(new URLSearchParams(location.search).get("fps") ?? 120);
+let refresh = 1 / 60;
+let lastStamp = 0;
+let vsyncs = 0;
+let heldDt = 0;
+let slower = 0;
+let lastDrawn = 0;
+const pacing = { drawn: 0, late: 0, clean: 0 };
+render(({ dt: frameDt }) => {
+  const stamp = performance.now();
+  if (lastStamp) {
+    const gap = (stamp - lastStamp) / 1000;
+    // The display's refresh, from the shortest recent gaps between callbacks.
+    if (gap > 0.002 && gap < 0.05) refresh += (Math.min(gap, refresh * 1.5) - refresh) * 0.05;
+  }
+  lastStamp = stamp;
+  heldDt += frameDt;
+  const every = (FPS > 0 ? Math.max(1, Math.round(1 / FPS / refresh)) : 1) + slower;
+  if (++vsyncs % every !== 0 && started) return;
+  if (lastDrawn && FPS > 0) {
+    pacing.drawn++;
+    // Late: a whole refresh missed.
+    if ((stamp - lastDrawn) / 1000 > (every + 0.9) * refresh) pacing.late++;
+    if (pacing.drawn >= 120) {
+      if (pacing.late > 30 && 1 / ((every + 1) * refresh) >= 30) {
+        slower++;
+        pacing.clean = 0;
+      } else if (pacing.late < 3 && slower > 0 && ++pacing.clean >= 5) {
+        slower--;
+        pacing.clean = 0;
+      }
+      pacing.drawn = pacing.late = 0;
+    }
+  }
+  lastDrawn = stamp;
+  const dt = Math.min(0.1, heldDt);
+  heldDt = 0;
   if (!started) {
     started = true;
     sound.start();

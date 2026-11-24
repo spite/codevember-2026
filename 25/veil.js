@@ -1,5 +1,6 @@
 import {
   AlwaysDepth,
+  Color,
   BackSide,
   BufferAttribute,
   BufferGeometry,
@@ -56,6 +57,10 @@ float veilNoise(vec2 p) {
   vec2 i = floor(p), f = fract(p);
   f = f * f * (3.0 - 2.0 * f);
   return mix(mix(veilHash(i), veilHash(i + vec2(1, 0)), f.x), mix(veilHash(i + vec2(0, 1)), veilHash(i + vec2(1, 1)), f.x), f.y);
+}
+// Soft cloth needs no blocker search: a fixed filter, offset toward the light from whichever side faces it.
+float veilShadow(vec3 P, vec3 n) {
+  return getShadowFixed(P, dot(n, lightDirection) < 0.0 ? -n : n, 3.0);
 }
 // Coverage of the pixel by cloth, with how thin it's worn and its dirt.
 float veilCloth(vec2 uv, out float thin, out vec3 dirt) {
@@ -118,6 +123,7 @@ void surface(inout Surface s) {
   s.sheenColor *= op;
   s.transmission *= op;
   s.transmissionOcclusion = 0.25;
+  s.shadow = veilShadow(vWorldPosition, normalize(s.normal));
   vec3 glow = emberIrradiance(vWorldPosition, normalize(s.normal), true);
   s.emissive += behind * (1.0 - op) + cloth * op * ${TRANSLUCENCY.toFixed(2)} * (1.0 / 3.14159265) * glow;
 }
@@ -155,6 +161,7 @@ void surface(inout Surface s) {
   float op = mix(veilOpacity, 1.0, ${DIRT_OPACITY.toFixed(2)} * dirtiness) * (1.0 - ${THINNESS.toFixed(2)} * thin);
   s.albedo *= dirt;
   s.alpha = coverage * op;
+  s.shadow = veilShadow(vWorldPosition, normalize(s.normal));
   vec3 glow = emberIrradiance(vWorldPosition, normalize(s.normal), true);
   s.emissive += s.albedo * ${TRANSLUCENCY.toFixed(2)} * (1.0 / 3.14159265) * glow;
 #endif
@@ -171,13 +178,24 @@ void surface(inout Surface s) {
 // hidden where the skull is in front of it, antialiased like the main pass.
 const fillFragment = /* glsl */ `
 precision highp float;
-uniform sampler2D tColor;
 uniform sampler2D tDepth;
 in vec2 vUv;
 layout(location = 0) out vec4 outColor;
 void main() {
-  outColor = texture(tColor, vUv);
+  outColor = vec4(0.0);
   gl_FragDepth = texture(tDepth, vUv).r;
+}
+`;
+// The cloth layer (premultiplied) over the frame.
+const overFragment = /* glsl */ `
+precision highp float;
+uniform sampler2D tColor;
+uniform sampler2D tLayer;
+in vec2 vUv;
+layout(location = 0) out vec4 outColor;
+void main() {
+  vec4 layer = texture(tLayer, vUv);
+  outColor = vec4(texture(tColor, vUv).rgb * (1.0 - layer.a) + layer.rgb, 1.0);
 }
 `;
 const blurFragment = /* glsl */ `
@@ -206,17 +224,21 @@ class VeilComposite {
   constructor(renderer, { samples = 4 } = {}) {
     this.renderer = renderer;
     this.scene = new Scene();
-    this.output = target({ depthBuffer: true, samples });
+    // The cloth alone, multisampled over the scene's depth, then laid over the frame.
+    this.layer = target({ depthBuffer: true, samples });
+    this.output = target();
     this.half = target();
     this.blurA = target();
     this.blurB = target();
     this.behind = { value: this.blurB.texture };
     this.diffusion = 0.2;
+    this.clearColor = new Color();
     const geometry = new BufferGeometry();
     geometry.setAttribute("position", new Float32BufferAttribute([-1, -1, 0, 3, -1, 0, -1, 3, 0], 3));
     const quad = (fragmentShader, uniforms, options = {}) =>
       new RawShaderMaterial({ glslVersion: GLSL3, vertexShader: fullscreenVertex, fragmentShader, uniforms, depthTest: false, depthWrite: false, ...options });
-    this.fill = quad(fillFragment, { tColor: { value: null }, tDepth: { value: null } }, { depthTest: true, depthWrite: true, depthFunc: AlwaysDepth });
+    this.fill = quad(fillFragment, { tDepth: { value: null } }, { depthTest: true, depthWrite: true, depthFunc: AlwaysDepth, colorWrite: false });
+    this.over = quad(overFragment, { tColor: { value: null }, tLayer: { value: this.layer.texture } });
     this.blur = quad(blurFragment, { tInput: { value: null }, direction: { value: new Vector2() } });
     this.copy = quad(copyFragment, { tInput: { value: null }, weight: { value: 1 } });
     this.quad = new Mesh(geometry, this.fill);
@@ -242,7 +264,10 @@ class VeilComposite {
     const renderer = this.renderer;
     const w = Math.max(1, Math.round(width / 4));
     const h = Math.max(1, Math.round(height / 4));
-    if (this.output.width !== width || this.output.height !== height) this.output.setSize(width, height);
+    if (this.output.width !== width || this.output.height !== height) {
+      this.output.setSize(width, height);
+      this.layer.setSize(width, height);
+    }
     if (this.blurA.width !== w || this.blurA.height !== h) {
       this.half.setSize(w * 2, h * 2);
       this.blurA.setSize(w, h);
@@ -257,12 +282,17 @@ class VeilComposite {
     this.blurPass(this.blurB, this.blurA, step * 2, 0);
     this.blurPass(this.blurA, this.blurB, 0, step * 2);
 
-    this.fill.uniforms.tColor.value = hdr;
     this.fill.uniforms.tDepth.value = depthTexture;
-    renderer.setRenderTarget(this.output);
-    renderer.clear(false, true, false);
-    this.pass(this.fill, this.output);
+    renderer.setRenderTarget(this.layer);
+    renderer.getClearColor(this.clearColor);
+    const clearAlpha = renderer.getClearAlpha();
+    renderer.setClearColor(0x000000, 0);
+    renderer.clear(true, true, false);
+    renderer.setClearColor(this.clearColor, clearAlpha);
+    this.pass(this.fill, this.layer);
     renderer.render(this.scene, camera);
+    this.over.uniforms.tColor.value = hdr;
+    this.pass(this.over, this.output);
     return this.output.texture;
   }
 }
@@ -284,6 +314,9 @@ class Veil {
     this.normals = new Float32Array(this.surface.length);
     this.prevNormals = new Float32Array(this.surface.length);
     this.display = new Float32Array(this.surface.length);
+    this.jawWeight = new Float32Array(this.surface.length / 3);
+    this.jawIndex = new Int32Array(this.surface.length / 3);
+    this.jawCount = 0;
     // When the last surface came back, and how far apart they come (ms).
     this.arrival = 0;
     this.interval = 25;
@@ -404,6 +437,7 @@ class Veil {
     this.arrival = now;
     this.surfaceJawInverse.copy(this.sentJawInverse);
     this.shownGeneration = data.generation;
+    this.weighJaw();
     this.ready = true;
   }
 
@@ -455,36 +489,50 @@ class Veil {
     normal.needsUpdate = true;
   }
 
-  followJaw(jawMatrix) {
-    if (!this.ready) return;
-    this.present();
-    const { display: surface, gradient } = this;
+  // How much of each sample goes with the jaw, from how close the latest surface is to it: worked out once per surface,
+  // so a frame only moves the few samples near the jaw.
+  weighJaw() {
     const field = this.jawField;
-    const position = this.geometry.getAttribute("position");
-    const out = position.array;
-    if (!field) {
-      out.set(surface);
-      position.needsUpdate = true;
-      return;
-    }
+    if (!field) return;
+    const { surface, gradient, jawWeight } = this;
     const a = this.surfaceJawInverse.elements;
-    const b = jawMatrix.elements;
-    for (let o = 0; o < surface.length; o += 3) {
+    let count = 0;
+    for (let k = 0, o = 0; o < surface.length; k++, o += 3) {
       const x = surface[o];
       const y = surface[o + 1];
       const z = surface[o + 2];
+      const d = field.sample(
+        a[0] * x + a[4] * y + a[8] * z + a[12],
+        a[1] * x + a[5] * y + a[9] * z + a[13],
+        a[2] * x + a[6] * y + a[10] * z + a[14],
+        gradient,
+      );
+      if (d >= JAW_REACH) continue;
+      const t = Math.min(1, Math.max(0, (JAW_REACH - d) / (JAW_REACH - JAW_CONTACT)));
+      jawWeight[count] = t * t * (3 - 2 * t);
+      this.jawIndex[count++] = o;
+    }
+    this.jawCount = count;
+  }
+
+  followJaw(jawMatrix) {
+    if (!this.ready) return;
+    this.present();
+    const { display } = this;
+    const position = this.geometry.getAttribute("position");
+    const out = position.array;
+    out.set(display);
+    const a = this.surfaceJawInverse.elements;
+    const b = jawMatrix.elements;
+    for (let k = 0; k < this.jawCount; k++) {
+      const o = this.jawIndex[k];
+      const w = this.jawWeight[k];
+      const x = display[o];
+      const y = display[o + 1];
+      const z = display[o + 2];
       const qx = a[0] * x + a[4] * y + a[8] * z + a[12];
       const qy = a[1] * x + a[5] * y + a[9] * z + a[13];
       const qz = a[2] * x + a[6] * y + a[10] * z + a[14];
-      const d = field.sample(qx, qy, qz, gradient);
-      if (d >= JAW_REACH) {
-        out[o] = x;
-        out[o + 1] = y;
-        out[o + 2] = z;
-        continue;
-      }
-      const t = Math.min(1, Math.max(0, (JAW_REACH - d) / (JAW_REACH - JAW_CONTACT)));
-      const w = t * t * (3 - 2 * t);
       out[o] = x + (b[0] * qx + b[4] * qy + b[8] * qz + b[12] - x) * w;
       out[o + 1] = y + (b[1] * qx + b[5] * qy + b[9] * qz + b[13] - y) * w;
       out[o + 2] = z + (b[2] * qx + b[6] * qy + b[10] * qz + b[14] - z) * w;
