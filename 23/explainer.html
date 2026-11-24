@@ -1,0 +1,1324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Magma Flows</title>
+<meta name="description" content="How Codevember 2026 day 23, Magma, bakes ten styles of volcanic rock from a fluid simulation on a sphere, tessellates the relief adaptively in a worker, lights glowing cracks with a blackbody ramp, melts one rock into a raymarched pool and raises the next, and fills the air with heat haze, embers and simulated smoke in a shaft of light.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Cold ash and basalt around a glowing core; figures sit on a dark stage, as the rock does. */
+:root {
+  --bg: #ece7e1;
+  --panel: #f6f2ed;
+  --ink: #1c1714;
+  --muted: #685d55;
+  --line: #d9cfc6;
+  --accent: #c2410c;
+  --accent2: #9f1239;
+  --stage: #141113;
+  --stage-ink: #9d9188;
+  --stage-line: #2e2725;
+  --lava: #ff7a1a;
+  --lava2: #ffc24a;
+  --basalt: #3a3d46;
+  --cool: #a9bccf;
+  --bar: #c2410c;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --text: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #110e0d; --panel: #1b1715; --ink: #f1ebe5; --muted: #a99d93; --line: #342c28;
+    --accent: #ff8a3d; --accent2: #f06a7a; --stage: #0c0a0a; --stage-ink: #9d9188; --stage-line: #2a2321; --bar: #ff8a3d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #110e0d; --panel: #1b1715; --ink: #f1ebe5; --muted: #a99d93; --line: #342c28;
+  --accent: #ff8a3d; --accent2: #f06a7a; --stage: #0c0a0a; --stage-ink: #9d9188; --stage-line: #2a2321; --bar: #ff8a3d;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--text); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.prose ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .glow { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .glow { background: linear-gradient(100deg, var(--accent2) 5%, var(--accent) 55%, #f59e0b 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; background: var(--stage); }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; border-radius: 3px; background: var(--stage); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+.controls select { font: 400 13px/1 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 5px 6px; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+input[type="checkbox"] { accent-color: var(--accent); }
+button { font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px; padding: 9px 14px; cursor: pointer; }
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button.ghost[aria-pressed="true"] { background: var(--ink); color: var(--bg); box-shadow: none; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { padding: 7px 10px; font-weight: 400; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+.items { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.items.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.items.two { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.items.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.item { background: var(--panel); border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.item img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; background: var(--stage); }
+.item > div { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
+.item h3 { font-size: 18px; }
+.item p { font-size: 14.5px; line-height: 1.5; color: var(--muted); }
+.item small { font: 400 11.5px/1.35 var(--mono); color: var(--muted); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: pre; }
+.formula .c { color: var(--muted); }
+.table-wrap { overflow-x: auto; background: var(--panel); border-radius: 4px; }
+table { border-collapse: collapse; width: 100%; font: 400 14px/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+td.num, th.num { text-align: right; }
+td.wrap { white-space: normal; min-width: 240px; }
+tr:last-child td { border-bottom: 0; }
+td.barcell { width: 40%; min-width: 120px; }
+.bar { height: 10px; background: var(--bar); border-radius: 0 4px 4px 0; min-width: 2px; }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
+.timeline { display: grid; grid-template-columns: repeat(7, auto); gap: 0; font: 400 12px/1.3 var(--mono); border-radius: 4px; overflow: hidden; }
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+  .items.four, .items.five { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .items { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .items.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.items.two { grid-template-columns: minmax(0, 1fr); }
+  .item > div { padding: 12px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 23</b> · Magma</div>
+      <h1>How Magma <span class="glow">flows</span></h1>
+      <p class="lede">A rock of cooling crust over molten magma turns in a dark caldera. Its cracks glow and pulse, heat haze shimmers over it, embers rise, and smoke curls through a shaft of light. Every new look melts it into a sloshing pool and raises another. Here is how ten kinds of volcanic rock are baked from a fluid flowing on a sphere, how the relief becomes real geometry, how the lava is lit, and how the air around it is filled.</p>
+      <a class="live" href="./">See it live <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M3 1.8v8.4c0 .5.5.8.9.5l6.6-4.2a.6.6 0 0 0 0-1L3.9 1.3c-.4-.3-.9 0-.9.5z" fill="currentColor"/></svg></a>
+    </div>
+    <figure>
+      <img src="../screenshots/23.jpg" width="1080" height="1080" alt="A torus of dark coiled volcanic crust split by glowing orange cracks, with lit smoke curling around it and embers rising." fetchpriority="high" decoding="async">
+      <figcaption>Pahoehoe Coils on a torus: rope ridges spiralling into hot seams.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>A rock that is still cooling</h2>
+      <p>The prompt was Magma. The references were photographs of fresh lava: black crust split into plates over a glowing river, pillows of glassy rock with white-hot seams, pahoehoe wound into ropes, obsidian knapped into shells. In all of them the rock is cold and blue-black, lit by the sky, and the light comes from inside it. The piece makes one such rock at a time, in one of ten styles on one of a dozen shapes, and keeps it turning slowly in a dark room.</p>
+      <p>It renders through the <a href="../modules/pipeline/explainer.html">shared photographic pipeline</a>: soft shadows, ambient occlusion and bounce light, bloom and AgX tonemapping. What is particular to the day splits into two halves. A look is <em>baked</em>: a fluid simulation, the maps of the rock, its mesh and a few volumes around it are made once per rock and then only read. And a frame is <em>live</em>: the lava flows over the baked maps, the air glows and shimmers with it, embers fly, smoke is simulated and lit.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Once per look</b><span>Fluid on an octahedral sphere map, 78 steps · height, heat, crust, plate, normal, AO and flow maps in a 3×2 cube atlas up to 3072×2048 · an adaptive mesh, a 64³ distance field, a 48³ heat volume, a 24³ flow volume and 2048 ember emitters, built in a worker.</span></div>
+      <div class="fact"><b>Every frame</b><span>Flow-mapped lava noise on the surface · a 24³ pulse volume of the same noise in the air · heat glow and haze · 220 embers · a 48×56×48 smoke simulation · a light shaft marched at half resolution · during a change, a raymarched liquid.</span></div>
+      <div class="fact"><b>Cost</b><span>About 3.4 ms of GPU a frame at 1904×985 on a laptop RTX 4060 (high tier), 0.9 ms of it the smoke's light shaft. The bakes are sliced over ~40 frames while the rock is hidden in the pool.</span></div>
+    </div>
+  </section>
+
+  <!-- 2. Styles as baked fields -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Ten styles · <b>baker.js BAKE_SOLID_FROM_FLUID_FS</b></div>
+      <h2>Ten rocks, each one branch of a shader</h2>
+      <p>The rock is not textured with images. One full-screen fragment shader evaluates the rock analytically for every texel of an atlas and writes four numbers into a half-float target: <b>height</b> (0 to 1), <b>heat</b> (0 to about 1.25, up to 1.5 for two styles), a <b>crust</b> mask (1 where the rock is solid, 0 where it is molten) and a <b>plate id</b> (a per-cell value the material uses for colour and roughness). A style is one branch of that shader: <code>#define uStyle N</code> at the top, so each of the ten styles is its own program and only its own branch is compiled. The first style's programs compile during the loading screen; the other nine compile in the background once the page is up, so switching to a new style never stalls.</p>
+      <p>Every style works in the same coordinate: a point on the unit sphere, carried by the fluid (next section), multiplied by the style's scale and offset by a per-seed vector. On that, each builds its rock from a small kit: a two-pass Euclidean 3D Voronoi that returns the exact distance to the cell's edge (so cracks have a uniform width), an anisotropic Voronoi whose cells are stretched along a direction, four-octave fbm and ridged noise, and three layers every style shares: a macro boulder shape (fbm at 1.15, ±0.095), rock grain (fbm at 14 × scale, ±0.042) and scoria pores (ridged noise at 24 × scale, up to 0.026 deep).</p>
+      <p>The shader runs four times per texel at rotated-grid sub-texel offsets (±⅛, ±⅜ of a texel) with additive blending at ¼ weight, so the sharp crack edges are supersampled instead of aliased. Two small portability details matter here: the Voronoi and fbm loops take their bounds from uniforms that are always 1 and 4, which stops Direct3D's compiler from unrolling and inlining every loop (that made the shader take seconds to compile), and the ten programs only differ by one define.</p>
+    </div>
+    <div class="items five" id="styleGrid"></div>
+    <p class="fig-cap col">Each rendered on its own shape at the default settings of its style. The numbers are the style's base frequency on the unit sphere (times Scale) and the range of its crack or seam width, from no crust to full crust.</p>
+
+    <div class="col prose">
+      <h3>A crack, from wall to wall</h3>
+      <p>Cracked Plates shows how the four channels come out of one distance. <code>v1.x</code> is the distance from the texel to the nearest Voronoi edge. The fissure's half-width is <code>gap = mix(0.075, 0.014, crust) · (0.35 + 1.2·open + 2.6·open³) · (0.8 + 0.4·rift)</code>, where <code>open</code> is a slow fbm deciding where the rock parts into a river and <code>rift</code> is the fluid's strain. Inside it the heat climbs from a dull 0.34 at the walls to a core above 1; outside it a bevel rounds the plate's shoulder (<code>pow(bevel, 0.45)</code>) up to the plate top, which each cell tilts about its own random axis.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Cross-section of a fissure</h3>
+        <div class="controls">
+          <label>crust <input id="cCrust" type="range" min="0" max="1" step="0.01" value="0.84"><output id="cCrustO"></output></label>
+          <label>open <input id="cOpen" type="range" min="0" max="1" step="0.01" value="0.55"><output id="cOpenO"></output></label>
+          <label>lava <input id="cLava" type="range" min="0" max="1" step="0.01" value="0.6"><output id="cLavaO"></output></label>
+        </div>
+      </div>
+      <canvas id="crackFig" aria-label="A side view of two basalt plates with a lava-filled fissure between them. Below, a strip of the lava's emitted colour across the crack: dark red at the walls, orange to yellow at the core."></canvas>
+      <div class="readout"><span>gap <b id="cGap"></b></span><span>peak heat <b id="cPeak"></b></span><span>peak temperature <b id="cTemp"></b></span></div>
+      <p class="fig-cap">Top: the baked height (the plate shoulders and the low fissure floor) and the heat inside it. Bottom: the colour the material gives that heat, with the flowing lava's brightness set by the lava slider. More crust narrows the fissure toward a hairline; where the rock opens up the gap grows with the cube of <code>open</code>, into rivers.</p>
+    </div>
+
+    <div class="col prose">
+      <h3>Normals, occlusion, flow and a readback</h3>
+      <p>Three more passes follow the height. A <b>normal and AO</b> pass takes an 8-tap Sobel of the height with a strength of <code>(3.8 + 5.6·relief) · faceSize / 768</code>, and an occlusion from eight directions at 3 and 8 texels, scaled with the face size (any neighbour higher than the texel darkens it, clamped to 0.12 to 1): the crevice darkening that the screen-space AO is too coarse to find. A <b>flow map</b> at half resolution gives the direction the lava moves at every texel: the fluid's velocity projected into the surface's tangent frame (×2.2), plus the height gradient turned 90° so the lava streams along the channels (×2.6), flipped to agree with the fluid so neighbouring fissures never fight; where the sum is weak, a slow swirl takes over, so a pool is never still. Its alpha is a smooth spatial phase, so the pulses travel instead of flickering. Last, a <b>mesh info</b> pass averages height and heat over 4×4 taps into a half-resolution 8-bit target, which is read back asynchronously for the mesh worker.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The atlas of one rock</h3>
+        <div class="seg" id="atlasSeg" role="group" aria-label="Channel">
+          <button class="ghost" data-k="height" aria-pressed="true">height</button>
+          <button class="ghost" data-k="heat">heat</button>
+          <button class="ghost" data-k="crust">crust</button>
+          <button class="ghost" data-k="plate">plate id</button>
+          <button class="ghost" data-k="normal">normal</button>
+          <button class="ghost" data-k="ao">AO</button>
+          <button class="ghost" data-k="flow">flow</button>
+        </div>
+      </div>
+      <canvas id="atlasFig" aria-label="The six faces of the cube atlas in two rows of three, showing the selected channel of a Cracked Plates rock: plates, cracks and their glow."></canvas>
+      <p class="fig-cap">The Cracked Plates sphere from the gallery above, read back from the GPU (baked at 3072×2048 at capture quality, shown at 768×512). Six cube faces in two rows: +X, −X, +Y along the bottom, −Y, +Z, −Z along the top, each with 16 texels of padding so filtering and mip levels never reach across into a neighbouring face. The flow map is drawn with its tangent direction in red and green and its speed in blue.</p>
+    </div>
+  </section>
+
+  <!-- 3. Fluid -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The pattern is a fluid · <b>sim.js</b></div>
+      <h2>Plates dragged by a current</h2>
+      <p>Real lava crust is sheared and folded by the flow under it: plates stretch into lenses, ropes wind into coils, bands fold into S-curves. A Voronoi pattern on its own looks like a honeycomb. So before a rock is baked, a small fluid simulation runs on the surface of the sphere, and the pattern is drawn in the coordinates the fluid has carried.</p>
+      <p>The sphere is stored as an <b>octahedral map</b>: the sphere folded onto an octahedron and the octahedron unfolded into a square, 512×512 half-float texels (384 on low). Each step (dt 0.028) runs the classic stable-fluids passes in that square: semi-Lagrangian advection of the velocity, a little viscosity, two kinds of forcing, a divergence, three Jacobi iterations of pressure and a gradient subtraction. The forcing is what gives the rock its character:</p>
+      <ul>
+        <li><b>Curl noise.</b> The gradient of a 3D simplex noise at frequency 1.9, drifting slowly, is turned 90° in the surface's local frame. A rotated gradient has no divergence, so it swirls without bunching, with strength <code>mix(0.35, 1.35, turbulence)</code>.</li>
+        <li><b>Six thermal vortices.</b> Gaussian eddies (radius 0.34) that orbit the sphere about random axes, alternating in spin, pushing mostly sideways (1.05) and slightly outward (0.14), the upwelling that makes S-curves.</li>
+        <li><b>Limits.</b> Damping of 0.982 per 60th of a second and a speed cap of 1.2 keep it from running away.</li>
+      </ul>
+      <p>Then comes the trick. The fluid does not carry a colour or a scalar: it carries a <b>3D coordinate</b>. Every texel starts holding its own direction on the sphere, and each step looks back along the velocity and takes the coordinate found there. After the 78 steps, a texel holds the point of the sphere whose rock has flowed to it. The bake evaluates the analytic Voronoi at that point, so cracks stay razor-sharp at any resolution and only the frame they are drawn in is sheared. A blurred scalar would have smeared them.</p>
+      <p>Three details keep the coordinate field healthy. The look-back happens on the sphere, not in the map: the map's stretch jumps across the octahedron's folds, and a step taken in map space drew visible lines along them. An elastic spring pulls each coordinate back toward its rest direction by up to 10% a step, so the field never collapses into bald pools where everything came from one point. And the fluid's divergence is accumulated along the streamlines into a signed <b>strain</b> (decaying by 1.5% a step): positive where the crust is being pulled apart, negative where it is pushed together. Several styles widen their cracks with it.</p>
+    </div>
+    <div class="formula">back  = normalize(rest − (v.x·dU + v.y·dV) · dt · mix(0.06, 0.22, fluidFlow) · 2)
+coord = normalize(mix(coord(back), rest, clamp(0.65·dt, 0, 0.1)))
+strain = clamp(0.985·strain + 5·div(v)·dt·0.65, −1, 1)
+<span class="c">dU, dV: the map's own axes on the sphere at this texel; coord(back): a bilinear fetch that folds across the map's edges</span></div>
+    <div class="fig">
+      <div class="fig-head"><h3>The fluid's coordinates, from a real bake</h3>
+        <div class="controls">
+          <label>fluid flow <input id="fFlow" type="range" min="0" max="1" step="0.01" value="0.35"><output id="fFlowO"></output></label>
+          <label>pattern <select id="fPat"><option value="cells">plates</option><option value="check">checker</option></select></label>
+          <label>view <select id="fView"><option value="sphere">sphere</option><option value="map">octahedral map</option><option value="strain">strain</option></select></label>
+          <label><input id="fSpin" type="checkbox" checked> turning</label>
+        </div>
+      </div>
+      <canvas id="fluidFig" aria-label="A sphere covered in dark plates with orange cracks. At fluid flow 0 the plates are a regular Voronoi; as fluid flow rises they shear into swirls and lenses."></canvas>
+      <p class="fig-cap">The coordinate field this page's Cracked Plates sphere was baked from, read back from the GPU, sampled the way the bake shader does: <code>normalize(mix(direction, carried, fluidFlow))</code>. At 0 the plates are a plain Voronoi; turn it up and they shear into the flow. The octahedral view shows the map itself: the sphere's +Z half in the central diamond and its −Z half folded into the four corners. The strain view shows where the crust is torn apart (orange) or squeezed (blue).</p>
+    </div>
+    <div class="col prose">
+      <h3>The seams of a folded map</h3>
+      <p>An octahedral map's outer edges fold onto themselves: the point at <code>(u, 1)</code> is the same as the point at <code>(1 − u, 1)</code>. Three things make the simulation see one continuous sphere. Every neighbour lookup goes through <code>wrapOct</code>, which reflects a coordinate that leaves the square back in across the fold, and flips the sign of a velocity read there, since uv-space directions point the other way across a fold. Bilinear lookups fold each of their four taps the same way (<code>octTexel</code>), so a sample straddling an edge blends the right texels. And because the solver never forces both sides of an edge to agree, a final pass pulls each edge texel halfway to its partner across the fold, fading over a 16-texel band. After two 3×3 smoothing passes that remove texel stair-steps in strong shear, the field is done: about 12 ms of GPU time in total, run in slices of 8 steps a frame.</p>
+      <p>The fluid is not run while you watch. The pattern is developed once per look, and the motion you see is the lava flowing over the baked map: the next sections.</p>
+    </div>
+  </section>
+
+  <!-- 4. Atlases and mesh -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Shapes and tessellation · <b>meshData.js, meshWorker.js, geometry.js</b></div>
+      <h2>Relief you can see in silhouette</h2>
+      <p>A normal map can make a sphere look cracked until it reaches the edge, where it is still a sphere. Here the plates stand up from the surface and the fissures sink into it: the rock's relief is real geometry, up to 0.175 units from trough to crest on a rock of radius 1.36. Making that affordable is the job of two choices, the atlas each shape is mapped with and an adaptive mesh.</p>
+      <p><b>Radial shapes use a cube atlas.</b> The sphere, the boulder (ten random cutting planes, smoothly unioned), the meteorite (a lumpy body scooped by 34 thumbprint dents), the rounded cube (an L<sup>4.6</sup> ball), the crystal (a hexagonal prism with pyramid caps), the dodecahedron, the icosahedron and the spiky star are all star-shaped: every direction from the centre meets the surface once. So each is a function from a direction to a radius, and all of them share the sphere's atlas: six cube faces, each mapped to the sphere by the spherified-cube formula (<code>x·√(1 − y²/2 − z²/2 + y²z²/3)</code>), which spreads texels far more evenly than normalising the cube.</p>
+      <p><b>Tubes use a periodic atlas.</b> The torus (radii 0.98 and 0.44), the twisted ring (a rounded-triangle section that turns as it goes round) and the trefoil knot (a tube of 0.3 along the knot) are not star-shaped. Each is parametrised by two angles, both of which wrap, so the whole 3072×2048 target is one tile that repeats in both directions with no seams. The fluid is still sampled on the sphere, by the tube point's direction from the centre, so the pattern is continuous on them too. Suzanne is a special case: a sphere grid shrink-wrapped onto her distance field (96×96 per face) lets her reuse the cube atlas. She is being rebuilt as this is written.</p>
+      <p><b>The mesh is a quadtree per face</b>, built in a worker from the height read back from the bake. A cell is split while its flat patch misses the displaced surface by more than a tolerance in world units: the height inside it is sampled on a k×k grid (k from 3 to 8, by the cell's size in texels), compared with the bilinear blend of its corners and multiplied by the displacement amplitude <code>0.04 + 0.135·relief</code>. Above depth 7 the base shape's own sag counts too, so the faceted shapes keep their edges. Triangles gather on crack walls, plate edges and terrace risers, and flat slabs stay lean.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>An adaptive quadtree over cracked plates</h3>
+        <div class="controls">
+          <label>tolerance <input id="qTol" type="range" min="0" max="1" step="0.01" value="0.55"><output id="qTolO"></output></label>
+          <label><input id="qBal" type="checkbox" checked> 2:1 balance</label>
+          <label><input id="qWire" type="checkbox" checked> triangles</label>
+        </div>
+      </div>
+      <canvas id="quadFig" aria-label="A square of dark plates with bright cracks, overlaid by a mesh: tiny triangles along the cracks, big squares over the flat plates."></canvas>
+      <div class="readout"><span>leaves <b id="qLeaves"></b></span><span>triangles <b id="qTris"></b></span><span>uniform grid at the same depth <b id="qUni"></b></span></div>
+      <p class="fig-cap">The same rule on a 256×256 height field, down to 2-texel cells. Each cell is split while the height inside strays from the corners' bilinear blend by more than the tolerance. With balance on, no cell is more than one level from its neighbours, and a cell whose neighbour is split becomes a fan of triangles around its centre, so no vertex sits on another triangle's edge and the mesh has no cracks.</p>
+    </div>
+    <div class="col prose">
+      <p>The details that make it hold together on a closed surface:</p>
+      <ul>
+        <li><b>Shared borders.</b> The cells along a face's border stay at a fixed depth (the maximum minus 2), so neighbouring cube faces, and the wrapped edges of a tube, produce the same vertices on their common edge. The ring just inside is capped one level deeper, so balancing never splits a border cell.</li>
+        <li><b>A budget.</b> The tree is planned first without building anything. Over budget, it gives up one level of depth and raises the tolerance by 25%, up to four times. High allows 1.5 million triangles (depth 9, tolerance 0.0018), capture 2.5 million (0.0012), medium 350,000 (depth 8, 0.004), low 150,000 (depth 7, 0.007). A Pillow Lava boulder comes out at about 606,000 triangles on high and 175,000 on medium.</li>
+        <li><b>Displacement LOD.</b> Each vertex stores its cell's size in texels. The vertex shader reads the height at the mip level of that size, <code>textureLod(height, uv, log2(max(cellTexels, 4)))</code>, so a vertex carries the relief its triangles can hold, never sharper than 4 texels, and the detail finer than that is left to the normal map. Without it, a big flat cell's corner could land on a crack and pull a long spike out of the slab.</li>
+        <li><b>Geometry detail</b> (the panel slider) slides from the tier's full tessellation down to three levels shallower and an 8× looser tolerance, leaving the rest to the normal map.</li>
+      </ul>
+      <p>The worker also builds what the air needs from the same mesh: a 64³ signed distance field of the shape over a 4-unit box (exact for the torus, from 160 segments for the knot, along the ray for star-shaped ones), a 48³ heat volume (each triangle's heat times its area splatted into the grid, then blurred near and far), a 24³ flow volume (the heat-weighted lava direction and phase around each point) and 2048 ember emitters picked with probability proportional to heat². The arrays come back as transferable buffers, and the new mesh's attributes are uploaded one per frame, with a 3-vertex draw, while it is still hidden, so its first visible frame doesn't stall.</p>
+    </div>
+    <div class="items two">
+      <article class="item"><img src="explainer/wire.jpg" alt="Wireframe close-up of a Pahoehoe Coils torus: dense triangles along every glowing seam and rope ridge, larger ones on the smooth lobes." loading="lazy" width="720" height="720"><div>
+        <h3>W: the adaptive wireframe</h3>
+        <p>A Pahoehoe Coils torus up close: dense along the seams and ropes, coarser on the smooth lobes.</p>
+      </div></article>
+      <article class="item"><img src="explainer/wire-shaded.jpg" alt="The same close-up shaded: dark coiled crust with glowing seams between the lobes." loading="lazy" width="720" height="720"><div>
+        <h3>The same view, shaded</h3>
+        <p>The mesh carries the lobes and seams; the normal map adds the finer ropes and grain.</p>
+      </div></article>
+    </div>
+  </section>
+
+  <!-- 5. Material -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Shading · <b>material.js, lava.js</b></div>
+      <h2>Cold rock, hot light</h2>
+      <p>The rock is a <code>PipelineMaterial</code> whose <code>surface()</code> reads the baked maps. The crust is nearly black and a little cool: each style has its own base, from Cracked Plates' blue-black basalt (0.011, 0.013, 0.018 linear) to Charred Grain's charcoal grey, varied by the plate id by ±28%, dusted with ash on the crests, and scorched a quarter darker along hot cracks. Roughness runs from 0.86 to 0.08 with Gloss. The key light is tinted cool (<code>0xe2e5ec</code>) and comes from the upper left, so black-blue rock against orange lava reads as temperature, the way it does in a photograph at dusk.</p>
+      <p>The molten part has an almost black albedo (0.012, 0.004, 0.002): everything it shows is emission. Its temperature is built in layers:</p>
+      <ul>
+        <li><b>Flow.</b> The baked heat is modulated by the flowing lava: <code>mix(0.28, 1.38, lava)</code> where <code>lava</code> is the flowing noise below, so it brightens and darkens as the pattern drifts along the cracks.</li>
+        <li><b>Skin.</b> Where the flowing noise is dark (<code>smoothstep(0.5, 0.15, lava)</code>), a cooling skin forms: 55% cooler, rougher, like the black film that drifts on real lava. A floor of 0.45 keeps the lava against the crust a dull crimson instead of black.</li>
+        <li><b>Hierarchy.</b> A broad static noise (at 0.16 of the object's scale) makes some fissures run hot (×1.45) and others dim (×0.6), so the rock doesn't glow evenly everywhere.</li>
+        <li><b>Core.</b> Across a crack, the edges stay a deeper red (×0.62) and a thin core above heat 0.7 burns yellow-orange; heat above 1.2, which the styles bake down the middle of wide seams, runs white-yellow.</li>
+        <li><b>Heat</b> (the slider) scales it all by <code>mix(0.32, 1.24, heat)</code>.</li>
+      </ul>
+      <p>The temperature goes through a five-stop ramp. It is not a physical blackbody, which would need a huge range to read: it is tuned for the tonemapper. Saturated red at the dim end turns pink once AgX brightens it, so the bright end gains green and goes orange, and only small cores reach the white-yellow last stop.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>From heat to light</h3>
+        <div class="controls">
+          <label>baked heat <input id="bHeat" type="range" min="0" max="1.5" step="0.01" value="0.75"><output id="bHeatO"></output></label>
+          <label>flowing lava <input id="bLava" type="range" min="0" max="1" step="0.01" value="0.6"><output id="bLavaO"></output></label>
+          <label>Heat <input id="bH" type="range" min="0" max="1" step="0.01" value="0.78"><output id="bHO"></output></label>
+        </div>
+      </div>
+      <canvas id="rampFig" aria-label="A colour ramp from black through crimson, red-orange and orange to yellow-white, with the five stops marked, and a marker at the temperature the sliders produce, beside a swatch of that colour."></canvas>
+      <div class="readout"><span>skin <b id="bSkin"></b></span><span>temperature <b id="bTemp"></b></span><span>emission <b id="bRgb"></b></span></div>
+      <p class="fig-cap">The ramp's stops are linear HDR colours: <code>(0.25, 0.006, 0)</code> at 0.05–0.22, <code>(1.3, 0.11, 0)</code>, <code>(3, 1.28, 0)</code>, <code>(7, 3.8, 0.18)</code> and <code>(16, 11, 2.6)</code> reached at 1.32, drawn here through a simple display curve. The sliders run the material's layers for a texel in the middle of a settled crack.</p>
+    </div>
+    <div class="col prose">
+      <h3>Lava that flows over a still map</h3>
+      <p>The maps don't move, but the lava does. A 512×512 tileable noise texture (three channels: a domain-warped billow, a ridge and a fine grain) is sampled triplanar in object space, so it has no seams on any shape, and pushed along the baked flow direction. A flow map can only push a texture so far before it stretches, so it is done twice with two phases half a cycle apart: each phase slides the noise from −½ to +½ of the flow vector and jumps back, and the two are cross-faded with a triangle weight that is zero for each exactly when it jumps. A broad and a medium layer (1.75× finer, pushed 1.25× further) are summed and remapped with <code>smoothstep(0.18, 0.84)</code>. The cycle runs at 0.32 per unit of flow time, which advances at <code>0.2 + 1.2·flow</code> a second, eased so a new look never jumps in pace.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Two phases, cross-faded</h3>
+        <div class="controls">
+          <label><input id="pBoth" type="checkbox" checked> both phases</label>
+          <label>speed <input id="pSpeed" type="range" min="0" max="1" step="0.01" value="0.5"><output id="pSpeedO"></output></label>
+        </div>
+      </div>
+      <canvas id="phaseFig" aria-label="A strip of lava noise drifting to the right, and below it two sawtooth phase curves and their triangular cross-fade weights over time."></canvas>
+      <p class="fig-cap">Above: the noise pushed along a flow to the right. Below: the two phases (sawtooths half a cycle apart) and the weight of each. Turn one phase off and you see the jump a single flow-mapped texture makes every cycle; with both, each jump happens while its phase is invisible.</p>
+    </div>
+    <div class="col prose">
+      <h3>Light that the lava throws</h3>
+      <p>Lava lights the rock around it. Three terms are added to the emission of the crust, all stylised but all driven by real data. Crack walls and crevices take light from the heat a few texels around, read from a blurred mip (level 2.5) of the heat channel, strongest on steep walls and low down, so plate tops stay dark. Rims along hot cracks get a red bounce. And the crust picks up the heat volume's light, the same 48³ volume the air glow uses, multiplied by the pulse volume (see the air below), so a patch of rock next to a river brightens and dims as the lava under it flares. Obsidian adds tiny ember flecks inside its glass, Ropy Strands keeps its lava threads hot down their middle whatever the skin does, and Marbled Glass gets one clear coat (roughness 0.03) over a second, softer layer of fire seen through the glass at a view-dependent offset of 0.006, so the fire has depth.</p>
+      <p>One shared change came out of this day. The pipeline used to cut the key light at the geometric terminator: a back face got no key, even where the normal map tilted toward the light. With relief this strong that drew a hard line across the plates near the edge of the light. The key now fades over a short band past the terminator (<code>smoothstep(−0.2, 0, N·L)</code>), identical wherever the shading normal is the geometric one, so earlier days are unaffected.</p>
+    </div>
+  </section>
+
+  <!-- 6. Transitions -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Changes · <b>main.js stepLook, morph.js, lava.js MORPH_GLSL</b></div>
+      <h2>Melt, pool, recompose</h2>
+      <p>A new look is a new fluid, new maps, a new mesh and new volumes: far too much to swap under the viewer's eyes, and a cut would look like a glitch. So the rock melts. Each change runs through seven phases, and the rock on show keeps every one of its old values until the liquid has taken it over:</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A change, in two dimensions</h3>
+        <div class="controls">
+          <button id="mPlay">Play</button>
+          <label>time <input id="mT" type="range" min="0" max="8.3" step="0.01" value="0"><output id="mTO"></output></label>
+        </div>
+      </div>
+      <canvas id="morphFig" aria-label="A crusted rock shape that melts from its low ground, collapses into a sloshing pool of lava, and rises into a ring shape that cools back into crust. A timeline below marks the seven phases."></canvas>
+      <div class="readout"><span>phase <b id="mPhase"></b></span><span>shown by <b id="mBy"></b></span></div>
+      <p class="fig-cap">The same field as the raymarched liquid, in a 2D slice: shape A sags and shrinks into a growing pool with a smooth minimum, the pool sloshes with damped squash and stretch, and shape B rises out of it. The crust melts from the low ground up and cools back in reverse.</p>
+    </div>
+    <div class="col prose">
+      <ul>
+        <li><b>Melt (1.4 s).</b> The crust liquefies on the mesh itself: a texel melts when <code>uMelt · 1.3</code> passes <code>0.7·height + 0.3·lava</code>, so the fissure floors go first and the peaks last, the normal map flattens, and the displacement sinks to nothing. Over the last 45% the lava pattern turns <em>neutral</em> (below). The fluid for the new look already develops, in slices, in the background.</li>
+        <li><b>Hand in (0.3 s).</b> A raymarched liquid fades in over the mesh, which is then hidden.</li>
+        <li><b>Collapse (1.1 s).</b> The shape sags (shrinks by 30% and drops by 0.3) into a pool that swells inside it, joined by a smooth minimum, so the liquid keeps its volume instead of shrinking and popping back. Embers spit off the surface.</li>
+        <li><b>Slosh (at least 1.2 s).</b> A wobbling ellipsoid: damped side-to-side motion and squash and stretch (energy <code>0.35 + 0.65·e<sup>−1.1t</sup></code>, ω 4.6), plus ±0.05 of surface noise. Meanwhile the new look is baked in slices and its mesh is built in the worker. The pool's radius eases to 0.9 of the new shape's volume radius, so it already holds the right amount of lava. It waits for the mesh.</li>
+        <li><b>Recompose (1.4 s).</b> The new shape grows out of the pool, from 45% of its size and lowered, joined to the draining pool.</li>
+        <li><b>Hand out (0.3 s).</b> The new mesh appears, fully molten, under the fading liquid.</li>
+        <li><b>Cool (2.6 s).</b> The melt runs backwards: the peaks crust over first and the fissures last.</li>
+      </ul>
+      <p>Measured on high, a change from one idle rock to the next takes 8.9 s, with the new mesh built in 1.7 s while the pool sloshes. Auto change waits for it to finish before it counts toward the next one.</p>
+    </div>
+    <div class="items four">
+      <article class="item"><img src="explainer/melt.jpg" alt="A torus seen edge-on, its crust melted into bright orange lava swirled with the neutral flowing pattern." loading="lazy" width="600" height="600"><div><h3>Melt</h3><small>melt 0.7, pattern going neutral</small></div></article>
+      <article class="item"><img src="explainer/pool.jpg" alt="A blob of glowing molten lava sloshing in the middle of the frame, wreathed in lit smoke." loading="lazy" width="600" height="600"><div><h3>Pool</h3><small>slosh, the new look baking</small></div></article>
+      <article class="item"><img src="explainer/rise.jpg" alt="A molten boulder rising out of the pool, all bright lava, throwing off embers." loading="lazy" width="600" height="600"><div><h3>Rise</h3><small>recompose, handed to the mesh</small></div></article>
+      <article class="item"><img src="explainer/cool.jpg" alt="The new boulder cooling: dark pillow crust forming on its crests while the low ground is still bright lava." loading="lazy" width="600" height="600"><div><h3>Cool</h3><small>melt 0.7, crests first</small></div></article>
+    </div>
+    <div class="col prose">
+      <h3>A liquid that is a distance field</h3>
+      <p>The liquid is not a mesh. A full-screen pass sphere-traces the morph field in the rock's object space, inside a bounding sphere sized to where the surface can be, for up to 96 steps. Both shapes' fields come from the worker's 64³ distance volumes. Evaluating the pool's noise and the smooth minimums at every step would be costly, and three passes need the field (the liquid, the haze and the light shaft), so once a frame it is baked into an atlas of 64 z slices (8×8 tiles of a 512² half-float target, within about 0.005 of the exact field). The march takes its big steps from the atlas and switches to the exact field near the surface. Near misses are remembered: the closest a ray came, relative to its pixel footprint, becomes the silhouette's coverage, so the liquid's edge is antialiased without MSAA. The normal is a four-tap tetrahedral gradient, and the shading is the same lava as the rock's, with a soft key highlight and a rim.</p>
+      <h3>Keeping the pattern continuous</h3>
+      <p>A hand-off between two renderers only works if they agree. The flowing lava lives in one GLSL chunk shared by the material and the march. During the melt the rock's pattern cross-fades to a <em>neutral</em> one that needs no baked flow map: the noise pushed along <code>cross(n, up) · 0.9</code> with a phase of 0.5, which the march can reproduce exactly. The flow slows to 45% while the rock is liquid, so the pattern holds together. In the pool, the pattern is read at the liquid's rest position (the point before the slosh's offset and squash), so it rides the wobble instead of the surface swimming through it. The old look's scale and seed are captured when the melt starts; once the new look is ready the liquid cross-fades to the new look's over 1.6 s while it churns, and the new rock appears with exactly that pattern before its own flow map fades back in during the cooling.</p>
+    </div>
+  </section>
+
+  <!-- 7. Air: glow and haze -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Heat in the air · <b>glow.js, pulse.js</b></div>
+      <h2>Glow that pulses with the flow</h2>
+      <p>Three things happen to the air around hot rock: it glows, it shimmers, and both follow the lava. The glow has two parts. A <b>scatter</b> takes only the warm part of the lit image (red minus 1.3 × blue, soft-kneed so the white cores don't dominate) and spreads it through a five-level mip pyramid, a 13-tap downsample and a 9-tap tent upsample whose radius and weight grow with Glow spread: a wide, smooth halo with no streaks. A <b>haze</b> is marched in 3D: 18 jittered steps per half-resolution pixel through a sphere of radius 2.25 around the rock, in the rock's own frame, counting only the air outside the shape. The air's density is the heat volume squared (so air over the big rivers stands out from the thin glow around scattered cracks), deep red where thin and orange where dense, and while the rock is molten an even shell glows all around it.</p>
+      <p>The haze is sharp-edged where the rock is, but the glow must not step at the silhouette. So it is integrated twice, over all the air along the ray and only the air in front of the rock, and a pixel blends from one to the other by how much of a ring of 8 taps around it sees past the rock. Over the rock's face the glow is also held back to 20%, judged over a wide ring of 17 depth taps, since glow over the crust would lift its blacks and flatten it.</p>
+      <p>The <b>shimmer</b> is the haze's alpha: the hot air along the ray, including the heat from below each point (five taps 0.14 apart, weighted down with height, baked into a 48³ atlas each frame), so plumes of shimmer stand over the lava instead of hugging it. The final composite offsets its lookups by two octaves of noise scrolling upward, stretched into vertical streaks, by up to 0.006 of the screen times Heat haze. The image, the shaft and the glow are all read through the same offset, so the rock's edge and its glow wobble together.</p>
+      <h3>The pulse volume</h3>
+      <p>A static heat volume makes a static glow, which looked painted on next to the flowing lava. The fix is a second volume, 24³, recomputed on the GPU each frame: for each voxel, find the nearest point of the surface (step down the distance field's gradient), take the lava's flow direction and phase there from the flow volume, and evaluate the same flowing noise the surface shows at that point. Divided by its average (0.32), it says how bright the lava under this bit of air is right now. The glow, the haze's density, the shimmer's plumes, the crust's spill light and the smoke's emission all multiply the heat volume by it, so they flare and drift with the flow. While only time moves, half of its layers are refreshed per frame, alternating; nothing updates while paused.</p>
+    </div>
+    <div class="formula">air(p) = heat(p) · pulse(p)          <span class="c">heat: 48³, baked per look   pulse: 24³, per frame</span>
+pulse(p) = lavaBrightness(surface(p), flow(p), phase(p), time) / 0.32
+haze density = surfaceGlow · air² + shell(melt)     glow ×(1 − 0.8·cover)</div>
+  </section>
+
+  <!-- 8. Embers -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Embers · <b>embers.js, emberLight.js</b></div>
+      <h2>Sparks off the brightest lava</h2>
+      <p>220 embers (90 on low) are simulated on the CPU and drawn as one instanced mesh of tiny spheres, each glowing through its own small blackbody ramp. An ember starts at one of the 2048 emitters, but not just any: a few times a second the pulse at every emitter is read back asynchronously (a 64-wide strip of bytes), and a spawn rejects emitters until it finds one whose lava is bright now, so sparks leave where the flow flares. It launches 0.1 above the surface at 0.12–0.37 along the normal plus a lift, inheriting the speed of the rock's surface where it was born, and lives 2.5 to 6 seconds.</p>
+      <p>The air is the curl of a vector potential made of ten drifting plane waves: <code>ψ = Σ A sin(k·p + ωt + φ)</code> has the closed-form curl <code>Σ cos(k·p + ωt + φ) (k × A)</code>, divergence-free and full of eddies, cheap enough for every ember every frame. The air takes hold of a new ember over about half a second (it first flies straight off the rock), buoyancy of <code>0.34(1 − age) + 0.12</code> fades as it cools, and a quadratic drag kills any speed beyond the air's within a fraction of a second, so a shove from the rock becomes a drift. Embers collide with the rock through its distance field, read trilinearly from the half floats with a lookup table: a soft cushion 0.08 thick pushes them out, the velocity into the surface is removed relative to the surface's own motion, and a hard floor keeps them above the plate tops. A turning rock sweeps them aside.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Embers in curl-noise air</h3>
+        <div class="controls">
+          <label>spin <input id="eSpin" type="range" min="0" max="3" step="0.01" value="0.6"><output id="eSpinO"></output></label>
+          <label><input id="eCol" type="checkbox" checked> collide</label>
+        </div>
+      </div>
+      <canvas id="emberFig" aria-label="A dark rounded rock with glowing spots, turning, with orange sparks leaving the spots and rising in curling paths around it."></canvas>
+      <p class="fig-cap">A 2D version of the same rules: launch from hot spots with the surface's speed, divergence-free air from six plane waves, buoyancy fading with age, quadratic drag toward the air, and a distance-field cushion around a turning rock. Spin it fast and the rock flings them; turn collision off and they pass through it.</p>
+    </div>
+    <div class="col prose">
+      <p>Embers also light the smoke. Every frame each live ember's glow is splatted on the CPU as a Gaussian (σ 0.22) into a grid of 0.25-unit cells over the smoke's box, 26×30×26, only over the 4 cells per axis it reaches, and written as an 8-bit 3D texture with a saturating curve (<code>255·s / (s + 1.5)</code>) so a cluster reads brighter than one spark without clipping. Only the box of cells touched last frame is cleared. The light-shaft march reads it once per pixel, at the depth where the smoke mostly is: a puff that a few sparks pass through lights up, and a spark crossing a billow drags a warm patch with it.</p>
+    </div>
+  </section>
+
+  <!-- 9. Smoke -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Smoke · <b>fumes.js, modules/fumes/SmokeGrid.js, shaft.js</b></div>
+      <h2>Smoke the rock stirs</h2>
+      <p>The room is full of smoke, lit by a shaft from high above and a little behind (<code>(−0.3, 1, −0.45)</code>), and by the lava from below. It is a real fluid: stable fluids on a 48×56×48 grid of 0.133-unit cells fixed in the room (32×38×32 of 0.2 on medium), spanning 6.4 units across and 7.5 up. The solver is shared with <a href="../10/explainer.html">day 10</a>'s acid fumes, moved into <code>modules/fumes/SmokeGrid.js</code> for this day: the grid's z slices are tiled into one 2D texture (8×6 tiles, 384×336 texels), so each pass is a single full-screen draw. A step is the day's obstacle pass, advection, the day's forces, vorticity confinement, a divergence, 16 Jacobi iterations of pressure (10 on medium), warm-started from the last step, and a projection that makes the flow divergence-free around the obstacle. It steps at 75 to 30 Hz, owed time carried over, at most two steps a frame.</p>
+      <p><b>The rock is the obstacle.</b> Its cells hold the morph field (so the smoke follows the melt, the pool and the new shape) and the velocity of the rock's surface, <code>ω × p</code>, with ω measured from the rock's turn since the last frame. The pressure is mirrored at it, so no air passes through, and the air in a thin shell around it is dragged along with its surface (rate 12). Turning the rock stirs the room, and flinging it throws the smoke off.</p>
+      <p><b>The forces.</b> The air relaxes toward a draught (0.22 up, 0.05 sideways at the Draught heading, 53° by default). The hot rock adds an updraft from its heat volume, the lava's smoke rises on buoyancy that saturates as it thickens, and the smoke thins at <code>0.45 / lifetime</code> a second. Smoke is given off where the surface below a cell is hot (heat × pulse again), from spots that flare and fade (two scrolling noise lookups), more from its underside when Plumes are on, with a push outward and a stir. Density is advected with a MacCormack correction, which keeps the puffs crisp on a coarse grid.</p>
+      <h3>Two layers</h3>
+      <p>A 48-cell grid can't hold wisps. So what you see is two layers, both drawn from a 64³ tileable noise made on the CPU at load (R a domain-warped four-octave fbm for billows, G a finer one, B and A the warp):</p>
+      <ul>
+        <li><b>Room smoke</b>: the static billows, read through a field of offsets that the flow carries. A carry pass after each step advects how far the flow has moved the air at each cell from where the draught alone would have taken it, capped at 0.9 and healing back at 8% a second. The billows stay crisp noise, but they swirl round the rock and get thrown when it turns.</li>
+        <li><b>Lava smoke</b>: the sim's own density, drawn either as thin curling sheets (where the fine noise crosses its middle) or, with Plumes, as puffs: the density eroded by billow noise and finer detail, so they have dense cores, torn rolling rims and clear air between.</li>
+      </ul>
+    </div>
+    <div class="items">
+      <article class="item"><img src="explainer/start.jpg" alt="The default view: a cracked rock in a dark room, with grey smoke lit by a shaft from above and warm puffs rising from the lava." loading="lazy" width="600" height="600"><div><h3>Default</h3><p>Room smoke and plumes, lit by the shaft and the lava.</p></div></article>
+      <article class="item"><img src="explainer/wisps.jpg" alt="The same scene with thin curling wisps of smoke instead of thick puffs." loading="lazy" width="600" height="600"><div><h3>Plumes 0</h3><p>The lava's smoke as thin wisps, in calmer air.</p></div></article>
+      <article class="item"><img src="explainer/nosmoke.jpg" alt="The same scene with no smoke: the rock with only its glow, embers and haze against black." loading="lazy" width="600" height="600"><div><h3>Light shaft 0</h3><p>No smoke: just the glow and the haze.</p></div></article>
+    </div>
+    <div class="col prose">
+      <h3>The light shaft</h3>
+      <p>The smoke is marched at half resolution, 14 steps a pixel through a sphere of radius 4.5 around the rock. Steps are not spaced evenly: they are taken evenly in angle as seen from the rock, <code>t = t<sub>c</sub> + 1.8·tan θ</code> around the ray's closest approach, so they bunch where the smoke is dense and lit and spread out far away. At each step the shaft (a soft cylinder of radius 1.5) is checked against the rock's shadow by sphere-tracing the morph field toward the light (up to 6 steps, skipped when the ray toward the light clears the field's bounds), each puff is self-shadowed by one tap of the billow toward the shaft and one toward the lava, and the lava's warm light falls off with distance to the rock, strongest on its own fresh smoke. The output is four numbers: cool light, warm light, transmittance and the mean depth of the smoke.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Where the 14 steps go</h3>
+        <div class="controls">
+          <label>ray height <input id="sY" type="range" min="-3" max="3" step="0.01" value="0.6"><output id="sYO"></output></label>
+          <label><input id="sUni" type="checkbox"> even spacing</label>
+          <label><input id="sJit" type="checkbox" checked> jitter</label>
+        </div>
+      </div>
+      <canvas id="shaftFig" aria-label="A side view: the camera on the left, a ray crossing the smoke volume, the rock at the centre with a beam of light falling on it from above and its shadow below. Dots along the ray mark the march steps, bunched near the rock."></canvas>
+      <p class="fig-cap">Side view of one pixel's ray. The steps crowd around the closest approach to the rock, where the shaft, its shadow and the warm light all change fastest, and leave the far smoke to a few long steps. With jitter, the steps shift each frame; the temporal resolve averages them.</p>
+    </div>
+    <div class="col prose">
+      <p>Fourteen jittered steps are noisy. The jitter is interleaved gradient noise, shifted every frame over a 64-frame cycle, and a temporal resolve blends each frame into the last at 20%: last frame's result is reprojected <em>at the smoke's mean depth</em> (a pixel of smoke has no surface, but it has a depth where most of its light comes from), and clamped to the 3×3 neighbourhood's mean ±1.25 standard deviations so moving smoke doesn't ghost. A paused frame settles to a clean image. The composite veils the scene behind the smoke by half its transmittance, then adds the cool light (0.64, 0.66, 0.71) and the warm (0.22, 0.04, 0.003).</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Smoke panel</th><th class="num">Range</th><th class="num">Default</th><th>What it changes</th></tr></thead>
+        <tbody>
+          <tr><td>Light shaft</td><td class="num">0–2</td><td class="num">1</td><td class="wrap">The whole smoke and its light; 0 skips the simulation.</td></tr>
+          <tr><td>Room smoke</td><td class="num">0–2</td><td class="num">1</td><td class="wrap">Density of the room's billows.</td></tr>
+          <tr><td>Room billow size</td><td class="num">0.5–2</td><td class="num">1</td><td class="wrap">Scale of the billow noise, its drift kept continuous.</td></tr>
+          <tr><td>Plumes</td><td class="num">0–2</td><td class="num">1</td><td class="wrap">Thick fast puffs, stronger buoyancy (0.8 + 1.4·p) and vorticity (5 + 7·p); 0 gives wisps.</td></tr>
+          <tr><td>From the lava · From underneath</td><td class="num">0–3</td><td class="num">1</td><td class="wrap">Emission from the hot cracks, and the hot air rising off the underside.</td></tr>
+          <tr><td>Rise speed</td><td class="num">0.2–3</td><td class="num">1</td><td class="wrap">Buoyancy and the rock's updraft.</td></tr>
+          <tr><td>Turbulence</td><td class="num">0–3</td><td class="num">1</td><td class="wrap">Vorticity confinement.</td></tr>
+          <tr><td>Density · Lifetime</td><td class="num">0.2–3 · 0.25–4</td><td class="num">1</td><td class="wrap">Thin wisps to thick smoke; how long the lava's smoke lasts.</td></tr>
+          <tr><td>Draught · heading</td><td class="num">0–4 · 0–360°</td><td class="num">1 · 53°</td><td class="wrap">The room's air current.</td></tr>
+          <tr><td>Lava light · Ember light</td><td class="num">0–3</td><td class="num">1</td><td class="wrap">Warm light on the smoke from the lava and the embers.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 10. Performance -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Performance · <b>measured with timer queries</b></div>
+      <h2>Bake once, read cheaply</h2>
+      <p>Most of the work is done once per look and spread so it never holds up a frame:</p>
+      <ul>
+        <li><b>Sliced bakes.</b> A bake is a generator that yields between slices, and the render loop advances it one slice a frame while the rock is hidden in the pool. The fluid runs 8 steps a slice (about 1.05 ms of GPU each, ten slices); the height pass runs in six horizontal bands per sub-sample (24 slices of about 1.8 ms on high, 16 of 0.7 ms on medium); normals in six bands of 0.13 ms; then the flow map and the readback pass (2.7 ms). About 60 ms of GPU work over some 40 frames, none of them longer than 3 ms. Mipmaps are generated once, after the last band.</li>
+        <li><b>Ahead of time.</b> The new look's fluid starts developing during the melt, before the rock is even hidden.</li>
+        <li><b>Asynchronous readbacks.</b> The mesh info and flow (1536×1024 each on high) and the ember probe are read with <code>readRenderTargetPixelsAsync</code>, so the CPU never waits on the GPU; a newer bake simply discards an older one's data.</li>
+        <li><b>A worker for geometry.</b> The quadtree, the volumes and the emitters are built off the main thread, in about 1.7 s on high.</li>
+        <li><b>Baked fields.</b> The morph field (64 slices, one pass a frame only during a change), the rising heat for the shimmer (48 slices) and the ember light (a CPU splat) are baked into textures rather than evaluated per sample by the three passes that read them.</li>
+        <li><b>Programs.</b> The fluid and the first style's bake compile in parallel during load; the other styles' height programs compile in the background.</li>
+        <li><b>Tiers.</b> Medium halves the atlas (1536×1024), coarsens the smoke grid and the mesh; low keeps the static smoke (no simulation), runs 42 fluid steps on a 384² map and flies 90 embers.</li>
+      </ul>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>GPU per frame, idle</th><th class="num">ms</th><th>Share</th></tr></thead>
+        <tbody id="perfRows"></tbody>
+      </table>
+    </div>
+    <p class="fig-cap col">A Pillow Lava boulder (606,000 triangles) at 1904×985 on a laptop RTX 4060, high tier, mean over 253 frames with WebGL timer queries. During the pool the rock's passes vanish and the raymarched liquid takes their place (0.93 ms) for about the same total, 3.4 ms. A star in Ropy Strands at 715,000 triangles costs 4.9 ms, 1.4 ms of it the rock's main pass.</p>
+  </section>
+
+  <!-- 11. Sound -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Sound · <b>sound.js</b></div>
+      <h2>A drone under the rock</h2>
+      <p>The soundtrack is a dark, minimalist drone made with Lyria 3.5. It is downloaded in full behind the loading pill (a load step of its own), so the first note never waits on the network, and plays from a looping media element through its own Web Audio gain bus. Nothing sounds until the first frame is drawn. Each visit joins the drone at a random point in its first minute and fades in over about four seconds; if the browser hasn't allowed audio yet, it starts on the first click, tap or key. Pausing or muting fades it out in 0.3 s before the element pauses, and recordings (<code>?capture</code>) load nothing at all.</p>
+    </div>
+  </section>
+
+  <!-- 12. Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Controls</div>
+      <h2>Turning the rock</h2>
+      <p>Dragging turns the rock itself, not the camera, so the air, the embers and the haze stay where they are around it; it keeps its momentum and returns to its slow spin. While paused, dragging orbits the camera instead, to look around the frozen scene. Randomizing always picks another style and another shape, sets each slider near its style's own profile, and leans toward many embers.</p>
+    </div>
+    <ul class="keys">
+      <li><b>Drag</b> turn the rock</li>
+      <li><b>Scroll / pinch</b> zoom</li>
+      <li><b>R</b> a new rock</li>
+      <li><b>W</b> adaptive wireframe</li>
+      <li><b>M</b> sound on and off</li>
+      <li><b>Space</b> pause</li>
+      <li><b>F</b> fullscreen</li>
+      <li><b>Tab</b> hide the interface</li>
+    </ul>
+  </section>
+
+  <footer class="col">
+    <div class="meta">
+      <span><b>three.js</b> r187</span><span>WebGL2</span><span>photographic pipeline</span><span>fluid-advected bakes</span><span>stable-fluids smoke</span><span>started in <b>Antigravity</b> with Gemini 4 Neon, finished in <b>Claude Code</b> with Opus 5.5</span><span>music by <b>Lyria 3.5</b></span>
+    </div>
+    Day 23 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/23/">spite.github.io/codevember-2026/23</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/23">23/ of the codevember-2026 repository</a>. The smoke solver is shared with <a href="../10/explainer.html">day 10</a>. Voronoi edge distance after Inigo Quilez; simplex noise from webgl-noise (Ian McEwan, Ashima Arts, MIT).
+  </footer>
+</main>
+
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const clamp01 = (x) => clamp(x, 0, 1);
+  const mix = (a, b, t) => a + (b - a) * t;
+  const smoothstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+  const fract = (x) => x - Math.floor(x);
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+  const hash = (n) => fract(Math.sin(n * 127.1 + 311.7) * 43758.5453);
+  const hash33 = (x, y, z) => {
+    let a = fract(x * 0.1031), b = fract(y * 0.103), c = fract(z * 0.0973);
+    const d = a * (b + 33.33) + b * (a + 33.33) + c * (c + 33.33);
+    a += d; b += d; c += d;
+    return [fract((a + b) * c), fract((a + a) * b), fract((b + a) * a)];
+  };
+
+  // Blackbody ramp of lava.js and a display curve for the figures
+  const STOPS = [[0.05, 0.22, [0.25, 0.006, 0]], [0.2, 0.46, [1.3, 0.11, 0]], [0.44, 0.72, [3, 1.28, 0]], [0.66, 0.96, [7, 3.8, 0.18]], [0.96, 1.32, [16, 11, 2.6]]];
+  const blackbody = (t) => {
+    const x = clamp(t, 0, 1.38);
+    let c = [0, 0, 0];
+    for (const [a, b, s] of STOPS) { const k = smoothstep(a, b, x); c = c.map((v, i) => mix(v, s[i], k)); }
+    return c;
+  };
+  const display = (c, exposure = 0.3) => c.map((v) => Math.round(255 * Math.pow(1 - Math.exp(-v * exposure), 1 / 2.2)));
+  const rgbStr = (c) => `rgb(${c[0]},${c[1]},${c[2]})`;
+  const skinOf = (lava) => smoothstep(0.5, 0.15, lava);
+
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1, W = 0, H = 0;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      W = canvas.clientWidth || 600; H = Math.round(W * (typeof aspect === "function" ? aspect(W) : aspect));
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, W, H);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    new MutationObserver(() => fit(true)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return { redraw: () => fit(true), paint: () => W && draw(ctx, W, H), size: () => [W, H] };
+  }
+  function animate(canvas, step) {
+    let on = false, last = 0;
+    new IntersectionObserver(([e]) => { on = e.isIntersecting; if (on) { last = performance.now(); requestAnimationFrame(loop); } }).observe(canvas);
+    function loop(now) {
+      if (!on) return;
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      step(dt);
+      requestAnimationFrame(loop);
+    }
+  }
+  const bind = (id, out, fmt, fn) => { const el = $(id); const o = $(out); const show = () => { if (o) o.textContent = fmt(+el.value); }; el.addEventListener("input", () => { show(); fn(); }); show(); return el; };
+  const label = (ctx, text, x, y, color = css("--stage-ink"), size = 11, align = "left") => { ctx.fillStyle = color; ctx.font = font(size); ctx.textAlign = align; ctx.fillText(text, x, y); ctx.textAlign = "left"; };
+
+  // The style gallery
+  {
+    const STYLES = [
+      ["cracked-plates", "Cracked Plates", "Sphere", "Angular basalt slabs, tilted and faceted, parted by hairline cracks that open into rivers with rafts of crust floating in them.", "2 · gap 0.014–0.075"],
+      ["pillow-lava", "Pillow Lava", "Boulder", "Plump glossy domes filling their cells (a hemisphere from centre and edge distance), blistered on the flanks, thin white-hot seams.", "1.9 · seam 0.016–0.075"],
+      ["pahoehoe-coils", "Pahoehoe Coils", "Torus", "Lobes wound with rope ridges that follow the lobe's outline and spiral into a glowing eye; the grooves next to a seam glow.", "2.05 · 82 rings per unit"],
+      ["obsidian", "Obsidian", "Crystal", "Knapped glass: big blocks chipped into concave conchoidal scallops with crisp ridges. Only some veins run hot; ember flecks inside.", "1.45 · gap 0.016–0.05"],
+      ["flow-bands", "Flow Bands", "Twisted Ring", "Layers folded into S-curves by a twice-warped field: sawtooth terraces with ragged risers, lava welling in lens-shaped slots.", "1.2 · 4.2 bands per unit"],
+      ["shard-scales", "Shard Scales", "Star", "Long glass blades from a Voronoi stretched 4× along a swirling grain, each lifted at one end, its tail sunk in molten light.", "3.3 · gap 0.03–0.1"],
+      ["strata-plates", "Strata Plates", "Rounded Cube", "Layered slabs stepping down in up to three ledges to thin cracks, which narrow where the flow stretched the pattern.", "1.45 · gap 0.005–0.03"],
+      ["charred-grain", "Charred Grain", "Dodecahedron", "Split blocks with wood-like grain, end-grain rings on a third of them, checks across the grain, a jagged rift with charred flakes.", "1.6 · 85 grooves per unit"],
+      ["ropy-strands", "Ropy Strands", "Trefoil Knot", "Bundles of fibrous ropes drawn out along the flow, fanning and pinching, braided, with thin lava threads between some bundles.", "3.6 bundles · 3–5 ropes each"],
+      ["marbled-glass", "Marbled Glass", "Meteorite", "Fire marbled through clear glass: a twice-warped field folded into black voids, a red body and bright flame ribbons, under one smooth coat.", "1.1 · flat height"],
+    ];
+    const grid = $("styleGrid");
+    for (const [file, name, shape, text, nums] of STYLES) {
+      const a = document.createElement("article");
+      a.className = "item";
+      a.innerHTML = `<img src="explainer/style-${file}.jpg" alt="A ${shape.toLowerCase()} in the ${name} style." loading="lazy" width="600" height="600"><div><h3>${name}</h3><small>${shape} · ${nums}</small><p>${text}</p></div>`;
+      grid.append(a);
+    }
+  }
+
+  // Cross-section of a Cracked Plates fissure: the baked height and heat, and the material's temperature
+  {
+    const C = bind("cCrust", "cCrustO", (v) => v.toFixed(2), () => fig.redraw());
+    const O = bind("cOpen", "cOpenO", (v) => v.toFixed(2), () => fig.redraw());
+    const L = bind("cLava", "cLavaO", (v) => v.toFixed(2), () => fig.redraw());
+    const span = 0.32;
+    const profile = (x, crust, open) => {
+      const d = Math.abs(x);
+      const gap = mix(0.075, 0.014, crust) * (0.35 + 1.2 * open + 2.6 * open ** 3);
+      const across = clamp01(1 - d / gap);
+      const bevel = smoothstep(gap * 0.7, gap + 0.045, d);
+      const shoulder = Math.pow(bevel, 0.45);
+      const plateTop = (x < 0 ? 0.64 : 0.56) + (x < 0 ? -1 : 1) * (d - 0.15) * 0.25;
+      const chip = 0.012 * Math.sin(x * 90) + 0.008 * Math.sin(x * 211);
+      const h = 0.08 + shoulder * (plateTop + chip);
+      let heat = (0.34 + 0.5 * Math.pow(across, 2.5)) * (across > 0.001 ? 1 : 0) + (1 - bevel) * 0.1;
+      heat += (1 - smoothstep(0, gap * 0.35, d)) * (0.3 + 0.35 * open);
+      return { h, heat, crust: bevel, gap };
+    };
+    const temperature = (heat, crustMask, lava, uHeat = 0.78) => {
+      const molten = 1 - crustMask;
+      const skin = skinOf(lava) * molten;
+      let t = heat * mix(0.58, mix(0.28, 1.38, lava), molten) * (1 - skin * 0.55);
+      t = Math.max(t, smoothstep(0, 0.5, molten) * 0.45 * (1 - skin * 0.5));
+      const settled = molten * (1 - skin);
+      t *= mix(1, mix(0.62, 1, smoothstep(0.35, 0.8, heat)), settled);
+      t += smoothstep(0.7, 1.05, heat) * (0.45 + 0.5 * lava) * settled;
+      t += smoothstep(1.2, 1.5, heat) * (0.55 + 0.35 * lava) * settled;
+      return t * mix(0.32, 1.24, uHeat);
+    };
+    const fig = setup($("crackFig"), (W) => (W < 520 ? 0.75 : 0.46), (ctx, W, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const crust = +C.value, open = +O.value, lava = +L.value;
+      const top = 18, ph = H * 0.62, X = (x) => ((x + span) / (2 * span)) * W, Y = (h) => top + ph - h * ph * 0.95;
+      const n = Math.max(200, Math.round(W));
+      let peakHeat = 0, peakT = 0;
+      const ink = css("--stage-ink");
+      // Lava fill up to the lava level, coloured by temperature, under the rock
+      const lavaLevel = 0.14;
+      for (let i = 0; i < n; i++) {
+        const x = -span + (i / n) * 2 * span;
+        const p = profile(x, crust, open);
+        peakHeat = Math.max(peakHeat, p.heat);
+        const t = temperature(p.heat, p.crust, lava);
+        peakT = Math.max(peakT, t);
+        const col = display(blackbody(t));
+        if (p.crust < 0.98) { ctx.fillStyle = rgbStr(col); ctx.fillRect(X(x), Y(lavaLevel), W / n + 1, Y(0) - Y(lavaLevel)); }
+        // strip below
+        ctx.fillStyle = p.crust > 0.99 ? "#15161a" : rgbStr(col);
+        ctx.fillRect(X(x), top + ph + 26, W / n + 1, H - (top + ph + 26) - 10);
+      }
+      // Rock profile
+      ctx.beginPath(); ctx.moveTo(0, Y(-0.02));
+      for (let i = 0; i <= n; i++) { const x = -span + (i / n) * 2 * span; const p = profile(x, crust, open); ctx.lineTo(X(x), Y(p.crust > 0.02 ? p.h : -0.02)); }
+      ctx.lineTo(W, Y(-0.02)); ctx.closePath();
+      const g = ctx.createLinearGradient(0, Y(0.8), 0, Y(0));
+      g.addColorStop(0, "#3c414c"); g.addColorStop(1, "#16171b");
+      ctx.fillStyle = g; ctx.fill();
+      ctx.strokeStyle = "#6d7686"; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i <= n; i++) { const x = -span + (i / n) * 2 * span; const p = profile(x, crust, open); const y = Y(p.h); i ? ctx.lineTo(X(x), y) : ctx.moveTo(X(x), y); }
+      ctx.stroke();
+      // Heat curve
+      ctx.strokeStyle = css("--lava2"); ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      for (let i = 0; i <= n; i++) { const x = -span + (i / n) * 2 * span; const p = profile(x, crust, open); const y = Y(p.heat * 0.7); i ? ctx.lineTo(X(x), y) : ctx.moveTo(X(x), y); }
+      ctx.stroke(); ctx.setLineDash([]);
+      label(ctx, "height", 10, Y(0.72) - 6, "#8b95a6");
+      label(ctx, "heat", X(0) + 8, Y(peakHeat * 0.7) + 4, css("--lava2"));
+      label(ctx, "emission across the crack", 10, top + ph + 20, ink);
+      label(ctx, "edge distance →", W - 10, top + ph + 20, ink, 11, "right");
+      const p0 = profile(0, crust, open);
+      $("cGap").textContent = (2 * p0.gap).toFixed(3) + " wide";
+      $("cPeak").textContent = peakHeat.toFixed(2);
+      $("cTemp").textContent = peakT.toFixed(2);
+    });
+  }
+
+  // Atlas viewer: the maps read back from a bake
+  {
+    const imgs = {};
+    let key = "height";
+    const fig = setup($("atlasFig"), 2 / 3, (ctx, W, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const img = imgs[key];
+      if (img && img.complete && img.naturalWidth) ctx.drawImage(img, 0, 0, W, H);
+      ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.lineWidth = 1;
+      for (let i = 1; i < 3; i++) { ctx.beginPath(); ctx.moveTo((W * i) / 3, 0); ctx.lineTo((W * i) / 3, H); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();
+      const names = [["−Y", "+Z", "−Z"], ["+X", "−X", "+Y"]];
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) {
+        const x = (W * c) / 3 + 8, y = (H * r) / 2 + 20;
+        ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(x - 4, y - 14, 34, 19);
+        label(ctx, names[r][c], x, y, "#f1ebe5", 12);
+      }
+    });
+    for (const k of ["height", "heat", "crust", "plate", "normal", "ao", "flow"]) {
+      const im = new Image();
+      im.onload = () => k === key && fig.paint();
+      im.src = `explainer/atlas-${k}.jpg`;
+      imgs[k] = im;
+    }
+    for (const b of document.querySelectorAll("#atlasSeg button")) b.addEventListener("click", () => {
+      key = b.dataset.k;
+      for (const o of document.querySelectorAll("#atlasSeg button")) o.setAttribute("aria-pressed", String(o === b));
+      fig.paint();
+    });
+  }
+
+  // The fluid's advected coordinates on the sphere, sampled like the bake does
+  {
+    const octEnc = (x, y, z) => {
+      const s = Math.abs(x) + Math.abs(y) + Math.abs(z);
+      x /= s; y /= s; z /= s;
+      if (z < 0) { const ox = x; x = (1 - Math.abs(y)) * (ox >= 0 ? 1 : -1); y = (1 - Math.abs(ox)) * (y >= 0 ? 1 : -1); }
+      return [x * 0.5 + 0.5, y * 0.5 + 0.5];
+    };
+    const octDec = (u, v) => {
+      let x = u * 2 - 1, y = v * 2 - 1;
+      const z = 1 - Math.abs(x) - Math.abs(y);
+      const t = clamp(-z, 0, 1);
+      x += x >= 0 ? -t : t; y += y >= 0 ? -t : t;
+      const l = Math.hypot(x, y, z);
+      return [x / l, y / l, z / l];
+    };
+    let coord = null, strain = null, N = 256;
+    const loadData = (src, done) => {
+      const im = new Image();
+      im.onload = () => {
+        const c = document.createElement("canvas"); c.width = im.naturalWidth; c.height = im.naturalHeight;
+        const x = c.getContext("2d"); x.drawImage(im, 0, 0);
+        try { done(x.getImageData(0, 0, c.width, c.height).data, c.width); } catch (e) { /* file:// */ }
+      };
+      im.src = src;
+    };
+    loadData("explainer/fluid-coord.png", (d, n) => { coord = d; N = n; dirty = true; });
+    loadData("explainer/fluid-strain.png", (d) => { strain = d; dirty = true; });
+    const carried = (u, v) => {
+      const px = clamp(Math.floor(u * N), 0, N - 1), py = clamp(Math.floor((1 - v) * N), 0, N - 1);
+      const o = (py * N + px) * 4;
+      const x = coord[o] / 127.5 - 1, y = coord[o + 1] / 127.5 - 1, z = coord[o + 2] / 127.5 - 1;
+      const l = Math.hypot(x, y, z) || 1;
+      return [x / l, y / l, z / l];
+    };
+    const SEED = [3.1, -1.7, 5.3];
+    const cells = (x, y, z) => {
+      const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+      let d1 = 9, d2 = 9, id = 0;
+      for (let k = -1; k <= 1; k++) for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+        const h = hash33(ix + i, iy + j, iz + k);
+        const dx = ix + i + h[0] - x, dy = iy + j + h[1] - y, dz = iz + k + h[2] - z;
+        const d = dx * dx + dy * dy + dz * dz;
+        if (d < d1) { d2 = d1; d1 = d; id = h[0] * 0.6 + h[1] * 0.4; } else if (d < d2) d2 = d;
+      }
+      return [Math.sqrt(d2) - Math.sqrt(d1), id];
+    };
+    const F = bind("fFlow", "fFlowO", (v) => v.toFixed(2), () => (dirty = true));
+    $("fPat").addEventListener("change", () => (dirty = true));
+    $("fView").addEventListener("change", () => (dirty = true));
+    let yaw = 0.4, dirty = true;
+    const R = 220;
+    const buf = document.createElement("canvas"); buf.width = buf.height = R;
+    const bctx = buf.getContext("2d");
+    const img = bctx.createImageData(R, R);
+    const shadeDir = (d, n, light) => {
+      const pat = $("fPat").value;
+      const s = 4.2;
+      if (pat === "check") {
+        const c = Math.sin(d[0] * 9) * Math.sin(d[1] * 9) * Math.sin(d[2] * 9) > 0;
+        const v = (c ? 0.55 : 0.12) * light;
+        return [v * 255, v * 230, v * 200];
+      }
+      const [e, id] = cells(d[0] * s + SEED[0], d[1] * s + SEED[1], d[2] * s + SEED[2]);
+      if (e < 0.05) {
+        const t = mix(0.95, 0.35, e / 0.05);
+        return display(blackbody(t));
+      }
+      const v = (0.1 + 0.18 * id) * light;
+      return [v * 150, v * 165, v * 190];
+    };
+    const render = () => {
+      const view = $("fView").value, flow = +F.value;
+      const data = img.data;
+      const cy = Math.cos(yaw), sy = Math.sin(yaw), tilt = 0.35, ct = Math.cos(tilt), st = Math.sin(tilt);
+      for (let py = 0; py < R; py++) for (let px = 0; px < R; px++) {
+        const o = (py * R + px) * 4;
+        let col = null;
+        if (view === "sphere") {
+          const sx = (px + 0.5) / R * 2 - 1, sy2 = 1 - (py + 0.5) / R * 2;
+          const r2 = sx * sx + sy2 * sy2;
+          if (r2 < 0.94) {
+            const sc = Math.sqrt(0.94);
+            const vx = sx / sc, vy = sy2 / sc, vz = Math.sqrt(Math.max(0, 1 - vx * vx - vy * vy));
+            const y1 = vy * ct - vz * st, z1 = vy * st + vz * ct;
+            const n = [vx * cy + z1 * sy, y1, -vx * sy + z1 * cy];
+            const light = 0.35 + 0.65 * Math.max(0, -0.5 * vx + 0.6 * vy + 0.62 * vz);
+            if (coord) {
+              const [u, v] = octEnc(n[0], n[1], n[2]);
+              const c = carried(u, v);
+              const m = [mix(n[0], c[0], flow), mix(n[1], c[1], flow), mix(n[2], c[2], flow)];
+              const l = Math.hypot(m[0], m[1], m[2]) || 1;
+              col = shadeDir([m[0] / l, m[1] / l, m[2] / l], n, light);
+            }
+          }
+        } else {
+          const u = (px + 0.5) / R, v = 1 - (py + 0.5) / R;
+          if (view === "strain") {
+            if (strain) {
+              const q = ((Math.floor((1 - v) * N)) * N + Math.floor(u * N)) * 4;
+              const s = strain[q] / 127.5 - 1;
+              const k = clamp(Math.abs(s) * 3, 0, 1);
+              col = s > 0 ? [20 + 235 * k, 18 + 110 * k, 16 + 20 * k] : [20 + 60 * k, 18 + 110 * k, 16 + 200 * k];
+            }
+          } else if (coord) {
+            const n = octDec(u, v);
+            const c = carried(u, v);
+            const m = [mix(n[0], c[0], flow), mix(n[1], c[1], flow), mix(n[2], c[2], flow)];
+            const l = Math.hypot(m[0], m[1], m[2]) || 1;
+            col = shadeDir([m[0] / l, m[1] / l, m[2] / l], n, 1);
+          }
+        }
+        if (col) { data[o] = col[0]; data[o + 1] = col[1]; data[o + 2] = col[2]; data[o + 3] = 255; }
+        else data[o + 3] = 0;
+      }
+      bctx.putImageData(img, 0, 0);
+    };
+    const fig = setup($("fluidFig"), (W) => (W < 520 ? 1 : 0.6), (ctx, W, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const s = Math.min(W, H) - 20;
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(buf, (W - s) / 2, (H - s) / 2, s, s);
+      if (!coord) label(ctx, "loading the field…", W / 2, H / 2, css("--stage-ink"), 12, "center");
+      if ($("fView").value === "map") {
+        const x0 = (W - s) / 2, y0 = (H - s) / 2;
+        ctx.strokeStyle = "rgba(255,255,255,0.35)"; ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(x0 + s / 2, y0); ctx.lineTo(x0 + s, y0 + s / 2); ctx.lineTo(x0 + s / 2, y0 + s); ctx.lineTo(x0, y0 + s / 2); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
+        label(ctx, "+Z", x0 + s / 2, y0 + s / 2 + 4, "#f1ebe5", 12, "center");
+        label(ctx, "−Z", x0 + 16, y0 + 20, "#f1ebe5", 12, "center");
+      }
+    });
+    animate($("fluidFig"), (dt) => {
+      if ($("fSpin").checked && $("fView").value === "sphere") { yaw += dt * 0.25; dirty = true; }
+      if (!dirty) return;
+      dirty = false;
+      render();
+      fig.paint();
+    });
+  }
+
+  // Adaptive quadtree with 2:1 balance and crack-free fans, as in buildPatch
+  {
+    const N = 256, LEVELS = 7, MIN_DEPTH = 2;
+    const Hf = new Float32Array((N + 1) * (N + 1));
+    const seeds = [];
+    for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) seeds.push([(i + 0.2 + 0.6 * hash(i * 7 + j)) / 4, (j + 0.2 + 0.6 * hash(i * 13 + j * 3 + 1)) / 4, hash(i * 31 + j * 17 + 5), hash(i * 3 + j * 29 + 9) * 6.28]);
+    for (let y = 0; y <= N; y++) for (let x = 0; x <= N; x++) {
+      const u = x / N, v = y / N;
+      const wu = u + 0.02 * Math.sin(v * 17), wv = v + 0.02 * Math.sin(u * 13);
+      let d1 = 9, d2 = 9, best = null;
+      for (const s of seeds) { const d = Math.hypot(wu - s[0], wv - s[1]); if (d < d1) { d2 = d1; d1 = d; best = s; } else if (d < d2) d2 = d; }
+      const e = (d2 - d1) * 0.5;
+      const gap = 0.002 + 0.006 * Math.pow(0.5 + 0.5 * Math.sin(u * 5 + v * 3), 3);
+      const bevel = smoothstep(gap * 0.7, gap + 0.012, e);
+      const tilt = Math.cos(best[3]) * (u - best[0]) + Math.sin(best[3]) * (v - best[1]);
+      Hf[y * (N + 1) + x] = 0.1 + Math.pow(bevel, 0.45) * (0.55 + best[2] * 0.15 + tilt * 0.5) + 0.004 * Math.sin(x * 0.9) * Math.sin(y * 0.7);
+    }
+    const hAt = (x, y) => Hf[clamp(y, 0, N) * (N + 1) + clamp(x, 0, N)];
+    const bg = document.createElement("canvas"); bg.width = bg.height = N;
+    {
+      const c = bg.getContext("2d"), im = c.createImageData(N, N);
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const h = hAt(x, y), o = ((N - 1 - y) * N + x) * 4;
+        if (h < 0.3) { const col = display(blackbody(1.05 - h * 2.5)); im.data[o] = col[0]; im.data[o + 1] = col[1]; im.data[o + 2] = col[2]; }
+        else { const v = 20 + h * 50; im.data[o] = v; im.data[o + 1] = v * 1.05; im.data[o + 2] = v * 1.2; }
+        im.data[o + 3] = 255;
+      }
+      c.putImageData(im, 0, 0);
+    }
+    const tolOf = (s) => 0.002 * Math.pow(100, s);
+    const T = bind("qTol", "qTolO", (v) => tolOf(v).toFixed(3), () => fig.redraw());
+    $("qBal").addEventListener("change", () => fig.redraw());
+    $("qWire").addEventListener("change", () => fig.redraw());
+    const error = (gx, gy, span) => {
+      const k = clamp(Math.round(span / 6), 3, 8);
+      const h00 = hAt(gx, gy), h10 = hAt(gx + span, gy), h01 = hAt(gx, gy + span), h11 = hAt(gx + span, gy + span);
+      let dev = 0;
+      for (let j = 1; j < k; j++) for (let i = 1; i < k; i++) {
+        const fx = i / k, fy = j / k;
+        const b = (h00 * (1 - fx) + h10 * fx) * (1 - fy) + (h01 * (1 - fx) + h11 * fx) * fy;
+        dev = Math.max(dev, Math.abs(hAt(Math.round(gx + span * fx), Math.round(gy + span * fy)) - b));
+      }
+      return dev;
+    };
+    const build = (tol, balance) => {
+      const G = 1 << LEVELS, cell = N / G;
+      const leaves = [], map = new Uint8Array(G * G);
+      const sub = (gx, gy, depth) => {
+        const span = 1 << (LEVELS - depth);
+        let split = depth < MIN_DEPTH;
+        if (!split && depth < LEVELS) split = error(gx * cell, gy * cell, span * cell) > tol;
+        if (split) { const h = span >> 1; sub(gx, gy, depth + 1); sub(gx + h, gy, depth + 1); sub(gx, gy + h, depth + 1); sub(gx + h, gy + h, depth + 1); return; }
+        leaves.push({ gx, gy, span, depth });
+        for (let y = gy; y < gy + span; y++) map.fill(depth, y * G + gx, y * G + gx + span);
+      };
+      sub(0, 0, 0);
+      let changed = balance, guard = 0;
+      while (changed && guard++ < 8) {
+        changed = false;
+        for (let i = leaves.length - 1; i >= 0; i--) {
+          const { gx, gy, span, depth } = leaves[i];
+          if (depth >= LEVELS) continue;
+          let mx = depth;
+          for (let t = 0; t < span; t++) {
+            if (gx > 0) mx = Math.max(mx, map[(gy + t) * G + gx - 1]);
+            if (gx + span < G) mx = Math.max(mx, map[(gy + t) * G + gx + span]);
+            if (gy > 0) mx = Math.max(mx, map[(gy - 1) * G + gx + t]);
+            if (gy + span < G) mx = Math.max(mx, map[(gy + span) * G + gx + t]);
+          }
+          if (mx > depth + 1) {
+            const h = span >> 1, nd = depth + 1;
+            leaves.splice(i, 1, { gx, gy, span: h, depth: nd }, { gx: gx + h, gy, span: h, depth: nd }, { gx, gy: gy + h, span: h, depth: nd }, { gx: gx + h, gy: gy + h, span: h, depth: nd });
+            for (let y = gy; y < gy + span; y++) map.fill(nd, y * G + gx, y * G + gx + span);
+            changed = true;
+          }
+        }
+      }
+      const tris = [];
+      for (const { gx, gy, span, depth } of leaves) {
+        const h = span >> 1;
+        const sL = gx > 0 && h && map[(gy + h) * G + gx - 1] > depth;
+        const sR = gx + span < G && h && map[(gy + h) * G + gx + span] > depth;
+        const sB = gy > 0 && h && map[(gy - 1) * G + gx + h] > depth;
+        const sT = gy + span < G && h && map[(gy + span) * G + gx + h] > depth;
+        const bl = [gx, gy], br = [gx + span, gy], tr = [gx + span, gy + span], tl = [gx, gy + span];
+        if (!sL && !sR && !sB && !sT) { tris.push([bl, br, tr], [bl, tr, tl]); continue; }
+        const c = [gx + h, gy + h], ring = [bl];
+        if (sB) ring.push([gx + h, gy]);
+        ring.push(br);
+        if (sR) ring.push([gx + span, gy + h]);
+        ring.push(tr);
+        if (sT) ring.push([gx + h, gy + span]);
+        ring.push(tl);
+        if (sL) ring.push([gx, gy + h]);
+        for (let k = 0; k < ring.length; k++) tris.push([c, ring[k], ring[(k + 1) % ring.length]]);
+      }
+      return { leaves, tris, G };
+    };
+    const fig = setup($("quadFig"), (W) => (W < 520 ? 1 : 0.62), (ctx, W, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const s = Math.min(W, H) - 16, x0 = (W - s) / 2, y0 = (H - s) / 2;
+      ctx.drawImage(bg, x0, y0, s, s);
+      const { leaves, tris, G } = build(tolOf(+T.value), $("qBal").checked);
+      const P = (p) => [x0 + (p[0] / G) * s, y0 + s - (p[1] / G) * s];
+      ctx.lineWidth = 0.7;
+      ctx.strokeStyle = "rgba(235,240,250,0.55)";
+      ctx.beginPath();
+      if ($("qWire").checked) {
+        for (const t of tris) { const a = P(t[0]), b = P(t[1]), c = P(t[2]); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.closePath(); }
+      } else {
+        for (const l of leaves) { const a = P([l.gx, l.gy]); const w = (l.span / G) * s; ctx.rect(a[0], a[1] - w, w, w); }
+      }
+      ctx.stroke();
+      $("qLeaves").textContent = leaves.length.toLocaleString("en");
+      $("qTris").textContent = tris.length.toLocaleString("en");
+      $("qUni").textContent = (2 * G * G).toLocaleString("en");
+    });
+  }
+
+  // Heat to light: the ramp, and a texel in the middle of a settled crack
+  {
+    const Hh = bind("bHeat", "bHeatO", (v) => v.toFixed(2), () => fig.redraw());
+    const Lv = bind("bLava", "bLavaO", (v) => v.toFixed(2), () => fig.redraw());
+    const Hp = bind("bH", "bHO", (v) => v.toFixed(2), () => fig.redraw());
+    const fig = setup($("rampFig"), (W) => (W < 520 ? 0.62 : 0.3), (ctx, W, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const heat = +Hh.value, lava = +Lv.value, uHeat = +Hp.value;
+      const skin = skinOf(lava);
+      let t = heat * mix(0.28, 1.38, lava) * (1 - skin * 0.55);
+      t = Math.max(t, 0.45 * (1 - skin * 0.5));
+      const settled = 1 - skin;
+      t *= mix(1, mix(0.62, 1, smoothstep(0.35, 0.8, heat)), settled);
+      t += smoothstep(0.7, 1.05, heat) * (0.45 + 0.5 * lava) * settled;
+      t += smoothstep(1.2, 1.5, heat) * (0.55 + 0.35 * lava) * settled;
+      t *= mix(0.32, 1.24, uHeat);
+      const sw = Math.min(H - 24, W * 0.22), L = 14, R = W - sw - 28, top = 22, rh = H - 58;
+      const X = (v) => L + (v / 1.38) * (R - L);
+      for (let i = 0; i < R - L; i++) { ctx.fillStyle = rgbStr(display(blackbody((i / (R - L)) * 1.38))); ctx.fillRect(L + i, top, 1.5, rh); }
+      const ink = css("--stage-ink");
+      for (const [a, b] of STOPS) { ctx.fillStyle = ink; ctx.fillRect(X(b), top + rh + 3, 1, 6); }
+      label(ctx, "0", L, top + rh + 22, ink); label(ctx, "1.38", R, top + rh + 22, ink, 11, "right");
+      label(ctx, "temperature", (L + R) / 2, top + rh + 22, ink, 11, "center");
+      const mx = X(clamp(t, 0, 1.38));
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(mx, top - 6); ctx.lineTo(mx, top + rh + 6); ctx.stroke();
+      const em = blackbody(t);
+      ctx.fillStyle = rgbStr(display(em)); ctx.fillRect(W - sw - 12, top, sw, sw);
+      $("bSkin").textContent = skin.toFixed(2);
+      $("bTemp").textContent = t.toFixed(2);
+      $("bRgb").textContent = em.map((v) => v.toFixed(2)).join(", ");
+    });
+  }
+
+  // Two-phase flow mapping, in one dimension of motion
+  {
+    const NW = 128, NH = 48;
+    const noise = new Float32Array(NW * NH);
+    {
+      const lat = (p, s) => { const v = new Float32Array(p * p); for (let i = 0; i < v.length; i++) v[i] = hash(i * 1.37 + s); return v; };
+      const oct = [[4, 0.55, lat(4, 1)], [8, 0.3, lat(8, 2)], [16, 0.15, lat(16, 3)]];
+      for (let y = 0; y < NH; y++) for (let x = 0; x < NW; x++) {
+        let s = 0;
+        for (const [p, a, v] of oct) {
+          const fx = (x / NW) * p, fy = (y / NH) * (p * NH / NW);
+          const ix = Math.floor(fx), iy = Math.floor(fy), tx = fx - ix, ty = fy - iy;
+          const ph = Math.max(1, Math.round(p * NH / NW));
+          const g = (i, j) => v[((((j % ph) + ph) % ph) * p) + (((i % p) + p) % p)];
+          const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+          s += a * mix(mix(g(ix, iy), g(ix + 1, iy), sx), mix(g(ix, iy + 1), g(ix + 1, iy + 1), sx), sy);
+        }
+        noise[y * NW + x] = s;
+      }
+    }
+    const sample = (x, y) => { x = ((x % NW) + NW) % NW; const i = Math.floor(x), f = x - i; const r = y * NW; return mix(noise[r + i], noise[r + ((i + 1) % NW)], f); };
+    const S = bind("pSpeed", "pSpeedO", (v) => (0.2 + 1.2 * v).toFixed(2), () => {});
+    let time = 0;
+    const RW = 200, RH = 48;
+    const buf = document.createElement("canvas"); buf.width = RW; buf.height = RH;
+    const bctx = buf.getContext("2d"), img = bctx.createImageData(RW, RH);
+    const adv = 40;
+    const fig = setup($("phaseFig"), (W) => (W < 520 ? 0.75 : 0.42), (ctx, W, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const cycle = time * 0.32;
+      const p0 = fract(cycle), p1 = fract(cycle + 0.5), blend = Math.abs(2 * p0 - 1);
+      const both = $("pBoth").checked;
+      for (let y = 0; y < RH; y++) for (let x = 0; x < RW; x++) {
+        const n0 = sample(x * (NW / RW) - adv * (p0 - 0.5), y);
+        const n1 = sample(x * (NW / RW) - adv * (p1 - 0.5) + 37, y);
+        const g = smoothstep(0.25, 0.8, both ? mix(n0, n1, blend) : n0);
+        const c = display(blackbody(0.15 + g * 0.65)), o = (y * RW + x) * 4;
+        img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255;
+      }
+      bctx.putImageData(img, 0, 0);
+      const sh = H * 0.5;
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(buf, 0, 0, W, sh);
+      label(ctx, "flow →", W - 10, 16, "#fff", 11, "right");
+      const top = sh + 14, gh = H - top - 22, ink = css("--stage-ink");
+      const span = 3 / 0.32;
+      const X = (t) => ((t - (time - span * 0.8)) / span) * W;
+      const curve = (fn, col, dash) => {
+        ctx.strokeStyle = col; ctx.lineWidth = 1.6; ctx.setLineDash(dash);
+        ctx.beginPath();
+        for (let i = 0; i <= W; i += 2) { const t = time - span * 0.8 + (i / W) * span; const v = fn(t); i ? ctx.lineTo(i, top + gh - v * gh) : ctx.moveTo(i, top + gh - v * gh); }
+        ctx.stroke(); ctx.setLineDash([]);
+      };
+      curve((t) => fract(t * 0.32), "rgba(255,170,80,0.55)", [3, 3]);
+      curve((t) => fract(t * 0.32 + 0.5), "rgba(150,180,255,0.55)", [3, 3]);
+      curve((t) => (both ? Math.abs(2 * fract(t * 0.32) - 1) : 0), "#ffa24a", []);
+      curve((t) => (both ? 1 - Math.abs(2 * fract(t * 0.32) - 1) : 1), "#9fb6ff", []);
+      ctx.strokeStyle = "#fff"; ctx.beginPath(); ctx.moveTo(X(time), top); ctx.lineTo(X(time), top + gh); ctx.stroke();
+      label(ctx, "phase 0 and its weight", 8, H - 6, "#ffa24a");
+      label(ctx, "phase 1 and its weight", W - 8, H - 6, "#9fb6ff", 11, "right");
+    });
+    $("pBoth").addEventListener("change", () => fig.paint());
+    animate($("phaseFig"), (dt) => { time += dt * (0.2 + 1.2 * +S.value); fig.paint(); });
+  }
+
+  // The morph in 2D: A sags into a pool, the pool sloshes, B rises out of it
+  {
+    const PH = [["melt", 0, 1.4], ["hand in", 1.4, 1.7], ["collapse", 1.7, 2.8], ["slosh", 2.8, 4.0], ["recompose", 4.0, 5.4], ["hand out", 5.4, 5.7], ["cool", 5.7, 8.3]];
+    const smin = (a, b, k) => { k = Math.max(k, 1e-4); const h = clamp01(0.5 + 0.5 * (b - a) / k); return mix(b, a, h) - k * h * (1 - h); };
+    const shapeA = (x, y) => { let d = -9; for (let i = 0; i < 7; i++) { const a = i * 0.8976 + 0.3; d = Math.max(d, x * Math.cos(a) + y * Math.sin(a) - 0.62); } return d; };
+    const shapeB = (x, y) => Math.abs(Math.hypot(x, y) - 0.6) - 0.22;
+    const sag = (f, x, y, s, drop) => f(x / s, (y + drop) / s) * s;
+    const POOL = 0.62;
+    const pool = (x, y, st) => {
+      const e = 0.35 + 0.65 * Math.exp(-st * 1.1), w = st * 4.6, sq = 0.2 * e * Math.cos(w);
+      const qx = x - 0.14 * Math.sin(w * 0.73) * e, qy = y - (-0.05 + 0.06 * Math.cos(w)) * e;
+      const ax = 1 + sq, ay = 1 - 1.4 * sq;
+      return (Math.hypot(qx / (POOL * ax), qy / (POOL * ay)) - 1) * POOL * Math.min(ax, ay) + 0.03 * Math.sin(x * 9 + st * 3) * Math.sin(y * 7);
+    };
+    const field = (x, y, T) => {
+      const st = Math.max(0, T - 2.25);
+      if (T < 1.7) return shapeA(x, y);
+      if (T < 2.8) { let s = (T - 1.7) / 1.1; s = s * s * (3 - 2 * s); const a = sag(shapeA, x, y, 1 - 0.3 * s, 0.3 * s * s) + smoothstep(0.5, 1, s) * 0.95; return smin(a, pool(x, y, st) + (1 - smoothstep(0, 0.55, s)) * 0.9, 0.35 * smoothstep(0, 0.3, s)); }
+      if (T < 4.0) return pool(x, y, st);
+      if (T < 5.4) { let s = (T - 4.0) / 1.4; s = s * s * (3 - 2 * s); const b = sag(shapeB, x, y, 0.45 + 0.55 * s, 0.35 * (1 - s) * (1 - s)) + (1 - smoothstep(0, 0.45, s)) * 0.6; return smin(b, pool(x, y, st) + smoothstep(0.4, 1, s), 0.35 * (1 - s * s)); }
+      return shapeB(x, y);
+    };
+    const meltAt = (T) => (T < 1.4 ? T / 1.4 : T < 5.7 ? 1 : Math.max(0, 1 - (T - 5.7) / 2.6));
+    const plateH = (x, y) => { const gx = x * 4.5, gy = y * 4.5, ix = Math.floor(gx), iy = Math.floor(gy); let d1 = 9, d2 = 9, id = 0; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const h1 = hash((ix + i) * 7.1 + (iy + j) * 13.7), h2 = hash((ix + i) * 3.3 + (iy + j) * 17.9 + 4); const d = Math.hypot(ix + i + h1 - gx, iy + j + h2 - gy); if (d < d1) { d2 = d1; d1 = d; id = h1; } else if (d < d2) d2 = d; } const e = (d2 - d1) * 0.5; return 0.06 + smoothstep(0.02, 0.09, e) * (0.6 + 0.3 * id); };
+    const lavaN = (x, y, T) => 0.5 + 0.25 * Math.sin(x * 6 + T * 1.3) * Math.sin(y * 5 - T * 0.9) + 0.2 * Math.sin((x + y) * 13 - T * 2);
+    const RW = 240, RH = 140;
+    const buf = document.createElement("canvas"); buf.width = RW; buf.height = RH;
+    const bctx = buf.getContext("2d"), img = bctx.createImageData(RW, RH);
+    const Ts = bind("mT", "mTO", (v) => v.toFixed(2) + " s", () => fig.paint());
+    let playing = false;
+    $("mPlay").addEventListener("click", () => { playing = !playing; if (playing && +Ts.value >= 8.29) Ts.value = 0; $("mPlay").textContent = playing ? "Pause" : "Play"; });
+    const fig = setup($("morphFig"), (W) => (W < 520 ? 0.8 : 0.55), (ctx, W, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const T = +Ts.value, melt = meltAt(T);
+      for (let py = 0; py < RH; py++) for (let px = 0; px < RW; px++) {
+        const x = ((px + 0.5) / RW - 0.5) * 3.4, y = (0.5 - (py + 0.5) / RH) * 2.0 + 0.05;
+        const d = field(x, y, T), o = (py * RW + px) * 4;
+        const cov = clamp01(0.5 - d / 0.02);
+        if (cov <= 0) { img.data[o + 3] = 0; continue; }
+        const h = plateH(x, y), lv = lavaN(x, y, T);
+        const key = h * 0.7 + lv * 0.3;
+        const meltLocal = smoothstep(key, key + 0.3, melt * 1.3);
+        const crack = h < 0.1 ? 1 : 0;
+        const molten = Math.max(crack, meltLocal);
+        const temp = molten ? mix(0.32, 0.98, lv) * (1 - skinOf(lv) * 0.7) * (crack && !meltLocal ? 1.2 : 1) : 0;
+        let c;
+        if (molten > 0.5) c = display(blackbody(temp));
+        else { const v = 22 + h * 40; c = [v, v * 1.05, v * 1.22]; }
+        img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255 * cov;
+      }
+      bctx.putImageData(img, 0, 0);
+      const ih = H - 46;
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(buf, (W - ih * RW / RH) / 2, 6, ih * RW / RH, ih);
+      // Timeline
+      const ty = H - 30, th = 14, ink = css("--stage-ink");
+      const cols = ["#ff8a3d", "#c084fc", "#f43f5e", "#f59e0b", "#22d3ee", "#c084fc", "#94a3b8"];
+      PH.forEach(([n, a, b], i) => {
+        const x0 = 10 + (a / 8.3) * (W - 20), x1 = 10 + (b / 8.3) * (W - 20);
+        ctx.fillStyle = cols[i]; ctx.globalAlpha = 0.45; ctx.fillRect(x0, ty, x1 - x0 - 1, th); ctx.globalAlpha = 1;
+        if (x1 - x0 > 46) label(ctx, n, (x0 + x1) / 2, ty + th + 12, ink, 10, "center");
+      });
+      const mx = 10 + (T / 8.3) * (W - 20);
+      ctx.fillStyle = "#fff"; ctx.fillRect(mx - 1, ty - 4, 2, th + 8);
+      const cur = PH.find(([, a, b]) => T >= a && T < b) ?? PH[6];
+      $("mPhase").textContent = cur[0];
+      $("mBy").textContent = T < 1.55 || T >= 5.55 ? "the mesh" : "the raymarched liquid";
+    });
+    animate($("morphFig"), (dt) => {
+      if (!playing) return;
+      let t = +Ts.value + dt;
+      if (t >= 8.3) { t = 8.3; playing = false; $("mPlay").textContent = "Play"; }
+      Ts.value = t; $("mTO").textContent = t.toFixed(2) + " s";
+      fig.paint();
+    });
+  }
+
+  // Embers in 2D: curl of plane waves, buoyancy, quadratic drag, an SDF cushion around a turning rock
+  {
+    const Sp = bind("eSpin", "eSpinO", (v) => v.toFixed(2) + " rad/s", () => {});
+    const waves = Array.from({ length: 6 }, (_, i) => {
+      const a = hash(i + 1) * 6.283, k = 1.1 + hash(i + 7) * 2.6;
+      return { kx: Math.cos(a) * k, ky: Math.sin(a) * k, A: 0.3 / k, w: 0.15 + hash(i + 13) * 0.45, f: hash(i + 19) * 6.283 };
+    });
+    const air = (x, y, t) => { let vx = 0, vy = 0; for (const { kx, ky, A, w, f } of waves) { const c = A * Math.cos(kx * x + ky * y + w * t + f); vx += c * ky; vy -= c * kx; } return [vx, vy]; };
+    let rot = 0, time = 0;
+    const rockR = (a) => 0.62 + 0.1 * Math.sin(3 * a) + 0.05 * Math.sin(5 * a + 1);
+    const sdf = (x, y) => { const a = Math.atan2(y, x) - rot; return Math.hypot(x, y) - rockR(a); };
+    const spots = [0.3, 1.5, 2.4, 3.6, 4.7, 5.6];
+    const P = Array.from({ length: 90 }, () => ({ alive: false, age: -Math.random() * 3 }));
+    const launch = (p) => {
+      const a = spots[Math.floor(Math.random() * spots.length)] + rot + (Math.random() - 0.5) * 0.12;
+      const r = rockR(a - rot);
+      const nx = Math.cos(a), ny = Math.sin(a);
+      const omega = +Sp.value;
+      Object.assign(p, { alive: true, age: 0, life: 2.5 + Math.random() * 3.5, x: nx * (r + 0.1), y: ny * (r + 0.1), inertia: 0.25 + Math.random() * 0.5, trail: [] });
+      const s = 0.12 + Math.random() * 0.25;
+      p.vx = nx * s - omega * p.y; p.vy = ny * s + 0.08 + Math.random() * 0.15 + omega * p.x;
+    };
+    const fig = setup($("emberFig"), (W) => (W < 520 ? 1 : 0.56), (ctx, W, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const s = H / 4.2, cx = W / 2, cy = H * 0.62;
+      const X = (x) => cx + x * s, Y = (y) => cy - y * s;
+      ctx.beginPath();
+      for (let i = 0; i <= 120; i++) { const a = (i / 120) * 6.283; const r = rockR(a - rot); const px = X(Math.cos(a) * r), py = Y(Math.sin(a) * r); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+      ctx.fillStyle = "#1c1e24"; ctx.fill();
+      for (const sp of spots) { const a = sp + rot, r = rockR(sp); ctx.fillStyle = "#ff8a2a"; ctx.beginPath(); ctx.arc(X(Math.cos(a) * r), Y(Math.sin(a) * r), 4, 0, 6.283); ctx.fill(); }
+      for (const p of P) {
+        if (!p.alive) continue;
+        const t = p.age / p.life, temp = (1 - Math.pow(t, 1.4) * 0.85) * 1.1;
+        const col = display(blackbody(temp), 0.5);
+        ctx.strokeStyle = `rgba(${col[0]},${col[1]},${col[2]},0.35)`; ctx.lineWidth = 1;
+        ctx.beginPath(); p.trail.forEach((q, i) => (i ? ctx.lineTo(X(q[0]), Y(q[1])) : ctx.moveTo(X(q[0]), Y(q[1])))); ctx.stroke();
+        ctx.fillStyle = rgbStr(col); ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), 2.2 * (1 - t * 0.6), 0, 6.283); ctx.fill();
+      }
+    });
+    const stepEmbers = (dt) => {
+      const omega = +Sp.value;
+      rot += omega * dt; time += dt;
+      for (const p of P) {
+        p.age += dt;
+        if (!p.alive || p.age >= p.life) { p.alive = false; if (p.age >= 0) launch(p); else continue; }
+        const t = p.age / p.life;
+        const g = smoothstep(0.06, 0.46, p.age);
+        let [ax, ay] = air(p.x, p.y, time);
+        ax *= 0.1 + 0.8 * g; ay *= 0.1 + 0.8 * g;
+        ay = Math.max(ay + 0.34 * (1 - t) + 0.12, 0.03);
+        const ex = p.vx - ax, ey = p.vy - ay, excess = Math.hypot(ex, ey);
+        const k = Math.exp(-dt * (0.8 + g * (1 / p.inertia + 14 * excess)));
+        p.vx = ax + ex * k; p.vy = ay + ey * k;
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        if ($("eCol").checked) {
+          const d = sdf(p.x, p.y);
+          if (d < 0.18) {
+            const h = 0.01, nx = sdf(p.x + h, p.y) - sdf(p.x - h, p.y), ny = sdf(p.x, p.y + h) - sdf(p.x, p.y - h), l = Math.hypot(nx, ny) || 1;
+            const n = [nx / l, ny / l], sv = [-omega * p.y, omega * p.x];
+            const push = 1 - (d - 0.1) / 0.08;
+            p.vx += n[0] * Math.min(push, 2) * 1.5 * dt; p.vy += n[1] * Math.min(push, 2) * 1.5 * dt;
+            const into = p.vx * n[0] + p.vy * n[1] - (sv[0] * n[0] + sv[1] * n[1]);
+            if (d < 0.1 && into < 0) { const m = Math.min(-into, 0.6); p.vx += n[0] * m; p.vy += n[1] * m; }
+            if (d < 0.09) { p.x += n[0] * (0.09 - d); p.y += n[1] * (0.09 - d); }
+          }
+        }
+        p.trail.push([p.x, p.y]); if (p.trail.length > 14) p.trail.shift();
+        if (p.y > 3 || Math.abs(p.x) > 4) p.age = p.life;
+      }
+    };
+    for (let i = 0; i < 150; i++) stepEmbers(1 / 30);
+    animate($("emberFig"), (dt) => { stepEmbers(dt); fig.paint(); });
+  }
+
+  // The shaft march: steps even in angle around the closest approach, t = tc + A tan(theta)
+  {
+    const Yr = bind("sY", "sYO", (v) => v.toFixed(2), () => fig.paint());
+    $("sUni").addEventListener("change", () => fig.paint());
+    let frame = 0;
+    const fig = setup($("shaftFig"), (W) => (W < 520 ? 0.8 : 0.48), (ctx, W, H) => {
+      ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H);
+      const s = Math.min(W / 13, H / 10.5), cx = W * 0.6, cy = H * 0.52;
+      const X = (x) => cx + x * s, Y = (y) => cy - y * s;
+      const Lx = -0.29, Ly = 0.96;
+      // Beam (radius 1.5 along L through the rock), and the rock's shadow below it
+      ctx.save();
+      ctx.translate(X(0), Y(0)); ctx.rotate(Math.atan2(Lx, Ly));
+      const bg = ctx.createLinearGradient(-1.5 * s, 0, 1.5 * s, 0);
+      bg.addColorStop(0, "rgba(200,215,235,0)"); bg.addColorStop(0.25, "rgba(200,215,235,0.16)"); bg.addColorStop(0.75, "rgba(200,215,235,0.16)"); bg.addColorStop(1, "rgba(200,215,235,0)");
+      ctx.fillStyle = bg; ctx.fillRect(-1.5 * s, -8 * s, 3 * s, 8 * s);
+      ctx.fillStyle = "rgba(200,215,235,0.06)"; ctx.fillRect(-1.5 * s, 0, 3 * s, 6 * s);
+      ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(-1 * s, 0, 2 * s, 6 * s);
+      ctx.restore();
+      // Volume sphere
+      ctx.strokeStyle = css("--stage-line"); ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(X(0), Y(0), 4.5 * s, 0, 6.283); ctx.stroke(); ctx.setLineDash([]);
+      // Rock
+      const g = ctx.createRadialGradient(X(-0.2), Y(0.3), 2, X(0), Y(0), s);
+      g.addColorStop(0, "#3a3e48"); g.addColorStop(0.8, "#1d1f25"); g.addColorStop(1, "#ff7a1a");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(X(0), Y(0), s, 0, 6.283); ctx.fill();
+      // Ray
+      const y0 = +Yr.value, camX = -7.4;
+      const ink = css("--stage-ink");
+      ctx.fillStyle = "#f1ebe5"; ctx.beginPath(); ctx.moveTo(X(camX) - 8, Y(y0) - 6); ctx.lineTo(X(camX), Y(y0)); ctx.lineTo(X(camX) - 8, Y(y0) + 6); ctx.fill();
+      label(ctx, "camera", X(camX) - 10, Y(y0) - 10, ink);
+      const R = 4.5, b = camX, c = camX * camX + y0 * y0 - R * R, disc = b * b - c;
+      if (disc <= 0) { label(ctx, "the ray misses the smoke volume", W / 2, 18, ink, 12, "center"); return; }
+      const sq = Math.sqrt(disc);
+      const t0 = Math.max(-b - sq, 0);
+      let t1 = -b + sq;
+      if (Math.abs(y0) < 1) t1 = Math.min(t1, -camX - Math.sqrt(1 - y0 * y0));
+      ctx.strokeStyle = "rgba(241,235,229,0.5)"; ctx.beginPath(); ctx.moveTo(X(camX), Y(y0)); ctx.lineTo(X(camX + t1), Y(y0)); ctx.stroke();
+      const tc = -b, A = 1.8, steps = 14;
+      const jit = $("sJit").checked ? fract(frame * 0.618) : 0.5;
+      const th0 = Math.atan((t0 - tc) / A), th1 = Math.atan((t1 - tc) / A), dth = (th1 - th0) / steps;
+      for (let i = 0; i < steps; i++) {
+        const t = $("sUni").checked ? t0 + ((i + jit) / steps) * (t1 - t0) : tc + A * Math.tan(th0 + (i + jit) * dth);
+        const px = camX + t;
+        // In the beam and not in the rock's shadow?
+        const along = px * Lx + y0 * Ly, r = Math.abs(px * Ly - y0 * Lx);
+        const lit = r < 1.5 && along > -6 && !(along < 0 && r < 1);
+        ctx.fillStyle = lit ? "#e6edf7" : "#ff8a3d";
+        ctx.beginPath(); ctx.arc(X(px), Y(y0), 4, 0, 6.283); ctx.fill();
+      }
+      label(ctx, "lit by the shaft", 10, H - 26, "#e6edf7");
+      label(ctx, "shadowed or outside the beam: warm light only", 10, H - 10, "#ff8a3d");
+    });
+    animate($("shaftFig"), () => { if (!$("sJit").checked) return; frame++; if (frame % 6 === 0) fig.paint(); });
+    $("sJit").addEventListener("change", () => fig.paint());
+  }
+
+  // Measured GPU cost per pass
+  {
+    const rows = [
+      ["Light shaft march (smoke)", 0.918], ["Rock, main pass", 0.627], ["Heat haze march", 0.312], ["AO and bounce light", 0.245],
+      ["Glow composite (shimmer, smoke, glow)", 0.227], ["Rock, prepass", 0.201], ["Prepass, other", 0.166], ["Rock, shadow map", 0.121],
+      ["Main pass, other", 0.123], ["Bloom", 0.105], ["Glow pyramid", 0.09], ["Shadow mask", 0.084], ["Final pass", 0.076],
+      ["Embers (shadow, prepass, main)", 0.041], ["Smoke simulation", 0.04], ["Pulse volume", 0.026],
+    ];
+    const max = rows[0][1], total = 3.438;
+    $("perfRows").innerHTML = rows.map(([n, v]) => `<tr title="${n}: ${v.toFixed(2)} ms"><td>${n}</td><td class="num">${v.toFixed(2)}</td><td class="barcell"><div class="bar" style="width:${(v / max) * 100}%"></div></td></tr>`).join("") +
+      `<tr><td><b>Total</b></td><td class="num"><b>${total.toFixed(2)}</b></td><td></td></tr>`;
+  }
+})();
+</script>
+</body>
+</html>
