@@ -10,8 +10,8 @@ the doll inside grows into the hero spot, forever.
 
 - **Drag** to orbit (gimbal-free: over the top and underneath), **scroll** to zoom
 - **Click / tap** or **N** to open the next doll
-- **R** for new dolls: the dolls on screen keep their paint, a new seed starts just past them, and two quick openings
-  bring it in
+- **R** for new dolls: the doll in the middle spins once and a new seed starts at the first doll still hidden, so the new designs
+  show at the next opening while the dolls on screen keep their paint
 - **Space** to pause, **M** for sound
 - Panel: Pattern, Finish, Palette, Faces, Shape and Backdrop (each "Family" by default), Direction (open / close),
   Speed, Finish polish, Orbit and Roll. No auto change: the nest keeps opening by itself.

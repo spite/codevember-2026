@@ -231,10 +231,16 @@ const currentOpts = () => ({
 });
 
 // R gives the dolls not yet on screen a new seed: each epoch's seed applies from its first generation on.
-const seedEpochs = [{ fromGen: -Infinity, seed: 0 }];
+// Seeds are base-36 strings: hashed to a 32-bit int for hashGen.
+function seedInt(seed) {
+  let h = 2166136261;
+  for (const c of String(seed)) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return h | 0;
+}
+const seedEpochs = [{ fromGen: -Infinity, seed: seedInt(getSeed()) }];
 function seedForGen(gen) {
   for (let i = seedEpochs.length - 1; i > 0; i--) if (gen >= seedEpochs[i].fromGen) return seedEpochs[i].seed;
-  return getSeed();
+  return seedEpochs[0].seed;
 }
 
 const smoother = (x) => {
@@ -295,7 +301,7 @@ function updateNest(u, sceneTime, glossBias) {
     // Multiplied by nestRoot.scale = exp(FACTOR * frac) -> world scale = exp(FACTOR * p) seamlessly!
     slot.group.scale.setScalar(Math.exp(-FACTOR * offset));
     slot.group.position.set(0, 0, 0);
-    slot.group.rotation.set(0, slot.yaw, 0);
+    slot.group.rotation.set(0, slot.yaw + (spinT >= 0 && gen >= spinFromGen ? spinAngle : 0), 0);
 
     // Halves leaving stop casting (and stop widening the shadow fit) once their shadow has faded out.
     slot.material.uniforms.uShadowAlpha.value = 1 - smoothstep(TWIST_END + 0.05, 0.6, p);
@@ -440,17 +446,25 @@ function turnCamera(yaw, pitch, roll) {
 
 onResize((w, h, dpr) => pipeline.setSize(w, h, dpr));
 let booted = false;
+let spinT = -1;
+let spinAngle = 0;
+let spinFromGen = 0;
+const SPIN_TIME = 0.9;
 onRandomize(() => {
   if (!booted) return;
-  // The dolls on screen keep their paint; the new seed starts past them and two quick openings bring it in.
-  seedEpochs.push({ fromGen: Math.floor(nestU) + 3, seed: getSeed() });
+  // The dolls on screen keep their paint: the new seed starts at the first doll still hidden (the one inside the
+  // hero until it starts opening, then the one inside that), so it shows at the next opening. The nest spins once.
+  const base = Math.floor(nestU);
+  seedEpochs.push({ fromGen: nestU - base < 0.03 ? base + 1 : base + 2, seed: seedInt(getSeed()) });
   if (seedEpochs.length > 8) seedEpochs.splice(1, 1);
-  popNext();
-  popNext();
+  // Only the whole doll in the middle (and the ones inside it) spins, not the halves already flying off.
+  spinFromGen = nestU - base < 0.03 ? base : base + 1;
+  spinT = 0;
   precompilePatterns();
 });
 
 applyUrlState();
+seedEpochs[0].seed = seedInt(getSeed());
 booted = true;
 
 function getTargetBackdrop(u) {
@@ -603,6 +617,12 @@ render(({ time, dt, frame }) => {
   }
 
   updateNest(nestU, time, smoothGloss);
+  // One quick turn of the middle doll about its axis after a randomize.
+  if (spinT >= 0) {
+    spinT = Math.min(1, spinT + dt / SPIN_TIME);
+    spinAngle = spinT < 1 ? (spinT < 0.5 ? 4 * spinT ** 3 : 1 - (-2 * spinT + 2) ** 3 / 2) * Math.PI * 2 : 0;
+    if (spinT === 1) spinT = -1;
+  }
 
   // Orbit (paused while the user drags) with a swinging pitch that carries over and under the doll, and a roll that
   // keeps turning, applied as small turns of the camera's own frame.

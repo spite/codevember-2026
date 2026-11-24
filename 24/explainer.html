@@ -282,7 +282,7 @@ cup.y  = −(0.02·tw + (2.15 + 0.55·r7)·s + (0.3 + 0.35·r6)·s² − 0.35·s
       </tbody>
     </table></div>
     <div class="col prose">
-      <p>The panel can pin any of it: a pattern, finish, palette, face style, shape or backdrop overrides the family's choice for every doll. <code>R</code> asks for new dolls without breaking the ones on screen: it records a new seed that applies only from three dolls ahead (past everything visible), then asks for two quick openings to bring it in. The page keeps a short list of these seed changes, so the dolls behind keep their paint.</p>
+      <p>The panel can pin any of it: a pattern, finish, palette, face style, shape or backdrop overrides the family's choice for every doll. <code>R</code> asks for new dolls without breaking the ones on screen: the whole doll in the middle, with the ones inside it, spins one turn about its axis (0.9 s, eased in and out) while the halves already flying off keep their course, and a new seed applies from the first doll that can't be seen, the one inside the hero until the hero starts opening and the one inside that after, so the new designs arrive at the next opening. The page keeps a short list of these seed changes, so the dolls behind keep their paint. Seeds are strings in the url, hashed to a 32-bit integer for the doll hashes.</p>
     </div>
   </section>
 
