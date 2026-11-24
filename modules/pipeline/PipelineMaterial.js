@@ -308,7 +308,7 @@ void main() {
   // Direct key light; lightColor is irradiance, so diffuse = lightColor * NdotL * albedo / pi.
   vec3 L = normalize(lightDirection);
   vec3 H = normalize(L + V);
-  // A geometric back face gets no key, even where the shading normal tilts toward it.
+  // A geometric back face gets no key beyond a short fade, even where the shading normal tilts toward it.
   #if defined(PIPELINE_THIN_SHEET)
   // Thin sheets: near the terminator the lighting follows the geometric normal, so the front and back terms meet.
   vec3 nl = normalize(mix(N, n, smoothstep(0.0, 0.25, abs(dot(N, L)))));
@@ -325,7 +325,9 @@ void main() {
   // Opt-in: fades it over the terminator instead, for strong per-pixel relief.
   float NdotL = clamp(dot(n, L), 0.0, 1.0) * smoothstep(-0.25, 0.15, dot(N, L));
   #else
-  float NdotL = clamp(dot(n, L), 0.0, 1.0) * step(0.0, dot(N, L));
+  // Fades over a short band past the geometric terminator instead of cutting there: identical wherever the
+  // shading normal is the geometric one, and no hard line where a normal map tilts toward the key past it.
+  float NdotL = clamp(dot(n, L), 0.0, 1.0) * smoothstep(-0.2, 0.0, dot(N, L));
   #endif
   float NdotH = clamp(dot(n, H), 0.0, 1.0);
   float VdotH = clamp(dot(V, H), 0.0, 1.0);
