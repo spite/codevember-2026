@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Nest Opens</title>
+<meta name="description" content="How Codevember 2026 day 24, Nest, turns hollow wooden Matryoshka dolls on a virtual lathe, nests them forever with an exponential zoom that never overflows, unscrews each one in time with a real wooden box, paints fifteen families of designs per pixel, and keeps every face turned to the camera.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Warm plaster, raw linden, coral and navy lacquer. */
+:root {
+  --bg: #efe9df;
+  --panel: #f8f4ec;
+  --ink: #1f1a16;
+  --muted: #6d6358;
+  --line: #ddd4c6;
+  --accent: #c94f33;
+  --accent2: #2d4a86;
+  --stage: #e6dfd4;
+  --stage-ink: #7a6f62;
+  --stage-line: #d2c8b9;
+  --wood: #d9c19c;
+  --wood2: #b89b72;
+  --lacq: #d9573b;
+  --lacq2: #2f5aa8;
+  --gold: #c99a2e;
+  --shade: #2a231d;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --text: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161311; --panel: #201c18; --ink: #efe8dd; --muted: #a89c8e; --line: #322b25;
+    --accent: #f07a5c; --accent2: #86a6ec; --stage: #1d1915; --stage-ink: #9a8e80; --stage-line: #352e27;
+    --wood: #c8ad86; --wood2: #9c8260; --lacq: #ec6a4c; --lacq2: #6f97e6; --gold: #ddb24a; --shade: #f3ebdf;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161311; --panel: #201c18; --ink: #efe8dd; --muted: #a89c8e; --line: #322b25;
+  --accent: #f07a5c; --accent2: #86a6ec; --stage: #1d1915; --stage-ink: #9a8e80; --stage-line: #352e27;
+  --wood: #c8ad86; --wood2: #9c8260; --lacq: #ec6a4c; --lacq2: #6f97e6; --gold: #ddb24a; --shade: #f3ebdf;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--text); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .glow { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .glow { background: linear-gradient(100deg, var(--accent) 10%, var(--accent2) 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; background: var(--stage); }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.live { font: 600 14px/1 var(--mono); display: inline-flex; gap: 8px; align-items: center; text-decoration: none; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; border-radius: 3px; background: var(--stage); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+.controls select { font: 400 13px/1 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 5px 6px; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+button { font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px; padding: 9px 14px; cursor: pointer; }
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: pre; }
+.formula .c { color: var(--muted); }
+.table-wrap { overflow-x: auto; background: var(--panel); border-radius: 4px; }
+table { border-collapse: collapse; width: 100%; font: 400 14px/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+td.num, th.num { text-align: right; }
+td.wrap { white-space: normal; min-width: 260px; }
+tr:last-child td { border-bottom: 0; }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+footer ul { margin: 8px 0 12px; padding-left: 18px; }
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 24</b> · Nest</div>
+      <h1>How Nest <span class="glow">opens</span></h1>
+      <p class="lede">A painted wooden doll unscrews, its halves drift away, and the doll inside grows into its place and starts to unscrew too. It never ends. Here is how each doll is turned on a virtual lathe, how the zoom goes on forever without the numbers running away, how an opening is timed to the sound of a real wooden box, how fifteen families of designs are painted pixel by pixel, and how the faces keep finding the camera.</p>
+      <a class="live" href="./">See it live <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M3 1.8v8.4c0 .5.5.8.9.5l6.6-4.2a.6.6 0 0 0 0-1L3.9 1.3c-.4-.3-.9 0-.9.5z" fill="currentColor"/></svg></a>
+    </div>
+    <figure>
+      <img src="../screenshots/24.jpg" width="1080" height="1080" alt="A City Skyline matryoshka rising out of its yellow cup, laughing, with the cap just lifted past its head, tilted from bottom-left to top-right on a warm grey backdrop." fetchpriority="high" decoding="async">
+      <figcaption>A City Skyline doll halfway out, 54% into its mother's opening.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>A doll inside a doll, forever</h2>
+      <p>A matryoshka is a promise you can only keep a few times: open the doll and there is a smaller one, open that and there is another, until the last one is solid. The prompt for the day was <em>Nest</em>, so the obvious thing to do was to break the promise the other way and never reach the last one. Every doll here is hollow and every doll has a doll inside it.</p>
+      <p>The dolls are not the traditional red babushkas. They follow the modern ones that designers and makers have been painting for the last fifteen years: colour-dipped raw wood, Bauhaus blocks, paint drips, harlequin triangles, city stripes, black-and-white graphics, a single red balloon (the makers are credited at the end). Each doll is meant to look like a product shot of a real object, turned from linden and lacquered or glazed, so the wood shows wherever a real one would: inside, on the lip, on the base.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>One doll every 4.2 s</b><span>The nest advances at 0.24 dolls a second by itself; a click or <code>N</code> opens the next one sooner.</span></div>
+      <div class="fact"><b>15 families of 5</b><span>Siblings share a design, finish, shape and palette; each has its own colourway and its own face.</span></div>
+      <div class="fact"><b>Never a big number</b><span>The whole nest is rescaled by at most <code>e<sup>0.35</sup> = 1.42</code>, however long it runs.</span></div>
+    </div>
+  </section>
+
+  <!-- 2. Geometry -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Turning · <b>geometry.js</b></div>
+      <h2>Turned on a lathe</h2>
+      <p>A matryoshka is turned: a block of wood spins and a chisel cuts its silhouette, so every doll is a surface of revolution. In three.js that is a <code>LatheGeometry</code>, which spins a list of (radius, height) points around the vertical axis in 96 steps (64 on the low quality tier). All the work is in the list of points.</p>
+      <p>The silhouette is one smooth formula per shape, the radius <code>r(h)</code> at a height <code>h</code> from 0 at the base to 1 at the crown. Each is a base radius plus a few Gaussian bumps (a belly, a waist, a head) multiplied by a dome factor <code>√(1 − h⁸)</code> that is almost 1 all the way up and closes the top into a round crown with a vertical tangent, so there is never a point or a seam at the top:</p>
+    </div>
+    <div class="formula"><span class="c">// dome: 1 almost everywhere, a round cap at the top</span>
+dome(h)  = √(1 − h⁸)
+<span class="c">// Nordic (sleek pear)</span>
+r(h) = dome · (0.425 + 0.122·G(h, 0.36, 0.27) + 0.038·G(h, 0.82, 0.22))
+<span class="c">// Classic (belly, pinched waist, round head)</span>
+r(h) = dome · (0.425 + 0.145·G(h, 0.31, 0.22) − 0.042·G(h, 0.62, 0.13) + 0.068·G(h, 0.82, 0.18))
+<span class="c">// Pear (low belly, full head)</span>
+r(h) = dome · (0.380 + 0.215·G(h, 0.28, 0.25) + 0.115·G(h, 0.84, 0.21))
+<span class="c">// G(h, c, w) = exp(−((h − c) / w)²); the doll is 2.2 units tall</span></div>
+    <div class="col prose">
+      <p>A real doll opens at the waist, so each doll is two meshes, split at 43% of its height. Both halves are hollow, with walls 0.056 thick (2.5% of the height) and a base 0.075 thick. The bottom cup has a <em>rabbet lip</em>: a ring 0.088 tall that stands up out of the cup, stepped in 0.034 from the outer wall, and the top cap has a matching recess cut into it with 0.0025 of clearance, which is what holds a real doll shut. The lip is placed inside the narrowest radius the cap reaches along the lip's height, so it never pokes through the cap's waist on the pinched shapes. Both rims have a three-step rounded chamfer of 0.0085 so the seam catches a highlight, and the bottom edge has a small chamfer too.</p>
+      <p>Each point carries two numbers into the shader as vertex attributes. <code>aPart</code> is 0 on the painted outside and 1 on everything a turner would leave raw: the rims, the lip, the inside walls, the inner floor and the underside. <code>aCavity</code> runs from 0 at the rim to about 0.96 at the bottom of the hollow, and darkens the inside as a real cavity is darker (the albedo by up to 58%, the occlusion by up to 35%), which ambient occlusion alone underestimates on a thin wall seen from outside. The lathe's seam, where the first and last column of vertices meet, is turned to the back of the doll, so the face side is seamless.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The cross-section</h3>
+        <div class="controls">
+          <label>shape <select id="lsS"><option>Nordic</option><option>Classic</option><option>Pear</option></select></label>
+          <label><input id="lsN" type="checkbox" checked> next doll inside</label>
+        </div>
+      </div>
+      <canvas id="latheFig" aria-label="A cross-section of the doll: the outer silhouette, the hollow walls of the cap and the cup, the rabbet lip, and the smaller next doll drawn inside."></canvas>
+      <div class="readout" id="lsR"></div>
+      <p class="fig-cap">The same point lists as <code>geometry.js</code>, cut in half: painted outside in colour, raw wood in brown, the cap lifted a little so the lip and the recess show. The dashed doll is the next one, at <code>e<sup>−0.35</sup> = 0.705</code> of the size and centred on the same point.</p>
+    </div>
+    <div class="col prose">
+      <p>The origin of each doll is not its base but a point 48% of the way up, inside the hollow. That is what makes nesting simple: every doll is centred on the same point and the next one is just the same mesh at 0.705 of the scale, which leaves 0.02 to 0.08 of air between it and its mother's wall (tightest when a Pear sits inside a Classic, whose waist pinches in), 0.24 below it and 0.28 above it under the cap's dome. Nothing has to be placed; the dolls nest by construction.</p>
+    </div>
+  </section>
+
+  <!-- 3. Zoom -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Forever · <b>main.js</b></div>
+      <h2>A zoom that never overflows</h2>
+      <p>The obvious way to zoom into nested dolls forever is to keep shrinking the camera, or keep growing the dolls, and both run out: after a few hundred dolls the numbers are too small or too large for 32-bit floats and the picture falls apart. The trick, borrowed from <a href="https://github.com/spite/infinite-gift">infinite-gift</a>, is to move the zoom into a single number that wraps around.</p>
+      <p>The state of the whole nest is one number, <code>u</code>. Its integer part says which doll is opening, its fractional part how far along. Each doll <code>g</code> sees the nest from its own point of view as <code>p = u − g</code>: 0 when it is closed in the hero spot, between 0 and 1 while it opens, negative while it is still inside its mother. Its size on screen must be <code>e<sup>0.35·p</sup></code>, so it is 1 in the hero spot, 0.705 inside its mother and 1.42 as it finishes opening. That is split into two factors that both stay small:</p>
+    </div>
+    <div class="formula"><span class="c">// one number for the whole nest</span>
+base = ⌊u⌋        frac = u − base
+nestRoot.scale = e^(0.35 · frac)                    <span class="c">// 1 … 1.42</span>
+<span class="c">// four slots: the doll that just left, the one opening, the next, the one after</span>
+slot(offset).scale = e^(−0.35 · offset)    offset ∈ {−1, 0, 1, 2}
+world scale = e^(0.35·frac) · e^(−0.35·offset) = e^(0.35 · (u − g)) = e^(0.35 · p)</div>
+    <div class="col prose">
+      <p>When <code>u</code> crosses an integer the fractional part wraps from 1 back to 0, the root drops from 1.42 back to 1, and every slot moves up one offset, which multiplies it by exactly 1.42: nothing on screen changes. Four slots are enough: the doll that just finished opening (still fading out until <code>p</code> = 1.05), the one opening, the one inside it and the one inside that, which is hidden until its mother starts to open (<code>p</code> ≤ −1 is never drawn). Slot <code>g mod 4</code> holds doll <code>g</code>; when a slot is handed a new doll, it is given that doll's design, shape and material and keeps its two meshes. Nothing is ever created or destroyed while it runs.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Four slots and one number</h3>
+        <div class="controls">
+          <label>u <input id="zmU" type="range" min="0" max="3" step="0.005" value="0.4"><output id="zmUo"></output></label>
+          <button id="zmP" class="ghost">play</button>
+        </div>
+      </div>
+      <canvas id="zoomFig" aria-label="Four nested doll silhouettes, one per slot, with their world scales, as the nest value u advances; the root scale wraps every integer."></canvas>
+      <div class="readout" id="zmR"></div>
+      <p class="fig-cap">Each column is a slot. The silhouettes are drawn at their world size <code>e<sup>0.35·p</sup></code>; the readout shows the root's own scale, which never leaves 1 … 1.42. Play it and watch the slot numbers rotate under constant sizes.</p>
+    </div>
+    <div class="col prose">
+      <p><code>u</code> moves at the <em>Speed</em> slider, 0.24 a second by default (a doll every 4.2 s), times the time step, so pausing stops it. A click or <code>N</code> asks for the next integer: the gap is added to a bonus that <code>u</code> eats at <code>1 − e<sup>−4.2·dt</sup></code> a frame, so the doll opens quickly but smoothly. Several clicks stack. With <em>Direction</em> set to <em>Close</em> it all runs backwards: the halves come back, seat and close, and the nest shrinks forever instead.</p>
+    </div>
+  </section>
+
+  <!-- 4. Opening -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Opening · <b>main.js</b></div>
+      <h2>Unscrew, then let go</h2>
+      <p>An opening is a function of <code>p</code> alone, so it plays the same at any speed and backwards. It has two overlapping movements. First the halves unscrew: they turn in opposite directions by 50° to 100°, shared unevenly between them as a hand would (each doll draws its own amounts from hashes of the seed and its number), and up to 55° more as they part. They lift just enough to clear the lip, 0.06 for the cap and 0.02 for the cup. The twist follows <code>tw = 1 − e<sup>−1.6·p / 0.26</sup></code>: fast at first, as a stuck lid breaks free, and 80% done by <code>p</code> = 0.26 (about 1.1 s at the default speed, the length of the opening sound), slowing but never stopping.</p>
+      <p>Then they part. The separation <code>s</code> starts from rest at 0.55 × 0.26 = 0.143, before the twist is done, and is eased in with <code>s<sup>2</sup>(2 − s)</code>, whose slope is 0 at the start and 1 at the end. Because the twist never stops and the separation starts from rest before it, nothing in the opening ever comes to a halt and starts again.</p>
+    </div>
+    <div class="formula"><span class="c">// per doll: r0 … r7 are hashes of (seed, doll, salt)</span>
+tw     = 1 − e^(−1.6 · p / 0.26)
+s      = ease(clamp((p − 0.143) / (1.02 − 0.143)))      ease(x) = x²(2 − x)
+twist  = (0.9 + 0.8·r2)·tw + (0.35 + 0.6·r3)·s          <span class="c">// split 0.55…1.45 : rest between the halves</span>
+cap.y  = 0.06·tw + (2.45 + 0.55·r3)·s + (0.35 + 0.4·r5)·s² − 0.65·s³
+cap.r  = (2.9 + 1.5·r2) · s^(2.7 + 0.7·r1)               <span class="c">// sideways, behind the doll</span>
+cap.pitch = (1.05 + 0.85·r6) · s^(2 + 0.4·r5)
+cup.y  = −(0.02·tw + (2.15 + 0.55·r7)·s + (0.3 + 0.35·r6)·s² − 0.35·s³)</div>
+    <div class="col prose">
+      <p>Each half lifts along the doll's axis first (the radial term grows as <code>s</code><sup>2.7 to 3.4</sup>, so it barely moves sideways until it is clear of the doll inside), then drifts sideways and tips over, pitching away from the doll as if peeled off by a hand, with a little bank. Both peel <em>behind</em> the doll: their directions are 20° to 49° either side of straight back (the face is at the front), one half to each side, so a half never swings toward the camera. In the doll's own frame the cap ends up about 2.7 above the doll and 3.7 out to the back, and the nest has grown 1.42 times by then, so both halves have left the frame.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>One opening</h3>
+        <div class="controls">
+          <label>p <input id="opP" type="range" min="0" max="1.05" step="0.005" value="0.3"><output id="opPo"></output></label>
+          <button id="opPl" class="ghost">play</button>
+        </div>
+      </div>
+      <canvas id="openFig" aria-label="Left: the curves tw, s, cap lift, fade and shadow strength against p with the end of the twist marked. Right: a side view of the halves leaving and the next doll growing."></canvas>
+      <div class="readout" id="opR"></div>
+      <p class="fig-cap">Left, the curves of one doll (all hashes at 0.5): twist, separation, the cap's lift (scaled to fit), the fade into the backdrop and the strength of its shadow. Right, a side view in the doll's frame as the nest grows: the cap goes up and away, the cup down and away, the next doll grows into the hero spot.</p>
+    </div>
+    <div class="col prose">
+      <p>The halves do not just leave the frame, they dissolve. The material blends its lit colour into the backdrop's own colour as <code>smoothstep(0.48, 0.98, s)</code> (albedo, metal, specular and sheen fade out, the emission fades in to exactly what the backdrop shows at that pixel), and over the last 15% it discards pixels in an interleaved-gradient-noise dither, which the pipeline's anti-aliasing and accumulation turn into a smooth fade. A half that has dissolved has no edge to pop.</p>
+      <p>The pipeline fits its shadow map around everything that casts, so halves flying 4 units away would spread the map thin over the hero, and they stop casting as they leave. To fade their shadows rather than cut them, the halves use the pipeline's <em>stochastic shadows</em>: in the shadow pass their alpha is the chance of blocking the light, <code>1 − smoothstep(0.31, 0.6, p)</code>, redrawn every frame and smoothed by the shadow denoiser, so the shadow fades out, and only at <code>p</code> = 0.62, with nothing left to see, are they dropped from casting and from the fit. The painted hairline at the waist also fades as the halves part, <code>clamp(0.25·tw + 5·s)</code>, so a closed doll shows a fine seam and an open one shows two clean rims.</p>
+    </div>
+  </section>
+
+  <!-- 5. Families -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Families · <b>palettes.js</b></div>
+      <h2>Fifteen families of five</h2>
+      <p>Real sets are designed together, so the dolls come in families of five. Siblings share a pattern, a finish (matte wood, glossy lacquer, glazed ceramic, raw and dipped, or satin with brass), a silhouette, a palette and the backdrop behind them; each sibling gets its own colourway from the palette and its own face. When a family has been seen, the next one starts inside its smallest doll. A doll's design is a pure function of its number and the seed, <code>getDollSpec(g, seed)</code>, so the same seed always plays the same dolls and any doll can be built at any time.</p>
+      <p>The order of the families is a shuffle of all fifteen, seeded by the seed and the <em>cycle</em> (how many times all fifteen have been seen), so each plays once before any repeats. After the first cycle they vary: every palette is shifted in hue by the golden ratio's fraction (0.382 a cycle plus up to 0.18 at random, with a little saturation and lightness), finishes rotate between matte, lacquer and ceramic, and the silhouette rotates between Nordic, Classic and Pear. Whites, blacks, skin and wood never shift, so the faces always look right.</p>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>family</th><th>pattern</th><th>finish</th><th>shape</th><th>faces</th></tr></thead>
+      <tbody>
+        <tr><td>Bauhaus Ceramic</td><td class="wrap">discs, quarter circles and blocks split at the waist; five fixed compositions</td><td>glazed ceramic</td><td>Nordic</td><td>minimal</td></tr>
+        <tr><td>Pastel Drip</td><td class="wrap">paint dripped over white, alternating round drips</td><td>glossy lacquer</td><td>Pear</td><td>emoji</td></tr>
+        <tr><td>Terracotta Folk</td><td class="wrap">botanical: tulips, leaves, daisies, raised gold dots</td><td>matte wood</td><td>Classic</td><td>emoji</td></tr>
+        <tr><td>Prism Mosaic</td><td class="wrap">triangular tessellation aligned to the waist</td><td>matte wood</td><td>Nordic</td><td>emoji</td></tr>
+        <tr><td>Dipped Studio</td><td class="wrap">raw wood with a dipped coat and a brass ring</td><td>raw &amp; dipped</td><td>Nordic</td><td>emoji</td></tr>
+        <tr><td>Jewel Patchwork</td><td class="wrap">colour-blocked curves around the face</td><td>glossy lacquer</td><td>Pear</td><td>emoji</td></tr>
+        <tr><td>City Skyline</td><td class="wrap">staggered vertical colour bars</td><td>glossy lacquer</td><td>Nordic</td><td>emoji</td></tr>
+        <tr><td>Folk Graphic</td><td class="wrap">chevrons, herringbone, bands, bevelled paint edges</td><td>glossy lacquer</td><td>Classic</td><td>emoji</td></tr>
+        <tr><td>Monochrome Lacquer</td><td class="wrap">five black-and-white siblings: scallops, dots, clouds, harlequin</td><td>glossy lacquer</td><td>Pear</td><td>emoji</td></tr>
+        <tr><td>Porcelain Shawl</td><td class="wrap">pastel hood parting over a floral apron</td><td>glossy lacquer</td><td>Classic</td><td>emoji</td></tr>
+        <tr><td>Crimson Babushka</td><td class="wrap">headscarf tied in a V-notched bow</td><td>glossy lacquer</td><td>Classic</td><td>emoji</td></tr>
+        <tr><td>Balloon</td><td class="wrap">white porcelain, one red balloon on a wavy string</td><td>glossy lacquer</td><td>Pear</td><td>none</td></tr>
+        <tr><td>Gel Overlap</td><td class="wrap">translucent overprinted colour gels</td><td>glossy lacquer</td><td>Nordic</td><td>emoji</td></tr>
+        <tr><td>Modern Folk</td><td class="wrap">navy cloak, coral hood, floral emblem apron</td><td>glossy lacquer</td><td>Classic</td><td>emoji</td></tr>
+        <tr><td>Scandi Emblem</td><td class="wrap">collar tabs, buttoned chest, colour-block skirt</td><td>glazed ceramic</td><td>Pear</td><td>emoji</td></tr>
+      </tbody>
+    </table></div>
+    <div class="col prose">
+      <p>The panel can pin any of it: a pattern, finish, palette, face style, shape or backdrop overrides the family's choice for every doll. <code>R</code> asks for new dolls without breaking the ones on screen: it records a new seed that applies only from three dolls ahead (past everything visible), then asks for two quick openings to bring it in. The page keeps a short list of these seed changes, so the dolls behind keep their paint.</p>
+    </div>
+  </section>
+
+  <!-- 6. Painting -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Painting · <b>material.js</b></div>
+      <h2>Painted per pixel</h2>
+      <p>There are no textures. Every pattern, face, wood grain and gold dot is computed in the fragment shader from the point's height <code>h</code> on the doll and its angle <code>θ = atan(x, z)</code> around it (0 at the face), as signed distance functions: circles, rounded boxes, segments, vesica leaves, smooth minimums for paint drips. A distance becomes paint with an analytic anti-aliased edge, so a pattern stays crisp at any size, which matters when the dolls are 0.7× one moment and 1.4× the next and the camera can come close.</p>
+      <p>Each pattern also writes a tiny height for the paint, a few ten-thousandths of a unit at an edge, which the shader turns into a bumped normal with the surface-gradient method (screen-space derivatives of position and height). Lacquer catches that height as a rim of highlight along every painted edge, which is most of what makes the paint look like paint. The finish then sets roughness and specular: matte wood 0.66 with the grain's ring and pore texture showing through, glossy lacquer 0.13 with a 1.5× specular, glazed ceramic 0.27 with kiln specks, raw-and-dipped mixing 0.36 on the paint with 0.75 on the bare wood, and brass inlays that become metal with a brushed roughness. The raw wood is linden: warped rings, pores stretched along the grain and lathe grooves 230 to the unit.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A face, as the shader paints it</h3>
+        <div class="controls">
+          <label>face <select id="fcS"><option value="0">Happy</option><option value="1">Wink</option><option value="2">Surprised</option><option value="3">Serene</option><option value="5">Grin</option></select></label>
+          <label>edge width <input id="fcW" type="range" min="0.0005" max="0.03" step="0.0005" value="0.0018"><output id="fcWo"></output></label>
+        </div>
+      </div>
+      <canvas id="faceFig" aria-label="A doll face drawn from signed distances: a skin medallion, hair cap, eyes, mouth and blush, with an adjustable anti-aliasing width."></canvas>
+      <p class="fig-cap">The face medallion of <code>evalFace()</code> in the (θ, h) plane: a disc of radius 0.268, a hair cap, arcs for eyes and mouth, soft blush. Each shape is a distance; the edge width is the AA width. At the default 0.0018 the edges are crisp; drag it up to see the same distances drawn soft.</p>
+    </div>
+    <div class="col prose">
+      <p>The faces were added on top of the original designs: eight emoji-like expressions (happy, wink, surprised, serene, smirk, grin, curious, bliss), handed to the five siblings in turn from a random start, plus a minimal Bauhaus face and none for the balloon. Hair is styled per family: scalloped bangs on the drip, botanical, city and shawl dolls, a side part on the dipped ones, curtain bangs on Gel Overlap, Modern Folk and Scandi Emblem, a sleek cap elsewhere, and an ink ring around the face on Folk Graphic.</p>
+      <p>The edge width is measured once per pixel, before any branch, from the surface itself: <code>gAA = max(|fwidth(position)|, 0.0018)</code>, since the face and pattern coordinates are close to object units. Every edge in every pattern and face uses it, so no screen-space derivative sits inside a branch that depends on the pixel (which would make the shader compiler flatten the branch). The bump's derivatives are taken once at the very end, outside the wood/paint branch, for the same reason.</p>
+    </div>
+  </section>
+
+  <!-- 7. Programs -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Shaders · <b>material.js, main.js</b></div>
+      <h2>One program per pattern</h2>
+      <p>Each pattern is its own small shader program: the material is created with <code>#define DOLL_PATTERN n</code>, and a chain of <code>#if</code> blocks keeps only that pattern's painting. The face is still a runtime choice (a uniform), since siblings change expression every doll. The shadow, depth and prepass variants of the material return before any painting and keep only the dithered discard of a fading half.</p>
+      <p>Each of the four slots keeps one material per pattern it has shown and swaps between them when a new doll is assigned to it; three.js shares the compiled program between slots, so a pattern is compiled once. At load only the patterns on screen are compiled. The rest are compiled in the background after the first frame, one at a time with <code>KHR_parallel_shader_compile</code>, in the order the nest will need them: the families nearest the current doll first, alternating ahead and behind.</p>
+    </div>
+  </section>
+
+  <!-- 8. Orientation -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Looking · <b>main.js, FreeOrbitControls.js</b></div>
+      <h2>Faces that find the camera</h2>
+      <p>The camera never stops: it orbits at 0.68 rad/s, swings over and under, and rolls. The shared orbit controls lock at the poles, so this day uses the gimbal-free ones from days 14 and 16: yaw turns about the camera's own up vector and pitch about its own right vector, and the up vector turns with them, so the camera can go over the top and come back upside down. The automatic motion is applied the same way, as small turns of the camera's frame each frame: a yaw of <code>1.05 · orbit · dt</code>, a pitch that swings with <code>cos(0.55·phase)</code>, and a roll of <code>0.72 · roll · dt</code> rotating the up vector about the view direction.</p>
+      <p>A free camera spends a lot of time looking at a doll's back or its base, and a matryoshka is about its face. So the dolls turn to meet it. Each doll is only slightly turned from its mother (up to ±0.35 rad), and the whole nest is turned as one: every frame, the camera's direction is expressed in the hero doll's frame, as an azimuth from the face and an elevation from the equator, and squeezed into a window in front of the face with <code>tanh</code>. The nest then turns, at <code>1 − e<sup>−2.5·dt</sup></code> a frame, toward the rotation that would put the camera at the squeezed direction.</p>
+    </div>
+    <div class="formula"><span class="c">// camera direction in the hero's frame → where it should be</span>
+az′ = 0.5 · tanh(az / 0.5)                    <span class="c">// ±29° at most</span>
+el′ = 0.225 + 0.225 · tanh((el − 0.225) / 0.225)   <span class="c">// 0 … 26°: never from below</span>
+fix = rotation(from dir(az′, el′) to dir(az, el))
+nest ← slerp(nest, hero · fix · yaw⁻¹, 1 − e^(−2.5·dt))</div>
+    <div class="fig">
+      <div class="fig-head"><h3>The face window</h3>
+        <div class="controls">
+          <label>orbit speed <input id="fwO" type="range" min="0" max="1" step="0.01" value="0.65"><output id="fwOo"></output></label>
+        </div>
+      </div>
+      <canvas id="windowFig" aria-label="The tanh squeeze of the camera's azimuth around the face, and where the camera settles relative to the face for a given orbit speed."></canvas>
+      <div class="readout" id="fwR"></div>
+      <p class="fig-cap">Left, the azimuth map: where the camera is relative to the face (x) and where the nest turns to put it (y). Right, a top view of the doll with the window and the camera where the orbit's push balances the nest's pull: the steady state of the two rates.</p>
+    </div>
+    <div class="col prose">
+      <p>With <code>tanh</code> the window has no hard edge: inside the window the correction is tiny and grows smoothly outside it, so the nest is always being turned a little. The hero's turn is blended from one doll's to the next over the reveal, between <code>p</code> = 0.26 and 0.7, so the hand-off is a small, smooth turn too. With the default orbit the camera settles about 40° off the face, inside the window's soft edge, and never below the equator, where it would look up into the base.</p>
+    </div>
+  </section>
+
+  <!-- 9. Light -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Light · <b>backdrop.js, modules/pipeline</b></div>
+      <h2>A studio with no floor</h2>
+      <p>The dolls are rendered with the shared photographic pipeline: PCSS soft shadows, ambient occlusion and one bounce of indirect light, MSAA, a little bloom (0.025), AgX tonemapping at an exposure of 1.06, a vignette of 0.18 and fine grain. The light is a procedural studio: a large soft key from the upper left and front (direction −0.55, 0.92, 0.58, intensity 8.8, size 0.52), fill 0.48, a floor bounce of 0.38 and walls of 0.56, which is what gives lacquer its long window highlights.</p>
+      <p>The dolls float, so the background is a sphere of radius 36 around everything, seen from inside. It is pure emission: no diffuse and no specular, so no shadow, ambient occlusion or reflection can ever mark it. Its colour is the family's backdrop (warm plaster, soft gallery grey, deep charcoal, terracotta and others), eased to the next family's at 2.2/s, graded a little darker below and lighter above, with two octaves of noise at 1.5% and 0.8% like plaster, and lit like a spot behind the doll: 1.6× at the centre of the screen falling to 0.32× at the corners. The halves fade into exactly this colour, computed the same way in their own shader, which is why they can vanish anywhere on screen.</p>
+    </div>
+  </section>
+
+  <!-- 10. Sound -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Sound · <b>sound.js</b></div>
+      <h2>A wooden box, opening</h2>
+      <p>Every opening plays the sound of a real one: six cuts from a CC0 recording of a small round hollow wooden box being handled, opened and closed, each 1.1 s, a quiet slide that builds to a release about 0.7 s in. They were picked by matching the shape of their loudness envelope and their spectrum to the one cut that sounded right. Each plays at <code>p</code> = 0 crossing upward, a random variant never the same twice in a row, with ±7% of pitch and ±15% of gain. Closing (the nest running backwards) plays a lid closing from a second recording. The opening of the animation is timed to them: the twist takes about as long as the slide.</p>
+      <p>The wood goes through a gentle low-pass at 1.8 kHz (Q 0.5), which takes the scrape off and makes it sound like it comes from inside the hollow, then a compressor (−14 dB, 3:1). Under it a song loops at 0.3 gain, <em>Melancholic Russian Folk Trip-Hop</em>, generated with Lyria 3.5. The audio context is created on load and resumes on the first gesture, but nothing at all plays until the loader has finished: the first rendered frame calls <code>sound.start()</code>.</p>
+    </div>
+  </section>
+
+  <footer class="col">
+    <div class="meta">
+      <span><b>three.js</b> r187</span><span>WebGL2</span><span>photographic pipeline</span><span>analytic SDF painting</span><span>gimbal-free orbit</span><span>started in <b>Antigravity</b> with Gemini 4 Neon, finished in <b>Claude Code</b> with Opus 5.5</span><span>music by <b>Lyria 3.5</b></span>
+    </div>
+    Day 24 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/24/">spite.github.io/codevember-2026/24</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/24">24/ of the codevember-2026 repository</a>. The infinite zoom follows <a href="https://github.com/spite/infinite-gift">infinite-gift</a>; the free orbit is from <a href="../16/explainer.html">day 16</a>.
+    <br><br>The designs are inspired by modern Matryoshkas and photos by:
+    <ul>
+      <li>Becky Kemp, Sketch Inc: <a href="https://petitmonkey.com/products/sketch-inc-nesting-dolls-black-and-white">black-and-white graphic dolls</a>, and probably the <a href="https://petitmonkey.com/products/nesting-dolls-dripped-dolls">dripped dolls</a></li>
+      <li>Studio Marii Roze "Vremya Samotsvetov": <a href="https://www.livemaster.ru/item/36924904-kukly-i-igrushki-interernaya-matreshka-vse-tsveta-razvivayusc">"All Colours" matryoshka</a></li>
+      <li>Emma, emuse: <a href="https://emusing-emma.blogspot.com/2014/04/how-to-design-unique-set-of-russian.html">How to design a unique set of Russian dolls</a></li>
+      <li>Katelyn Masters, Bit &amp; Bauble: <a href="https://bitandbauble.com/diy-modern-nesting-dolls/">DIY Modern Nesting Dolls</a></li>
+      <li>Fortmoon Forty: <a href="https://www.flickr.com/photos/125787439@N05/37853823356/">Fortmoon_dolls_1</a></li>
+      <li>Studio SIESTA (Zuzanna Malinowska, Marcin Wroński): <a href="http://www.siestastudio.com/">ceramic BABA matryoshkas</a></li>
+      <li>Fluid Market: <a href="https://fluidmarket.fr/en/products/sel-poivre-doll-poupee-russe">Salt and Pepper Dolls</a></li>
+      <li>Bud: Babushka Dinner Dolls · Eline Pellinkhof: harlequin dolls (signed photo)</li>
+    </ul>
+    Sounds: CC0 recordings on freesound.org, "Wooden Box Handling Opening Closing" by onewileybear (852176) and "Wooden Box: Open / Close 2 (Compilation)" by Sheyvan (475294). Music: "Melancholic Russian Folk Trip-Hop", generated with Lyria 3.5.
+  </footer>
+</main>
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const clamp01 = (x) => clamp(x, 0, 1);
+  const smoothstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+  const rgb = (hex) => { const c = document.createElement("canvas").getContext("2d"); c.fillStyle = hex; const s = c.fillStyle; if (s[0] === "#") return [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16)); return s.match(/\d+/g).slice(0, 3).map(Number); };
+  const rgba = (hex, a) => `rgba(${rgb(hex).join(",")},${a})`;
+
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1, W = 0, H = 0;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      W = canvas.clientWidth || 600; H = Math.round(W * (typeof aspect === "function" ? aspect(W) : aspect));
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, W, H);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    new MutationObserver(() => fit(true)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return { redraw: () => fit(true) };
+  }
+  const bind = (id, out, fmt, fn) => { const el = $(id); const o = $(out); const show = () => { if (o) o.textContent = fmt(+el.value); }; el.addEventListener("input", () => { show(); fn(); }); show(); return el; };
+  const stage = (ctx, W, H) => { ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H); };
+  const label = (ctx, text, x, y, color = css("--stage-ink"), size = 11, align = "left") => { ctx.fillStyle = color; ctx.font = font(size); ctx.textAlign = align; ctx.fillText(text, x, y); ctx.textAlign = "left"; };
+  function player(btn, input, speed, loop) {
+    let on = false, last = 0;
+    const step = (t) => {
+      if (!on) return;
+      const dt = last ? Math.min(0.05, (t - last) / 1000) : 0; last = t;
+      let v = +input.value + dt * speed;
+      const max = +input.max, min = +input.min;
+      if (v > max) v = loop ? min + (v - max) : max;
+      input.value = v; input.dispatchEvent(new Event("input"));
+      if (!loop && v >= max) { on = false; btn.textContent = "play"; return; }
+      requestAnimationFrame(step);
+    };
+    btn.addEventListener("click", () => { on = !on; btn.textContent = on ? "pause" : "play"; last = 0; if (on) { if (!loop && +input.value >= +input.max) input.value = input.min; requestAnimationFrame(step); } });
+  }
+
+  // ---- Doll geometry (as geometry.js) ----
+  const DOLL_HEIGHT = 2.2, CENTER_Y = DOLL_HEIGHT * 0.48, SPLIT_H = 0.43, SPLIT_Y = DOLL_HEIGHT * SPLIT_H;
+  const WALL = 0.056, LIP_HEIGHT = 0.088, BASE = 0.075, CHAMFER = 0.0085;
+  const G = (t, c, w) => Math.exp(-Math.pow((t - c) / w, 2));
+  function profileRadius(h, shape) {
+    const t = clamp01(h), t2 = t * t, t4 = t2 * t2, dome = Math.sqrt(Math.max(0, 1 - t4 * t4));
+    if (shape === "Classic") return dome * (0.425 + 0.145 * G(t, 0.31, 0.22) - 0.042 * G(t, 0.62, 0.13) + 0.068 * G(t, 0.82, 0.18));
+    if (shape === "Pear") return dome * (0.38 + 0.215 * G(t, 0.28, 0.25) + 0.115 * G(t, 0.84, 0.21));
+    return dome * (0.425 + 0.122 * G(t, 0.36, 0.27) + 0.038 * G(t, 0.82, 0.22));
+  }
+  function dollPoints(shape) {
+    const rSplit = profileRadius(SPLIT_H, shape), rBase = profileRadius(0, shape);
+    const rLipOuter = Math.min(rSplit, profileRadius((SPLIT_Y + LIP_HEIGHT + 0.01) / DOLL_HEIGHT, shape)) - 0.034;
+    const rInnerRim = rLipOuter - 0.026;
+    const bottom = [];
+    bottom.push({ r: 0, y: 0, part: 1 }, { r: rBase - 0.022, y: 0, part: 1 }, { r: rBase - 0.008, y: 0.008, part: 0 }, { r: rBase, y: 0.022, part: 0 });
+    for (let i = 1; i <= 28; i++) {
+      const h = 0.01 + (SPLIT_H - 0.01) * (i / 28), y = Math.min(h * DOLL_HEIGHT, SPLIT_Y - CHAMFER);
+      bottom.push({ r: profileRadius(y / DOLL_HEIGHT, shape), y, part: 0 });
+    }
+    bottom.push({ r: rSplit - CHAMFER * 0.18, y: SPLIT_Y - CHAMFER * 0.52, part: 0 }, { r: rSplit - CHAMFER * 0.58, y: SPLIT_Y - CHAMFER * 0.16, part: 0 }, { r: rSplit - CHAMFER * 0.95, y: SPLIT_Y, part: 0 });
+    bottom.push({ r: rLipOuter + 0.004, y: SPLIT_Y, part: 1 }, { r: rLipOuter, y: SPLIT_Y + 0.004, part: 1 }, { r: rLipOuter, y: SPLIT_Y + LIP_HEIGHT - 0.006, part: 1 });
+    bottom.push({ r: rLipOuter - 0.006, y: SPLIT_Y + LIP_HEIGHT, part: 1 }, { r: rInnerRim + 0.006, y: SPLIT_Y + LIP_HEIGHT, part: 1 }, { r: rInnerRim, y: SPLIT_Y + LIP_HEIGHT - 0.006, part: 1 });
+    for (let i = 0; i <= 16; i++) {
+      const t = i / 16, y = (SPLIT_Y + LIP_HEIGHT - 0.012) * (1 - t) + (BASE + 0.016) * t;
+      const h = clamp(y / DOLL_HEIGHT, 0, SPLIT_H);
+      bottom.push({ r: Math.max(0.06, Math.min(rInnerRim, profileRadius(h, shape) - WALL)), y, part: 1 });
+    }
+    const rInnerFloor = Math.max(0.05, Math.min(rInnerRim, rBase - WALL) - 0.015);
+    bottom.push({ r: rInnerFloor - 0.015, y: BASE, part: 1 }, { r: 0, y: BASE, part: 1 });
+    const top = [];
+    const innerCrownY = DOLL_HEIGHT - WALL, innerStartY = SPLIT_Y + LIP_HEIGHT + 0.006;
+    top.push({ r: 0, y: innerCrownY, part: 1 });
+    for (let i = 1; i <= 22; i++) {
+      const t = i / 22, y = innerCrownY * (1 - t) + innerStartY * t, h = Math.min(0.995, y / DOLL_HEIGHT);
+      const domeCap = Math.sqrt(Math.max(0, 1 - Math.pow(Math.max(0, (y - (innerCrownY - 0.34)) / 0.34), 2)));
+      const rProfile = Math.max(0, Math.min(rInnerRim, profileRadius(h, shape) - WALL));
+      const rIn = y > innerCrownY - 0.34 ? Math.min(rProfile, rInnerRim * 0.88 * domeCap) : rProfile;
+      top.push({ r: Math.max(0.002, rIn), y, part: 1 });
+    }
+    const rRecess = rLipOuter + 0.0025;
+    top.push({ r: rRecess, y: innerStartY, part: 1 }, { r: rRecess, y: SPLIT_Y + 0.004, part: 1 }, { r: rRecess + 0.004, y: SPLIT_Y, part: 1 });
+    top.push({ r: rSplit - CHAMFER * 0.95, y: SPLIT_Y, part: 0 }, { r: rSplit - CHAMFER * 0.58, y: SPLIT_Y + CHAMFER * 0.16, part: 0 }, { r: rSplit - CHAMFER * 0.18, y: SPLIT_Y + CHAMFER * 0.52, part: 0 });
+    top.push({ r: profileRadius((SPLIT_Y + CHAMFER) / DOLL_HEIGHT, shape), y: SPLIT_Y + CHAMFER, part: 0 });
+    const hTop = (SPLIT_Y + CHAMFER) / DOLL_HEIGHT;
+    for (let i = 1; i < 56; i++) { const u = i / 56, s = 1 - Math.pow(1 - u, 1.55), h = hTop + (1 - hTop) * s; top.push({ r: profileRadius(h, shape), y: h * DOLL_HEIGHT, part: 0 }); }
+    top.push({ r: 0, y: DOLL_HEIGHT, part: 0 });
+    return { bottom, top, rLipOuter, rInnerRim, rSplit };
+  }
+  // Draws a half's profile mirrored (both sides of the axis) around the doll's origin; tf maps doll coords to screen.
+  function drawHalf(ctx, pts, tf, fillOut, fillRaw, strokeCol, lw = 1) {
+    const poly = [];
+    for (const p of pts) poly.push([p.r, p.y - CENTER_Y, p.part]);
+    for (let i = pts.length - 1; i >= 0; i--) poly.push([-pts[i].r, pts[i].y - CENTER_Y, pts[i].part]);
+    ctx.beginPath();
+    poly.forEach(([x, y], i) => { const [sx, sy] = tf(x, y); if (i) ctx.lineTo(sx, sy); else ctx.moveTo(sx, sy); });
+    ctx.closePath();
+    ctx.fillStyle = fillRaw; ctx.fill();
+    // painted outside as a thick stroke along the part-0 run
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    for (const side of [1, -1]) {
+      ctx.beginPath(); let open = false;
+      for (const p of pts) {
+        const [sx, sy] = tf(side * p.r, p.y - CENTER_Y);
+        if (p.part === 0) { if (open) ctx.lineTo(sx, sy); else { ctx.moveTo(sx, sy); open = true; } } else open = false;
+      }
+      ctx.strokeStyle = fillOut; ctx.lineWidth = lw * 3; ctx.stroke();
+    }
+    if (strokeCol) { ctx.beginPath(); poly.forEach(([x, y], i) => { const [sx, sy] = tf(x, y); if (i) ctx.lineTo(sx, sy); else ctx.moveTo(sx, sy); }); ctx.closePath(); ctx.strokeStyle = strokeCol; ctx.lineWidth = lw * 0.6; ctx.stroke(); }
+  }
+
+  // ---- 1. Lathe cross-section ----
+  {
+    const fig = setup($("latheFig"), (W) => (W < 520 ? 1.25 : 0.62), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const shape = $("lsS").value, d = dollPoints(shape);
+      const s = Math.min(H / 2.55, W / 1.5), cx = W / 2, cy = H / 2 + 0.05 * s;
+      const lift = 0.1;
+      const tf = (x, y) => [cx + x * s, cy - y * s];
+      const tfTop = (x, y) => [cx + x * s, cy - (y + lift) * s];
+      // axis and split
+      ctx.strokeStyle = css("--stage-line"); ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx, 8); ctx.lineTo(cx, H - 8); ctx.stroke();
+      const ys = cy - (SPLIT_Y - CENTER_Y) * s;
+      ctx.beginPath(); ctx.moveTo(14, ys); ctx.lineTo(W - 14, ys); ctx.stroke(); ctx.setLineDash([]);
+      drawHalf(ctx, d.bottom, tf, css("--lacq"), rgba(css("--wood"), 0.95), css("--wood2"), 1.4);
+      drawHalf(ctx, d.top, tfTop, css("--lacq"), rgba(css("--wood"), 0.95), css("--wood2"), 1.4);
+      if ($("lsN").checked) {
+        const k = Math.exp(-0.35), n = dollPoints(shape);
+        const tfn = (x, y) => [cx + x * k * s, cy - y * k * s];
+        ctx.setLineDash([4, 3]); ctx.strokeStyle = css("--lacq2"); ctx.lineWidth = 1.3;
+        for (const half of [n.bottom, n.top]) {
+          ctx.beginPath(); let first = true;
+          for (const p of half) { if (p.part !== 0) continue; const [a, b] = tfn(p.r, p.y - CENTER_Y); if (first) { ctx.moveTo(a, b); first = false; } else ctx.lineTo(a, b); }
+          first = true;
+          for (const p of half) { if (p.part !== 0) continue; const [a, b] = tfn(-p.r, p.y - CENTER_Y); if (first) { ctx.moveTo(a, b); first = false; } else ctx.lineTo(a, b); }
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }
+      // origin
+      ctx.fillStyle = css("--accent"); ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+      label(ctx, "origin (48% up)", cx + 8, cy - 6, css("--accent"));
+      label(ctx, "split 43%", 16, ys - 6);
+      const [lx, ly] = tf(d.rLipOuter, SPLIT_Y + LIP_HEIGHT - CENTER_Y);
+      label(ctx, "lip", lx + 10, ly + 4, css("--ink"));
+      // clearance between next doll belly and wall
+      let minGap = 1;
+      const k = Math.exp(-0.35);
+      for (let y = BASE + 0.05; y < DOLL_HEIGHT - 0.2; y += 0.01) {
+        const yl = (y - CENTER_Y) / k + CENTER_Y;
+        if (yl < 0 || yl > DOLL_HEIGHT) continue;
+        const inner = profileRadius(yl / DOLL_HEIGHT, shape) * k;
+        const wall = y < SPLIT_Y + LIP_HEIGHT ? Math.min(d.rInnerRim, profileRadius(Math.min(SPLIT_H, y / DOLL_HEIGHT), shape) - WALL) : profileRadius(y / DOLL_HEIGHT, shape) - WALL;
+        minGap = Math.min(minGap, wall - inner);
+      }
+      $("lsR").innerHTML = `<span>belly radius <b>${Math.max(...d.bottom.filter((p) => p.part === 0).map((p) => p.r)).toFixed(3)}</b></span><span>lip outer <b>${d.rLipOuter.toFixed(3)}</b></span><span>wall <b>0.056</b></span><span>tightest gap to next doll <b>${minGap.toFixed(3)}</b></span>`;
+    });
+    $("lsS").addEventListener("change", fig.redraw);
+    $("lsN").addEventListener("change", fig.redraw);
+  }
+
+  // ---- 2. Zoom slots ----
+  {
+    const shapePts = dollPoints("Nordic");
+    const cols = ["--lacq", "--lacq2", "--gold", "--accent2"];
+    const fig = setup($("zoomFig"), (W) => (W < 520 ? 0.9 : 0.45), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const u = +$("zmU").value, base = Math.floor(u), frac = u - base;
+      const colW = W / 4, s = Math.min(H / 3.6, colW / 1.9);
+      const rows = [];
+      for (let offset = -1; offset <= 2; offset++) {
+        const g = base + offset, p = u - g, slot = ((g % 4) + 4) % 4;
+        const visible = p > -1 && p <= 1.05;
+        const world = Math.exp(0.35 * p);
+        rows.push({ offset, g, p, slot, visible, world });
+        const cx = colW * (slot + 0.5), cy = H * 0.52;
+        const col = css(cols[g % 4 < 0 ? (g % 4) + 4 : g % 4]);
+        ctx.globalAlpha = visible ? (p > 0.48 ? 1 - smoothstep(0.48, 1.02, p) * 0.85 : 1) : 0.15;
+        for (const half of [shapePts.bottom, shapePts.top]) {
+          ctx.beginPath(); let first = true;
+          const pts = half.filter((q) => q.part === 0);
+          for (const q of pts) { const x = cx + q.r * world * s, y = cy - (q.y - CENTER_Y) * world * s; if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y); }
+          for (let i = pts.length - 1; i >= 0; i--) { const q = pts[i]; ctx.lineTo(cx - q.r * world * s, cy - (q.y - CENTER_Y) * world * s); }
+          ctx.closePath(); ctx.fillStyle = rgba(col, 0.85); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        label(ctx, `slot ${slot}`, cx, 16, css("--stage-ink"), 11, "center");
+        label(ctx, `doll ${g}`, cx, H - 26, css("--ink"), 12, "center");
+        label(ctx, `p ${p.toFixed(2)} · ×${world.toFixed(3)}`, cx, H - 10, css("--stage-ink"), 10.5, "center");
+      }
+      $("zmR").innerHTML = `<span>u <b>${u.toFixed(3)}</b></span><span>opening <b>doll ${base}</b></span><span>root scale e<sup>0.35·frac</sup> <b>${Math.exp(0.35 * frac).toFixed(3)}</b></span><span>slots <b>${rows.map((r) => `${r.g}→${r.slot}`).join(" ")}</b></span>`;
+    });
+    bind("zmU", "zmUo", (v) => v.toFixed(2), fig.redraw);
+    player($("zmP"), $("zmU"), 0.24, true);
+  }
+
+  // ---- 3. Opening ----
+  {
+    const T = 0.26;
+    const curves = (p) => {
+      const tw = 1 - Math.exp((-1.6 * p) / T);
+      const sl = clamp01((p - T * 0.55) / (1.02 - T * 0.55)), s = sl * sl * (2 - sl);
+      const r = 0.5;
+      const capY = 0.06 * tw + (2.45 + 0.55 * r) * s + (0.35 + 0.4 * r) * s * s - 0.65 * s * s * s;
+      const capR = (2.9 + 1.5 * r) * Math.pow(s, 2.7 + 0.7 * r);
+      const capPitch = (1.05 + 0.85 * r) * Math.pow(s, 2 + 0.4 * r);
+      const cupY = -(0.02 * tw + (2.15 + 0.55 * r) * s + (0.3 + 0.35 * r) * s * s - 0.35 * s * s * s);
+      const cupR = (2.7 + 1.5 * r) * Math.pow(s, 2.7 + 0.7 * r);
+      const cupPitch = (0.95 + 0.85 * r) * Math.pow(s, 2 + 0.4 * r);
+      const fade = smoothstep(0.48, 0.98, s);
+      const shadow = 1 - smoothstep(T + 0.05, 0.6, p);
+      const twist = (0.9 + 0.8 * r) * tw + (0.35 + 0.6 * r) * s;
+      return { tw, s, capY, capR, capPitch, cupY, cupR, cupPitch, fade, shadow, twist };
+    };
+    const pts = dollPoints("Classic");
+    const fig = setup($("openFig"), (W) => (W < 620 ? 1.25 : 0.5), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const narrow = W < 620;
+      const p = +$("opP").value, c = curves(p);
+      // plot
+      const px = 34, py = 16, pw = narrow ? W - 50 : W * 0.5 - 44, ph = narrow ? H * 0.42 - 30 : H - 44;
+      ctx.strokeStyle = css("--stage-line"); ctx.lineWidth = 1;
+      ctx.strokeRect(px, py, pw, ph);
+      const X = (q) => px + (q / 1.05) * pw, Y = (v) => py + ph - v * ph;
+      ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(X(T), py); ctx.lineTo(X(T), py + ph); ctx.stroke(); ctx.setLineDash([]);
+      label(ctx, "TWIST_END 0.26", X(T) + 4, py + 12);
+      const series = [
+        ["tw", "--accent", (q) => curves(q).tw],
+        ["s", "--accent2", (q) => curves(q).s],
+        ["cap lift / 2.8", "--gold", (q) => curves(q).capY / 2.8],
+        ["fade", "--muted", (q) => curves(q).fade],
+        ["shadow", "--wood2", (q) => curves(q).shadow],
+      ];
+      series.forEach(([name, col, f], i) => {
+        ctx.beginPath();
+        for (let k = 0; k <= 200; k++) { const q = (k / 200) * 1.05, v = clamp01(f(q)); if (k) ctx.lineTo(X(q), Y(v)); else ctx.moveTo(X(q), Y(v)); }
+        ctx.strokeStyle = css(col); ctx.lineWidth = 1.8; ctx.stroke();
+        label(ctx, name, px + 8 + i * Math.min(92, pw / 5), py + ph + 18, css(col), 10.5);
+      });
+      ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(p), py); ctx.lineTo(X(p), py + ph); ctx.stroke();
+      // side view
+      const vx = narrow ? 0 : W * 0.5, vy = narrow ? H * 0.42 : 0, vw = narrow ? W : W * 0.5, vh = narrow ? H * 0.58 : H;
+      ctx.save(); ctx.beginPath(); ctx.rect(vx + 4, vy + 4, vw - 8, vh - 8); ctx.clip();
+      const grow = Math.exp(0.35 * p), s = Math.min(vh / 6.4, vw / 6.2), cx = vx + vw * 0.42, cy = vy + vh * 0.55;
+      const T2 = (ox, oy, ang, k) => (x, y) => { const ca = Math.cos(ang), sa = Math.sin(ang); const rx = x * ca - y * sa, ry = x * sa + y * ca; return [cx + (ox + rx) * k * s, cy - (oy + ry) * k * s]; };
+      const alpha = 1 - c.fade;
+      ctx.globalAlpha = 1;
+      const inner = Math.exp(0.35 * (p - 1));
+      drawHalf(ctx, pts.bottom, T2(0, 0, 0, inner), css("--lacq2"), rgba(css("--wood"), 0.9), null, 1);
+      drawHalf(ctx, pts.top, T2(0, 0, 0, inner), css("--lacq2"), rgba(css("--wood"), 0.9), null, 1);
+      ctx.globalAlpha = Math.max(0.08, alpha);
+      drawHalf(ctx, pts.bottom, T2(c.cupR * 0.85, c.cupY, c.cupPitch * 0.6, grow), css("--lacq"), rgba(css("--wood"), 0.95), css("--wood2"), 1);
+      drawHalf(ctx, pts.top, T2(c.capR * 0.85, c.capY, -c.capPitch * 0.6, grow), css("--lacq"), rgba(css("--wood"), 0.95), css("--wood2"), 1);
+      ctx.restore(); ctx.globalAlpha = 1;
+      label(ctx, "away from the camera →", vx + vw - 12, vy + vh - 12, css("--stage-ink"), 10.5, "right");
+      $("opR").innerHTML = `<span>p <b>${p.toFixed(3)}</b></span><span>tw <b>${c.tw.toFixed(2)}</b></span><span>s <b>${c.s.toFixed(2)}</b></span><span>twist <b>${((c.twist * 180) / Math.PI).toFixed(0)}°</b></span><span>cap lift <b>${c.capY.toFixed(2)}</b></span><span>nest ×<b>${grow.toFixed(2)}</b></span><span>fade <b>${c.fade.toFixed(2)}</b></span><span>shadow <b>${c.shadow.toFixed(2)}</b></span>`;
+    });
+    bind("opP", "opPo", (v) => v.toFixed(2), fig.redraw);
+    player($("opPl"), $("opP"), 0.24, false);
+  }
+
+  // ---- 4. Face ----
+  {
+    const DOLL_H = DOLL_HEIGHT;
+    const sdSeg = (px, py, ax, ay, bx, by) => { const pax = px - ax, pay = py - ay, bax = bx - ax, bay = by - ay; const h = clamp01((pax * bax + pay * bay) / Math.max(bax * bax + bay * bay, 1e-6)); return Math.hypot(pax - bax * h, pay - bay * h); };
+    const arcEye = (ex, ey, cy, r, half, up) => Math.max(Math.abs(Math.hypot(ex, ey - cy) - r) - 0.009, Math.max(Math.abs(ex) - half, up ? -(ey + 0.012) : ey - 0.010));
+    // Returns [r,g,b] in 0..1 for a point fp in face coordinates.
+    function face(style, fx, fy, w, cols) {
+      const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+      const aa = (d) => smoothstep(w, -w, d);
+      let col = cols.body;
+      const dFace = Math.hypot(fx * 0.98, fy * 1.04) - 0.268;
+      let f = cols.skin;
+      const dHair = -(fy - 0.128 + 0.16 * fx * fx);
+      f = mix(f, cols.ink, aa(dHair));
+      const dBlush = Math.min(Math.hypot(fx + 0.152, fy + 0.048), Math.hypot(fx - 0.152, fy + 0.048)) - 0.046;
+      const mBlush = smoothstep(0.022, -0.022, dBlush);
+      if (style === 0) {
+        f = mix(f, cols.blush, mBlush * 0.62);
+        const ex = Math.abs(fx) - 0.1, ey = fy - 0.012;
+        f = mix(f, cols.ink, aa(arcEye(ex, ey, -0.048, 0.062, 0.042, true)));
+        const sx = fx, sy = fy + 0.028;
+        f = mix(f, cols.ink, aa(Math.max(Math.abs(Math.hypot(sx, sy) - 0.048) - 0.0085, sy + 0.016)));
+      } else if (style === 1) {
+        f = mix(f, cols.blush, mBlush * 0.58);
+        f = mix(f, cols.ink, aa(Math.hypot(fx + 0.098, fy - 0.012) - 0.027));
+        f = mix(f, [1, 1, 1], aa(Math.hypot(fx + 0.106, fy - 0.021) - 0.0085) * 0.92);
+        const ex = fx - 0.102, ey = fy - 0.012;
+        f = mix(f, cols.ink, aa(Math.max(Math.abs(Math.hypot(ex, ey + 0.045) - 0.058) - 0.009, Math.max(Math.abs(ex) - 0.04, -(ey + 0.01)))));
+        const sx = fx - 0.01, sy = fy + 0.032;
+        f = mix(f, cols.ink, aa(Math.max(Math.abs(Math.hypot(sx, sy) - 0.048) - 0.0085, sy + 0.014 - sx * 0.25)));
+      } else if (style === 2) {
+        f = mix(f, cols.blush, mBlush * 0.45);
+        f = mix(f, cols.ink, aa(Math.min(Math.hypot(fx + 0.098, fy - 0.012), Math.hypot(fx - 0.098, fy - 0.012)) - 0.03));
+        f = mix(f, [1, 1, 1], aa(Math.min(Math.hypot(fx + 0.107, fy - 0.022), Math.hypot(fx - 0.089, fy - 0.022)) - 0.0095) * 0.92);
+        const bx = Math.abs(fx) - 0.1, by = fy - 0.072;
+        f = mix(f, cols.ink, aa(Math.max(Math.abs(Math.hypot(bx, by + 0.055) - 0.065) - 0.007, Math.max(Math.abs(bx) - 0.032, -(by + 0.008)))));
+        const dO = Math.hypot(fx * 1.12, (fy + 0.072) * 0.92) - 0.034;
+        f = mix(f, cols.ink, aa(dO)); f = mix(f, cols.blush.map((v) => v * 0.85), aa(dO + 0.014));
+      } else if (style === 3) {
+        f = mix(f, cols.blush, mBlush * 0.55);
+        const ex = Math.abs(fx) - 0.1, ey = fy - 0.014;
+        f = mix(f, cols.ink, aa(Math.max(Math.abs(Math.hypot(ex, ey - 0.048) - 0.06) - 0.0085, Math.max(Math.abs(ex) - 0.04, ey - 0.01))));
+        const sy = fy + 0.028;
+        f = mix(f, cols.ink, aa(Math.max(Math.abs(Math.hypot(fx, sy) - 0.044) - 0.008, sy + 0.018)));
+      } else {
+        f = mix(f, cols.blush, mBlush * 0.65);
+        const ex = Math.abs(fx) - 0.102, ey = fy - 0.016;
+        f = mix(f, cols.ink, aa(arcEye(ex, ey, -0.046, 0.058, 0.04, true)));
+        const gx = fx, gy = fy + 0.046;
+        const dG = Math.max(Math.hypot(gx * 0.88, gy * 1.15) - 0.064, gy);
+        f = mix(f, cols.ink, aa(dG)); f = mix(f, [0.99, 0.98, 0.96], aa(dG + 0.011));
+      }
+      return mix(col, f, aa(dFace));
+    }
+    const fig = setup($("faceFig"), (W) => (W < 520 ? 0.9 : 0.5), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const style = +$("fcS").value, w = +$("fcW").value;
+      const n = (c) => rgb(css(c)).map((v) => v / 255);
+      const cols = { body: n("--lacq"), skin: [0.95, 0.91, 0.85], blush: [0.85, 0.55, 0.47], ink: [0.11, 0.1, 0.11] };
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      const size = Math.round(Math.min(H - 20, W * 0.6)), res = Math.min(360, Math.round(size * dpr));
+      const img = ctx.createImageData(res, res), span = 0.36;
+      for (let j = 0; j < res; j++) for (let i = 0; i < res; i++) {
+        const fx = ((i + 0.5) / res - 0.5) * 2 * span, fy = (0.5 - (j + 0.5) / res) * 2 * span;
+        const c = face(style, fx, fy, w, cols), k = (j * res + i) * 4;
+        img.data[k] = c[0] * 255; img.data[k + 1] = c[1] * 255; img.data[k + 2] = c[2] * 255; img.data[k + 3] = 255;
+      }
+      const off = document.createElement("canvas"); off.width = res; off.height = res; off.getContext("2d").putImageData(img, 0, 0);
+      const x0 = (W - size) / 2, y0 = (H - size) / 2;
+      ctx.imageSmoothingEnabled = true; ctx.drawImage(off, x0, y0, size, size);
+      label(ctx, `fp = (θ·0.43, (h − 0.79)·2.2)`, 12, H - 12);
+      label(ctx, `edge ±${w.toFixed(4)}`, W - 12, H - 12, css("--stage-ink"), 11, "right");
+    });
+    $("fcS").addEventListener("change", fig.redraw);
+    bind("fcW", "fcWo", (v) => v.toFixed(4), fig.redraw);
+  }
+
+  // ---- 5. Face window ----
+  {
+    const A = 0.5;
+    const fig = setup($("windowFig"), (W) => (W < 620 ? 1.1 : 0.45), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const narrow = W < 620, orbit = +$("fwO").value;
+      const pw = narrow ? W - 60 : W * 0.5 - 60, ph = narrow ? H * 0.5 - 50 : H - 60, px = 40, py = 18;
+      ctx.strokeStyle = css("--stage-line"); ctx.strokeRect(px, py, pw, ph);
+      const R = Math.PI;
+      const X = (a) => px + ((a + R) / (2 * R)) * pw, Y = (a) => py + ph / 2 - (a / R) * (ph / 2);
+      ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(X(-R), Y(-R)); ctx.lineTo(X(R), Y(R)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(px, Y(A)); ctx.lineTo(px + pw, Y(A)); ctx.moveTo(px, Y(-A)); ctx.lineTo(px + pw, Y(-A)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); for (let k = 0; k <= 200; k++) { const a = -R + (k / 200) * 2 * R, v = A * Math.tanh(a / A); if (k) ctx.lineTo(X(a), Y(v)); else ctx.moveTo(X(a), Y(v)); }
+      ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2; ctx.stroke();
+      label(ctx, "az (camera from face)", px + pw / 2, py + ph + 16, css("--stage-ink"), 10.5, "center");
+      label(ctx, "az′ = 0.5·tanh(az/0.5)", px + 8, py + 14, css("--accent"));
+      label(ctx, "±29°", px + pw - 6, Y(A) - 4, css("--stage-ink"), 10, "right");
+      // steady state: orbit push = pull 2.5·(az − az′)
+      const push = orbit * 1.05;
+      let az = 0; for (let k = 0; k < 60; k++) { const gap = az - A * Math.tanh(az / A); const f = 2.5 * gap - push; const dg = 2.5 * (1 - 1 / Math.cosh(az / A) ** 2); az -= f / Math.max(dg, 0.05); az = clamp(az, 0, 3); }
+      const vx = narrow ? 0 : W * 0.5, vy = narrow ? H * 0.5 : 0, vw = narrow ? W : W * 0.5, vh = narrow ? H * 0.5 : H;
+      const cx = vx + vw / 2, cy = vy + vh / 2 + 6, r = Math.min(vw, vh) * 0.32;
+      ctx.fillStyle = rgba(css("--accent2"), 0.12);
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r * 1.3, -Math.PI / 2 - A, -Math.PI / 2 + A); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = css("--lacq"); ctx.beginPath(); ctx.arc(cx, cy, r * 0.35, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#f3e8dc"; ctx.beginPath(); ctx.arc(cx, cy - r * 0.22, r * 0.11, 0, Math.PI * 2); ctx.fill();
+      label(ctx, "face", cx, cy - r * 0.42, css("--ink"), 10.5, "center");
+      const ang = -Math.PI / 2 + az;
+      const camx = cx + Math.cos(ang) * r * 1.15, camy = cy + Math.sin(ang) * r * 1.15;
+      ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(camx, camy); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = css("--ink"); ctx.beginPath(); ctx.arc(camx, camy, 5, 0, Math.PI * 2); ctx.fill();
+      label(ctx, "camera", camx + 8, camy + 4, css("--ink"), 10.5);
+      $("fwR").innerHTML = `<span>orbit push <b>${push.toFixed(2)} rad/s</b></span><span>camera settles <b>${((az * 180) / Math.PI).toFixed(0)}°</b> off the face</span><span>squeezed to <b>${((A * Math.tanh(az / A) * 180) / Math.PI).toFixed(0)}°</b></span>`;
+    });
+    bind("fwO", "fwOo", (v) => v.toFixed(2), fig.redraw);
+  }
+})();
+</script>
+</body>
+</html>
