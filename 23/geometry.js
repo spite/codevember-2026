@@ -25,6 +25,23 @@ class MeshBuilder {
     };
   }
 
+  // Hands Suzanne's mesh (suzanne-mesh.bin) to the worker; resolves to the baker's atlas-space geometry for her
+  setSuzanne(buffer) {
+    const id = this.nextId++;
+    return new Promise((resolve) => {
+      this.pending.set(id, (m) => {
+        const geometry = new BufferGeometry();
+        geometry.setAttribute("position", new BufferAttribute(m.position, 3));
+        geometry.setAttribute("normal", new BufferAttribute(m.normal, 3));
+        geometry.setAttribute("aTangent", new BufferAttribute(m.tangent, 4));
+        geometry.setAttribute("uv", new BufferAttribute(m.uv, 2));
+        geometry.setIndex(new BufferAttribute(m.index, 1));
+        resolve(geometry);
+      });
+      this.worker.postMessage({ id, suzanne: buffer }, [buffer]);
+    });
+  }
+
   // Resolves to { geometry, sdf, heat, emitters, volumeRadius }; the readback is copied, so the baker can rebake at once.
   build({ radius, baker, shape, seed, levels, tol, maxTriangles, dispAmp }) {
     const id = this.nextId++;
@@ -88,6 +105,7 @@ function toGeometry(m) {
   geometry.setAttribute("position", new BufferAttribute(m.positions, 3));
   geometry.setAttribute("normal", new BufferAttribute(m.normals, 3));
   geometry.setAttribute("uv", new BufferAttribute(m.uvs, 2));
+  if (m.dispUvs) geometry.setAttribute("aDispUv", new BufferAttribute(m.dispUvs, 2));
   geometry.setAttribute("aTangent", new BufferAttribute(m.tangents, 4));
   geometry.setAttribute("aTileBounds", new BufferAttribute(m.tileBounds, 4));
   geometry.setAttribute("aCellTexels", new BufferAttribute(m.cellTexels, 1));

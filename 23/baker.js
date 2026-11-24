@@ -4,6 +4,8 @@ import {
   GLSL3,
   RGBAFormat,
   HalfFloatType,
+  FloatType,
+  NearestFilter,
   UnsignedByteType,
   CustomBlending,
   OneFactor,
@@ -31,6 +33,47 @@ void main() {
 }
 `;
 
+// Suzanne: her mesh drawn in atlas space (uv as the position) into one band of rows, shifted by the bake's sub-texel
+// jitter; writes each texel's surface point (w = 1 where she is)
+const FRAME_VS = /* glsl */ `
+in vec3 position;
+in vec2 uv;
+uniform vec3 uBand; // first row, rows in the frame target, rows in the atlas
+uniform vec2 uJitter;
+out vec3 vPos;
+void main() {
+  vPos = position;
+  vec2 a = uv - uJitter;
+  gl_Position = vec4(a.x * 2.0 - 1.0, (a.y * uBand.z - uBand.x) / uBand.y * 2.0 - 1.0, 0.0, 1.0);
+}
+`;
+const FRAME_FS = /* glsl */ `
+precision highp float;
+in vec3 vPos;
+layout(location = 0) out vec4 outColor;
+void main() {
+  outColor = vec4(vPos, 1.0);
+}
+`;
+// Suzanne's flow pass: her mesh in atlas space, with its frame
+const MESH_FLOW_VS = /* glsl */ `
+in vec3 position;
+in vec3 normal;
+in vec4 aTangent;
+in vec2 uv;
+out vec2 vUv;
+out vec3 vPos;
+out vec3 vNrm;
+out vec4 vTan;
+void main() {
+  vUv = uv;
+  vPos = position;
+  vNrm = normal;
+  vTan = aTangent;
+  gl_Position = vec4(uv * 2.0 - 1.0, 0.0, 1.0);
+}
+`;
+
 // Pass 1: Solidifies the Navier-Stokes fluid-advected 3D coordinates (uSimCoord) into RAZOR-SHARP
 // Substance-Designer-grade solid volcanic rock PBR maps (80-88% hard dark stone + narrow fiery veins)!
 // Zero bilinear blur: all IQ Voronoi cracks, chipped bevels, pahoehoe folds & scoria pores are
@@ -47,19 +90,9 @@ uniform sampler2D uSimCoord; // xyz = Navier-Stokes advected 3D sphere dir, w = 
 uniform int uOne;
 uniform int uFour;
 uniform int uShapeMode;      // 0: cube atlas (radial shapes), 1: torus, 2: trefoil knot, 3: twisted ring, 5: Suzanne
-// Suzanne (mode 5): the cube atlas direction mapped onto her surface by the shrink-wrap grid (see meshData.js)
-uniform sampler2D uWrapGrid;
-uniform float uWrapN;
-vec3 wrapPos(vec3 d) {
-  vec3 a = abs(d);
-  float f, u, v;
-  if (a.x >= a.y && a.x >= a.z) { f = d.x > 0.0 ? 0.0 : 1.0; u = (d.x > 0.0 ? -d.z : d.z) / a.x; v = d.y / a.x; }
-  else if (a.y >= a.z) { f = d.y > 0.0 ? 2.0 : 3.0; u = d.x / a.y; v = (d.y > 0.0 ? -d.z : d.z) / a.y; }
-  else { f = d.z > 0.0 ? 4.0 : 5.0; u = (d.z > 0.0 ? d.x : -d.x) / a.z; v = d.y / a.z; }
-  float n1 = uWrapN + 1.0;
-  vec2 g = (vec2(u, v) * 0.5 + 0.5) * uWrapN;
-  return texture(uWrapGrid, vec2((g.x + 0.5) / n1, (f * n1 + g.y + 0.5) / (6.0 * n1))).xyz;
-}
+// Suzanne (mode 5): her surface point per texel of this band (rows from uFrameY0), rasterised from her mesh
+uniform highp sampler2D uFrame;
+uniform int uFrameY0;
 
 uniform float uCrust;
 uniform float uScale;
@@ -289,12 +322,22 @@ vec3 atlasUVToDir(vec2 uv) {
   s.x = c.x * sqrt(max(0.0, 1.0 - c2.y * 0.5 - c2.z * 0.5 + (c2.y * c2.z) / 3.0));
   s.y = c.y * sqrt(max(0.0, 1.0 - c2.z * 0.5 - c2.x * 0.5 + (c2.z * c2.x) / 3.0));
   s.z = c.z * sqrt(max(0.0, 1.0 - c2.x * 0.5 - c2.y * 0.5 + (c2.x * c2.y) / 3.0));
-  vec3 d0 = normalize(s);
-  return uShapeMode == 5 ? wrapPos(d0) : d0;
+  return normalize(s);
 }
 
 void main() {
-  vec3 dir = atlasUVToDir(vUv + uJitter);
+  vec3 dir;
+  if (uShapeMode == 5) {
+    vec4 frame = texelFetch(uFrame, ivec2(gl_FragCoord.xy) - ivec2(0, uFrameY0), 0);
+    // Outside her charts and skirts
+    if (frame.w < 0.5) {
+      outColor = vec4(0.0);
+      return;
+    }
+    dir = frame.xyz;
+  } else {
+    dir = atlasUVToDir(vUv + uJitter);
+  }
   // Always sample the sphere-wrapped Navier-Stokes field via octEncode(normalize(dir))!
   // Because dir is 100% periodic on Torus & Trefoil Knot (pos(0,v)==pos(1,v), pos(u,0)==pos(u,1)),
   // every baked map tiles seamlessly across u=0/1 and v=0/1 with zero seam!
@@ -723,20 +766,12 @@ uniform sampler2D uHeightMap;
 uniform vec2 uTexel;
 uniform float uPad;
 uniform int uShapeMode;
-// Suzanne (mode 5): the cube atlas direction mapped onto her surface by the shrink-wrap grid (see meshData.js)
-uniform sampler2D uWrapGrid;
-uniform float uWrapN;
-vec3 wrapPos(vec3 d) {
-  vec3 a = abs(d);
-  float f, u, v;
-  if (a.x >= a.y && a.x >= a.z) { f = d.x > 0.0 ? 0.0 : 1.0; u = (d.x > 0.0 ? -d.z : d.z) / a.x; v = d.y / a.x; }
-  else if (a.y >= a.z) { f = d.y > 0.0 ? 2.0 : 3.0; u = d.x / a.y; v = (d.y > 0.0 ? -d.z : d.z) / a.y; }
-  else { f = d.z > 0.0 ? 4.0 : 5.0; u = (d.z > 0.0 ? d.x : -d.x) / a.z; v = d.y / a.z; }
-  float n1 = uWrapN + 1.0;
-  vec2 g = (vec2(u, v) * 0.5 + 0.5) * uWrapN;
-  return texture(uWrapGrid, vec2((g.x + 0.5) / n1, (f * n1 + g.y + 0.5) / (6.0 * n1))).xyz;
-}
-
+#ifdef MESH_FRAME
+// Suzanne: drawn from her mesh in atlas space, so the frame comes from it
+in vec3 vPos;
+in vec3 vNrm;
+in vec4 vTan;
+#endif
 
 vec2 octEncode(vec3 n) {
   n /= (abs(n.x) + abs(n.y) + abs(n.z));
@@ -814,18 +849,15 @@ vec3 trefoilCenterFlow(float t) {
 
 void main() {
   vec3 dir, T, B;
-  if (uShapeMode == 0 || uShapeMode == 5) {
+#ifdef MESH_FRAME
+  // Her mesh's frame, as the mesh worker gives it to the rendered mesh
+  dir = normalize(vPos);
+  vec3 nrm = normalize(vNrm);
+  T = normalize(vTan.xyz - nrm * dot(vTan.xyz, nrm));
+  B = cross(nrm, T) * vTan.w;
+#else
+  if (uShapeMode == 0) {
     atlasUVToFrame(vUv, dir, T, B);
-    if (uShapeMode == 5) {
-      // Her surface frame: the wrap's derivatives along the sphere frame, so it matches the mesh's tangents
-      vec3 tT = wrapPos(normalize(dir + T * 0.004)) - wrapPos(normalize(dir - T * 0.004));
-      vec3 tB = wrapPos(normalize(dir + B * 0.004)) - wrapPos(normalize(dir - B * 0.004));
-      vec3 nrm = normalize(cross(tT, tB) + 1e-7);
-      dir = normalize(wrapPos(dir));
-      T = normalize(tT - nrm * dot(tT, nrm) + 1e-7);
-      B = normalize(cross(nrm, T));
-      if (dot(B, tB) < 0.0) B = -B;
-    }
   } else if (uShapeMode == 1) {
     float phi = vUv.x * 6.2831853;
     float theta = vUv.y * 6.2831853;
@@ -853,6 +885,7 @@ void main() {
     T = tanV;
     B = normalize(normV * st - binorm * ct);
   }
+#endif
 
   // Project octahedral Navier-Stokes velocity onto the surface's seamless tangent basis (T, B)
   vec2 octUv = octEncode(dir);
@@ -986,10 +1019,9 @@ class MagmaTextureBaker {
 
     const texel = new Vector2(1 / width, 1 / height);
 
-    // Suzanne's shrink-wrap grid (setWrapGrid), shared by the height and flow passes
-    this.wrapUniforms = { uWrapGrid: { value: null }, uWrapN: { value: 96 } };
     const heightUniforms = {
-      ...this.wrapUniforms,
+      uFrame: { value: null },
+      uFrameY0: { value: 0 },
       uSimCoord: { value: fluid.coordTexture },
       uShapeMode: { value: 0 },
       uCrust: { value: 0.72 },
@@ -1054,8 +1086,26 @@ class MagmaTextureBaker {
         uTexel: { value: texel },
         uPad: { value: this.padFraction },
         uShapeMode: { value: 0 },
-        ...this.wrapUniforms,
       },
+    });
+
+    // Suzanne (shape mode 5): her surface rasterised band by band (setSuzanneMesh), and her flow pass
+    this.bands = faceSize >= 1024 ? 6 : 4;
+    this.frameMat = new RawShaderMaterial({
+      glslVersion: GLSL3,
+      vertexShader: FRAME_VS,
+      fragmentShader: FRAME_FS,
+      depthTest: false,
+      depthWrite: false,
+      uniforms: { uBand: { value: new Vector3() }, uJitter: { value: new Vector2() } },
+    });
+    this.meshFlowMat = new RawShaderMaterial({
+      glslVersion: GLSL3,
+      vertexShader: MESH_FLOW_VS,
+      fragmentShader: "#define MESH_FRAME\n" + BAKE_FLOW_MAP_FS,
+      depthTest: false,
+      depthWrite: false,
+      uniforms: this.flowMat.uniforms,
     });
 
     this.noiseMat = new RawShaderMaterial({
@@ -1074,14 +1124,49 @@ class MagmaTextureBaker {
 
   // The programs a bake of this style needs; the other styles' height programs can compile later
   materialsFor(style) {
-    return [this.heightMats[style], this.normalMat, this.infoMat, this.flowMat];
+    return [this.heightMats[style], this.normalMat, this.infoMat, this.flowMat, this.frameMat, this.meshFlowMat];
   }
 
   get heightHeatTexture() { return this.heightHeatRT.texture; }
   get normalAoTexture() { return this.normalAoRT.texture; }
-  setWrapGrid(texture, n) {
-    this.wrapUniforms.uWrapGrid.value = texture;
-    this.wrapUniforms.uWrapN.value = n;
+
+  // Suzanne's atlas-space geometry (MeshBuilder.setSuzanne): her charts, and skirts that run them on into the gutters
+  setSuzanneMesh(geometry) {
+    this.suzanne = new Mesh(geometry, this.frameMat);
+    this.suzanne.frustumCulled = false;
+    this.suzanneScene = new Scene();
+    this.suzanneScene.add(this.suzanne);
+  }
+
+  // Allocated on her first bake, so other shapes don't pay for it
+  get frameRT() {
+    this._frameRT ||= new WebGLRenderTarget(this.heightHeatRT.width, Math.ceil(this.heightHeatRT.height / this.bands) + 1, {
+      type: FloatType,
+      format: RGBAFormat,
+      minFilter: NearestFilter,
+      magFilter: NearestFilter,
+      depthBuffer: false,
+      stencilBuffer: false,
+      generateMipmaps: false,
+    });
+    return this._frameRT;
+  }
+
+  // Draws her mesh into target with mat, cleared first to (clear, clear, clear, alpha)
+  _drawSuzanne(mat, target, clear, alpha) {
+    const prev = this.renderer.getRenderTarget();
+    const prevClear = this.renderer.getClearColor(new Color());
+    const prevAlpha = this.renderer.getClearAlpha();
+    this.suzanne.material = mat;
+    const autoClear = this.renderer.autoClear;
+    this.renderer.setRenderTarget(target);
+    this.renderer.setClearColor(new Color(clear, clear, clear), alpha);
+    this.renderer.clear(true, false, false);
+    this.renderer.autoClear = false;
+    this.renderer.render(this.suzanneScene, this.camera);
+    this.renderer.autoClear = autoClear;
+    this.renderer.setClearColor(prevClear, prevAlpha);
+    this.renderer.setRenderTarget(prev);
   }
 
   get flowTexture() { return this.flowRT.texture; }
@@ -1138,14 +1223,28 @@ class MagmaTextureBaker {
     this.renderer.clear(true, false, false);
     this.renderer.setClearColor(prevClear, prevAlpha);
     this.renderer.setRenderTarget(prevTarget);
-    const bands = this.faceSize >= 1024 ? 6 : 4;
+    const bands = this.bands;
+    const mesh = shapeMode === 5 && this.suzanne;
+    if (!mesh && this._frameRT) {
+      this._frameRT.dispose();
+      this._frameRT = null;
+      this.heightMat.uniforms.uFrame.value = null;
+    }
     const jitters = [[0.125, 0.375], [0.375, -0.125], [-0.125, -0.375], [-0.375, 0.125]];
     for (let k = 0; k < jitters.length; k++) {
       const [jx, jy] = jitters[k];
       for (let b = 0; b < bands; b++) {
+        this.heightMat.uniforms.uJitter.value.set(jx / this.heightHeatRT.width, jy / this.heightHeatRT.height);
+        if (mesh) {
+          const y0 = Math.round((b * this.heightHeatRT.height) / bands);
+          this.frameMat.uniforms.uBand.value.set(y0, this.frameRT.height, this.heightHeatRT.height);
+          this.frameMat.uniforms.uJitter.value.copy(this.heightMat.uniforms.uJitter.value);
+          this._drawSuzanne(this.frameMat, this.frameRT, 0, 0);
+          this.heightMat.uniforms.uFrame.value = this.frameRT.texture;
+          this.heightMat.uniforms.uFrameY0.value = y0;
+        }
         const autoClear = this.renderer.autoClear;
         this.renderer.autoClear = false;
-        this.heightMat.uniforms.uJitter.value.set(jx / this.heightHeatRT.width, jy / this.heightHeatRT.height);
         this._runBand(this.heightMat, this.heightHeatRT, b, bands, k === jitters.length - 1 && b === bands - 1);
         this.renderer.autoClear = autoClear;
         yield;
@@ -1155,7 +1254,9 @@ class MagmaTextureBaker {
       this._runBand(this.normalMat, this.normalAoRT, b, bands, b === bands - 1);
       yield;
     }
-    this._run(this.flowMat, this.flowRT);
+    // Alpha 1: three premultiplies the clear colour, and 0.5 is zero flow
+    if (mesh) this._drawSuzanne(this.meshFlowMat, this.flowRT, 0.5, 1);
+    else this._run(this.flowMat, this.flowRT);
 
     if (readInfo) {
       yield;

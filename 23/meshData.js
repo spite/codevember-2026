@@ -1,4 +1,5 @@
 // Worker-safe mesh builder: plain typed arrays out, no three.js or DOM.
+import { parseSuzanne, suzanneBakeArrays, buildSuzanneMesh } from "./suzanneMesh.js";
 
 class V3 {
   constructor(x = 0, y = 0, z = 0) {
@@ -122,7 +123,6 @@ function smoothMaxPlanes(planes, k) {
   };
 }
 
-// dir -> surface position for the genus-0 shapes
 // ── Suzanne ──────────────────────────────────────────────────────────────────────────────────────────────
 // Her baked distance field (tools/suzanne-sdf.mjs: 96³ half floats at cell centres over [-1.12, 1.12]³, x fastest),
 // tilted back 0.37 rad about x so she looks ahead instead of nose-down.
@@ -168,12 +168,6 @@ function loadSuzanneField() {
   return suzanneField;
 }
 
-// A sphere grid shrink-wrapped onto her surface: each direction from the centre gets a point on Suzanne, so she
-// reuses the sphere's atlas and adaptive tessellation. Projection onto the field alternates with tangential
-// smoothing, which keeps the grid from bunching; deep concavities (behind the ears) stay webbed over.
-const WRAP_N = 96;
-let suzanneWrap = null;
-
 // Synchronous read of a file next to this module (worker: XHR; node: fs)
 function readBytesSync(name) {
   const url = new URL(name, import.meta.url);
@@ -195,171 +189,7 @@ function readBytesSync(name) {
   }
 }
 
-// The wrap is precomputed into suzanne-wrap.bin (half floats, xyzw per grid point, faces stacked): see
-// computeSuzanneWrap, which builds it when the file is missing
-function buildSuzanneWrap() {
-  if (suzanneWrap) return suzanneWrap;
-  const N = WRAP_N;
-  const stride = N + 1;
-  const count = 6 * stride * stride;
-  let pos;
-  const bytes = readBytesSync("./suzanne-wrap.bin");
-  if (bytes && bytes.byteLength === count * 8) {
-    const half = new Uint16Array(bytes.buffer, bytes.byteOffset, count * 4);
-    pos = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) for (let c = 0; c < 3; c++) pos[i * 3 + c] = halfToFloat(half[i * 4 + c]);
-  } else {
-    pos = computeSuzanneWrap();
-  }
-  suzanneWrap = makeWrapLookup(pos, N);
-  return suzanneWrap;
-}
-
-function computeSuzanneWrap() {
-  const field = loadSuzanneField();
-  const N = WRAP_N;
-  const stride = N + 1;
-  const count = 6 * stride * stride;
-  const pos = new Float32Array(count * 3);
-  const dirs = new Float32Array(count * 3);
-  // Gnomonic cube faces: +x, -x, +y, -y, +z, -z
-  const faceDir = (f, u, v, o) => {
-    const a = u * 2 - 1, b = v * 2 - 1;
-    if (f === 0) o.set(1, b, -a);
-    else if (f === 1) o.set(-1, b, a);
-    else if (f === 2) o.set(a, 1, -b);
-    else if (f === 3) o.set(a, -1, b);
-    else if (f === 4) o.set(a, b, 1);
-    else o.set(-a, b, -1);
-    return o.normalize();
-  };
-  const d = new V3();
-  const weld = new Map();
-  const canon = new Int32Array(count);
-  for (let f = 0, i = 0; f < 6; f++) {
-    for (let y = 0; y <= N; y++) {
-      for (let x = 0; x <= N; x++, i++) {
-        faceDir(f, x / N, y / N, d);
-        dirs.set([d.x, d.y, d.z], i * 3);
-        pos.set([d.x * 1.3, d.y * 1.3, d.z * 1.3], i * 3);
-        const key = `${Math.round(d.x * 1e5)},${Math.round(d.y * 1e5)},${Math.round(d.z * 1e5)}`;
-        if (!weld.has(key)) weld.set(key, i);
-        canon[i] = weld.get(key);
-      }
-    }
-  }
-  // Neighbours of each welded vertex across faces
-  const nb = new Map();
-  const link = (a, b) => {
-    a = canon[a];
-    b = canon[b];
-    if (a === b) return;
-    if (!nb.has(a)) nb.set(a, new Set());
-    nb.get(a).add(b);
-  };
-  for (let f = 0; f < 6; f++) {
-    for (let y = 0; y <= N; y++) {
-      for (let x = 0; x <= N; x++) {
-        const i = f * stride * stride + y * stride + x;
-        if (x > 0) link(i, i - 1);
-        if (x < N) link(i, i + 1);
-        if (y > 0) link(i, i - stride);
-        if (y < N) link(i, i + stride);
-      }
-    }
-  }
-  const roots = [...nb.keys()];
-  const nbArr = roots.map((r) => [...nb.get(r)]);
-  const g = new V3();
-  const grad = (x, y, z) => {
-    const h = 0.01;
-    return g.set(field(x + h, y, z) - field(x - h, y, z), field(x, y + h, z) - field(x, y - h, z), field(x, y, z + h) - field(x, y, z - h)).normalize();
-  };
-  const avg = new Float32Array(count * 3);
-  const iterations = 140;
-  for (let it = 0; it < iterations; it++) {
-    const smooth = it < iterations - 15 ? 0.6 : 0.15;
-    for (let r = 0; r < roots.length; r++) {
-      const i = roots[r] * 3;
-      let ax = 0, ay = 0, az = 0;
-      for (const n of nbArr[r]) {
-        ax += pos[n * 3];
-        ay += pos[n * 3 + 1];
-        az += pos[n * 3 + 2];
-      }
-      const k = 1 / nbArr[r].length;
-      avg[i] = ax * k;
-      avg[i + 1] = ay * k;
-      avg[i + 2] = az * k;
-    }
-    for (let r = 0; r < roots.length; r++) {
-      const i = roots[r] * 3;
-      let x = pos[i], y = pos[i + 1], z = pos[i + 2];
-      const dist = field(x, y, z);
-      grad(x, y, z);
-      // Tangential part of the pull toward the neighbours' centroid
-      let mx = avg[i] - x, my = avg[i + 1] - y, mz = avg[i + 2] - z;
-      const dn = mx * g.x + my * g.y + mz * g.z;
-      mx -= g.x * dn;
-      my -= g.y * dn;
-      mz -= g.z * dn;
-      x += mx * smooth - g.x * dist * 0.8;
-      y += my * smooth - g.y * dist * 0.8;
-      z += mz * smooth - g.z * dist * 0.8;
-      pos[i] = x;
-      pos[i + 1] = y;
-      pos[i + 2] = z;
-    }
-  }
-  for (let i = 0; i < count; i++) {
-    const c = canon[i];
-    if (c !== i) pos.set(pos.subarray(c * 3, c * 3 + 3), i * 3);
-  }
-  return pos;
-}
-
-// Bilinear lookup by direction into the wrap grid; the baker's wrapPos does the same on the GPU
-function makeWrapLookup(pos, N) {
-  const stride = N + 1;
-  return (dir, out) => {
-    const ax = Math.abs(dir.x), ay = Math.abs(dir.y), az = Math.abs(dir.z);
-    let f, u, v;
-    if (ax >= ay && ax >= az) {
-      f = dir.x > 0 ? 0 : 1;
-      const m = 1 / ax;
-      u = dir.x > 0 ? -dir.z * m : dir.z * m;
-      v = dir.y * m;
-    } else if (ay >= az) {
-      f = dir.y > 0 ? 2 : 3;
-      const m = 1 / ay;
-      u = dir.x * m;
-      v = dir.y > 0 ? -dir.z * m : dir.z * m;
-    } else {
-      f = dir.z > 0 ? 4 : 5;
-      const m = 1 / az;
-      u = dir.z > 0 ? dir.x * m : -dir.x * m;
-      v = dir.y * m;
-    }
-    const gx = Math.min(N - 1e-4, Math.max(0, (u * 0.5 + 0.5) * N));
-    const gy = Math.min(N - 1e-4, Math.max(0, (v * 0.5 + 0.5) * N));
-    const x0 = Math.floor(gx), y0 = Math.floor(gy);
-    const tx = gx - x0, ty = gy - y0;
-    const base = f * stride * stride;
-    const i00 = (base + y0 * stride + x0) * 3, i10 = i00 + 3, i01 = i00 + stride * 3, i11 = i01 + 3;
-    const w00 = (1 - tx) * (1 - ty), w10 = tx * (1 - ty), w01 = (1 - tx) * ty, w11 = tx * ty;
-    return out.set(
-      pos[i00] * w00 + pos[i10] * w10 + pos[i01] * w01 + pos[i11] * w11,
-      pos[i00 + 1] * w00 + pos[i10 + 1] * w10 + pos[i01 + 1] * w01 + pos[i11 + 1] * w11,
-      pos[i00 + 2] * w00 + pos[i10 + 2] * w10 + pos[i01 + 2] * w01 + pos[i11 + 2] * w11,
-    );
-  };
-}
-
 function makeGenus0Evaluator(shape, radius, seed) {
-  if (shape === "Suzanne") {
-    const wrap = buildSuzanneWrap();
-    return (dir, out) => wrap(dir, out).multiplyScalar(radius);
-  }
   if (shape === "Sphere") {
     return (dir, out) => out.copy(dir).multiplyScalar(radius);
   }
@@ -826,7 +656,8 @@ function buildPeriodic(shape, info, opts) {
 }
 
 // Recentres on the bounding box and scales so the furthest vertex sits at targetRadius
-function normalizeToSphere(positions, targetRadius) {
+// headOnly: size by the part within 60% of the half-width in x (Suzanne's head), so her ears stick out past it
+function normalizeToSphere(positions, targetRadius, headOnly = false) {
   let minX = Infinity, minY = Infinity, minZ = Infinity;
   let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
   for (let i = 0; i < positions.length; i += 3) {
@@ -835,10 +666,21 @@ function normalizeToSphere(positions, targetRadius) {
     if (y < minY) minY = y; if (y > maxY) maxY = y;
     if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
   }
-  const cx = (minX + maxX) * 0.5, cy = (minY + maxY) * 0.5, cz = (minZ + maxZ) * 0.5;
+  let cx = (minX + maxX) * 0.5, cy = (minY + maxY) * 0.5, cz = (minZ + maxZ) * 0.5;
+  const inHead = (i) => !headOnly || Math.abs(positions[i] - (minX + maxX) * 0.5) <= 0.6 * (maxX - minX) * 0.5;
+  if (headOnly) {
+    let y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (let i = 0; i < positions.length; i += 3) {
+      if (!inHead(i)) continue;
+      y0 = Math.min(y0, positions[i + 1]); y1 = Math.max(y1, positions[i + 1]);
+      z0 = Math.min(z0, positions[i + 2]); z1 = Math.max(z1, positions[i + 2]);
+    }
+    cy = (y0 + y1) * 0.5;
+    cz = (z0 + z1) * 0.5;
+  }
   let maxR = 0;
   for (let i = 0; i < positions.length; i += 3) {
-    maxR = Math.max(maxR, Math.hypot(positions[i] - cx, positions[i + 1] - cy, positions[i + 2] - cz));
+    if (inHead(i)) maxR = Math.max(maxR, Math.hypot(positions[i] - cx, positions[i + 1] - cy, positions[i + 2] - cz));
   }
   const s = maxR > 1e-5 ? targetRadius / maxR : 1;
   for (let i = 0; i < positions.length; i += 3) {
@@ -1146,6 +988,14 @@ function buildEmitters(positions, normals, uvs, info, periodic, seed) {
   return out;
 }
 
+let suzanne = null;
+
+// Takes suzanne-mesh.bin; returns the geometry the baker rasterises in atlas space
+function setSuzanne(buffer) {
+  suzanne = parseSuzanne(buffer);
+  return suzanneBakeArrays(suzanne);
+}
+
 function isPeriodicShape(shape) {
   return shape === "Torus" || shape === "Trefoil Knot" || shape === "Twisted Ring";
 }
@@ -1158,15 +1008,23 @@ function buildMeshData({ radius, info, shape, seed, levels, tol, maxTriangles, d
     const opts = { pad, levels, tol, dispAmp, faceTexels, countOnly };
     return periodic ? buildPeriodic(shape, info, opts) : buildGenus0(radius, info, opts, shape, seed);
   };
-  // Plan first; over budget, give up a level of depth (crack walls refine to full depth at any tolerance)
-  for (let attempt = 0; attempt < 4 && levels > MIN_DEPTH + 2; attempt++) {
-    if (build(true).leaves * 3 <= maxTriangles) break;
-    levels--;
-    tol *= 1.25;
+  let built;
+  if (shape === "Suzanne") {
+    // Her own mesh and atlas (setSuzanne), refined within the budget by suzanneMesh.js
+    const heightAt = makeHeightSampler(info, false);
+    built = buildSuzanneMesh(suzanne, { radius, heightAt, texelsU: info.width * 2, texelsV: info.height * 2, levels, tol, maxTriangles, dispAmp, faceTexels });
+    built.radius = radius;
+  } else {
+    // Plan first; over budget, give up a level of depth (crack walls refine to full depth at any tolerance)
+    for (let attempt = 0; attempt < 4 && levels > MIN_DEPTH + 2; attempt++) {
+      if (build(true).leaves * 3 <= maxTriangles) break;
+      levels--;
+      tol *= 1.25;
+    }
+    built = build(false);
   }
-  const built = build(false);
   const positions = new Float32Array(built.positions);
-  const xf = normalizeToSphere(positions, radius);
+  const xf = normalizeToSphere(positions, radius, shape === "Suzanne");
   const vertexCount = positions.length / 3;
   const heat = buildHeatVolume(positions, built.uvs, built.indices, info, periodic);
   const emitters = buildEmitters(positions, built.normals, built.uvs, info, periodic, seed);
@@ -1175,6 +1033,7 @@ function buildMeshData({ radius, info, shape, seed, levels, tol, maxTriangles, d
     positions,
     normals: new Float32Array(built.normals),
     uvs: new Float32Array(built.uvs),
+    dispUvs: built.dispUvs ? new Float32Array(built.dispUvs) : null,
     tangents: new Float32Array(built.tangents),
     tileBounds: new Float32Array(built.tileBounds),
     cellTexels: new Float32Array(built.cellTexels),
@@ -1189,4 +1048,4 @@ function buildMeshData({ radius, info, shape, seed, levels, tol, maxTriangles, d
   };
 }
 
-export { buildMeshData, isPeriodicShape, computeSuzanneWrap, SDF_SIZE, SDF_BOUND, HEAT_SIZE, FLOW_SIZE, WRAP_N };
+export { buildMeshData, isPeriodicShape, setSuzanne, SDF_SIZE, SDF_BOUND, HEAT_SIZE, FLOW_SIZE };

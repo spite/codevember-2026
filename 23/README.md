@@ -46,6 +46,12 @@ The Smoke section (not randomised, kept in the url, all live):
   misses the displaced surface by more than a tolerance, so triangles gather on crack walls, plate edges and terraces
   while flat slabs stay lean, within a triangle budget per quality tier. Each vertex reads the baked height filtered to
   its own cell size; detail finer than the triangles is left to the normal map. W shows the result.
+- **Suzanne is her own mesh** (`suzanneMesh.js`, `suzanne-mesh.bin` from `tools/suzanne-mesh.mjs`): Blender's monkey,
+  Loop-subdivided, unwrapped offline into 144 charts packed in the same 3:2 atlas the cube faces use. The baker
+  rasterises her charts (plus skirts that run them on into the gutters) into that atlas, so the cracks keep an even size
+  over her eyes, brow, muzzle and ears, and the worker refines each of her triangles to the level the relief needs.
+  Copies of a point on a chart seam read the height at the same uv, so seams stay closed. Her relief is halved so her
+  face stays readable.
 - **Melt, pool, recompose** (`morph.js`): a change of look melts the crust (1.4 s), hands the rock to a raymarched
   liquid, a blend of the two shapes' distance fields that collapses into a sloshing pool (1.1 s + 1.2 s), raises the new
   shape out of it (1.4 s) and hands it back to the new mesh, which cools (2.6 s). The old and new lava patterns

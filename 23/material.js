@@ -12,6 +12,9 @@ function createMagmaMaterial(baker) {
     uNoiseMap: { value: baker.noiseTexture },
     uStyle: { value: 0 },
     uRelief: { value: 0.68 },
+    // Scales the mesh's displacement for one shape (Suzanne keeps her features)
+    uShapeRelief: { value: 1 },
+    uUseDispUv: { value: 0 },
     uHeat: { value: 0.76 },
     uGloss: { value: 0.40 },
     uScale: { value: 1.15 },
@@ -41,9 +44,13 @@ function createMagmaMaterial(baker) {
 in vec4 aTangent;
 in vec4 aTileBounds;
 in float aCellTexels;
+// Suzanne's height uv, shared by every copy of a seam point; read only when uUseDispUv is 1
+in vec2 aDispUv;
 uniform sampler2D uHeightHeatMap;
 uniform float uRelief;
 uniform float uMelt;
+uniform float uShapeRelief;
+uniform float uUseDispUv;
 `,
     vertex: /* glsl */ `
 vec3 displace(vec3 p, inout vec3 n) {
@@ -52,8 +59,8 @@ vec3 displace(vec3 p, inout vec3 n) {
   // the normal map is relative to.
   // Never sharper than 4 texels: creases finer than that would zigzag across triangles; the normal map draws them
   float lod = log2(max(aCellTexels, 4.0));
-  float h = textureLod(uHeightHeatMap, uv, lod).r;
-  float dispAmp = (0.040 + uRelief * 0.135) * (1.0 - uMelt);
+  float h = textureLod(uHeightHeatMap, uUseDispUv > 0.5 ? aDispUv : uv, lod).r;
+  float dispAmp = (0.040 + uRelief * 0.135) * (1.0 - uMelt) * uShapeRelief;
   return p + normalize(n) * ((h - 0.5) * dispAmp);
 }
 `,
@@ -281,6 +288,8 @@ void surface(inout Surface s) {
 }
 `,
   });
+
+  material.defaultAttributeValues.aDispUv = [0, 0];
 
   return { material, uniforms };
 }

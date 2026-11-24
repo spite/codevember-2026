@@ -18,7 +18,7 @@ import {
   showSoundHint,
 } from "common";
 import { GUI } from "guspira";
-import { Scene, Mesh, Vector3, Color, Quaternion, DataTexture, RGBAFormat, HalfFloatType, LinearFilter, BufferGeometry, RawShaderMaterial, GLSL3, WebGLRenderTarget, OrthographicCamera } from "three";
+import { Scene, Mesh, Vector3, Color, Quaternion, BufferGeometry, RawShaderMaterial, GLSL3, WebGLRenderTarget, OrthographicCamera } from "three";
 import { Pipeline } from "modules/pipeline/Pipeline.js";
 import { createStudioEnvironmentAsync } from "modules/pipeline/studio.js";
 import { globalUniforms } from "modules/pipeline/uniforms.js";
@@ -27,7 +27,6 @@ import { OrbitControls as FreeOrbitControls } from "modules/FreeOrbitControls.js
 import { seededRandom, nativeRandom } from "modules/random.js";
 import { MagmaFluidField, STYLES, STYLE_PROFILES } from "./sim.js";
 import { MagmaTextureBaker } from "./baker.js";
-import { WRAP_N } from "./meshData.js";
 import { MeshBuilder, SHAPES, createSdfTexture, createHeatTexture, createFlowTexture, writeVolume, SDF_BOUND, SDF_SIZE, FLOW_SIZE } from "./geometry.js";
 import { LavaPulseVolume } from "./pulse.js";
 import { LightShaft } from "./shaft.js";
@@ -77,20 +76,20 @@ const defaults = {
   autoTime: 14,
   detail: 1,
   shimmer: 1,
-  shaft: 1,
-  smokeRoom: 1,
+  shaft: 1.4,
+  smokeRoom: 1.2,
   smokeSize: 1,
-  smokePlumes: 1,
-  smokeLava: 1,
+  smokePlumes: 1.1,
+  smokeLava: 1.2,
   smokeUnder: 1,
-  smokeRise: 1,
+  smokeRise: 1.8,
   smokeDensity: 1,
-  smokeTurbulence: 1,
-  smokeLifetime: 1,
-  smokeDraught: 1,
-  smokeHeading: 53,
-  smokeLavaLight: 1,
-  smokeEmberLight: 1,
+  smokeTurbulence: 1.5,
+  smokeLifetime: 1.8,
+  smokeDraught: 2.5,
+  smokeHeading: 90,
+  smokeLavaLight: 2,
+  smokeEmberLight: 2,
 };
 
 const params = fromDefaults(defaults);
@@ -99,7 +98,7 @@ const load = {
   fluid: loadingStep(2, "Simulating magma flow…"),
   bake: loadingStep(1, "Solidifying basalt crust…"),
   compile: loadingStep(3, "Compiling shaders…"),
-  wrap: loadingStep(0.3, "Shaping Suzanne…"),
+  suzanne: loadingStep(0.3, "Shaping Suzanne…"),
   sound: loadingStep(1, "Loading the soundtrack…"),
 };
 
@@ -218,23 +217,16 @@ const meshQuality = QUALITY_MESH[pipeline.quality] ?? QUALITY_MESH.high;
 
 const fluid = new MagmaFluidField(renderer, fluidSize);
 const baker = new MagmaTextureBaker(renderer, fluid, faceSize);
-// Suzanne's shrink-wrap grid, so the baker can lay patterns on her surface (see meshData.js)
-const wrapGrid = await load.wrap.track(
-  fetch(new URL("./suzanne-wrap.bin", import.meta.url))
+const meshBuilder = new MeshBuilder();
+// Suzanne's mesh and atlas: the worker keeps the mesh and hands back the geometry the baker draws her charts with
+const suzanneMesh = load.suzanne.track(
+  fetch(new URL("./suzanne-mesh.bin", import.meta.url))
     .then((r) => r.arrayBuffer())
-    .then((buffer) => {
-      const n = WRAP_N + 1;
-      const texture = new DataTexture(new Uint16Array(buffer), n, n * 6, RGBAFormat, HalfFloatType);
-      texture.minFilter = texture.magFilter = LinearFilter;
-      texture.needsUpdate = true;
-      return texture;
-    }),
+    .then((buffer) => meshBuilder.setSuzanne(buffer)),
 );
-baker.setWrapGrid(wrapGrid, WRAP_N);
 const morphUniforms = createMorphUniforms(SDF_BOUND);
 const volumetricGlow = new VolumetricLavaGlow(renderer, morphUniforms, baker.noiseTexture);
 const SHAFT_DIRECTION = new Vector3(-0.3, 1, -0.45).normalize();
-const meshBuilder = new MeshBuilder();
 const moltenMorph = new MoltenMorph(renderer, { noiseTexture: baker.noiseTexture, morphUniforms });
 const fieldAtlas = new MorphFieldAtlas(renderer, morphUniforms);
 const sdf = { a: createSdfTexture(), b: createSdfTexture() };
@@ -254,7 +246,7 @@ let emberLightAmount = -1;
 
 
 // Uploads a hidden mesh's buffers one per frame, so its first visible frame doesn't stall on them
-const UPLOAD_ATTRIBUTES = ["position", "normal", "uv", "aTangent", "aTileBounds", "aCellTexels"];
+const UPLOAD_ATTRIBUTES = ["position", "normal", "uv", "aDispUv", "aTangent", "aTileBounds", "aCellTexels"];
 const uploader = {
   scene: new Scene(),
   camera: new OrthographicCamera(),
@@ -452,8 +444,11 @@ function meshSettings(detail) {
 let appliedDetail = -1;
 let detailChangedAt = 0;
 
+// Suzanne's relief is halved so her features stay readable
+const SUZANNE_RELIEF = 0.5;
+const shapeRelief = (shape) => (shape === "Suzanne" ? SUZANNE_RELIEF : 1);
 // Must match displace() in material.js
-const displacementAmount = (relief) => 0.04 + relief * 0.135;
+const displacementAmount = (relief, shape) => (0.04 + relief * 0.135) * shapeRelief(shape);
 
 // Builds the mesh for the maps just baked; only the latest request is applied.
 // Its distance field goes to sdf.a when it is the rock on show, to sdf.b when it is a morph target.
@@ -463,7 +458,7 @@ const meshOptions = (seed) => ({
   baker,
   shape: params.shape(),
   seed,
-  dispAmp: displacementAmount(params.relief()),
+  dispAmp: displacementAmount(params.relief(), params.shape()),
   ...meshSettings(params.detail()),
 });
 
@@ -478,13 +473,20 @@ async function buildMesh(seed = getSeed(), { target = "a" } = {}) {
     built.geometry.dispose();
     return false;
   }
+  built.shape = opts.shape;
   applyBuilt(built, target, detail);
   return true;
 }
 
 function applyBuilt(built, target, detail) {
+  if (target === "a" && revealOnBuild) {
+    revealOnBuild = false;
+    magmaMesh.visible = true;
+  }
   magmaMesh.geometry.dispose();
   magmaMesh.geometry = built.geometry;
+  uniforms.uShapeRelief.value = shapeRelief(built.shape);
+  uniforms.uUseDispUv.value = built.geometry.hasAttribute("aDispUv") ? 1 : 0;
   if (!magmaMesh.visible) uploader.start(built.geometry);
   else uploader.queue = [];
   appliedDetail = detail;
@@ -499,6 +501,20 @@ function applyBuilt(built, target, detail) {
   if (target === "a") Object.assign(look, { radiusA: built.volumeRadius, extentA: extent });
   else Object.assign(look, { radiusB: built.volumeRadius, extentB: extent });
 }
+
+// The new look baked and built in place; a new shape hides the rock until its mesh is ready, so the old mesh never
+// shows the new shape's maps
+function swapLookInPlace() {
+  const shapeChanged = appliedLookKey.split("|")[1] !== params.shape();
+  syncImmediate();
+  bakeMaps(getSeed(), currentFluidKey() !== appliedFluidKey);
+  if (shapeChanged) {
+    magmaMesh.visible = false;
+    revealOnBuild = true;
+  }
+  buildMesh(getSeed());
+}
+let revealOnBuild = false;
 
 function changeLook(reDevelopFluid) {
   look.fluid ||= reDevelopFluid;
@@ -690,12 +706,32 @@ function pickOther(param, options, previous) {
   param.set(rest[Math.floor(Math.random() * rest.length)]);
 }
 
+// Smoke moods the randomizer cycles through (each new look picks a different one); unlisted sliders stay at 1
+const SMOKE_PRESETS = [
+  { smokeDraught: 2.5, smokeHeading: 90, smokeTurbulence: 1.4, smokeLifetime: 1.6, smokeRise: 1.8, smokeLavaLight: 2.2, smokeEmberLight: 2.2, smokeDensity: 1.1 },
+  { shaft: 1.6, smokeDensity: 0.9, smokeTurbulence: 1.8, smokeDraught: 2.5, smokeHeading: 90, smokeLifetime: 1.6, smokeLavaLight: 1.4, smokeRoom: 1.2 },
+  { smokeLavaLight: 2.4, smokeEmberLight: 2.4, smokePlumes: 0.8, smokeLava: 0.8, smokeRoom: 1.3, smokeDraught: 1.8, smokeHeading: 90, smokeTurbulence: 1.4 },
+  { smokeLifetime: 2.2, smokeRoom: 0.8, smokePlumes: 1.3, smokeRise: 1.6, smokeDraught: 2.2, smokeHeading: 90, smokeTurbulence: 1.5, smokeDensity: 1.1 },
+  { smokeRise: 2.2, smokeTurbulence: 1, smokeDraught: 2.5, smokeHeading: 90, smokeLava: 1.4, smokeLifetime: 1.5, smokeLavaLight: 1.6 },
+  { shaft: 1.4, smokeRoom: 1.2, smokePlumes: 1.1, smokeLava: 1.2, smokeRise: 1.8, smokeDensity: 1, smokeTurbulence: 1.5, smokeLifetime: 1.8, smokeDraught: 2.5, smokeHeading: 90, smokeLavaLight: 2, smokeEmberLight: 2 },
+];
+const SMOKE_KEYS = Object.keys(defaults).filter((k) => k === "shaft" || k.startsWith("smoke"));
+// The page starts on the last one (the defaults)
+let smokePreset = SMOKE_PRESETS.length - 1;
+function applySmokePreset(i) {
+  smokePreset = i;
+  for (const key of SMOKE_KEYS) params[key].set(SMOKE_PRESETS[i][key] ?? (key === "smokeHeading" ? 53 : 1));
+}
+
 onRandomize((seed) => {
   const previousStyle = params.style();
   const previousShape = params.shape();
   gui.randomizeAll();
   pickOther(params.style, STYLES, previousStyle);
   pickOther(params.shape, SHAPES, previousShape);
+  let preset = Math.floor(Math.random() * (SMOKE_PRESETS.length - 1));
+  if (preset >= smokePreset && smokePreset >= 0) preset++;
+  applySmokePreset(preset);
   const profile = STYLE_PROFILES[params.style()] ?? STYLE_PROFILES["Cracked Plates"];
   lastStyle = params.style();
   remap(params.crust, Math.max(0.32, profile.crust - 0.10), Math.min(0.90, profile.crust + 0.08));
@@ -736,6 +772,7 @@ const precompile = new Scene();
 const firstStyle = Math.max(0, STYLES.indexOf(params.style()));
 for (const m of [...fluid.materials, ...baker.materialsFor(firstStyle), moltenMorph.material, fieldAtlas.material, ...Object.values(uploader.meshes).map((u) => u.material)]) precompile.add(new Mesh(fluid.quad.geometry, m));
 await load.fluid.track(Promise.all([renderer.compileAsync(precompile, camera), rockSmoke?.compile(renderer)]), 4);
+baker.setSuzanneMesh(await suzanneMesh);
 bakeMaps(getSeed(), true);
 embers.reset();
 load.bake.done();
@@ -803,7 +840,8 @@ async function prepareLook(entry) {
   setLook(entry);
   bakeMaps(entry.seed, true);
   await baker.ready;
-  prepared.set(entry, await meshBuilder.build(meshOptions(entry.seed)));
+  const opts = meshOptions(entry.seed);
+  prepared.set(entry, { ...(await meshBuilder.build(opts)), shape: opts.shape });
 }
 
 // Rebakes the look's maps in this frame and puts its prepared mesh on show, cooled
@@ -924,7 +962,8 @@ render(({ time, dt, frame }) => {
 
   if (look.phase === "idle" || look.phase === "cool") {
     if (currentLookKey() !== appliedLookKey) {
-      changeLook(currentFluidKey() !== appliedFluidKey);
+      // A style or shape picked in the panel switches at once, without the melt (randomizing still melts)
+      swapLookInPlace();
     } else if (currentBakeKey() !== appliedBakeKey) {
       // Slider changes rebake in place, debounced
       if (!bakeChangedAt) bakeChangedAt = now;
