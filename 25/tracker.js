@@ -39,6 +39,8 @@ class OneEuro {
 }
 
 const mirror = new Matrix4().makeScale(-1, 1, 1);
+// ?pose=jump shows each detection as it comes, like the original demo, instead of drawing between them.
+const jump = new URLSearchParams(location.search).get("pose") === "jump";
 const _p = new Vector3();
 const _q = new Quaternion();
 const _s = new Vector3();
@@ -52,7 +54,7 @@ function createTracker() {
   const state = {
     status: "idle", // idle | asking | loading | running | denied | failed | off
     found: false,
-    // What's shown: eased every frame toward the latest detection, which comes at the camera's rate.
+    // What's shown: drawn between the last two detections, which come at the camera's rate.
     pose: new Matrix4(),
     blendshapes: {},
     mirrored: true,
@@ -64,15 +66,23 @@ function createTracker() {
   let stream = null;
   let lastVideoTime = -1;
   let lastTime = 0;
-  let snap = true;
+  // The newest camera frame not yet handed to the landmarker, by its capture time (ms).
+  let frameTime = 0;
+  let sentFrame = 0;
+  // Counts for the panel's readout, over the last second.
+  const counts = { frames: 0, results: 0, detect: 0, renders: 0, since: performance.now() };
+  state.stats = "";
   const position = new OneEuro(0.5, 0.5);
   let rotation = null;
   let rotationSpeed = 0;
   const target = new Matrix4();
   const targetPosition = new Vector3();
   const targetRotation = new Quaternion();
-  const shownPosition = new Vector3();
-  const shownRotation = new Quaternion();
+  // The detection before the latest, and when the latest came in: the skull is drawn between the two (see update).
+  const prevPosition = new Vector3();
+  const prevRotation = new Quaternion();
+  let arrival = 0;
+  let interval = 50;
 
   async function loadLandmarker() {
     const vision = await import(`${VISION}/vision_bundle.mjs`);
@@ -101,7 +111,9 @@ function createTracker() {
         else if (data.type === "error" && !worker) reject(new Error(data.message));
         else if (data.type === "result") {
           busy = false;
-          handle(data.found, data.matrix, data.shapes);
+          counts.results++;
+          counts.detect += data.ms;
+          handle(data.found, data.matrix, data.shapes, data.time);
         }
       };
       w.onerror = (e) => reject(new Error(e.message || "tracker worker failed"));
@@ -119,6 +131,10 @@ function createTracker() {
     state.status = "asking";
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+      // Then the fastest frame rate the camera says it has, if that's more than it chose.
+      const track = stream.getVideoTracks()[0];
+      const max = track?.getCapabilities?.().frameRate?.max;
+      if (max && max > (track.getSettings().frameRate ?? 0)) await track.applyConstraints({ frameRate: { ideal: max } }).catch(() => {});
     } catch (e) {
       state.status = "denied";
       state.error = e.message;
@@ -128,10 +144,20 @@ function createTracker() {
     state.mirrored = settings.facingMode !== "environment";
     video.srcObject = stream;
     await video.play().catch(() => {});
+    if (video.requestVideoFrameCallback) {
+      const onFrame = (now, meta) => {
+        counts.frames++;
+        frameTime = meta.captureTime || meta.expectedDisplayTime || now;
+        if (stream) video.requestVideoFrameCallback(onFrame);
+      };
+      video.requestVideoFrameCallback(onFrame);
+    }
     state.status = "loading";
     try {
       if (!worker && !landmarker) {
         try {
+          // ?tracker=main detects on the main thread, on the GPU, as the original did.
+          if (new URLSearchParams(location.search).get("tracker") === "main") throw new Error("main thread asked for");
           worker = await loadWorker();
         } catch (e) {
           console.warn("FaceLandmarker worker unavailable, detecting on the main thread", e);
@@ -155,17 +181,16 @@ function createTracker() {
   }
 
   // A detection: filter the pose (One Euro on the position, a speed-dependent slerp on the rotation) into the target.
-  function handle(found, matrix, shapes) {
+  function handle(found, matrix, shapes, time) {
     if (!found) {
       state.found = false;
       position.reset();
       rotation = null;
-      snap = true;
       return;
     }
-    const now = performance.now();
-    const dt = lastTime ? (now - lastTime) / 1000 : 0;
-    lastTime = now;
+    // Timed by when the frame was captured, not when its detection came back, which varies.
+    const dt = lastTime && time > lastTime ? (time - lastTime) / 1000 : 0;
+    lastTime = time;
     target.fromArray(matrix);
     target.decompose(_p, _q, _s);
     _p.fromArray(position.filter(_p.toArray(), dt));
@@ -179,7 +204,17 @@ function createTracker() {
     target.compose(_p, rotation, _s.set(1, 1, 1));
     // Mirrored in the world and in the head's own space, so the pose stays a rotation (the skull is symmetric).
     if (state.mirrored) target.premultiply(mirror).multiply(mirror);
+    prevPosition.copy(targetPosition);
+    prevRotation.copy(targetRotation);
     target.decompose(targetPosition, targetRotation, _s);
+    if (!state.found) {
+      prevPosition.copy(targetPosition);
+      prevRotation.copy(targetRotation);
+    }
+    const now = performance.now();
+    // How far apart the frames were captured, so the drawing between them takes as long.
+    if (state.found && dt > 0) interval += (Math.min(150, dt * 1000) - interval) * 0.3;
+    arrival = now;
     for (const name in state.blendshapes) delete state.blendshapes[name];
     for (const [name, score] of shapes) state.blendshapes[name] = score;
     state.found = true;
@@ -187,28 +222,47 @@ function createTracker() {
 
   // Once a frame: hands a new video frame to the landmarker, and eases the shown pose toward the latest detection.
   function update(dt) {
-    if (state.status === "running" && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+    counts.renders++;
+    if (!video.requestVideoFrameCallback && video.currentTime !== lastVideoTime) {
+      lastVideoTime = video.currentTime;
+      counts.frames++;
+      frameTime = performance.now();
+    }
+    if (state.status === "running" && video.readyState >= 2 && frameTime !== sentFrame) {
+      const time = frameTime;
       if (worker && !busy) {
-        lastVideoTime = video.currentTime;
+        sentFrame = time;
         busy = true;
         createImageBitmap(video).then(
-          (bitmap) => worker.postMessage({ type: "frame", bitmap, time: performance.now() }, [bitmap]),
+          (bitmap) => worker.postMessage({ type: "frame", bitmap, time }, [bitmap]),
           () => (busy = false),
         );
       } else if (landmarker) {
-        lastVideoTime = video.currentTime;
-        const result = landmarker.detectForVideo(video, performance.now());
+        sentFrame = time;
+        const t0 = performance.now();
+        const result = landmarker.detectForVideo(video, time);
+        counts.results++;
+        counts.detect += performance.now() - t0;
         const matrix = result.facialTransformationMatrixes?.[0];
         const found = !!(result.faceLandmarks?.[0] && matrix);
-        handle(found, found ? matrix.data : null, found ? (result.faceBlendshapes?.[0]?.categories ?? []).map((c) => [c.categoryName, c.score]) : []);
+        handle(found, found ? matrix.data : null, found ? (result.faceBlendshapes?.[0]?.categories ?? []).map((c) => [c.categoryName, c.score]) : [], time);
       }
     }
+    const elapsed = performance.now() - counts.since;
+    if (elapsed > 1000) {
+      const rate = (n) => Math.round((n * 1000) / elapsed);
+      const where = worker ? "worker" : landmarker ? "main" : "-";
+      const max = stream?.getVideoTracks()[0]?.getCapabilities?.().frameRate?.max;
+      const detect = counts.results ? (counts.detect / counts.results).toFixed(0) : "-";
+      state.stats = `cam ${rate(counts.frames)}${max ? `/${Math.round(max)}` : ""} · ${detect} ms ${where} · ${rate(counts.renders)} fps`;
+      Object.assign(counts, { frames: 0, results: 0, detect: 0, renders: 0, since: performance.now() });
+    }
     if (state.found) {
-      const k = snap ? 1 : 1 - Math.exp(-dt / 0.045);
-      snap = false;
-      shownPosition.lerp(targetPosition, k);
-      shownRotation.slerp(targetRotation, k);
-      state.pose.compose(shownPosition, shownRotation, _s.set(1, 1, 1));
+      // One camera frame behind: from the detection before the latest to the latest, over the time between them.
+      const t = jump ? 1 : Math.min(1, (performance.now() - arrival) / interval);
+      _p.lerpVectors(prevPosition, targetPosition, t);
+      _q.slerpQuaternions(prevRotation, targetRotation, t);
+      state.pose.compose(_p, _q, _s.set(1, 1, 1));
     }
     return state.found;
   }

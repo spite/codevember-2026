@@ -108,6 +108,8 @@ const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expand
 gui.addSelect("Skull", params.skull, Object.entries(SKULLS).map(([k, v]) => [k, v.label]), { randomizable: false });
 gui.addCheckbox("Follow my face", params.followFace, { randomizable: false });
 gui.addMonitor("Camera", cameraStatus);
+const trackingStats = signal("");
+gui.addMonitor("Tracking", trackingStats);
 gui.addGraph("Frown", frownScore, { min: 0, max: 1, format: (v) => v.toFixed(2) });
 gui.addSlider("Frown threshold", params.frownThreshold, 0.1, 0.9, 0.01, { randomizable: false, title: "How hard to frown before the eyes light up" });
 gui.addSlider("Glow", params.glow, 0, 3, 0.05, { randomizable: false });
@@ -532,6 +534,7 @@ render(({ dt }) => {
   if (dt > 0) frame(dt);
   const text = describeCamera();
   if (text !== cameraStatus.peek()) cameraStatus.set(text);
+  if (tracker.state.stats !== trackingStats.peek()) trackingStats.set(tracker.state.stats);
   controls.update();
   pipeline.render(scene, camera, elapsed);
 });

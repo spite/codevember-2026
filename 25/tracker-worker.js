@@ -33,6 +33,7 @@ onmessage = async ({ data }) => {
     }
   } else if (data.type === "frame") {
     let result = null;
+    const t0 = performance.now();
     try {
       result = landmarker.detectForVideo(data.bitmap, data.time);
     } catch (e) {
@@ -43,6 +44,8 @@ onmessage = async ({ data }) => {
     const found = !!(result?.faceLandmarks?.[0] && matrix);
     postMessage({
       type: "result",
+      time: data.time,
+      ms: performance.now() - t0,
       found,
       matrix: found ? Array.from(matrix.data) : null,
       shapes: found ? (result.faceBlendshapes?.[0]?.categories ?? []).map((c) => [c.categoryName, c.score]) : [],
