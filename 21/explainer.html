@@ -114,6 +114,9 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
   .fig { padding: 16px; }
   main { gap: 56px; }
 }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
 </style>
 </head>
 <body>
@@ -253,7 +256,7 @@ front = (0.4, 0.58, 1) · 14 · exp(−22 · since)           <span class="c">//
       <div class="fact"><b>Gain</b><span>All of it is scaled by 0.2 against the key, so the figure reads as white glass lit from outside, not as a light of its own.</span></div>
     </div>
     <div class="col prose">
-      <p>The key comes from behind and to the left (<code>(−0.8, 0.65, −0.45)</code>), tinted cool, so from the default camera the figure is backlit against the dark of the glass, as in the photographs of acrylic blocks on a light box. The lamp is the warm counterpart from below. The real objects are often shown on lit stands, and this is what gives the figure the warm-and-cool look of the reference the day was aimed at.</p>
+      <p>The key comes from behind and to the left (<code>(−0.8, 0.65, −0.45)</code>), tinted cool, so from the default camera the figure is backlit against the dark of the glass, as in the photographs of acrylic blocks on a light box. The lamp is the warm counterpart from below. The real objects are often shown on lit stands, and this is what gives the figure its warm-and-cool look.</p>
     </div>
   </section>
 
@@ -288,7 +291,7 @@ front = (0.4, 0.58, 1) · 14 · exp(−22 · since)           <span class="c">//
       <p>The object stands on a slab of cast concrete 2.4 units square and 0.22 high, about as wide as the glass, on a darker recessed foot 2.1 square and 0.08 high, on a seamless cyc: a floor disc of radius 9 that sweeps up into a round wall over a quarter circle of radius 4. The studio has the cool key behind and to the left (intensity 6, a soft box 0.5 wide) and a warm fill (<code>#ff9850</code> at 0.2) from the other side, so the room goes warm to the right and cool to the left without either wall being painted.</p>
       <p>The concrete is mottled by four octaves of value noise, each on a lattice turned and offset from the last (<code>mat3</code> rotation, ×2.13, +7.31) so that no grid shows through, at ±10% of the albedo; a fine grain of ±4%; and sparse pits at 35% darker. The roughness follows the mottle.</p>
       <p>Since the glass's shadow is computed by the receivers themselves (above), their shadow value is overridden, and that also throws away the pipeline's own shadow of the slab on the floor. The floor puts it back from the slab's boxes: a soft shadow traced through their distance field toward the key, the darkest of <code>h / (0.12 t)</code> over 32 steps, the classic trick in which a ray that passes close to an occluder far away is in its penumbra.</p>
-      <p>The air has a little haze, laid over the frame in the glass pass: the room's light scattered toward the eye along the way, <code>mix(colour, environment · 0.12, 1 − exp(−0.03 · distance))</code>, measured to the glass where it is hit (it is not in the depth buffer) and to the room beyond it where not. The figure's light scatters too, as a halo round the glass. The halo is the integral along the ray of a light falling off as one over distance squared, <code>(atan((d − t꜀)/h) + atan(t꜀/h)) / h</code>, where <code>h</code> is how close the ray passes to the object's centre. A point light there peaks without limit as <code>h</code> goes to 0, which showed as a glowing ball inside a torus's hole, where nothing hides the centre. The light comes from all of the figure, so the source is taken as half a unit across: <code>h = √(h² + 0.25)</code>.</p>
+      <p>The air has a little haze, laid over the frame in the glass pass: the room's light scattered toward the eye along the way, <code>mix(colour, environment · 0.12, 1 − exp(−0.03 · distance))</code>, measured to the glass where it is hit (it is not in the depth buffer) and to the room beyond it where not. The figure's light scatters too, as a halo round the glass. The halo is the integral along the ray of a light falling off as one over distance squared, <code>(atan((d − t꜀)/h) + atan(t꜀/h)) / h</code>, where <code>h</code> is how close the ray passes to the object's centre. A point light there peaks without limit as <code>h</code> goes to 0, which would show as a glowing ball inside a torus's hole, where nothing hides the centre. The light comes from all of the figure, so the source is taken as half a unit across: <code>h = √(h² + 0.25)</code>.</p>
     </div>
     <div class="fig">
       <div class="fig-head"><h3>The halo across the object</h3>
@@ -343,7 +346,7 @@ front = (0.4, 0.58, 1) · 14 · exp(−22 · since)           <span class="c">//
       </div>
       <canvas id="boltFig" aria-label="A lightning bolt from the top of the frame to a point at the bottom, with branches, lit by the timeline: leader steps, the return stroke climbing, restrikes and the beaded afterglow."></canvas>
       <div class="readout" id="bR"></div>
-      <p class="fig-cap">The bolt in 2D with the page's timing, played 40 times slower than life (time is in real seconds from the first stroke; before 0 is the leader's dash). "Levels" is how many times the channel was halved and displaced. "Per-piece levels" draws each piece at one brightness, as the page first did: in the dim afterglow neighbouring pieces then step against each other and the channel reads as a chain of sticks. Drawn with brightness and width interpolated from end to end, and any noise taken from the joints' places, they agree where they meet.</p>
+      <p class="fig-cap">The bolt in 2D with the page's timing, played 40 times slower than life (time is in real seconds from the first stroke; before 0 is the leader's dash). "Levels" is how many times the channel was halved and displaced. "Per-piece levels" draws each piece at one brightness instead: in the dim afterglow neighbouring pieces then step against each other and the channel reads as a chain of sticks. Drawn with brightness and width interpolated from end to end, and any noise taken from the joints' places, they agree where they meet.</p>
     </div>
     <div class="col prose">
       <p>Each piece is a card: an instanced quad in screen space, spanning the piece and as wide as its glow. Its fragment shader draws the distance to the segment, so the card is a capsule; it is never seen as a rectangle because every term falls to zero at the card's edge. The glow's radius at each end is a world size (0.14 × width), never less than 14 pixels so the core never falls between pixels, and is interpolated along the card, as is the brightness. Brightness depends on where along the channel each end is and on a hash of the end's position, so the two cards meeting at a joint agree there.</p>
@@ -393,7 +396,7 @@ front = (0.4, 0.58, 1) · 14 · exp(−22 · since)           <span class="c">//
     <div class="col prose">
       <div class="eyebrow">Left alone · <b>main.js</b></div>
       <h2>It strikes itself, and turns to look</h2>
-      <p>Like every day, a page left open keeps showing new things. Each object gets the panel's <em>Change every</em> seconds, 12 by default. If nobody has struck it five seconds before the end (or at 60% of the time, if that is shorter), it strikes itself; and any strike, by hand or not, holds off the next object for at least six seconds, so there is always time to watch the figure form. Any interaction starts the count over. The hold is a small opt-in addition to the shared kiosk module, <code>hold(seconds)</code>; days that do not call it are unchanged.</p>
+      <p>Like every day, a page left open keeps showing new things. Each object gets the panel's <em>Change every</em> seconds, 12 by default. If nobody has struck it five seconds before the end (or at 60% of the time, if that is shorter), it strikes itself; and any strike, by hand or not, holds off the next object for at least six seconds, so there is always time to watch the figure form. Any interaction starts the count over. The hold is the kiosk module's opt-in <code>hold(seconds)</code>.</p>
       <p>After four seconds with no pointer, wheel or key input, the camera comes round by itself to where the strike shows best: in front of the glass, so the key backlights the figure; low, at a polar angle of 1.63 (looking slightly up at the object); 5.6 units out; and a little to one side, 0.1 to 0.45 radians, a different side for each object. It eases there with a time constant of 1.6 s and then sways, 0.1 radians round and 0.03 up and down, so the glass never sits dead still. Any input hands it back at once. Recordings (<code>?capture</code>) drive their own camera, so it is off there.</p>
     </div>
   </section>
@@ -414,8 +417,25 @@ front = (0.4, 0.58, 1) · 14 · exp(−22 · since)           <span class="c">//
       </tbody>
     </table></div>
     <div class="col prose">
-      <p>The bolt is at most 2,560 cards, 640 of them kept for the charge's filaments, drawn only while it lasts. The worker's growth and drawing take a few hundred milliseconds on a laptop, inside the 1.1 s the charge takes anyway.</p>
+      <p>The bolt is at most 2,560 cards, 640 of them kept for the charge's filaments, drawn only while it lasts. The worker's growth and drawing fit inside the 1.1 s the charge takes anyway.</p>
     </div>
+  </section>
+
+  <!-- Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>Click or tap the glass to strike it there; drag to orbit, scroll or pinch to zoom.</li>
+      <li><b>Shape</b>, with <b>Edges</b> and <b>Inflate</b> for the faceted ones (a change brings a fresh, clear object).</li>
+      <li><b>Density</b> and <b>Wander</b> shape the figure; <b>Refraction</b> is the glass's index; <b>Spin</b> turns it; <b>Lamp</b> is the warm light in the slab.</li>
+      <li><b>Strike</b> (or <b>S</b>) strikes somewhere visible; <b>C</b> clears the figure.</li>
+      <li><b>Auto change</b> (on by default): a new object every 12 s (<b>Change every</b>, 5–60 s), striking itself if nobody has.</li>
+      <li><b>R</b> brings a new shape, <b>M</b> or the speaker button toggles sound.</li>
+      <li><b>Space</b> pauses, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
+    </ul>
   </section>
 
   <footer class="col">
