@@ -170,7 +170,7 @@ footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px so
 
   <section>
     <div class="col prose">
-      <div class="eyebrow">The object · <b>tools/bake.mjs</b></div>
+      <div class="eyebrow">The object · <b>3/tools/bake.mjs</b></div>
       <h2>A shape is a distance field, meshed once</h2>
       <p>Each shape (Heart, Knot, Icosahedron, Star…) starts as a signed distance function: negative inside, positive outside, zero on the surface. An offline script samples it on a grid and builds a mesh with <em>surface nets</em>: every grid cell the surface passes through gets one vertex, placed at the average of where the surface crosses the cell's edges, then snapped onto the surface.</p>
       <p>The bake centres each shape, scales it to radius 1 and picks a grid of 72 to 128 cells per side so the mesh lands near 19,000 vertices, then repeats at 48 to 88 cells for an 8,000-vertex phone mesh. Each vertex takes Newton steps onto the surface, three rounds of tangential smoothing even out the triangles, and normals come from the field's gradient. Ambient occlusion samples the field five times along the normal, at 0.06, 0.15, 0.3, 0.5 and 0.8 units. Positions are stored as 16-bit integers, normals as octahedral pairs and AO as bytes.</p>
@@ -297,24 +297,16 @@ footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px so
 
   <section>
     <div class="col prose">
-      <div class="eyebrow">The speed-up · <b>bake.js</b></div>
+      <div class="eyebrow">The bake · <b>bake.js</b></div>
       <h2>Compute the surface once, read it everywhere</h2>
-      <p>The <a href="../modules/pipeline/explainer.html">shared pipeline</a> draws the object in several passes: the shadow map, a depth-and-velocity prepass, a second prepass at the motion-blur shutter's pose, and the lit main pass. Each pass used to evaluate the whole melt field again for every vertex, and the velocity passes did it twice, for this frame's pose and the previous one.</p>
-      <p>Now a small pass draws the body's vertices as points into float textures: this frame's offset and normal, last frame's offset, and (with motion blur) the shutter pose's offset, so 3 evaluations with motion blur and 2 without. Every other pass just reads its vertex's texel. The per-pixel normal in the main pass still evaluates the field, pools included, so highlights stay smooth however coarse the mesh is; the low tier skips it and uses the baked normal.</p>
+      <p>The <a href="../modules/pipeline/explainer.html">shared pipeline</a> draws the object in several passes: the shadow map, a depth-and-velocity prepass, a second prepass at the motion-blur shutter's pose, and the lit main pass. Evaluating the melt field in each of them would cost six evaluations per vertex per frame with motion blur, since the velocity passes need two poses each.</p>
+      <p>Instead a small pass draws the body's vertices as points into float textures: this frame's offset and normal, last frame's offset, and (with motion blur) the shutter pose's offset, so 3 evaluations with motion blur and 2 without. Every other pass just reads its vertex's texel. The per-pixel normal in the main pass still evaluates the field, pools included, so highlights stay smooth however coarse the mesh is; the low tier skips it and uses the baked normal.</p>
       <p>Testing every kernel at every vertex would mean 96 blobs and 160 trails each. Instead the CPU builds an 8³ grid over the shape's box each frame, and each cell lists up to 47 kernels whose bounding sphere touches it. A blob's sphere is grown by how far it moved between the three poses, so one list serves all of them. The shader reads its cell's list from a texture, and a cell that overflows falls back to looping over every kernel.</p>
     </div>
     <div class="fig">
-      <div class="bake">
+      <div class="bake" style="grid-template-columns: minmax(0, 1fr); max-width: 520px; margin: 0 auto;">
         <div class="bake-col">
-          <h3>Before: the field in every pass</h3>
-          <div class="pass">Shadow map <span class="chips"><span class="chip">FIELD</span></span></div>
-          <div class="pass">Prepass <span class="chips"><span class="chip">FIELD</span><span class="chip">FIELD prev</span></span></div>
-          <div class="pass">Motion prepass <span class="chips"><span class="chip">FIELD</span><span class="chip">FIELD shutter</span></span></div>
-          <div class="pass">Main pass <span class="chips"><span class="chip">FIELD</span></span></div>
-          <p class="fig-cap">6 field evaluations per vertex per frame with motion blur.</p>
-        </div>
-        <div class="bake-col">
-          <h3>After: baked once, then read</h3>
+          <h3>Baked once, then read</h3>
           <div class="bake-src"><b>Bake</b>: vertices drawn as points → float textures<br>now · previous · shutter = <b>3</b> evaluations</div>
           <div class="pass">Shadow map <span class="chips"><span class="chip read">texel</span></span></div>
           <div class="pass">Prepass <span class="chips"><span class="chip read">texel</span><span class="chip read">texel</span></span></div>
@@ -322,18 +314,6 @@ footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px so
           <div class="pass">Main pass <span class="chips"><span class="chip read">texel</span></span></div>
         </div>
       </div>
-      <div class="scroll">
-        <table>
-          <thead><tr><th>GPU per frame, fastest 10 %</th><th>Before</th><th>After</th></tr></thead>
-          <tbody>
-            <tr><td>Torus, Lacquer, desktop</td><td>5.30 ms</td><td><b>3.94 ms</b></td></tr>
-            <tr><td>Suzanne, Lacquer, desktop</td><td>7.04 ms</td><td><b>3.56 ms</b></td></tr>
-            <tr><td>Suzanne, Wax, desktop</td><td>7.47 ms</td><td><b>4.60 ms</b></td></tr>
-            <tr><td>Torus, phone tier</td><td>5.73 ms</td><td><b>4.62 ms</b></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="fig-cap">Measured on an RTX 4060 laptop through ANGLE D3D11 with a fixed seed and clock. Reference frames before and after match within 1/255.</p>
     </div>
   </section>
 
@@ -456,7 +436,7 @@ footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">The wax · <b>waxScatterLight()</b></div>
       <h2>Wax needs light to get inside</h2>
-      <p>Plain diffuse shading made wax look like plaster. Real wax scatters light under its surface, which shows in three ways, and the Wax finish fakes each one.</p>
+      <p>Plain diffuse shading makes wax look like plaster. Real wax scatters light under its surface, which shows in three ways, and the Wax finish fakes each one.</p>
       <p><strong>Light wraps past the shadow line.</strong> A share of the diffuse light uses a wrapped falloff, <code>(n·l + w) / (1 + w)²</code>, so it keeps going past where the surface turns away. Red travels furthest through wax and blue least, so w is widest for red, and the shadow side turns warm instead of grey.</p>
       <p><strong>Thin parts glow.</strong> Wherever the surface turns away from the light (n·l below 0.6), the shader sphere-traces the object's distance field toward the light to find how much wax the light crossed. Each step moves by the distance to the surface, so it takes only a few steps. The light that gets through falls off as <code>e^(−t/ℓ)</code>, with a longer ℓ for red. Ears, rims and hanging drops light up from behind.</p>
       <p><strong>Fine bumps blur.</strong> The dimpled dry surface shows only in the highlights. The scattering share, 75 % of the diffuse light, uses the smooth normal, the way scattering softens small detail; the other 25 % is ordinary diffuse on the bumped normal.</p>
@@ -492,14 +472,15 @@ footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px so
       <li><b>Size</b> scales blob radii and drop size; <b>Drip length</b> stretches the hanging drops.</li>
       <li><b>Motion</b>: Rock, Tumble or Still, with <b>Spin</b> in radians per second. <b>Height</b> raises it above the floor and refits the camera and shadow.</li>
       <li><b>Set</b>: a light or dark studio. <b>Reflections</b>: the environment the surface reflects.</li>
-      <li><b>M</b> resets the melt, <b>F</b> flips the object, <b>W</b> toggles wireframe (in the Rendering section).</li>
-      <li><b>R</b> randomises, <b>Space</b> pauses, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot.</li>
+      <li><b>M</b> resets the melt, <b>T</b> turns the object over, <b>W</b> toggles wireframe (also in the Rendering section).</li>
+      <li><b>Auto change</b> (on by default): a new shape, finish and melt every 15 s without input (<b>Change every</b>, 5–60 s); the count waits until a new shape has loaded.</li>
+      <li><b>R</b> randomises, <b>Space</b> pauses, <b>F</b> toggles fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
     </ul>
   </section>
 
   <footer class="col">
     <div class="meta">
-        <span><b>three.js</b> r187</span><span>WebGL2</span><span>desktop and phones</span><span>coded with <b>Claude Code</b> and Opus 5.5</span>
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>desktop and phones</span><span>made in <b>Claude Code</b> with Opus 5.5</span>
       </div>
     Day 3 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. Rendered with the repo's shared photographic pipeline: PCSS soft shadows, screen-space AO and one bounce of indirect light, MSAA, motion blur, bloom and AgX tonemapping. See it live at <a href="https://spite.github.io/codevember-2026/3/">spite.github.io/codevember-2026/3</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/3">3/ of the codevember-2026 repository</a>. How the shared pipeline renders all of this is on the <a href="../modules/pipeline/explainer.html">rendering pipeline explainer</a>.
   </footer>
