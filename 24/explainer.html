@@ -115,6 +115,9 @@ footer ul { margin: 8px 0 12px; padding-left: 18px; }
   .fig { padding: 16px; }
   main { gap: 56px; }
 }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
 </style>
 </head>
 <body>
@@ -305,7 +308,7 @@ cup.y  = −(0.02·tw + (2.15 + 0.55·r7)·s + (0.3 + 0.35·r6)·s² − 0.35·s
       <p class="fig-cap">The face medallion of <code>evalFace()</code> in the (θ, h) plane: a disc of radius 0.268, a hair cap, arcs for eyes and mouth, soft blush. Each shape is a distance; the edge width is the AA width. At the default 0.0018 the edges are crisp; drag it up to see the same distances drawn soft.</p>
     </div>
     <div class="col prose">
-      <p>The faces were added on top of the original designs: eight emoji-like expressions (happy, wink, surprised, serene, smirk, grin, curious, bliss), handed to the five siblings in turn from a random start, plus a minimal Bauhaus face and none for the balloon. Hair is styled per family: scalloped bangs on the drip, botanical, city and shawl dolls, a side part on the dipped ones, curtain bangs on Gel Overlap, Modern Folk and Scandi Emblem, a sleek cap elsewhere, and an ink ring around the face on Folk Graphic.</p>
+      <p>The faces are the day's own, painted over every design: eight emoji-like expressions (happy, wink, surprised, serene, smirk, grin, curious, bliss), handed to the five siblings in turn from a random start, plus a minimal Bauhaus face and none for the balloon. Hair is styled per family: scalloped bangs on the drip, botanical, city and shawl dolls, a side part on the dipped ones, curtain bangs on Gel Overlap, Modern Folk and Scandi Emblem, a sleek cap elsewhere, and an ink ring around the face on Folk Graphic.</p>
       <p>The edge width is measured once per pixel, before any branch, from the surface itself: <code>gAA = max(|fwidth(position)|, 0.0018)</code>, since the face and pattern coordinates are close to object units. Every edge in every pattern and face uses it, so no screen-space derivative sits inside a branch that depends on the pixel (which would make the shader compiler flatten the branch). The bump's derivatives are taken once at the very end, outside the wood/paint branch, for the same reason.</p>
     </div>
   </section>
@@ -325,7 +328,7 @@ cup.y  = −(0.02·tw + (2.15 + 0.55·r7)·s + (0.3 + 0.35·r6)·s² − 0.35·s
     <div class="col prose">
       <div class="eyebrow">Looking · <b>main.js, FreeOrbitControls.js</b></div>
       <h2>Faces that find the camera</h2>
-      <p>The camera never stops: it orbits at 0.68 rad/s, swings over and under, and rolls. The shared orbit controls lock at the poles, so this day uses the gimbal-free ones from days 14 and 16: yaw turns about the camera's own up vector and pitch about its own right vector, and the up vector turns with them, so the camera can go over the top and come back upside down. The automatic motion is applied the same way, as small turns of the camera's frame each frame: a yaw of <code>1.05 · orbit · dt</code>, a pitch that swings with <code>cos(0.55·phase)</code>, and a roll of <code>0.72 · roll · dt</code> rotating the up vector about the view direction.</p>
+      <p>The camera never stops: it orbits at 0.68 rad/s, swings over and under, and rolls. The shared orbit controls lock at the poles, so this day uses the shared gimbal-free ones (<code>modules/FreeOrbitControls.js</code>, as days 14 and 16 do): yaw turns about the camera's own up vector and pitch about its own right vector, and the up vector turns with them, so the camera can go over the top and come back upside down. The automatic motion is applied the same way, as small turns of the camera's frame each frame: a yaw of <code>1.05 · orbit · dt</code>, a pitch that swings with <code>cos(0.55·phase)</code>, and a roll of <code>0.72 · roll · dt</code> rotating the up vector about the view direction.</p>
       <p>A free camera spends a lot of time looking at a doll's back or its base, and a matryoshka is about its face. So the dolls turn to meet it. Each doll is only slightly turned from its mother (up to ±0.35 rad), and the whole nest is turned as one: every frame, the camera's direction is expressed in the hero doll's frame, as an azimuth from the face and an elevation from the equator, and squeezed into a window in front of the face with <code>tanh</code>. The nest then turns, at <code>1 − e<sup>−2.5·dt</sup></code> a frame, toward the rotation that would put the camera at the squeezed direction.</p>
     </div>
     <div class="formula"><span class="c">// camera direction in the hero's frame → where it should be</span>
@@ -363,16 +366,32 @@ nest ← slerp(nest, hero · fix · yaw⁻¹, 1 − e^(−2.5·dt))</div>
     <div class="col prose">
       <div class="eyebrow">Sound · <b>sound.js</b></div>
       <h2>A wooden box, opening</h2>
-      <p>Every opening plays the sound of a real one: six cuts from a CC0 recording of a small round hollow wooden box being handled, opened and closed, each 1.1 s, a quiet slide that builds to a release about 0.7 s in. They were picked by matching the shape of their loudness envelope and their spectrum to the one cut that sounded right. Each plays at <code>p</code> = 0 crossing upward, a random variant never the same twice in a row, with ±7% of pitch and ±15% of gain. Closing (the nest running backwards) plays a lid closing from a second recording. The opening of the animation is timed to them: the twist takes about as long as the slide.</p>
+      <p>Every opening plays the sound of a real one: six cuts from a CC0 recording of a small round hollow wooden box being handled, opened and closed, each 1.1 s, a quiet slide that builds to a release about 0.7 s in. Each plays at <code>p</code> = 0 crossing upward, a random variant never the same twice in a row, with ±7% of pitch and ±15% of gain. Closing (the nest running backwards) plays a lid closing from a second recording. The opening of the animation is timed to them: the twist takes about as long as the slide.</p>
       <p>The wood goes through a gentle low-pass at 1.8 kHz (Q 0.5), which takes the scrape off and makes it sound like it comes from inside the hollow, then a compressor (−14 dB, 3:1). Under it a song loops at 0.3 gain, <em>Melancholic Russian Folk Trip-Hop</em>, generated with Lyria 3.5. The audio context is created on load and resumes on the first gesture, but nothing at all plays until the loader has finished: the first rendered frame calls <code>sound.start()</code>.</p>
     </div>
+  </section>
+
+  <!-- Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>Drag to orbit, freely over and under; scroll or pinch to zoom. Click or tap (or <b>N</b>) to open the next doll sooner.</li>
+      <li><b>Pattern</b>, <b>Finish</b>, <b>Palette</b>, <b>Faces</b>, <b>Shape</b> and <b>Backdrop</b> pin a choice for every doll, or leave it to the family.</li>
+      <li><b>Direction</b>: open, or close and shrink forever. <b>Speed</b>: dolls a second (0.24 by default).</li>
+      <li><b>Finish polish</b> shifts every finish's roughness; <b>Orbit</b> and <b>Roll</b> set the camera's own motion.</li>
+      <li>The nest never stops, so there is no auto change: a new doll opens every 4.2 s at the default speed.</li>
+      <li><b>R</b> for new dolls, <b>M</b> or the speaker button toggles sound, <b>Space</b> pauses, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
+    </ul>
   </section>
 
   <footer class="col">
     <div class="meta">
       <span><b>three.js</b> r187</span><span>WebGL2</span><span>photographic pipeline</span><span>analytic SDF painting</span><span>gimbal-free orbit</span><span>started in <b>Antigravity</b> with Gemini 4 Neon, finished in <b>Claude Code</b> with Opus 5.5</span><span>music by <b>Lyria 3.5</b></span>
     </div>
-    Day 24 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/24/">spite.github.io/codevember-2026/24</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/24">24/ of the codevember-2026 repository</a>. The infinite zoom follows <a href="https://github.com/spite/infinite-gift">infinite-gift</a>; the free orbit is from <a href="../16/explainer.html">day 16</a>.
+    Day 24 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/24/">spite.github.io/codevember-2026/24</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/24">24/ of the codevember-2026 repository</a>. The infinite zoom follows <a href="https://github.com/spite/infinite-gift">infinite-gift</a>.
     <br><br>The designs are inspired by modern Matryoshkas and photos by:
     <ul>
       <li>Becky Kemp, Sketch Inc: <a href="https://petitmonkey.com/products/sketch-inc-nesting-dolls-black-and-white">black-and-white graphic dolls</a>, and probably the <a href="https://petitmonkey.com/products/nesting-dolls-dripped-dolls">dripped dolls</a></li>
