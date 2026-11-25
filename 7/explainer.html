@@ -185,14 +185,14 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">The surface · <b>surface.js</b></div>
       <h2>A mesh, not a field</h2>
-      <p>The first versions of this day carved the holes out of a 3D distance field and meshed the result. It looked blobby: a field fine enough for crisp struts was too slow to re-mesh while the holes grow. So everything here is done on the surface instead, the way MeshLab perforates a mesh. The 3D field is only used once, to make that surface.</p>
+      <p>Carving the holes out of a 3D distance field and meshing the result would come out blobby: a field fine enough for crisp struts is too slow to re-mesh while the holes grow. So everything is done on the surface instead, the way MeshLab perforates a mesh. The 3D field is only used once, to make that surface.</p>
       <p>Each shape (a thick trefoil, Suzanne, a sphere, an egg, a torus, a rounded cube, the Platonic solids, a capsule or a blend of two) is a signed distance function. Surface nets mesh it, sampling finely only next to the surface. Then the vertices are relaxed along the surface and pulled back onto it with Newton steps, so the triangles are even and every vertex is an exact sample. Normals come from the field's gradient.</p>
       <p>The mesh is turned to its principal axes and scaled to a common reach, so every shape fills the same view. Suzanne is the exception: her axes are nearly tied, so she keeps a fixed upright frame and faces the camera.</p>
     </div>
     <div class="facts">
       <div class="fact"><b>Suzanne</b><span>Blender's monkey, as a 96³ distance field baked offline from the mesh (<code>tools/suzanne-sdf.mjs</code>), with the ears and brow thickened so they survive hollowing.</span></div>
       <div class="fact"><b>Once per shape</b><span>The surface, its curvature, its clearance (how far along the normal to the next wall) and the cells are prepared once per build, in a worker.</span></div>
-      <div class="fact"><b>Phones</b><span>A coarser mesh, fewer steps across a lip and larger erosion steps. A large surface is coarser everywhere, so a frame stays around half a million triangles.</span></div>
+      <div class="fact"><b>Phones</b><span>A coarser mesh, fewer steps across a lip and larger erosion steps on one worker (two with six cores or more), a longer default Hollow time, a smaller light cube redrawn only when a new mesh lands, and a wider lens in portrait. A large surface is coarser everywhere, so a frame stays around half a million triangles.</span></div>
     </div>
   </section>
 
@@ -201,7 +201,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">The cells · <b>hollow.js</b></div>
       <h2>Holes from the distance to a cell's border</h2>
-      <p>Cell sites are Poisson-disc samples over the mesh. Their spacing comes from Cells and varies with a noise (Variation). Each vertex belongs to its nearest site, and stores <i>b</i>, its distance to the cell's border: half the gap between its distance to its own site and to a neighbouring one. That is Worley's F2 − F1. It is the same from either side of a border, so a strut is continuous across it.</p>
+      <p>Cell sites are Poisson-disc samples over the mesh, by distance along the mesh, so a part of the surface passing close never blocks another. Their spacing comes from Cells, varies with a noise (Variation) and shrinks where the surface is tight (curved, or a solid that is thin). The whole layout is then scaled to stay near the count asked for, but never wider than a solid is thick, so a cell can't wrap round a thin tube and cut it, and no site sits right by an open edge. Each vertex takes its nearest site over the mesh (Dijkstra), then the nearest in space among the cells around it, so cell borders are the planes halfway between sites and parts that pass close don't talk to each other. Each vertex belongs to its nearest site, and stores <i>b</i>, its distance to the cell's border: half the gap between its distance to its own site and to a neighbouring one. That is Worley's F2 − F1. It is the same from either side of a border, so a strut is continuous across it.</p>
       <p>The gaps to all the neighbours are blended with a soft minimum (log-sum-exp) as wide as Roundness. At 0 the holes are the cells' polygons, shrunk. As it grows, their corners round off, their sides bow out, and the struts thicken towards the joints, which read as webs.</p>
       <p>A hole is wherever <i>b</i> is greater than the strut's half-width <i>w</i>. The figure below runs the same rules on a flat patch. Drag Erosion or press Play to watch it open.</p>
     </div>
@@ -264,8 +264,8 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">The glow · <b>materials.js</b></div>
       <h2>Light through the walls</h2>
-      <p>The light inside renders a cube map of the sculpture from where it is, in the sculpture's own frame. It doesn't store depth but the length of wall along every ray. Faces the ray enters subtract their distance, faces it leaves add theirs, all under additive blending, so the sum is the total thickness crossed.</p>
-      <p>Every surface the light reaches reads that thickness and turns it into a transmittance, exp(−σ · thickness), per colour channel. Glossy glaze stops the most, wax the least, and red gets through further than blue, so thin walls glow warm. The cube is mip-mapped and sampled over a cone as wide as the light's penumbra at that distance, so the hole patterns on the floor sharpen close to the sculpture and blur further away.</p>
+      <p>The light starts at the most enclosed point clear of every wall: the one from which the most rays hit the skin, near the middle. It renders a cube map of the sculpture from where it is, in the sculpture's own frame. It doesn't store depth but the length of wall along every ray. Faces the ray enters subtract their distance, faces it leaves add theirs, all under additive blending, so the sum is the total thickness crossed.</p>
+      <p>Every surface the light reaches reads that thickness and turns it into a transmittance, exp(−σ · thickness), per colour channel. Glossy glaze stops the most, wax the least, and red gets through further than blue, so thin walls glow warm. The cube is mip-mapped and sampled over a cone as wide as the light's penumbra at that distance, so the hole patterns on the floor sharpen close to the sculpture and blur further away. Each lit pixel reads it with a fixed spiral of 6 taps (4 on phones).</p>
       <p>Drag the light in the figure. It is a slice through a hollowed shell.</p>
     </div>
     <div class="fig">
@@ -307,7 +307,24 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <h2>A sketch while the settings move</h2>
       <p>A new sculpture takes a second or two to prepare, which is too slow to follow a slider. So while the Shape and Hollowing settings change, a third worker sketches the result. A coarse mesh of the shape (cached per shape) is celled with the mesher's rules, simplified, and the rims of the holes it will open are traced as glowing outlines. The outlines are drawn on the sculpture's own skin when only the cells change, or on the coarse mesh of a new shape.</p>
       <p>The outlines are screen-space quads of a fixed width in pixels with a soft additive halo, offset to the outer face of the wall. The sculpture is built and hollowed 1.2 s after the last change.</p>
-      <p>A new shape shrinks the old one away. The backdrop then fades to the new palette, the new material goes on, and the new shape grows in with a little overshoot. The light, the view and the tumble carry on across the swap. In kiosk mode this happens by itself every 20 seconds once the sculpture has finished hollowing.</p>
+      <p>A new shape shrinks the old one away. The backdrop then fades to the new palette, the new material goes on, and the new shape grows in with a little overshoot. The light, the view and the tumble carry on across the swap.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Finish and studio · <b>materials.js</b>, <b>main.js</b></div>
+      <h2>Glaze, plastic, porcelain or wax</h2>
+      <p>The colour comes from the palette (white, bone, blush or magenta, each with a backdrop to match) and the material from the finish. Each finish sets the roughness, the strength of the specular, a sheen, how much of the key light comes through thin walls, and how much of the glow gets through and how much the wall stops it.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Glossy</b><span>A ceramic glaze: roughness 0.08 and a strong specular over the colour, which deepens where the glaze pools in the hollows. It is the most opaque to the glow.</span></div>
+      <div class="fact"><b>Plastic</b><span>Satin moulded or printed plastic: roughness 0.22, more saturated colour and a faint sheen.</span></div>
+      <div class="fact"><b>Porcelain</b><span>Matte-satin at roughness 0.46, with a soft sheen and a little translucency.</span></div>
+      <div class="fact"><b>Wax</b><span>Scatters: the key wraps past the terminator, redder the further it goes, and comes through thin walls; the specular is broad and low, and the glow comes through the most and warmest.</span></div>
+    </div>
+    <div class="col prose">
+      <p>The sculpture floats a little above the floor, bobs, and tumbles about two axes the whole time, while it is sketched, built and hollowed too. The key is a soft window light with PCSS shadows that fall beside it, and the floor under it is darkened by an analytic sphere occluder the sculpture's size. The pipeline's AO and screen-space GI also bounce the glow onto the floor and back onto the skin. As Daylight goes down, the glow bounced back by the room fills the outer skin from below and from the camera's side, so the form still reads at night. Backdrop, daylight, warmth and brightness always ease to new values, never jump.</p>
     </div>
   </section>
 
@@ -319,18 +336,19 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </div>
     <ul class="keys col">
       <li>Drag to orbit, scroll or pinch to zoom. With Light on pointer, the light follows the mouse (or the last tap).</li>
-      <li><b>Shape</b>: the solid and its own sliders. A change sketches, then builds and hollows.</li>
-      <li><b>Hollowing</b>: Cells, Variation, Roundness, and Hollow time.</li>
+      <li><b>Shape</b>: the solid, or random, and its own sliders: Knot width, Knot height, Tube and Swell for the trefoil, Tube for the torus, Taper for the egg, Edges for the rounded cube and the Platonic solids, Length and Radius for the capsule, Thicken and Swell for Suzanne, Variant for the blend. A change sketches, then builds and hollows.</li>
+      <li><b>Hollowing</b>: Cells, Variation, Roundness, and Hollow time; <b>Hollow again</b> (or <b>H</b>) replays it from a solid skin.</li>
       <li><b>Look</b>: Strut, Fillet, Thickness, Puff, palette, Translucency, finish and Tumble. These change the sculpture in place.</li>
       <li><b>Light</b>: Glow, Brightness, Warmth, pointer or fixed, Light distance, Daylight and Flicker.</li>
-      <li><b>H</b> hollows it again, <b>L</b> switches the glow, <b>R</b> randomises.</li>
-      <li><b>Space</b> pauses, <b>Tab</b> hides the panel, <b>F</b> goes fullscreen, <b>P</b> saves a screenshot.</li>
+      <li><b>H</b> hollows it again, <b>L</b> switches the glow, <b>R</b> randomises: a shape, 150 to 300 cells with a thinner strut the more there are, round holes, a near-full fillet, a wall about as thick as the struts are wide, and day or night.</li>
+      <li><b>Auto change</b> (on by default): a new sculpture every 20 s (<b>Change every</b>, 5–120 s), counted only once the current one has finished hollowing and nobody is interacting.</li>
+      <li><b>Space</b> pauses, <b>Tab</b> hides the panel, <b>F</b> goes fullscreen, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
     </ul>
   </section>
 
   <footer class="col">
     <div class="meta">
-        <span><b>three.js</b> r187</span><span>WebGL2</span><span>web workers</span><span>desktop and phones</span><span>coded with <b>Claude Code</b> and Opus 5.5</span>
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>web workers</span><span>desktop and phones</span><span>made in <b>Claude Code</b> with Opus 5.5</span>
       </div>
     Day 7 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/7/">spite.github.io/codevember-2026/7</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/7">7/ of the codevember-2026 repository</a>. Rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>.
   </footer>
