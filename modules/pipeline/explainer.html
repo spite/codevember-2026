@@ -153,7 +153,7 @@ select { font: 400 13px var(--mono); color: var(--ink); background: var(--bg); b
       <div class="eyebrow">The frame · <b>Pipeline.js</b></div>
       <h2>Passes in order</h2>
       <p>A day calls <code>pipeline.render(scene, camera, time)</code> instead of <code>renderer.render</code>. Each frame the pipeline collects the meshes and their previous poses, then runs: the shadow map, a prepass of normals, velocity and depth, ambient occlusion and indirect light at half resolution, an optional shadow mask, the lit main pass into a multisampled float target, then the optional motion blur, a day's own composite pass and depth of field, then bloom and the final pass that tonemaps to the screen. On the low tier, FXAA replaces MSAA.</p>
-      <p>Two paths replace the single frame. The <strong>capture</strong> tier renders 16 sub-frames, each jittered by half a pixel along a Halton (2, 3) sequence, and averages them, which antialiases and smooths every noisy effect. And when depth of field is on and the view holds still, the <strong>lens</strong> path averages frames rendered from across the aperture (below). There is no TAA on the live path.</p>
+      <p>Two paths replace the single frame. The <strong>capture</strong> tier renders 16 sub-frames, each jittered by half a pixel along a Halton (2, 3) sequence, and averages them, which antialiases and smooths every noisy effect. And when depth of field is on and the view holds still, the <strong>lens</strong> path averages frames rendered from across the aperture (below). The live path has no temporal antialiasing unless a day opts in (below).</p>
       <p>The tier is picked from <code>?quality=</code>, then <code>?capture</code>, then the day's option; otherwise phones and coarse pointers get medium and everything else high. Every full-screen program compiles in parallel at construction, and <code>compileAsync(scene, camera)</code> compiles the scene's three material variants before the first frame, so nothing stalls on first use.</p>
     </div>
   </section>
@@ -287,7 +287,7 @@ select { font: 400 13px var(--mono); color: var(--ink); background: var(--bg); b
     <div class="col prose">
       <div class="eyebrow">The finish · <b>shaders/pipeline/final.js</b> · <b>bloom.js</b></div>
       <h2>Bloom, AgX and grain</h2>
-      <p>A day can run its own full-screen pass over the lit HDR image through the <code>composite</code> hook, after motion blur and before depth of field and bloom; an earlier version of Day 2 ray-traced glass there.</p>
+      <p>A day can run its own full-screen pass over the lit HDR image through the <code>composite</code> hook, after motion blur and before depth of field and bloom: day 5's mist, day 8's mirrored inside, day 14's water and the glass of days 19 and 21 are drawn there. A second hook, <code>afterFocus</code>, runs after depth of field instead, for light that draws its own blur, such as day 16's dust specks.</p>
       <p>Bloom builds a pyramid of up to 7 half-size levels with Jimenez's 13-tap downsample (with Karis averaging on the first level, so single hot pixels don't sparkle) and a tent upsample. It is mixed in as an energy-preserving lerp, <code>mix(color, bloom, strength)</code>, not added, so it never brightens the image overall.</p>
       <p>The final pass applies, in order: chromatic aberration (off by default), exposure, a vignette before tonemapping, the tonemapper (AgX by default; ACES, Khronos PBR Neutral or a plain clamp), sRGB encoding, saturation and contrast in display space, an optional clip warning, film grain that fades toward black and white, and a ±0.5/255 dither against banding. AgX converts to Rec.2020, applies an inset matrix, maps log₂ exposure over about 16.5 stops through a polynomial S-curve and back out, so highlights desaturate toward white smoothly instead of clipping to a hue.</p>
     </div>
@@ -310,6 +310,26 @@ select { font: 400 13px var(--mono); color: var(--ink); background: var(--bg); b
 
   <section>
     <div class="col prose">
+      <div class="eyebrow">Opt-in · <b>Pipeline.js</b>, <b>PipelineMaterial.js</b></div>
+      <h2>What a day can switch on</h2>
+      <p>Everything above is the default frame. A day can turn on more, and each option defaults to off, so the days that don't ask for it render exactly as before. The key light already fades over a short band past the geometric terminator, <code>smoothstep(−0.2, 0, N·L)</code>, so a normal map that tilts toward the light past the silhouette never draws a hard line there.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>Temporal antialiasing</b><span><code>temporal</code>: one sub-pixel-jittered sample per pixel each frame, resolved against the reprojected history with a clamp in YCoCg, instead of MSAA. Day 12 uses it to average its stochastic feathers. <code>markMoving()</code> tells it a frame moved in a way it can't see.</span></div>
+      <div class="fact"><b>Still accumulation</b><span><code>stillSamples</code>: once nothing moves, frames are averaged into a supersampled still, up to that many. <code>restartAccumulation(fade)</code> starts it over.</span></div>
+      <div class="fact"><b>Depth prepass</b><span><code>depthPrepass</code>: depth is drawn before the main pass, so each pixel is shaded once. It pays where much of the geometry hides behind itself.</span></div>
+      <div class="fact"><b>Holding the live frame</b><span><code>depthOfField.holdLive</code>: while the lens average builds up, the last live frame is held and cross-faded into it, so settling doesn't shake.</span></div>
+      <div class="fact"><b>Cutouts</b><span><code>alphaToCoverage</code>: alpha becomes MSAA coverage in the main pass, for soft cutout edges.</span></div>
+      <div class="fact"><b>Thin sheets</b><span><code>thinSheet</code>: transmission for sheets. The key lights through only from the back, and the environment comes through from the far side, scaled by how open it is.</span></div>
+      <div class="fact"><b>Partial shadows</b><span><code>stochasticShadows</code>: alpha is the chance of blocking the key, redrawn every frame and smoothed by the shadow denoiser, so translucent layers cast partial shadows that multiply. Layer depth can also pass light by the gap to the blockers.</span></div>
+      <div class="fact"><b>Anisotropy</b><span><code>anisotropy</code>: an anisotropic GGX lobe for the key and a bent reflection for the environment, stretched along a direction the surface gives. Day 12 runs it along feather barbs.</span></div>
+      <div class="fact"><b>Traced reflections</b><span><code>reflections</code>: the material supplies its own <code>traceReflection(P, R, rough)</code>, mixed over the prefiltered environment by the coverage it returns. Day 13's floors trace their walls and marble.</span></div>
+      <div class="fact"><b>Instance motion</b><span><code>instanceMotion</code>: per-instance velocity for instanced meshes, so their motion reaches AO, GI and blur.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="col prose">
       <div class="eyebrow">Controls · <b>addGUI()</b></div>
       <h2>The Rendering panel</h2>
       <p>Every day has a collapsed Rendering section with the same controls. None are randomised, and every change restarts the lens average.</p>
@@ -318,6 +338,7 @@ select { font: 400 13px var(--mono); color: var(--ink); background: var(--bg); b
       <table>
         <thead><tr><th>Control</th><th>Range</th><th>What it does</th></tr></thead>
         <tbody>
+          <tr><td>Quality (reloads)</td><td>auto / high / medium / low</td><td>the tier; auto shows the one it picked, and a change reloads the page</td></tr>
           <tr><td>Exposure</td><td>0.1–4</td><td>scene multiplier before the tonemapper</td></tr>
           <tr><td>Tonemapper</td><td>agx / aces / neutral / none</td><td>the curve above</td></tr>
           <tr><td>Environment</td><td>0–3</td><td>scales SH ambient and reflections</td></tr>
@@ -337,8 +358,8 @@ select { font: 400 13px var(--mono); color: var(--ink); background: var(--bg); b
   </section>
 
   <footer class="col">
-    <div class="meta"><span><b>three.js</b> r187</span><span>WebGL2</span><span>forward + MSAA</span><span>four quality tiers</span><span>coded with <b>Claude Code</b> and Opus 5.5</span></div>
-    Part of <a href="../../">Codevember 2026</a> by Jaume Sanchez Elias. Source in <span class="mono">modules/pipeline/</span> and <span class="mono">shaders/pipeline/</span> of the codevember-2026 repository. Explainers for the days: <a href="../../1/explainer.html">Fold</a>, <a href="../../2/explainer.html">Shatter</a>, <a href="../../3/explainer.html">Melt</a>, <a href="../../4/explainer.html">Tangle</a>, <a href="../../5/explainer.html">Moss</a>, <a href="../../6/explainer.html">Orrery</a>, <a href="../../7/explainer.html">Hollow</a>, <a href="../../8/explainer.html">Tesseract</a>, <a href="../../9/explainer.html">Membrane</a>.
+    <div class="meta"><span><b>three.js</b> r187</span><span>WebGL2</span><span>forward + MSAA</span><span>four quality tiers</span><span>made in <b>Claude Code</b> with Opus 5.5</span></div>
+    Part of <a href="../../">Codevember 2026</a> by Jaume Sanchez Elias. Source in <span class="mono">modules/pipeline/</span> and <span class="mono">shaders/pipeline/</span> of the codevember-2026 repository. Explainers for the days: <a href="../../1/explainer.html">Fold</a>, <a href="../../2/explainer.html">Shatter</a>, <a href="../../3/explainer.html">Melt</a>, <a href="../../4/explainer.html">Tangle</a>, <a href="../../5/explainer.html">Moss</a>, <a href="../../6/explainer.html">Orrery</a>, <a href="../../7/explainer.html">Hollow</a>, <a href="../../8/explainer.html">Tesseract</a>, <a href="../../9/explainer.html">Membrane</a>, <a href="../../10/explainer.html">Caustic</a>, <a href="../../11/explainer.html">Rust</a>, <a href="../../12/explainer.html">Feather</a>, <a href="../../13/explainer.html">Labyrinth</a>, <a href="../../14/explainer.html">Tension</a>, <a href="../../15/explainer.html">Mirage</a>, <a href="../../16/explainer.html">Spore</a>, <a href="../../17/explainer.html">Kelp</a>, <a href="../../18/explainer.html">Pendulum</a>, <a href="../../19/explainer.html">Erosion</a>, <a href="../../20/explainer.html">Cocoon</a>, <a href="../../21/explainer.html">Bolt</a>, <a href="../../22/explainer.html">Echo</a>, <a href="../../23/explainer.html">Magma</a>, <a href="../../24/explainer.html">Nest</a>.
   </footer>
 </main>
 
