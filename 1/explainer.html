@@ -314,7 +314,7 @@ footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">The sound · <b>1/sound.js</b></div>
       <h2>Paper you can hear</h2>
-      <p>The sound is 24 one-shot paper samples: 10 creases, 2 opens, 4 rustles and 8 taps, all CC0 from freesound.org. Nothing loads or plays until the first pointer, touch, click or key. All voices go through one gain into a gentle compressor (threshold −18 dB, ratio 3), with at most 10 at once. Each play picks a random variant of its set, never the same as last time, at a playback rate of 0.9 to 1.1, from a random source separate from the seed, so sound never shifts the layout.</p>
+      <p>The sound is 24 one-shot paper samples: 10 creases, 2 opens, 4 rustles and 8 taps, all CC0 from freesound.org. The samples download while the page loads, as one of its loading steps. The audio context is created on load and plays at once if the browser allows it; otherwise it starts on the first pointer, touch, click or key, and until then a pill under the hint says to click anywhere for sound. All voices go through one gain into a gentle compressor (threshold −18 dB, ratio 3), with at most 10 at once. Each play picks a random variant of its set, never the same as last time, at a playback rate of 0.9 to 1.1, from a random source separate from the seed, so sound never shifts the layout.</p>
       <p>A transition plays an open when it starts and one crease per old shape, scattered over the first 80 % of the unfold. Up to five rustles play as the sheets begin to morph, and one crease per new shape is scattered over the refold. Each sound is panned by its shape's horizontal position on screen. Collisions play taps: harder hits are louder and lower. A pair stays silent for 0.08 s after a tap. Pausing suspends the audio, so scheduled sounds freeze with the animation; M or the speaker button mutes.</p>
     </div>
     <div class="fig">
@@ -332,13 +332,14 @@ footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px so
     </div>
     <ul class="keys col">
       <li>Drag a shape to grab and throw it; tap empty space for a burst. Drag elsewhere to orbit; scroll or pinch to zoom, between 4 and 14 units.</li>
-      <li><b>Solid</b>: one of twelve solids, or mixed, which draws from the five Platonic solids plus the truncated dodecahedron and icosahedron.</li>
+      <li><b>Solid</b>: one of thirteen solids, or mixed, which draws from the five Platonic solids plus the truncated dodecahedron and icosahedron.</li>
       <li><b>Faces</b>: plain, pyramids, inverted or mixed. <b>Colors</b>: white, accents or colorful.</li>
       <li><b>Count</b>: 3 to 12 shapes (default 7). <b>Size</b>: the mean radius (default 0.85), each shape 0.75 to 1.2 times that. These start a transition to a new layout.</li>
       <li><b>Home spring</b>, <b>Bounce</b>, <b>Drift</b> and <b>Spin</b> change the physics live: the pull home, the restitution of the shapes and floor, the wandering force, and how fast each home orientation turns.</li>
       <li><b>Crease</b>: the fillet radius and the depth of the valley shading. Every shape is rebuilt in place a quarter second after the slider stops.</li>
       <li><b>R</b> randomises; <b>M</b> or the speaker button toggles sound.</li>
-      <li><b>Space</b> pauses, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
+      <li><b>Auto change</b> (on by default) randomises by itself every 15 s without input (<b>Change every</b>, 5–60 s). The count waits while a transition runs or a new layout is still building, and starts over on any input.</li>
+      <li><b>Space</b> pauses, <b>F</b> toggles fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
     </ul>
     <div class="col prose">
       <p>Every random choice in a layout comes from the seed. While a layout is planned, Math.random is swapped for a generator seeded with the page seed plus ":layout", covering the solids, sizes, homes, orientations, spin axes, colours, face variants and a per-shape seed. That per-shape seed drives the shape's net search, crease jitter and face bow, so two cubes in one layout fold from different nets, and a link with the same seed rebuilds the same scene. The url carries the seed plus any setting that differs from what the seed gives. On load the shapes appear already folded; only later changes animate.</p>
@@ -346,7 +347,7 @@ footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px so
   </section>
 
   <footer class="col">
-    <div class="meta"><span><b>three.js</b> r187</span><span>Ammo.js physics</span><span>desktop and phones</span><span>coded with <b>Claude Code</b> and Opus 5.5</span></div>
+    <div class="meta"><span><b>three.js</b> r187</span><span>Ammo.js physics</span><span>desktop and phones</span><span>made in <b>Claude Code</b> with Opus 5.5</span></div>
     Day 1 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. Rendered with the repo's shared photographic pipeline: soft shadows, screen-space AO and one bounce of indirect light, MSAA, bloom and AgX tonemapping. See it live at <a href="https://spite.github.io/codevember-2026/1/">spite.github.io/codevember-2026/1</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/1">1/ of the codevember-2026 repository</a> and <span class="mono">modules/polyhedra/</span>. How the shared pipeline renders all of this is on the <a href="../modules/pipeline/explainer.html">rendering pipeline explainer</a>.
   </footer>
 </main>
