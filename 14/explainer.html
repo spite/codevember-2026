@@ -216,7 +216,8 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="eyebrow">Drops · <b>main.js tendrils, sim.js</b></div>
       <h2>A neck that thins, then lets go</h2>
       <p>Dragging off the edge of the water pulls a tendril: a bulb at the pointer, two spheres along a neck, and a foot in the coat, all soft-minned into it. The bulb follows the pointer on a spring, so it lags and overshoots. As it stretches, the neck thins and the coat under the foot is drawn down. Past about a body's radius it snaps. The bulb flies on as a drop, a small satellite breaks from the neck, and the stump recoils into the coat with a kick to the waves.</p>
-      <p>A drop is a particle with a wobble: a damped spring on its stretch along its acceleration, keeping its volume. Cohesion pulls it home. When it touches the coat it sinks and shrinks over most of a second, and its volume is poured into the coat around the landing point as a swell, which then spreads. The recordings pull three at once.</p>
+      <p>A drop is a particle with a wobble: a damped spring on its stretch along its acceleration, keeping its volume. Cohesion pulls it home. When it touches the coat it sinks and shrinks over most of a second, and its volume is poured into the coat around the landing point as a swell, which then spreads. <code>window.app.pull(n)</code> pulls n at once, for recordings.</p>
+      <p>Beads are loose parcels of water riding on the coat (none by default; Beads and Bead size set them). A spring holds each at a rest height over the surface, but the coat can only hold it with so much acceleration (Grip), so a fast spin flings beads off. Free blobs start loose. Once free, a parcel falls back under a weak cohesion pull, overlapping ones push apart, and each wobbles as an ellipsoid stretched along its acceleration, keeping its volume.</p>
     </div>
     <div class="fig">
       <div class="fig-head"><h3>The soft minimum, pinching</h3>
@@ -236,7 +237,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="eyebrow">Prints · <b>water.js pattern, noise.js</b></div>
       <h2>Patterns with no seams</h2>
       <p>Finishes wrap these shapes arbitrarily, so a print projected from outside always seams somewhere. Every print here is defined through space instead, and the surface simply cuts it: stripes are planes, spots are spheres on a jittered lattice, latitude bands are cones round the axis, a candy swirl is planes turning with height, giraffe patches are Voronoi cells, coral is a gyroid, wood is rings round a buried log, agate onion shells, Damascus folded layers, marble warped veins. Each edge is filtered over the pixel's footprint.</p>
-      <p>Their noise comes from a small baked 3D texture rather than a noise function in the shader. That isn't about speed. On Windows, Chrome translates the shader for Direct3D, whose compiler inlines every call and slows down sharply on long shaders. Inlined noise pushed the compile toward ten seconds; the texture brought it to under two.</p>
+      <p>Their noise comes from a small baked 3D texture rather than a noise function in the shader. That isn't about speed. On Windows, Chrome translates the shader for Direct3D, whose compiler inlines every call and slows down sharply on long shaders. Inlined noise would push the compile toward ten seconds; read from a texture it stays under two.</p>
     </div>
   </section>
 
@@ -278,14 +279,14 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <li><b>Drag off its edge</b> to pull a drop; <b>swipe</b> to push and spin the object.</li>
       <li>Drag the background to orbit, freely, over the poles; scroll or pinch to zoom.</li>
       <li><b>Shape</b>, <b>Finish</b>, <b>Background</b> and their blur and turn; water thickness, pooling, smoothness, IOR.</li>
-      <li><b>Spin</b>, <b>Drift</b>, <b>Tap strength</b> and how often it taps itself.</li>
-      <li><b>R</b> for a new look, <b>M</b> or the speaker button for sound; it changes by itself every 15 s.</li>
-      <li><b>Space</b> pauses, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot.</li>
+      <li><b>Spin</b>, <b>Drift</b>, <b>Grip</b>, <b>Tap strength</b> and how often it taps itself (<b>Random taps</b>); <b>Beads</b>, <b>Bead size</b> and <b>Free blobs</b>; <b>Steps</b>, the tracer's march budget.</li>
+      <li><b>R</b> for a new look, <b>M</b> or the speaker button for sound; it changes by itself every 15 s (<b>Auto change</b>, on by default; <b>Change every</b> 5–60 s), counted once a change has landed.</li>
+      <li><b>Space</b> pauses, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
     </ul>
   </section>
   <footer class="col">
     <div class="meta">
-      <span><b>three.js</b> r187</span><span>WebGL2</span><span>ray traced water</span><span>CC0 sound</span><span>coded with <b>Claude Code</b> and Opus 5.5</span>
+      <span><b>three.js</b> r187</span><span>WebGL2</span><span>ray traced water</span><span>CC0 sound</span><span>made in <b>Claude Code</b> with Opus 5.5</span>
     </div>
     Day 14 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/14/">spite.github.io/codevember-2026/14</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/14">14/ of the codevember-2026 repository</a>. The cabin and the object's light come through the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>.
   </footer>
