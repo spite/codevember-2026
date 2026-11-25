@@ -160,7 +160,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">The idea</div>
       <h2>Jelly in a glass box</h2>
-      <p>The references were product shots of cast resin: a frosted block on a pale floor with a deep coloured shape inside, sharp where it meets the surface and dissolving into a soft glow further in. Day 9's prompt was Membrane, so the shape inside went soft: a dozen jelly bodies, each with a skin, packed into a hollow shell that you can pick up and turn.</p>
+      <p>Day 9 is shot like cast resin on a pale floor: a frosted block with deep colour inside, sharp where it meets the surface and dissolving into a soft glow further in. The prompt was Membrane, so what is inside is soft: a dozen jelly bodies, each with a skin, packed into a hollow shell that you can pick up and turn.</p>
       <p>Turn it and the bodies tumble and slide, flatten against the walls and bulge into the gaps between each other, and settle again under their own weight. Beads, dice, rings or a single dark core float inside each body and push its skin around from within. The shell is a rounded cube, slab, tower, sphere, capsule, torus, T, L, cross or peanut; the bodies are balls, cushions, pills and five-lobed gumdrops.</p>
       <p>Two halves make it work: a soft-body solver that runs in a worker, and a renderer that lays the jelly over the frame as a volume, in the <a href="../modules/pipeline/explainer.html">shared pipeline</a>'s composite hook rather than as its meshes, then sphere-traces the glass from the same distance field the physics collides with.</p>
     </div>
@@ -363,7 +363,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="eyebrow">Sound · <b>sound.js</b></div>
       <h2>Heard through jelly and glass</h2>
       <p>Every sound is a one-shot cut from CC0 recordings on freesound.org, played with a random variant, pitch and pan. The page watches each body's centre between physics states: a sudden change of velocity is a knock, played as a rubber marble, with a deep voop under a firmer one and a low wobbling jelly bounce under the hardest. Beads knocking about inside their body play the marble too. While everything rests, a body now and then squishes softly, panned to where it sits. A change of shape plays a suction pop as the old set leaves and squelches played backwards as the new one swells in, and swinging the volume round fast, or onto a new axis, gives a swoosh.</p>
-      <p>Everything goes through a soft low-pass and a short, dark echo, convolved with a room impulse the page generates itself (a few early reflections, then a noise tail that darkens as it decays), as if heard from inside. Sixteen voices at most; the shape change's sounds always get one.</p>
+      <p>Everything goes through a soft low-pass and a short, dark echo, convolved with a room impulse the page generates itself (a few early reflections, then a noise tail that darkens as it decays), as if heard from inside. Sixteen voices at most; the shape change's sounds always get one. The samples download while the page loads; the audio context is created on load and plays at once if the browser allows it, otherwise from the first click, tap or key, with a pill under the hint saying so until then.</p>
     </div>
   </section>
 
@@ -380,13 +380,13 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <li><b>Container</b>: Shape (morphs), Visible, Walls, Frost, Haze, Tumble, Motion blur.</li>
       <li><b>Bodies</b>: Count, Variety, Fill, Softness, the mix of Spheres, Cushions, Pills and Gumdrops, Floaters, Skin thickness.</li>
       <li><b>Jelly</b>: Colour, Milk, Scatter, Refraction. <b>Light</b>: Colour, Brightness, Key light.</li>
-      <li><b>R</b> makes a new one, <b>M</b> or the speaker button toggles sound, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot.</li>
-      <li>Auto change brings a new one every 12 seconds; randomizing, pausing or any interaction starts the count over.</li>
+      <li><b>R</b> makes a new one, <b>M</b> or the speaker button toggles sound, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
+      <li>Auto change (on by default) brings a new one every 12 seconds (<b>Change every</b>, 5–60 s); randomizing, pausing or any interaction starts the count over.</li>
     </ul>
   </section>
   <footer class="col">
     <div class="meta">
-        <span><b>three.js</b> r187</span><span>WebGL2</span><span>soft bodies in a worker</span><span>desktop and phones</span><span>coded with <b>Claude Code</b> and Opus 5.5</span>
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>soft bodies in a worker</span><span>desktop and phones</span><span>made in <b>Claude Code</b> with Opus 5.5</span>
       </div>
     Day 9 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/9/">spite.github.io/codevember-2026/9</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/9">9/ of the codevember-2026 repository</a>. The floor and floaters are rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>. Sounds are CC0 recordings from freesound.org, credited in the day's README.
   </footer>
