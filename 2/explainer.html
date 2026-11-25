@@ -145,7 +145,7 @@ footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px so
       <div class="eyebrow">The idea</div>
       <h2>A burst, frozen and scrubbed</h2>
       <p>Day 2's prompt was Shatter. An object is caught a split second after it bursts, like a high-speed photograph: its surface tears into curved pieces with real thickness, and they fly out with their filling, drops and chips of shell.</p>
-      <p>The subjects are a white shell over a dark core, grapefruit, porcelain, egg, chocolate, aged bronze, obsidian glowing from inside and an iridescent coating, on a sphere, torus, rounded cube, icosahedron, dodecahedron or Suzanne. Each burst plays in slow motion over 6 seconds and holds its last moment, and the bar at the bottom scrubs it.</p>
+      <p>The subjects are a white shell over a dark core, grapefruit, porcelain, egg, chocolate, aged bronze, obsidian glowing from inside and an iridescent coating, on a sphere, torus, rounded cube, icosahedron, dodecahedron or Suzanne. Each new object appears whole, bursts in slow motion and holds its last moment until the next one, and the bar at the bottom scrubs it.</p>
       <p>Every piece sits at position = start + velocity × t, so the burst is a function of time and any moment of it can be shown. Most of the work is the fracture: a warped 3D Voronoi over the surface, triangles cut along the tears, and walls built between each piece's outer and inner skin. The <a href="../modules/pipeline/explainer.html">shared pipeline</a> renders it with depth of field on the burst, and the coating is real thin-film interference.</p>
     </div>
   </section>
@@ -322,7 +322,7 @@ footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px so
       <h2>The studio is only in the reflections</h2>
       <p>There is no floor or backdrop geometry. The background is the pipeline's clear colour: white, grey, dark or night. White is 16, far above white, so it tonemaps to pure white at an exposure of 0.62; the darker sets raise exposure to 0.9–1.1 and use a vignette of 0.5–0.6 in place of a studio gradient, and night adds bloom for the obsidian's glow.</p>
       <p>The studio is baked once into an environment map: a seamless curved cyc (floor 0.5, wall 0.55), a key softbox up and to the left (intensity 9, size 0.45), a fill at 0.45 and a dim ceiling disc. Its spherical-harmonics irradiance lights the diffuse. The key is also a real light that casts PCSS soft shadows, auto-fitted to the burst and denoised, so pieces shadow each other and the core. Ambient occlusion has a floor of 0.2, so the insides of deep pieces never go black. On every resize the camera distance is set so a sphere of radius 2.6 fits the narrower field of view, capped at 14.</p>
-      <p>Shapes are built on first use and cached; until a new one is ready the last burst stays on screen. All shaders compile in parallel before the first frame. A rebuild happens only when the subject, shape or seed changes, and it restarts the lens average. Frustum culling is off on the instanced meshes, because their spray reaches far outside the source geometry's bounds.</p>
+      <p>The first shape is built while the page loads; the rest are built in the background, one every 300 ms or so after the first frame, so a change rarely waits. Until a shape is ready the last burst stays on screen. All shaders compile in parallel before the first frame. A rebuild happens only when the subject, shape or seed changes, and it restarts the lens average. Frustum culling is off on the instanced meshes, because their spray reaches far outside the source geometry's bounds.</p>
       <p>For recording tools, <code>window.app</code> exposes the canvas, params, pipeline, camera, controls and transport. <code>preload()</code> builds every shape, <code>nextLook({subject, shape, seed})</code> switches look and replays the burst, <code>frame()</code> places the orbit, <code>focusAt()</code> pins focus and <code>warm(n)</code> renders n still frames so shadows, AO and GI settle before capture.</p>
     </div>
     <div class="scroll">
@@ -349,13 +349,13 @@ footer { font: 400 13px/1.5 var(--mono); color: var(--muted); border-top: 1px so
       <li><b>Subject</b> and <b>Shape</b> pick the object. <b>Explosion</b>: how far into the burst. <b>Spray</b>: how much filling, drops and chips fly.</li>
       <li><b>Rotation</b>: how fast it turns.</li>
       <li><b>Depth of field</b>: <b>Focus</b>, from the nearest piece to the farthest, and <b>Aperture</b>.</li>
-      <li><b>Auto change</b>: a new burst every 10 seconds by default, or off.</li>
+      <li><b>Auto change</b> (on by default): a new object every 10 seconds (<b>Change every</b>, 5–60 s). Each one starts whole once it is built and bursts over the first 60% of the interval (6 s by default), then holds. A link that sets Explosion holds that moment instead; <b>Play</b> on the bar runs the burst over 4 seconds.</li>
       <li><b>R</b> randomises, <b>Space</b> pauses, <b>Tab</b> hides the panel, <b>F</b> goes fullscreen, <b>P</b> saves a screenshot.</li>
     </ul>
   </section>
 
   <footer class="col">
-    <div class="meta"><span><b>three.js</b> r187</span><span>no physics engine</span><span>desktop and phones</span><span>coded with <b>Claude Code</b> and Opus 5.5</span></div>
+    <div class="meta"><span><b>three.js</b> r187</span><span>no physics engine</span><span>desktop and phones</span><span>made in <b>Claude Code</b> with Opus 5.5</span></div>
     Day 2 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. Rendered with the repo's shared photographic pipeline: soft shadows, screen-space AO and one bounce of indirect light, MSAA, accumulated depth of field, bloom and AgX tonemapping. See it live at <a href="https://spite.github.io/codevember-2026/2/">spite.github.io/codevember-2026/2</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/2">2/ of the codevember-2026 repository</a>. How the shared pipeline renders all of this is on the <a href="../modules/pipeline/explainer.html">rendering pipeline explainer</a>.
   </footer>
 </main>
