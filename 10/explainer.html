@@ -167,7 +167,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">The idea</div>
       <h2>A blank, a pattern and a bath of acid</h2>
-      <p>The references were repoussé and chased silver, crowded with flowers and acanthus over a matted ground, and copper panels of scrolling leaves with verdigris in every hollow. Day 10's prompt was Caustic, so the ornament isn't modelled. It is made the way a workshop would make it: drawn onto a blank, raised by the hammer, and left standing when acid eats the ground away around it.</p>
+      <p>The look is repoussé and chased silver, crowded with flowers and acanthus over a matted ground, and copper panels of scrolling leaves with verdigris in every hollow. Day 10's prompt was Caustic, so the ornament isn't modelled. It is made the way a workshop would make it: drawn onto a blank, raised by the hammer, and left standing when acid eats the ground away around it.</p>
       <p>There are 14 blanks: a sphere, torus, rounded box, superellipsoid cushion, trefoil and cinquefoil knots, a twisted triangular ring, a Möbius band, soft blobs, Suzanne, a gyroid sheet cut to a ball, a rounded dodecahedron and icosahedron, and a lentil. There are 16 patterns and 21 metals, from copper with verdigris to champlevé enamel. Shape, Pattern, Metal and Symmetry each have their own selector, and every combination works.</p>
       <p>The work is split three ways. A worker grows the ornament as a list of primitives. The <a href="../modules/pipeline/explainer.html">shared pipeline</a> renders the blank as an ordinary mesh, and its fragment shader finds the primitives near each pixel and builds the relief there. A small fluid solver on the GPU makes the fumes.</p>
     </div>
@@ -300,7 +300,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </div>
     <div class="col prose">
       <h3>Written for one compiler</h3>
-      <p>The loops are shaped for Direct3D's HLSL compiler, which ANGLE uses on Windows. Inlined three times, once per sample, <code>ornEval</code> took minutes to compile there, so it is called once from a loop the compiler can't unroll. The cell's count comes from data, while a constant bound would be unrolled 96 times. And a program only holds the types a piece uses: each <code>#ifdef ORN_T&lt;type&gt;</code> block is compiled in only when the worker lists that type.</p>
+      <p>The loops are shaped for Direct3D's HLSL compiler, which ANGLE uses on Windows. Inlined three times, once per sample, <code>ornEval</code> would take minutes to compile there, so it is called once from a loop the compiler can't unroll. The cell's count comes from data, while a constant bound would be unrolled 96 times. And a program only holds the types a piece uses: each <code>#ifdef ORN_T&lt;type&gt;</code> block is compiled in only when the worker lists that type.</p>
       <h3>The hammer</h3>
       <p>The blows are the one thing done on the mesh. Between 24 and 96 points (by area: 63 on the sphere) are spread over the blank and ordered as a greedy nearest-neighbour tour, so the hammer works its way across. Each primitive rises at the first blow within reach. In the vertex shader each blow dents the blank with a falloff of (1 − r²/R²)², overshooting by half its depth and springing back, and the normal is bent by the same gradient. In the fragment shader a struck motif rises over 5% of the stage, overshooting about 10% before it settles.</p>
     </div>
@@ -416,7 +416,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="eyebrow">Sound · <b>sound.js</b></div>
       <h2>The workshop's noises</h2>
       <p>Everything is cut from CC0 recordings on freesound.org. The scribe's scratch is a loop whose level follows the histogram of how much is being drawn at that moment. Each hammer blow plays one of 21 tinks. Its pitch goes with the size of the blow, its strength with the depth, and it is panned to where the blow lands on screen and duller on the far side of the piece; now and then it bounces for a soft second tap. During the etch the acid's sizzle and the fizz of its bubbles get louder and higher while it bites fastest, and a splash plays as the bath drains off. The burnish rubs. For enamel the kiln roars and the stone grinds.</p>
-      <p>Loops are started at a random point, eased in and out, and stopped once silent. They fall quiet while pieces change over, and their rate follows Speed. Twelve one-shot voices play at most, through a gentle compressor. Sound varies with the unseeded random, so it never shifts the seeded piece.</p>
+      <p>Loops are started at a random point, eased in and out, and stopped once silent. They fall quiet while pieces change over, and their rate follows Speed. Twelve one-shot voices play at most, through a gentle compressor. Sound varies with the unseeded random, so it never shifts the seeded piece. The recordings download while the page loads; the audio context is created on load and plays at once if the browser allows it, otherwise from the first click, tap or key, with a pill under the hint saying so until then.</p>
     </div>
   </section>
 
@@ -433,13 +433,13 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <li><b>Relief</b>: Relief, Grind, Bite, Matting. <b>Finish</b>: Metal.</li>
       <li><b>Process</b>: Speed, Auto change, Change every (counted once a piece is finished). <b>View</b>: Spin, Studio.</li>
       <li><b>R</b> makes a coherent new piece, <b>E</b> replays the etching, <b>M</b> or the speaker button toggles sound.</li>
-      <li><b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot.</li>
-      <li>Auto change brings a new piece once the current one has finished and stayed up for Change every seconds (10 by default); the next one is grown while you watch.</li>
+      <li><b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×). The gallery button opens The Etcher's Pattern Book.</li>
+      <li>Auto change brings a new piece once the current one has finished and stayed up for Change every seconds (10 by default, up to 90); the next one is grown while you watch.</li>
     </ul>
   </section>
   <footer class="col">
     <div class="meta">
-        <span><b>three.js</b> r187</span><span>WebGL2</span><span>ornament grown in a worker</span><span>desktop and phones</span><span>coded with <b>Claude Code</b> and Opus 5.5</span>
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>ornament grown in a worker</span><span>desktop and phones</span><span>made in <b>Claude Code</b> with Opus 5.5</span>
       </div>
     Day 10 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/10/">spite.github.io/codevember-2026/10</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/10">10/ of the codevember-2026 repository</a>. The piece and studio are rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>. Sounds are CC0 recordings from freesound.org, credited in the day's README.
   </footer>
