@@ -152,20 +152,10 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">The idea</div>
       <h2>Mirrors that never end</h2>
-      <p>Day 8's prompt was Tesseract. It is an infinity polyhedron, after Anthony James's sculptures: a convex solid with a dark steel frame, faces of two-way mirror glass and a light tube along every edge inside. The mirrors send the tubes back and forth without end, and the solid opens onto a lattice of light in every direction. The page opens on a cube with a smaller cube nested inside and joined to it at every corner, the usual picture of a tesseract.</p>
-      <p>There are forty solids: Platonic, Archimedean and Catalan solids, prisms, antiprisms and bipyramids, with up to 64 faces, and a change morphs one into the next. The piece floats in a pale dome, which it lights through its windows.</p>
+      <p>Day 8's prompt was Tesseract. It is an infinity polyhedron, after Anthony James's sculptures. He builds them from the oldest shapes there are, an icosahedron, a dodecahedron, a cube: each face is a pane of two-way mirror glass in a dark steel frame, and along every edge, inside, runs a light tube. The inner surfaces of the glass reflect the tubes back and forth, so from outside the solid opens onto a lattice of light that goes on in every direction, folded into a box you could carry.</p>
+      <p>The tesseract is the four-dimensional cube, and the page opens on its familiar picture: a cube with a smaller cube inside, joined to it at every corner, the way a hypercube is drawn in three dimensions. The mirrors repeat it in every direction, so the solid seems to hold more inside than a solid can. Any other solid can nest itself the same way.</p>
+      <p>There are forty solids: Platonic, Archimedean and Catalan solids, prisms, antiprisms and bipyramids, with up to 64 faces, every one described as a set of planes, and a change morphs one into the next. The piece floats in a pale dome, which it lights through its windows.</p>
       <p>The frame is a mesh rendered by the <a href="../modules/pipeline/explainer.html">shared pipeline</a>. The inside is ray traced exactly, per pixel, in the pipeline's composite pass, through dozens of bounces, with no reflection probes or screen-space tricks.</p>
-    </div>
-  </section>
-
-  <!-- 1. The piece -->
-  <section>
-    <div class="col prose">
-      <div class="eyebrow">The homage</div>
-      <h2>A polytope that never ends</h2>
-      <p>Anthony James builds his infinity sculptures from the oldest shapes there are: an icosahedron, a dodecahedron, a cube. Each face is a pane of two-way mirror glass in a steel frame, and along every edge, inside, runs a light tube. The inner surfaces of the glass reflect the tubes back and forth, so from outside the solid opens onto a lattice of light that goes on in every direction, folded into a box you could carry.</p>
-      <p>The day's prompt was Tesseract, the four-dimensional cube. The page opens on its familiar picture: a cube with a smaller cube inside, joined to it at every corner, the way a hypercube is drawn in three dimensions. The mirrors do the rest, repeating it in every direction, so the solid seems to hold more inside than a solid can. Any other solid can nest itself the same way.</p>
-      <p>The day offers forty solids: the Platonic and Archimedean solids, the Catalan solids, and prisms, antiprisms and bipyramids, with up to 64 faces. Everything about them is described as planes.</p>
     </div>
   </section>
 
@@ -175,7 +165,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="eyebrow">The inside · <b>infinity.js</b></div>
       <h2>Two-way mirrors, traced exactly</h2>
       <p>The frame is an ordinary mesh, rendered by the shared pipeline. The inside is not: it is ray traced per pixel, in a full-screen pass that the pipeline runs over its lit image before bloom. A solid is a list of planes <i>n</i>·<i>p</i> ≤ <i>d</i>, which makes every step exact and cheap.</p>
-      <p>A ray enters through the plane it crosses last on the way in, and inside it leaves through the plane it meets first. Where it meets a plane, the frame mesh's own test says whether it is in that face's window or behind the bar: it is behind the bar if it lies within the rim of another face's plane. In the window, the inner side of the glass reflects most of the light back in (Inner mirror), and the ray goes on, for up to 48 bounces. A tube in its way ends it.</p>
+      <p>A ray enters through the plane it crosses last on the way in, and inside it leaves through the plane it meets first. Where it meets a plane, the frame mesh's own test says whether it is in that face's window or behind the bar: it is behind the bar if it lies within the rim of another face's plane. In the window, the inner side of the glass reflects most of the light back in (Inner mirror), and the ray goes on, for 14 bounces by default and up to 48 (Bounces). A tube in its way ends it.</p>
       <p>Move the pointer over the figure to aim the ray. Below it is what that eye sees across the whole solid, one row of pixels: the same few tubes, over and over, fainter at each reflection. The marked pixel is the ray you are aiming.</p>
     </div>
     <div class="fig">
@@ -224,7 +214,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       </div>
       <canvas id="footCanvas" aria-label="Three rows of pixels showing the same receding row of ever thinner tube images: point sampled, which breaks up and misses tubes, box filtered over the footprint, and a supersampled reference."></canvas>
       <div class="readout" id="fOut"></div>
-      <p class="fig-cap">Slide moves the row by a fraction of a pixel, as a turning sculpture does: the point-sampled row flickers, the filtered row barely changes. Where a path goes deep on the sparser solids, two more rays across the pixel help at full quality. A ray with light left after the last bounce adds the mean of the rest: the tubes at the rate they cover the walls, over a geometric series of mirror bounces.</p>
+      <p class="fig-cap">Slide moves the row by a fraction of a pixel, as a turning sculpture does: the point-sampled row flickers, the filtered row barely changes. Where a path goes past three bounces on a solid of up to 30 faces, one more ray across the pixel helps, at full quality and below a pixel ratio of 1.5. A ray with light left after the last bounce adds the mean of the rest: the tubes at the rate they cover the walls, over a geometric series of mirror bounces.</p>
     </div>
     <div class="formula">
       <span class="c">// footprint at distance t along a segment, after b bounces</span><br>
@@ -312,6 +302,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="fact"><b>Patterns and animation</b><span>Colours per window, per tube, in segments or as a gradient; windows that breathe, wave, scan, light in sequence, flicker or chase. The room, haze and tail follow each window's light.</span></div>
       <div class="fact"><b>Floor</b><span>On a glossy floor the mirror image of the camera ray is traced too, with the floor's roughness widening its footprint, so the lattice reflects softly.</span></div>
       <div class="fact"><b>Depth of field</b><span>The pipeline blurs by depth, and the traced inside is in no depth buffer, so after the trace the solid's hull is drawn into the pipeline's depth. Aperture and Focus then work as for any mesh: a quick blur while moving, and an exact average over the lens once still.</span></div>
+      <div class="fact"><b>Budget</b><span>Bounces are capped at 48 on high (10 on solids of more than 30 faces), 12 (8) on medium and 8 (6) on low, and the direction map is 512² on high and 256² below. The pipeline's AO and GI are off: the windows light the room.</span></div>
     </div>
   </section>
 
@@ -329,12 +320,14 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <li><b>Surface</b>: Glass and Amount, Inner mirror, See-through, Warp, Ripple, Tilt, Uneven, Bounces.</li>
       <li><b>Room</b>: gallery or sphere, Haze, Floor gloss, Room light, Shadow sharpness.</li>
       <li><b>Camera</b>: Aperture and Focus.</li>
-      <li><b>R</b> randomises, <b>Space</b> pauses, <b>Tab</b> hides the panel, <b>F</b> goes fullscreen, <b>P</b> saves a screenshot.</li>
+      <li><b>R</b> morphs to another solid at a new angle, empty inside four times in five, and eases in new lights, Brightness, glass flaws, haze and room light; the tubes switch type halfway through. Everything else stays.</li>
+      <li><b>Auto change</b> (on by default): a new sculpture every 20 s (<b>Change every</b>, 5–60 s), counted once the morph has landed.</li>
+      <li><b>Space</b> pauses, <b>Tab</b> hides the panel, <b>F</b> goes fullscreen, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
     </ul>
   </section>
   <footer class="col">
     <div class="meta">
-        <span><b>three.js</b> r187</span><span>WebGL2</span><span>per-pixel ray tracing</span><span>desktop and phones</span><span>coded with <b>Claude Code</b> and Opus 5.5</span>
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>per-pixel ray tracing</span><span>desktop and phones</span><span>made in <b>Claude Code</b> with Opus 5.5</span>
       </div>
     Day 8 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias, after the infinity sculptures of Anthony James. See it live at <a href="https://spite.github.io/codevember-2026/8/">spite.github.io/codevember-2026/8</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/8">8/ of the codevember-2026 repository</a>. Rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>.
   </footer>
