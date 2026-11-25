@@ -127,6 +127,9 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
   .fig { padding: 16px; }
   main { gap: 56px; }
 }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
 </style>
 </head>
 <body>
@@ -287,20 +290,11 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <h3>Tori, traced</h3>
       <p>Screen-space refraction only knows the surface the glass is drawn on, which is fine for a slab and wrong for a ring: through a torus you should see its own far side, bent, and the world through the hole. So rings and tori are ray traced inside. Each piece's geometry carries a fitted ideal torus (major radius, tube radii, a superellipse exponent for the squarer collars of bottle necks, a wobble and a thread), in both its raw and worn shape, blended by erosion like the mesh. The shader refracts the view ray into it at the fitted surface's smooth normal (the frost pits would make the path flicker), marches it through the tube to the far wall, and there follows both the transmitted ray and the Fresnel-reflected one, so the image stays continuous across the critical angle. The transmitted ray may go through the hole, into the other side of the ring and out again. Whatever the final ray looks at is read from the pyramid.</p>
-      <p>Frosted pieces average two rays over a cone (when frost is above 0.15). Frost then blends the traced view back towards the ordinary diffuse look, by up to 85%: a frosted torus shows only a hint of the lensing inside, a wet one stays glassy. The tracer is its own shader variant (<code>TRACE</code>); compiled into the shared glass shader it made every piece about three times slower. It compiles in the background after load (rings use plain glass until it is ready), and its loop bounds come from uniforms rather than constants, which stops Direct3D from unrolling them; unrolled, the programs took 5–6 s to compile.</p>
+      <p>Frosted pieces average two rays over a cone (when frost is above 0.15). Frost then blends the traced view back towards the ordinary diffuse look, by up to 85%: a frosted torus shows only a hint of the lensing inside, a wet one stays glassy. The tracer is its own shader variant (<code>TRACE</code>); compiled into the shared glass shader it would slow every piece down. It compiles in the background after load (rings use plain glass until it is ready), and its loop bounds come from uniforms rather than constants, which stops Direct3D from unrolling them and keeps the compile short.</p>
     </div>
     <div class="col prose">
-      <h3>What it costs</h3>
-      <p>On a laptop RTX 4060 at 1264×705 on the high tier, a frame takes about 3.2 ms of GPU, nearly all of it this composite.</p>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>stage</th><th class="num">GPU ms / frame</th><th></th></tr></thead>
-        <tbody id="costs"></tbody>
-      </table>
-    </div>
-    <div class="col prose">
-      <p>Two things keep it there. After the first layer, only the area under the previous layer has changed, so the pyramid, the copy and the thickness clear are scissored to that rectangle (its screen bounds from the projected corners of a camera-aligned box around each piece's bounding sphere); each pyramid level grows the rectangle by 10 texels to cover its blur's reach, and the targets keep the rest from the last build. That took the copies from 0.19 to 0.05 ms and the pyramid from about 0.53 to 0.35. And while nothing the composite reads changes (paused, view still), it reuses its last image: the camera, every piece's matrix, look and colour, the settings and every shared uniform are flattened into a key each frame, and an unchanged key costs 0.13 ms instead of 3.47. The CPU side is about 1.5 ms a frame, mostly the ~200 draw calls of ten layers; the physics is 0.16 ms of it.</p>
+      <h3>Only what changed</h3>
+      <p>Two things keep the composite light. After the first layer, only the area under the previous layer has changed, so the pyramid, the copy and the thickness clear are scissored to that rectangle (its screen bounds from the projected corners of a camera-aligned box around each piece's bounding sphere); each pyramid level grows the rectangle by 10 texels to cover its blur's reach, and the targets keep the rest from the last build. And while nothing the composite reads changes (paused, view still), it reuses its last image: the camera, every piece's matrix, look and colour, the settings and every shared uniform are flattened into a key each frame, and an unchanged key skips the whole composite.</p>
     </div>
   </section>
 
@@ -310,7 +304,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="eyebrow">Touching · <b>collide.js, physics.js</b></div>
       <h2>Colliding by their real shapes</h2>
       <p>The pieces are weightless, as if in water. A slow current moves them: a divergence-free field of sines with incommensurate frequencies, so it never repeats, which drags each piece towards the local flow (smaller ones follow faster) and spins it at its local vorticity, four times what a sphere would get, since lopsided pieces also tumble. A soft push keeps neighbours apart once their centres come within 60% of their summed radii, and a gentle tether pulls strays back beyond 1.9× the set's spread. Physics steps at a fixed 120 Hz.</p>
-      <p>Spheres made poor colliders, though: a flat shard's sphere touches its neighbour well before the glass does, so the clinks played in mid-air. So every piece builds a <b>signed distance grid</b> of its own geometry: 22 cells along its longest side, each cell's distance to the nearest of 480 surface samples, negative when it is behind that sample's normal. There are two grids, one per pose, blended by erosion exactly as the mesh is. Another piece then tests 128 of its own surface points against that field, sampled trilinearly with its gradient: any point with a negative distance is inside. The deepest one sets the push, along a depth-weighted average of the gradients. A ring's hole is empty space in its field, so a pebble can sit in it.</p>
+      <p>Spheres would make poor colliders: a flat shard's sphere touches its neighbour well before the glass does, so the clinks would play in mid-air. So every piece builds a <b>signed distance grid</b> of its own geometry: 22 cells along its longest side, each cell's distance to the nearest of 480 surface samples, negative when it is behind that sample's normal. There are two grids, one per pose, blended by erosion exactly as the mesh is. Another piece then tests 128 of its own surface points against that field, sampled trilinearly with its gradient: any point with a negative distance is inside. The deepest one sets the push, along a depth-weighted average of the gradients. A ring's hole is empty space in its field, so a pebble can sit in it.</p>
     </div>
     <div class="fig">
       <div class="fig-head"><h3>A field and the points that reach into it</h3>
@@ -331,7 +325,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="eyebrow">A new set · <b>startSweep</b></div>
       <h2>Away with the wave, back with the backwash</h2>
       <p>A sweep picks a direction across the screen (left or right of the camera, tilted a little up or down) and sorts the pieces along it, leading edge first. Each leaves on an eased flight off-screen, starting up to 0.8 s after the first, in 2.2 s. Pieces in flight neither collide nor push.</p>
-      <p>Meanwhile the new set is generated, a few milliseconds a frame, at erosion 0 and with its collision grids. Then it is <b>settled out of sight</b>: a separate cluster with only the new pieces runs 360 physics steps of 1/120 s, three seconds of drifting and pushing apart, so the places they fly to are places the physics would leave them in. Without this, pieces overlapping in the fresh layout jumped apart as soon as they landed.</p>
+      <p>Meanwhile the new set is generated, a few milliseconds a frame, at erosion 0 and with its collision grids. Then it is <b>settled out of sight</b>: a separate cluster with only the new pieces runs 360 physics steps of 1/120 s, three seconds of drifting and pushing apart, so the places they fly to are places the physics would leave them in. Without it, pieces overlapping in the fresh layout would jump apart as soon as they landed.</p>
       <p>When the old set is gone, the set is ready and the wave's backwash is due (2.6 s in), the arrivals start: farthest places first, so later pieces cross empty space rather than the ones already landed, staggered over 0.9 s, each a 2.4 s flight in from off-screen. They rest 1.5 s in their broken shape, then erode to the set's target over 9 s with a smoothstep. The sound follows: a wave rushing in at the start, the backwash as the new set arrives, then grinding and water while the glass wears down.</p>
     </div>
     <div class="fig">
@@ -394,6 +388,23 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </div>
   </section>
 
+  <!-- Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>Drag a piece to grab and throw it; drag elsewhere to orbit, freely over and under; scroll or pinch to zoom.</li>
+      <li><b>Palette</b>, <b>Backdrop</b>, <b>Environment</b> (the beach) and <b>BG blur</b>.</li>
+      <li><b>Erosion</b> and <b>Pattern wear</b>; the glass ranges <b>Frosting</b>, <b>Wetness</b>, <b>Diffusion</b>, <b>IOR</b>, <b>Refraction</b>, <b>Dispersion</b>, <b>Translucency</b>.</li>
+      <li><b>Drift</b>, <b>Camera speed</b> and <b>Shore</b> (the surf's level). <b>Pieces</b>: Count and a weight per kind.</li>
+      <li><b>Auto change</b> (on by default): a new set every 12 s (<b>Change every</b>, 5–60 s), once the last one has landed.</li>
+      <li><b>R</b> sends a wave with a new set, <b>W</b> toggles wireframe, <b>M</b> or the speaker button toggles sound.</li>
+      <li><b>Space</b> pauses, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
+    </ul>
+  </section>
+
   <footer class="col">
     <div class="meta">
       <span><b>three.js</b> r187</span><span>WebGL2</span><span>layered screen-space glass</span><span>traced tori</span><span>signed distance contacts</span><span>started in <b>Antigravity</b> with Gemini 4 Hydrogen, finished in <b>Claude Code</b> with Opus 5.5</span>
@@ -449,8 +460,6 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
   ];
   const total = KINDS.reduce((a, k) => a + k[2], 0);
   $("kinds").innerHTML = KINDS.map(([k, w, v]) => `<tr><td>${k}</td><td>${w}</td><td class="num">${v}</td><td><span class="bar" style="width:${Math.max(2, (v / total) * 260)}px"></span> ${((v / total) * 100).toFixed(1)}%</td></tr>`).join("");
-  const COSTS = [["glass shading", 1.28], ["blur pyramids (scissored)", 0.35], ["thickness", 0.13], ["layer copies (scissored)", 0.05], ["backdrop, bloom, final pass", 0.15]];
-  $("costs").innerHTML = COSTS.map(([k, v]) => `<tr><td>${k}</td><td class="num">${v.toFixed(2)}</td><td><span class="bar" style="width:${v * 150}px"></span></td></tr>`).join("");
 
   // Broken to worn
   {
