@@ -143,7 +143,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="eyebrow">The idea</div>
       <h2>A plumage with no bird</h2>
       <p>Day 12's prompt was Feather. Rather than a bird, the piece puts a plumage on abstract forms: a torus, a (p, q) torus knot, or one of the classic knots (trefoil, figure-eight, saddle, crown, star). Every one is a tube around a closed centre line. Thousands of feathers are rooted on it, overlapping like a real coat. The coat is alive: it breathes, now and then it rouses, a wave running round the whole form the way a bird shakes itself out, and it parts where the pointer passes.</p>
-      <p>Each feather is a single card, but its vane, barbs, rachis and down are drawn per pixel, and light passes through it as it does through real white keratin. The forms render with the <a href="../modules/pipeline/explainer.html">shared pipeline</a>, which grew an opt-in temporal pass for this day. The sound is synthesized: there isn't a single sample in it.</p>
+      <p>Each feather is a single card, but its vane, barbs, rachis and down are drawn per pixel, and light passes through it as it does through real white keratin. The forms render with the <a href="../modules/pipeline/explainer.html">shared pipeline</a>, through its opt-in temporal pass. The sound is synthesized: there isn't a single sample in it.</p>
     </div>
   </section>
 
@@ -264,11 +264,11 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
   <!-- 7. Stochastic -->
   <section>
     <div class="col prose">
-      <div class="eyebrow">Stochastic rendering · <b>feathers.js, Pipeline temporal, taa.js</b></div>
+      <div class="eyebrow">Stochastic rendering · <b>feathers.js, Pipeline.js temporal</b></div>
       <h2>Noisy every frame, right on average</h2>
       <p>A coat is a dozen layers of half-transparent feathers in no fixed order. Sorting thousands of overlapping cards every frame is slow and still wrong where they intersect, so nothing is blended. Instead each feather is either there or not, per pixel, at random. A pixel of vane is dropped with the chance that it lets light through (its openness, from See-through: more at the thin edges and down, none on the rachis, never more than 60%), drawn from interleaved gradient noise shifted every frame and offset per feather. Whatever is behind shows through the hole, fully shaded. Over frames, stacked feathers multiply exactly as blended layers would, and order never matters.</p>
       <p>Shadows use the same idea, with a twist. In the shadow pass a feather blocks the key at a fraction of points equal to the light it doesn't pass on (Shadow light sets how much a layer passes). Those points are pinned to the feather rather than redrawn each frame, so shadows don't crawl, and every shadow lookup averages over a disc at least 7 texels wide. Through one layer the shadow is partial; through three it is the product of three.</p>
-      <p>The noise is resolved by a temporal pass added to the pipeline for this day. Every frame the camera is jittered by a sub-pixel offset from a Halton (2, 3) sequence over 16 frames, and the frame is blended into a history: the history is reprojected with the prepass's velocity (taken from the nearest surface in the pixel's neighbourhood, so edges move with what's in front), resampled with a Catmull-Rom filter so it doesn't blur, and clipped in YCoCg to the current 3×3 neighbourhood's mean ± 1.25σ so stale colours can't ghost. Each frame contributes 10%, more where things move fast. The jitter also anti-aliases, so MSAA is off and the main pass draws straight over the prepass's depth, which saves most of its overdraw. When nothing moves, up to 32 frames are averaged into a clean still.</p>
+      <p>The noise is resolved by the pipeline's opt-in temporal pass. Every frame the camera is jittered by a sub-pixel offset from a Halton (2, 3) sequence over 16 frames, and the frame is blended into a history: the history is reprojected with the prepass's velocity (taken from the nearest surface in the pixel's neighbourhood, so edges move with what's in front), resampled with a Catmull-Rom filter so it doesn't blur, and clipped in YCoCg to the current 3×3 neighbourhood's mean ± 1.25σ so stale colours can't ghost. Each frame contributes 10%, more where things move fast. The jitter also anti-aliases, so MSAA is off and the main pass draws straight over the prepass's depth, which saves most of its overdraw. When nothing moves, up to 32 frames are averaged into a clean still.</p>
     </div>
     <div class="fig">
       <div class="fig-head"><h3>Three translucent feathers, one frame at a time</h3>
@@ -348,7 +348,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <h3>Never a mixed state</h3>
       <p>Randomizing draws the new values at once, but nothing on show may take them early: the form on show keeps reading a held copy of its own look until it's gone or the morph has begun. With Transition set to shrink, the order is strict. The form shrinks away in its old look (holding its size, then going quickly, so little empty space follows). Only once it's gone is the new form built, out of sight. Then the background fades to its own colour, and the new form grows in already feathered, coming up quickly and settling into its size. If the layout isn't back from the worker yet, it simply waits hidden. A form that would scale to nothing is hidden instead, since a zero-size matrix breaks the lighting.</p>
-      <p>Changes from the panel are different: they apply at once, with no animation, and a new shape is reframed. While a slider is held down, the form is rebuilt bare at every step for a fast preview, and the feathers come back on release. Auto change, which randomizes every 10 s when left alone, waits while a morph runs or a layout is still in the worker.</p>
+      <p>Changes from the panel are different: they apply at once, with no animation, and a new shape is reframed. While a slider is held down, the form is rebuilt bare at every step for a fast preview, and the feathers come back on release. Auto change, on by default, which randomizes every 10 s when left alone (<b>Change every</b>, 5–60 s),, waits while a morph runs or a layout is still in the worker.</p>
     </div>
   </section>
 
@@ -387,7 +387,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">Sound · <b>sound.js, rustle</b></div>
       <h2>Brrrrt</h2>
-      <p>Recorded feather sounds mostly turned out to be wind, pillows or paper. The rustle is built sample by sample instead, from what makes it: barbs and vanes brushing past each other. A burst is hundreds of tiny contacts, each half a millisecond to a few milliseconds of decaying, slightly smoothed noise, with log-normal loudness so it crackles softly without sharp outliers. For a rouse the contacts bunch tightly on a flutter of 22–30 Hz with silence between: the dry "brrrrt" of a bird shaking out, fading as the shake dies down. The pointer gives shorter, looser bursts on no rhythm.</p>
+      <p>The rustle is built sample by sample from what makes it: barbs and vanes brushing past each other. A burst is hundreds of tiny contacts, each half a millisecond to a few milliseconds of decaying, slightly smoothed noise, with log-normal loudness so it crackles softly without sharp outliers. For a rouse the contacts bunch tightly on a flutter of 22–30 Hz with silence between: the dry "brrrrt" of a bird shaking out, fading as the shake dies down. The pointer gives shorter, looser bursts on no rhythm.</p>
       <p>Under it, a faint breath, wind that swells with each gust through a drifting band, and now and then a distant bird: one to five short whistled chirps, each a quick glide in pitch. Each rouse plays its own shake, even one that starts before the last has settled, as two independent bursts, one per side, so it's wide. A swipe is a quick brush as long as it runs. Everything plays through a generated stereo room so it sounds big rather than close and dry. Variation comes from the unseeded random, so the sound never shifts the seeded layout. The audio context is created on load and starts on the first gesture if the browser holds it back.</p>
     </div>
     <div class="fig">
@@ -407,8 +407,8 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">Pause and recording · <b>main.js, Pipeline markMoving</b></div>
       <h2>Stills that don't smear</h2>
-      <p>Space stops the spin and the auto change, nothing else: the coat keeps breathing, rousing and answering the pointer. When nothing at all moves, the pipeline averages up to 32 frames into a still (every frame a fresh draw of the stochastic transparency and jitter), which is what makes paused screenshots so clean. But that average only knows the camera and time, not a feather stirred by a uniform. So the day keeps a key of everything that moves the image (the form's rotation, a transition, the rouse, breath, gust, swipe, the pointer's stir and where it points), and on any change it calls <code>markMoving()</code>, a small opt-in added to the pipeline: that frame renders live through the temporal pass rather than into the still. Changes to the look from the panel restart the still instead.</p>
-      <p>The video is recorded with CCapture on a virtual clock, every frame averaged from several sub-frames for motion blur. A <code>timeScale</code> slows the whole piece (feathers, spin and transitions) for the recording, while the sound keeps real time. The sound is rendered offline on the recording's clock into a WAV and muxed in afterwards, so it lines up to the frame without anything being played.</p>
+      <p>Space stops the spin and the auto change, nothing else: the coat keeps breathing, rousing and answering the pointer. When nothing at all moves, the pipeline averages up to 32 frames into a still (every frame a fresh draw of the stochastic transparency and jitter), which is what makes paused screenshots so clean. But that average only knows the camera and time, not a feather stirred by a uniform. So the day keeps a key of everything that moves the image (the form's rotation, a transition, the rouse, breath, gust, swipe, the pointer's stir and where it points), and on any change it calls <code>markMoving()</code>, the pipeline's opt-in for this: that frame renders live through the temporal pass rather than into the still. Changes to the look from the panel restart the still instead.</p>
+      <p>Recordings run on a virtual clock, every frame averaged from several sub-frames for motion blur. <code>window.app.timeScale</code> slows the whole piece (feathers, spin and transitions) for the recording, while the sound keeps real time. The sound is rendered offline on the recording's clock into a WAV for the recording, so it lines up to the frame without anything being played.</p>
     </div>
   </section>
 
@@ -425,12 +425,12 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <li><b>Light</b>: the studio, backdrop colour and falloff, shadow mode, spin and the transition (morph, or shrink and grow).</li>
       <li><b>R</b> makes a new form, <b>M</b> or the speaker button toggles sound; it changes by itself every 10 s.</li>
       <li><b>O</b> rouses the plumage, <b>S</b> runs a swipe along it, <b>W</b> sends a gust of wind, <b>C</b> makes a bird call.</li>
-      <li><b>Space</b> stops the spin, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot.</li>
+      <li><b>Space</b> stops the spin, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
     </ul>
   </section>
   <footer class="col">
     <div class="meta">
-      <span><b>three.js</b> r187</span><span>WebGL2</span><span>stochastic transparency</span><span>no samples</span><span>coded with <b>Claude Code</b> and Opus 5.5</span>
+      <span><b>three.js</b> r187</span><span>WebGL2</span><span>stochastic transparency</span><span>no samples</span><span>made in <b>Claude Code</b> with Opus 5.5</span>
     </div>
     Day 12 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/12/">spite.github.io/codevember-2026/12</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/12">12/ of the codevember-2026 repository</a>. The forms and studio are rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>. The sound is synthesized with Web Audio.
   </footer>
