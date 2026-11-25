@@ -160,7 +160,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="eyebrow">The stone · <b>rd.js</b></div>
       <h2>Two chemicals in a box</h2>
       <p>Gray-Scott is the simplest recipe for growth that looks alive. Two substances, <i>U</i> and <i>V</i>, fill a volume. <i>U</i> is fed in everywhere at a steady rate; <i>V</i> feeds on it, two molecules of <i>V</i> turning one of <i>U</i> into more <i>V</i>, and is removed at its own rate. Both diffuse, <i>U</i> twice as fast. From a few random seeds of <i>V</i>, spots, worms and mazes appear and spread until they fill the space, and which of them depends only on the feed and kill rates.</p>
-      <p>The day runs it in 3D, in a 128³ volume (96³ on phones). WebGL2 cannot render into a 3D texture slice by slice cheaply, so the volume is a 2D atlas: one tile per z slice, sixteen tiles across and eight down. A single full-screen draw advances every voxel, reading its neighbours across tiles. The day takes 2600 steps, a few hundred per frame, as many as the device keeps up with.</p>
+      <p>The day runs it in 3D, in a 128³ volume (96³ on phones). WebGL2 cannot render into a 3D texture slice by slice cheaply, so the volume is a 2D atlas: one tile per z slice, sixteen tiles across and eight down. A single full-screen draw advances every voxel, reading its neighbours across tiles. The day takes 2600 steps. The steps per frame adapt to what the device keeps up with, from 4 to 400, and a change of shape spreads them over at least 2.2 seconds so the previews below read as the form growing.</p>
       <p>The reaction runs only inside a shape. Outside it, <i>U</i> is marked as −1, and a neighbour there is read as the voxel itself: no flux through the edge. A wall of fixed values would line the surface with a skin of pattern; zero flux lets the pattern run straight out through it, so the tunnels open onto the surface as they would in a sponge.</p>
     </div>
     <div class="formula">
@@ -325,13 +325,13 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <li><b>Stone</b>: Stone and Weathering.</li>
       <li><b>Moss</b>: palette, Overgrowth, Depth, Shoots, Grow time, Regrow.</li>
       <li><b>Scene</b>: Spin, Float, Aperture and Focus.</li>
-      <li><b>Auto change</b> brings a new sculpture every 15 seconds, by default.</li>
-      <li><b>R</b> randomises, <b>G</b> regrows the moss, <b>Space</b> pauses, <b>Tab</b> hides the panel, <b>F</b> goes fullscreen, <b>P</b> saves a screenshot.</li>
+      <li><b>Auto change</b> (on by default) brings a new sculpture every 15 s without input (<b>Change every</b>, 5–60 s), counted once the last one is built.</li>
+      <li><b>R</b> randomises, <b>Space</b> pauses, <b>Tab</b> hides the panel, <b>F</b> goes fullscreen, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×). <b>Regrow</b> in the panel grows the moss again.</li>
     </ul>
   </section>
   <footer class="col">
     <div class="meta">
-        <span><b>three.js</b> r187</span><span>WebGL2</span><span>3D reaction-diffusion</span><span>fur shells</span><span>desktop and phones</span><span>coded with <b>Claude Code</b> and Opus 5.5</span>
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>3D reaction-diffusion</span><span>fur shells</span><span>desktop and phones</span><span>made in <b>Claude Code</b> with Opus 5.5</span>
       </div>
     Day 5 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/5/">spite.github.io/codevember-2026/5</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/5">5/ of the codevember-2026 repository</a>. Rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>.
   </footer>
