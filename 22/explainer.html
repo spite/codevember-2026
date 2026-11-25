@@ -113,6 +113,9 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
   .fig { padding: 16px; }
   main { gap: 56px; }
 }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
 </style>
 </head>
 <body>
@@ -177,7 +180,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <h2>A call is four thousand rays</h2>
       <p>A call starts at the mouth, 12 cm ahead of the eyes and 11 cm below them, and sends out 4,000 rays (scaled by the call's strength: a shout up to 1.5×, a whisper half). Their directions are uniform over the sphere and then pulled toward where you face by adding 0.55 of the view direction and renormalising, so most of the rays go ahead but some always go behind. Each ray is traced on the CPU through the cell grid with a digital differential analyser: step from cell to cell along the ray and, in each cell, test only what is in it. Walls and posts are axis-aligned boxes, so they are slab tests; floors and ceilings are planes at the cell's own heights; objects are meshes, tested with three.js's raycaster only when the ray passes near them; and bodies are capsules. Rays go at most 40 m.</p>
       <p>A ray does not draw itself instantly. It is a dash that leaves at the call's time and travels at the speed of sound; when it has gone as far as its hit, it lands: it leaves a dot there and, if it has bounces left, sets off again, reflected about the surface with a random wobble of ±0.175 per axis and 55% of its energy, until it has bounced twice or its energy falls under 0.06. Nothing draws the dashes themselves (they are invisible): you see the front of the call only as the dots appearing in order of distance.</p>
-      <p>The first 200 rays are traced the moment you call, because their distances set the sound you hear; the other 3,800 are traced at up to 600 a frame over the next frames, keeping the call's start time so they land exactly when they would have. That keeps a call to a few milliseconds of tracing.</p>
+      <p>The first 200 rays are traced the moment you call, because their distances set the sound you hear; the other 3,800 are traced at up to 600 a frame over the next frames, keeping the call's start time so they land exactly when they would have.</p>
     </div>
     <div class="fig">
       <div class="fig-head"><h3>A call in a slice of the maze</h3>
@@ -224,7 +227,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">Watching · <b>walk.js</b></div>
       <h2>Walking it like someone afraid of it</h2>
-      <p>When you just watch, it walks itself, and the aim was a person: someone lost and nervous who keeps to the walls. It picks a destination and goes for it. The destination comes from a breadth-first search from where it stands that only passes through cells it has <em>heard</em> (cells some ray has hit), up to 900 of them: the unheard cells at the edge of that search are the candidates, scored by how far they are (best between 3 and 14 cells), how much they lie ahead (<code>1.3 + cos</code> of the angle to the heading), how much further from the start they are (<code>exp(0.15 Δr / 2.4)</code>), and a random factor between 0.7 and 1.3. Because the route only crosses heard cells, it can never walk into a dead end it has already heard; when there is nothing unheard in reach, it heads for the heard cell farthest out.</p>
+      <p>When you just watch, it walks itself, and it walks like a person: someone lost and nervous who keeps to the walls. It picks a destination and goes for it. The destination comes from a breadth-first search from where it stands that only passes through cells it has <em>heard</em> (cells some ray has hit), up to 900 of them: the unheard cells at the edge of that search are the candidates, scored by how far they are (best between 3 and 14 cells), how much they lie ahead (<code>1.3 + cos</code> of the angle to the heading), how much further from the start they are (<code>exp(0.15 Δr / 2.4)</code>), and a random factor between 0.7 and 1.3. Because the route only crosses heard cells, it can never walk into a dead end it has already heard; when there is nothing unheard in reach, it heads for the heard cell farthest out.</p>
       <p>The route is a list of cells, turned into waypoints that keep to a wall: each one sits 0.6 m off the cell's centre toward a wall beside the path (about 10 cm from it), on the same side as before when it can. At a corner, the waypoint is pushed into the corner's outer side, so the turn is taken wide and comes out along the outer wall. At forks and rooms, at most every third cell and three times in four, it stops: puts its back to a wall if one is within a small turn, calls, looks down each way out from left to right (not the way it came), and then plans again from what that call has just revealed, which is when it may change its mind.</p>
     </div>
     <div class="fig">
@@ -258,7 +261,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       </tbody>
     </table></div>
     <div class="col prose">
-      <p>ntsc-rs's filters are IIR filters: each output depends on the previous outputs, which is cheap on a CPU running along a line but has no direct GPU form. Here each filter's impulse response is computed once in JavaScript by running its difference equation on a unit impulse, the cascades are convolved together, and the result is run as a causal FIR filter: every sample sums its 19 to 115 predecessors in a float texture of kernels. Causal is the point: a real tape smears only forward in time, which is why VHS colour trails to the right of what it belongs to. The kernels are designed at the true sample rate, 14.318 MHz (ntsc-rs designs them at four times that, which spreads every filter over four times as many samples).</p>
+      <p>ntsc-rs's filters are IIR filters: each output depends on the previous outputs, which is cheap on a CPU running along a line but has no direct GPU form. Here each filter's impulse response is computed once in JavaScript by running its difference equation on a unit impulse, the cascades are convolved together, and the result is run as a causal FIR filter: every sample sums its 19 to 115 predecessors in a float texture of kernels. Causal is the point: a real tape smears only forward in time, which is why VHS colour trails to the right of what it belongs to. The kernels are designed at the true sample rate, 14.318 MHz.</p>
     </div>
     <div class="fig">
       <div class="fig-head"><h3>One line through the tape</h3>
@@ -331,8 +334,8 @@ voice      = min(1, voice + 0.07 · dt)
     <div class="col prose">
       <div class="eyebrow">Recording · <b>record.js</b></div>
       <h2>A walk you can play back</h2>
-      <p>The video of this day is someone's own walk. <code>K</code> records it: the camera's position and orientation every frame, and every call (with its strength), footstep and breath, all in scene time. A take starts from a fresh state of the maze (nothing heard, everyone where they began), so playing it back reproduces it: the camera follows the recorded poses, interpolated, and the calls fire at their moments, so the dots land the same way and the presences step the same. Only the rays' random scatter and the watchers' placement differ. A take is about 15 kB a second.</p>
-      <p>For a video, the recorder drives the page on a virtual clock at a fixed 60 frames a second, however slowly each frame renders. The sound cannot be recorded from the speakers on that clock, so it is rendered offline: from the moment the capture starts, every sound goes to an offline audio context scheduled on the page's clock, and at the end it is rendered in one go and muxed with the frames. A 140-second take at 1440×1080 takes about half an hour to capture.</p>
+      <p><code>K</code> records a walk: the camera's position and orientation every frame, and every call (with its strength), footstep and breath, all in scene time. A take starts from a fresh state of the maze (nothing heard, everyone where they began), so playing it back reproduces it: the camera follows the recorded poses, interpolated, and the calls fire at their moments, so the dots land the same way and the presences step the same. Only the rays' random scatter and the watchers' placement differ. A take is about 15 kB a second.</p>
+      <p>For a video, the recorder drives the page on a virtual clock at a fixed 60 frames a second, however slowly each frame renders. The sound cannot be recorded from the speakers on that clock, so it is rendered offline: from the moment the capture starts, every sound goes to an offline audio context scheduled on the page's clock, and at the end it is rendered in one go and muxed with the frames.</p>
     </div>
   </section>
 
@@ -341,7 +344,7 @@ voice      = min(1, voice + 0.07 · dt)
     <div class="col prose">
       <div class="eyebrow">Cost</div>
       <h2>What a frame does</h2>
-      <p>The scene itself is cheap to draw: black walls and a few hundred thousand small discs. The ray tracing is on the CPU, a few milliseconds per call spread over frames. The rest is the post chain, all at the signal's small size except the last pass:</p>
+      <p>The scene itself is cheap to draw: black walls and a few hundred thousand small discs. The ray tracing is on the CPU, spread over frames. The rest is the post chain, all at the signal's small size except the last pass:</p>
     </div>
     <div class="table-wrap"><table>
       <thead><tr><th>pass</th><th class="num">size</th><th class="num">work per pixel</th></tr></thead>
@@ -357,8 +360,27 @@ voice      = min(1, voice + 0.07 · dt)
       </tbody>
     </table></div>
     <div class="col prose">
-      <p>On a laptop the whole chain costs well under a millisecond at 1080p. Phones get the pipeline's medium quality and 160,000 dots instead of 400,000.</p>
+      <p>Phones get the pipeline's medium quality and 160,000 dots instead of 400,000.</p>
     </div>
+  </section>
+
+  <!-- Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>At the start, choose how to explore: your voice (the microphone), clicking to shout, or watching. <b>V</b> brings the choice back.</li>
+      <li><b>WASD</b> or the arrow keys walk; the first click grabs the mouse to look around, <b>Esc</b> lets go. On touch, drag to look and hold to walk.</li>
+      <li>In click mode, click (or <b>E</b>) to shout. <b>Auto walk</b> walks by itself, calling every few seconds (<b>Call every</b>).</li>
+      <li>The scan: <b>Rays per call</b>, <b>Bounces</b>, <b>Sound speed</b>, <b>Memory</b>, <b>Dot size</b>, <b>Forward focus</b>; <b>Mic sensitivity</b>.</li>
+      <li>The picture: <b>Fisheye</b>, <b>VHS</b>, <b>CRT</b>, <b>Camcorder display</b>; <b>Tape</b> sets its length in minutes.</li>
+      <li>The body: its sound shadow, <b>Footsteps reveal the floor</b>, <b>Watchers in the distance</b>, <b>Breathing</b>; two debug views show the maze and the map.</li>
+      <li><b>K</b> records a walk (again to stop); the Recording section saves, plays, or loads a take.</li>
+      <li><b>Auto change</b> (on by default): a new maze every 120 s (<b>Change every</b>, 20–180 s), not while the microphone is on or a take records or plays.</li>
+      <li><b>R</b> for a new maze, <b>M</b> or the speaker button toggles sound, <b>Space</b> pauses, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
+    </ul>
   </section>
 
   <footer class="col">
