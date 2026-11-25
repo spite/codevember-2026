@@ -158,13 +158,13 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">The idea</div>
       <h2>A rock that is still cooling</h2>
-      <p>The prompt was Magma. The references were photographs of fresh lava: black crust split into plates over a glowing river, pillows of glassy rock with white-hot seams, pahoehoe wound into ropes, obsidian knapped into shells. In all of them the rock is cold and blue-black, lit by the sky, and the light comes from inside it. The piece makes one such rock at a time, in one of ten styles on one of a dozen shapes, and keeps it turning slowly in a dark room.</p>
+      <p>The prompt was Magma, and the look is a photograph of fresh lava: black crust split into plates over a glowing river, pillows of glassy rock with white-hot seams, pahoehoe wound into ropes, obsidian knapped into shells. The rock is cold and blue-black, lit by the sky, and the light comes from inside it. The piece makes one such rock at a time, in one of ten styles on one of a dozen shapes, and keeps it turning slowly in a dark room.</p>
       <p>It renders through the <a href="../modules/pipeline/explainer.html">shared photographic pipeline</a>: soft shadows, ambient occlusion and bounce light, bloom and AgX tonemapping. What is particular to the day splits into two halves. A look is <em>baked</em>: a fluid simulation, the maps of the rock, its mesh and a few volumes around it are made once per rock and then only read. And a frame is <em>live</em>: the lava flows over the baked maps, the air glows and shimmers with it, embers fly, smoke is simulated and lit.</p>
     </div>
     <div class="facts">
       <div class="fact"><b>Once per look</b><span>Fluid on an octahedral sphere map, 78 steps · height, heat, crust, plate, normal, AO and flow maps in a 3×2 cube atlas up to 3072×2048 · an adaptive mesh, a 64³ distance field, a 48³ heat volume, a 24³ flow volume and 2048 ember emitters, built in a worker.</span></div>
       <div class="fact"><b>Every frame</b><span>Flow-mapped lava noise on the surface · a 24³ pulse volume of the same noise in the air · heat glow and haze · 220 embers · a 48×56×48 smoke simulation · a light shaft marched at half resolution · during a change, a raymarched liquid.</span></div>
-      <div class="fact"><b>Cost</b><span>About 3.4 ms of GPU a frame at 1904×985 on a laptop RTX 4060 (high tier), 0.9 ms of it the smoke's light shaft. The bakes are sliced over ~40 frames while the rock is hidden in the pool.</span></div>
+      <div class="fact"><b>Spread out</b><span>The bakes are sliced over about 40 frames while the rock is hidden in the pool.</span></div>
     </div>
   </section>
 
@@ -175,7 +175,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <h2>Ten rocks, each one branch of a shader</h2>
       <p>The rock is not textured with images. One full-screen fragment shader evaluates the rock analytically for every texel of an atlas and writes four numbers into a half-float target: <b>height</b> (0 to 1), <b>heat</b> (0 to about 1.25, up to 1.5 for two styles), a <b>crust</b> mask (1 where the rock is solid, 0 where it is molten) and a <b>plate id</b> (a per-cell value the material uses for colour and roughness). A style is one branch of that shader: <code>#define uStyle N</code> at the top, so each of the ten styles is its own program and only its own branch is compiled. The first style's programs compile during the loading screen; the other nine compile in the background once the page is up, so switching to a new style never stalls.</p>
       <p>Every style works in the same coordinate: a point on the unit sphere, carried by the fluid (next section), multiplied by the style's scale and offset by a per-seed vector. On that, each builds its rock from a small kit: a two-pass Euclidean 3D Voronoi that returns the exact distance to the cell's edge (so cracks have a uniform width), an anisotropic Voronoi whose cells are stretched along a direction, four-octave fbm and ridged noise, and three layers every style shares: a macro boulder shape (fbm at 1.15, ±0.095), rock grain (fbm at 14 × scale, ±0.042) and scoria pores (ridged noise at 24 × scale, up to 0.026 deep).</p>
-      <p>The shader runs four times per texel at rotated-grid sub-texel offsets (±⅛, ±⅜ of a texel) with additive blending at ¼ weight, so the sharp crack edges are supersampled instead of aliased. Two small portability details matter here: the Voronoi and fbm loops take their bounds from uniforms that are always 1 and 4, which stops Direct3D's compiler from unrolling and inlining every loop (that made the shader take seconds to compile), and the ten programs only differ by one define.</p>
+      <p>The shader runs four times per texel at rotated-grid sub-texel offsets (±⅛, ±⅜ of a texel) with additive blending at ¼ weight, so the sharp crack edges are supersampled instead of aliased. Two small portability details matter here: the Voronoi and fbm loops take their bounds from uniforms that are always 1 and 4, which stops Direct3D's compiler from unrolling and inlining every loop (which would make the shader take seconds to compile), and the ten programs only differ by one define.</p>
     </div>
     <div class="items five" id="styleGrid"></div>
     <p class="fig-cap col">Each rendered on its own shape at the default settings of its style. The numbers are the style's base frequency on the unit sphere (times Scale) and the range of its crack or seam width, from no crust to full crust.</p>
@@ -231,7 +231,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
         <li><b>Limits.</b> Damping of 0.982 per 60th of a second and a speed cap of 1.2 keep it from running away.</li>
       </ul>
       <p>Then comes the trick. The fluid does not carry a colour or a scalar: it carries a <b>3D coordinate</b>. Every texel starts holding its own direction on the sphere, and each step looks back along the velocity and takes the coordinate found there. After the 78 steps, a texel holds the point of the sphere whose rock has flowed to it. The bake evaluates the analytic Voronoi at that point, so cracks stay razor-sharp at any resolution and only the frame they are drawn in is sheared. A blurred scalar would have smeared them.</p>
-      <p>Three details keep the coordinate field healthy. The look-back happens on the sphere, not in the map: the map's stretch jumps across the octahedron's folds, and a step taken in map space drew visible lines along them. An elastic spring pulls each coordinate back toward its rest direction by up to 10% a step, so the field never collapses into bald pools where everything came from one point. And the fluid's divergence is accumulated along the streamlines into a signed <b>strain</b> (decaying by 1.5% a step): positive where the crust is being pulled apart, negative where it is pushed together. Several styles widen their cracks with it.</p>
+      <p>Three details keep the coordinate field healthy. The look-back happens on the sphere, not in the map: the map's stretch jumps across the octahedron's folds, and a step taken in map space would draw visible lines along them. An elastic spring pulls each coordinate back toward its rest direction by up to 10% a step, so the field never collapses into bald pools where everything came from one point. And the fluid's divergence is accumulated along the streamlines into a signed <b>strain</b> (decaying by 1.5% a step): positive where the crust is being pulled apart, negative where it is pushed together. Several styles widen their cracks with it.</p>
     </div>
     <div class="formula">back  = normalize(rest − (v.x·dU + v.y·dV) · dt · mix(0.06, 0.22, fluidFlow) · 2)
 coord = normalize(mix(coord(back), rest, clamp(0.65·dt, 0, 0.1)))
@@ -251,7 +251,7 @@ strain = clamp(0.985·strain + 5·div(v)·dt·0.65, −1, 1)
     </div>
     <div class="col prose">
       <h3>The seams of a folded map</h3>
-      <p>An octahedral map's outer edges fold onto themselves: the point at <code>(u, 1)</code> is the same as the point at <code>(1 − u, 1)</code>. Three things make the simulation see one continuous sphere. Every neighbour lookup goes through <code>wrapOct</code>, which reflects a coordinate that leaves the square back in across the fold, and flips the sign of a velocity read there, since uv-space directions point the other way across a fold. Bilinear lookups fold each of their four taps the same way (<code>octTexel</code>), so a sample straddling an edge blends the right texels. And because the solver never forces both sides of an edge to agree, a final pass pulls each edge texel halfway to its partner across the fold, fading over a 16-texel band. After two 3×3 smoothing passes that remove texel stair-steps in strong shear, the field is done: about 12 ms of GPU time in total, run in slices of 8 steps a frame.</p>
+      <p>An octahedral map's outer edges fold onto themselves: the point at <code>(u, 1)</code> is the same as the point at <code>(1 − u, 1)</code>. Three things make the simulation see one continuous sphere. Every neighbour lookup goes through <code>wrapOct</code>, which reflects a coordinate that leaves the square back in across the fold, and flips the sign of a velocity read there, since uv-space directions point the other way across a fold. Bilinear lookups fold each of their four taps the same way (<code>octTexel</code>), so a sample straddling an edge blends the right texels. And because the solver never forces both sides of an edge to agree, a final pass pulls each edge texel halfway to its partner across the fold, fading over a 16-texel band. After two 3×3 smoothing passes that remove texel stair-steps in strong shear, the field is done, run in slices of 8 steps a frame.</p>
       <p>The fluid is not run while you watch. The pattern is developed once per look, and the motion you see is the lava flowing over the baked map: the next sections.</p>
     </div>
   </section>
@@ -345,7 +345,7 @@ strain = clamp(0.985·strain + 5·div(v)·dt·0.65, −1, 1)
     <div class="col prose">
       <h3>Light that the lava throws</h3>
       <p>Lava lights the rock around it. Three terms are added to the emission of the crust, all stylised but all driven by real data. Crack walls and crevices take light from the heat a few texels around, read from a blurred mip (level 2.5) of the heat channel, strongest on steep walls and low down, so plate tops stay dark. Rims along hot cracks get a red bounce. And the crust picks up the heat volume's light, the same 48³ volume the air glow uses, multiplied by the pulse volume (see the air below), so a patch of rock next to a river brightens and dims as the lava under it flares. Obsidian adds tiny ember flecks inside its glass, Ropy Strands keeps its lava threads hot down their middle whatever the skin does, and Marbled Glass gets one clear coat (roughness 0.03) over a second, softer layer of fire seen through the glass at a view-dependent offset of 0.006, so the fire has depth.</p>
-      <p>One shared change came out of this day. The pipeline used to cut the key light at the geometric terminator: a back face got no key, even where the normal map tilted toward the light. With relief this strong that drew a hard line across the plates near the edge of the light. The key now fades over a short band past the terminator (<code>smoothstep(−0.2, 0, N·L)</code>), identical wherever the shading normal is the geometric one, so earlier days are unaffected.</p>
+      <p>The pipeline's key light fades over a short band past the geometric terminator (<code>smoothstep(−0.2, 0, N·L)</code>), so a back face whose normal map tilts toward the light still catches some of it. With relief this strong, a hard cut at the terminator would draw a line across the plates near the edge of the light.</p>
     </div>
   </section>
 
@@ -377,7 +377,7 @@ strain = clamp(0.985·strain + 5·div(v)·dt·0.65, −1, 1)
         <li><b>Hand out (0.3 s).</b> The new mesh appears, fully molten, under the fading liquid.</li>
         <li><b>Cool (2.6 s).</b> The melt runs backwards: the peaks crust over first and the fissures last.</li>
       </ul>
-      <p>Measured on high, a change from one idle rock to the next takes 8.9 s, with the new mesh built in 1.7 s while the pool sloshes. Auto change waits for it to finish before it counts toward the next one.</p>
+      <p>Auto change waits for it to finish before it counts toward the next one.</p>
     </div>
     <div class="items four">
       <article class="item"><img src="explainer/melt.jpg" alt="A torus seen edge-on, its crust melted into bright orange lava swirled with the neutral flowing pattern." loading="lazy" width="600" height="600"><div><h3>Melt</h3><small>melt 0.7, pattern going neutral</small></div></article>
@@ -402,7 +402,7 @@ strain = clamp(0.985·strain + 5·div(v)·dt·0.65, −1, 1)
       <p>The haze is sharp-edged where the rock is, but the glow must not step at the silhouette. So it is integrated twice, over all the air along the ray and only the air in front of the rock, and a pixel blends from one to the other by how much of a ring of 8 taps around it sees past the rock. Over the rock's face the glow is also held back to 20%, judged over a wide ring of 17 depth taps, since glow over the crust would lift its blacks and flatten it.</p>
       <p>The <b>shimmer</b> is the haze's alpha: the hot air along the ray, including the heat from below each point (five taps 0.14 apart, weighted down with height, baked into a 48³ atlas each frame), so plumes of shimmer stand over the lava instead of hugging it. The final composite offsets its lookups by two octaves of noise scrolling upward, stretched into vertical streaks, by up to 0.006 of the screen times Heat haze. The image, the shaft and the glow are all read through the same offset, so the rock's edge and its glow wobble together.</p>
       <h3>The pulse volume</h3>
-      <p>A static heat volume makes a static glow, which looked painted on next to the flowing lava. The fix is a second volume, 24³, recomputed on the GPU each frame: for each voxel, find the nearest point of the surface (step down the distance field's gradient), take the lava's flow direction and phase there from the flow volume, and evaluate the same flowing noise the surface shows at that point. Divided by its average (0.32), it says how bright the lava under this bit of air is right now. The glow, the haze's density, the shimmer's plumes, the crust's spill light and the smoke's emission all multiply the heat volume by it, so they flare and drift with the flow. While only time moves, half of its layers are refreshed per frame, alternating; nothing updates while paused.</p>
+      <p>A static heat volume makes a static glow, which would look painted on next to the flowing lava. So there is a second volume, 24³, recomputed on the GPU each frame: for each voxel, find the nearest point of the surface (step down the distance field's gradient), take the lava's flow direction and phase there from the flow volume, and evaluate the same flowing noise the surface shows at that point. Divided by its average (0.32), it says how bright the lava under this bit of air is right now. The glow, the haze's density, the shimmer's plumes, the crust's spill light and the smoke's emission all multiply the heat volume by it, so they flare and drift with the flow. While only time moves, half of its layers are refreshed per frame, alternating; nothing updates while paused.</p>
     </div>
     <div class="formula">air(p) = heat(p) · pulse(p)          <span class="c">heat: 48³, baked per look   pulse: 24³, per frame</span>
 pulse(p) = lavaBrightness(surface(p), flow(p), phase(p), time) / 0.32
@@ -437,7 +437,7 @@ haze density = surfaceGlow · air² + shell(melt)     glow ×(1 − 0.8·cover)<
     <div class="col prose">
       <div class="eyebrow">Smoke · <b>fumes.js, modules/fumes/SmokeGrid.js, shaft.js</b></div>
       <h2>Smoke the rock stirs</h2>
-      <p>The room is full of smoke, lit by a shaft from high above and a little behind (<code>(−0.3, 1, −0.45)</code>), and by the lava from below. It is a real fluid: stable fluids on a 48×56×48 grid of 0.133-unit cells fixed in the room (32×38×32 of 0.2 on medium), spanning 6.4 units across and 7.5 up. The solver is shared with <a href="../10/explainer.html">day 10</a>'s acid fumes, moved into <code>modules/fumes/SmokeGrid.js</code> for this day: the grid's z slices are tiled into one 2D texture (8×6 tiles, 384×336 texels), so each pass is a single full-screen draw. A step is the day's obstacle pass, advection, the day's forces, vorticity confinement, a divergence, 16 Jacobi iterations of pressure (10 on medium), warm-started from the last step, and a projection that makes the flow divergence-free around the obstacle. It steps at 75 to 30 Hz, owed time carried over, at most two steps a frame.</p>
+      <p>The room is full of smoke, lit by a shaft from high above and a little behind (<code>(−0.3, 1, −0.45)</code>), and by the lava from below. It is a real fluid: stable fluids on a 48×56×48 grid of 0.133-unit cells fixed in the room (32×38×32 of 0.2 on medium), spanning 6.4 units across and 7.5 up. The solver is shared with <a href="../10/explainer.html">day 10</a>'s acid fumes, in <code>modules/fumes/SmokeGrid.js</code>: the grid's z slices are tiled into one 2D texture (8×6 tiles, 384×336 texels), so each pass is a single full-screen draw. A step is the day's obstacle pass, advection, the day's forces, vorticity confinement, a divergence, 16 Jacobi iterations of pressure (10 on medium), warm-started from the last step, and a projection that makes the flow divergence-free around the obstacle. It steps at 75 to 30 Hz, owed time carried over, at most two steps a frame.</p>
       <p><b>The rock is the obstacle.</b> Its cells hold the morph field (so the smoke follows the melt, the pool and the new shape) and the velocity of the rock's surface, <code>ω × p</code>, with ω measured from the rock's turn since the last frame. The pressure is mirrored at it, so no air passes through, and the air in a thin shell around it is dragged along with its surface (rate 12). Turning the rock stirs the room, and flinging it throws the smoke off.</p>
       <p><b>The forces.</b> The air relaxes toward a draught (0.22 up, 0.05 sideways at the Draught heading, 53° by default). The hot rock adds an updraft from its heat volume, the lava's smoke rises on buoyancy that saturates as it thickens, and the smoke thins at <code>0.45 / lifetime</code> a second. Smoke is given off where the surface below a cell is hot (heat × pulse again), from spots that flare and fade (two scrolling noise lookups), more from its underside when Plumes are on, with a push outward and a stir. Density is advected with a MacCormack correction, which keeps the puffs crisp on a coarse grid.</p>
       <h3>Two layers</h3>
@@ -492,26 +492,19 @@ haze density = surfaceGlow · air² + shell(melt)     glow ×(1 − 0.8·cover)<
   <!-- 10. Performance -->
   <section>
     <div class="col prose">
-      <div class="eyebrow">Performance · <b>measured with timer queries</b></div>
+      <div class="eyebrow">Performance</div>
       <h2>Bake once, read cheaply</h2>
       <p>Most of the work is done once per look and spread so it never holds up a frame:</p>
       <ul>
-        <li><b>Sliced bakes.</b> A bake is a generator that yields between slices, and the render loop advances it one slice a frame while the rock is hidden in the pool. The fluid runs 8 steps a slice (about 1.05 ms of GPU each, ten slices); the height pass runs in six horizontal bands per sub-sample (24 slices of about 1.8 ms on high, 16 of 0.7 ms on medium); normals in six bands of 0.13 ms; then the flow map and the readback pass (2.7 ms). About 60 ms of GPU work over some 40 frames, none of them longer than 3 ms. Mipmaps are generated once, after the last band.</li>
+        <li><b>Sliced bakes.</b> A bake is a generator that yields between slices, and the render loop advances it one slice a frame while the rock is hidden in the pool. The fluid runs 8 steps a slice (ten slices); the height pass runs in six horizontal bands per sub-sample (24 slices on high, 16 on medium); normals in six bands; then the flow map and the readback pass: some 40 frames in all. Mipmaps are generated once, after the last band.</li>
         <li><b>Ahead of time.</b> The new look's fluid starts developing during the melt, before the rock is even hidden.</li>
         <li><b>Asynchronous readbacks.</b> The mesh info and flow (1536×1024 each on high) and the ember probe are read with <code>readRenderTargetPixelsAsync</code>, so the CPU never waits on the GPU; a newer bake simply discards an older one's data.</li>
-        <li><b>A worker for geometry.</b> The quadtree, the volumes and the emitters are built off the main thread, in about 1.7 s on high.</li>
+        <li><b>A worker for geometry.</b> The quadtree, the volumes and the emitters are built off the main thread.</li>
         <li><b>Baked fields.</b> The morph field (64 slices, one pass a frame only during a change), the rising heat for the shimmer (48 slices) and the ember light (a CPU splat) are baked into textures rather than evaluated per sample by the three passes that read them.</li>
         <li><b>Programs.</b> The fluid and the first style's bake compile in parallel during load; the other styles' height programs compile in the background.</li>
         <li><b>Tiers.</b> Medium halves the atlas (1536×1024), coarsens the smoke grid and the mesh; low keeps the static smoke (no simulation), runs 42 fluid steps on a 384² map and flies 90 embers.</li>
       </ul>
     </div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>GPU per frame, idle</th><th class="num">ms</th><th>Share</th></tr></thead>
-        <tbody id="perfRows"></tbody>
-      </table>
-    </div>
-    <p class="fig-cap col">A Pillow Lava boulder (606,000 triangles) at 1904×985 on a laptop RTX 4060, high tier, mean over 253 frames with WebGL timer queries. During the pool the rock's passes vanish and the raymarched liquid takes their place (0.93 ms) for about the same total, 3.4 ms. A star in Ropy Strands at 715,000 triangles costs 4.9 ms, 1.4 ms of it the rock's main pass.</p>
   </section>
 
   <!-- 11. Sound -->
@@ -528,7 +521,7 @@ haze density = surfaceGlow · air² + shell(melt)     glow ×(1 − 0.8·cover)<
     <div class="col prose">
       <div class="eyebrow">Controls</div>
       <h2>Turning the rock</h2>
-      <p>Dragging turns the rock itself, not the camera, so the air, the embers and the haze stay where they are around it; it keeps its momentum and returns to its slow spin. While paused, dragging orbits the camera instead, to look around the frozen scene. Randomizing always picks another style and another shape, sets each slider near its style's own profile, and leans toward many embers.</p>
+      <p>Dragging turns the rock itself, not the camera, so the air, the embers and the haze stay where they are around it; it keeps its momentum and returns to its slow spin. While paused, dragging orbits the camera instead, to look around the frozen scene. Randomizing always picks another style and another shape, sets each slider near its style's own profile, and leans toward many embers. The panel holds Style and Shape; Crust, Fluid flow, Turbulence, Scale, Relief and Geometry detail for the bake; Heat, Glow, Glow spread, Heat haze, Gloss, Magma flow, Embers and Spin for the look; and the Smoke section above.</p>
     </div>
     <ul class="keys">
       <li><b>Drag</b> turn the rock</li>
@@ -539,6 +532,8 @@ haze density = surfaceGlow · air² + shell(melt)     glow ×(1 − 0.8·cover)<
       <li><b>Space</b> pause</li>
       <li><b>F</b> fullscreen</li>
       <li><b>Tab</b> hide the interface</li>
+      <li><b>P</b> screenshot (<b>Shift+P</b> at 2×)</li>
+      <li><b>Auto change</b> a new rock every 14 s once the last change has finished (<b>Change every</b>, 5–60 s)</li>
     </ul>
   </section>
 
@@ -1306,18 +1301,6 @@ haze density = surfaceGlow · air² + shell(melt)     glow ×(1 − 0.8·cover)<
     $("sJit").addEventListener("change", () => fig.paint());
   }
 
-  // Measured GPU cost per pass
-  {
-    const rows = [
-      ["Light shaft march (smoke)", 0.918], ["Rock, main pass", 0.627], ["Heat haze march", 0.312], ["AO and bounce light", 0.245],
-      ["Glow composite (shimmer, smoke, glow)", 0.227], ["Rock, prepass", 0.201], ["Prepass, other", 0.166], ["Rock, shadow map", 0.121],
-      ["Main pass, other", 0.123], ["Bloom", 0.105], ["Glow pyramid", 0.09], ["Shadow mask", 0.084], ["Final pass", 0.076],
-      ["Embers (shadow, prepass, main)", 0.041], ["Smoke simulation", 0.04], ["Pulse volume", 0.026],
-    ];
-    const max = rows[0][1], total = 3.438;
-    $("perfRows").innerHTML = rows.map(([n, v]) => `<tr title="${n}: ${v.toFixed(2)} ms"><td>${n}</td><td class="num">${v.toFixed(2)}</td><td class="barcell"><div class="bar" style="width:${(v / max) * 100}%"></div></td></tr>`).join("") +
-      `<tr><td><b>Total</b></td><td class="num"><b>${total.toFixed(2)}</b></td><td></td></tr>`;
-  }
 })();
 </script>
 </body>
