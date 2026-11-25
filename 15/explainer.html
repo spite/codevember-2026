@@ -219,7 +219,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       </div></article>
       <article class="item"><img src="explainer/scene-head.jpg" alt="Suzanne, Blender's monkey head, turned slightly, inside the glass plate." loading="lazy"><div>
         <h3>Head</h3>
-        <p>Blender's Suzanne, parsed from its OBJ by the shared Suzanne module and Loop-subdivided twice into a smooth head, centred on its bounding box and given a satin finish. The mesh comes pitched nose-down, so she is tilted back 21° to face out of the card. Only her turn changes from seed to seed (up to 23° either way), so the subdivided mesh is built once while the page loads and each card takes a copy: subdividing it took 44 ms, a visible hitch, when it was done on a change.</p>
+        <p>Blender's Suzanne, parsed from its OBJ by the shared Suzanne module and Loop-subdivided twice into a smooth head, centred on its bounding box and given a satin finish. The mesh comes pitched nose-down, so she is tilted back 21° to face out of the card. Only her turn changes from seed to seed (up to 23° either way), so the subdivided mesh is built once while the page loads and each card takes a copy, so a change never stalls on subdividing it.</p>
       </div></article>
       <article class="item"><img src="explainer/scene-crystals.jpg" alt="A spiky star polyhedron surrounded by smaller faceted solids at different depths, inside the glass plate." loading="lazy"><div>
         <h3>Crystals</h3>
@@ -237,7 +237,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       </div></article>
       <article class="item"><img src="explainer/scene-knot.jpg" alt="A thick glossy trefoil knot, its three loops spread across the plate." loading="lazy"><div>
         <h3>Knot</h3>
-        <p>A torus knot: a tube following a curve that winds p times round a torus's axis while circling it q times. It is mostly the trefoil (2, 3), sometimes the cinquefoil (2, 5); denser knots turned into a tangle once the bands smeared them. Its axis stays within 25° of the viewer, so the loops spread across the plate instead of stacking end-on.</p>
+        <p>A torus knot: a tube following a curve that winds p times round a torus's axis while circling it q times. It is mostly the trefoil (2, 3), sometimes the cinquefoil (2, 5); denser knots would turn into a tangle once the bands smeared them. Its axis stays within 25° of the viewer, so the loops spread across the plate instead of stacking end-on.</p>
       </div></article>
       <article class="item"><img src="explainer/scene-atom.jpg" alt="A cluster of small balls in the middle with three or four thin elliptical orbits round it, each with a ball on it." loading="lazy"><div>
         <h3>Atom</h3>
@@ -381,8 +381,8 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">Motion blur · <b>tunnel.js tBand, tShape</b></div>
       <h2>A smear in closed form</h2>
-      <p>At 14 metres a second, a neon ring near the camera crosses many pixels in one frame, and without blur it strobes. The first version averaged the wall at up to ten points along the frame's travel. That cost ten evaluations of the whole wall per pixel, and still showed the ring as a few separate copies.</p>
-      <p>A ring is a line across the tube, and a line swept along its own normal for a distance L has an exact average: a band L longer and correspondingly dimmer, with the same total light. So the line styles draw their rings already smeared, in one evaluation. Lines along the tube don't change at all. Embers and dots stretch into dashes, and each kick's flashing cells spill into their neighbours by how much of the travel crosses into them. Only the three shape styles (tiles, suns, Memphis) still take taps, and then only for the pattern, not the whole wall. The tunnel's frame time fell by a fifth to a third.</p>
+      <p>At 14 metres a second, a neon ring near the camera crosses many pixels in one frame, and without blur it strobes. Averaging the wall at points along the frame's travel would cost an evaluation of the whole wall per point per pixel, and still show the ring as a few separate copies.</p>
+      <p>A ring is a line across the tube, and a line swept along its own normal for a distance L has an exact average: a band L longer and correspondingly dimmer, with the same total light. So the line styles draw their rings already smeared, in one evaluation. Lines along the tube don't change at all. Embers and dots stretch into dashes, and each kick's flashing cells spill into their neighbours by how much of the travel crosses into them. Only the three shape styles (tiles, suns, Memphis) still take taps, and then only for the pattern, not the whole wall.</p>
     </div>
     <div class="formula">band(r) = min(2w + a, L + a) / (L + a) · (1 − smoothstep(|w − L/2|, w + L/2 + a, r))<br><span class="c">r: distance to the line along the tube; w: its half-width; a: a pixel; L: the travel during the shutter. At L = 0 it is the still line.</span></div>
     <div class="fig">
@@ -402,7 +402,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">Reflections · <b>tunnel.js traceTunnel, hologram.js traceReflection</b></div>
       <h2>Reflections traced, not rendered</h2>
-      <p>The glass and foil reflect the tunnel, and the tunnel is all that is there to reflect. At first it was rendered round the card into a cube map every frame and prefiltered: six faces of the tunnel, then a 256-sample convolution of every mip. That was a quarter of the frame. Now each pixel of the card traces its own reflected ray into the tube and runs the wall's shader where it lands: sharp, with true parallax, and almost free.</p>
+      <p>The glass and foil reflect the tunnel, and the tunnel is all that is there to reflect. Rendering it round the card into a cube map every frame would mean six faces of the tunnel and a prefiltering pass over every mip. Instead each pixel of the card traces its own reflected ray into the tube and runs the wall's shader where it lands: sharp, with true parallax, and almost free.</p>
       <p>The tube is bent, so the ray first meets the straight tube, then the hit is bracketed and bisected against the bent one, and finally solved exactly against the circle the bend puts there. The footprint comes from the screen, so the far wall fades to its average instead of shimmering. On the dark glass, which reflects only a few percent, the reflection's range is compressed so the wall's dim fill and its flashing cells still show next to the bright lines.</p>
     </div>
     <div class="fig">
@@ -448,9 +448,9 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="facts">
       <div class="fact"><b>Bands</b><span>8 a frame (6 on phones), each one draw into one channel, 2 buffers.</span></div>
       <div class="fact"><b>Bake</b><span>248 directions, 8 a frame, the first frame alone (it uploads the mesh).</span></div>
-      <div class="fact"><b>Bursts</b><span>Day 2's shapes at 60% tessellation, the smallest chips left out: 350k → 155k vertices.</span></div>
-      <div class="fact"><b>Reflections</b><span>Traced per pixel, no cube map: −0.8 ms a frame.</span></div>
-      <div class="fact"><b>Motion blur</b><span>Closed form for lines, pattern-only taps for shapes: 20–30% faster frames.</span></div>
+      <div class="fact"><b>Bursts</b><span>Day 2's shapes at 60% tessellation, the smallest chips left out: about 155k vertices.</span></div>
+      <div class="fact"><b>Reflections</b><span>Traced per pixel against the bent tube, with no cube map.</span></div>
+      <div class="fact"><b>Motion blur</b><span>Closed form for lines, pattern-only taps for shapes.</span></div>
       <div class="fact"><b>Music</b><span>Starts after 3 smooth frames with no new shader, its clock corrected for output latency.</span></div>
     </div>
   </section>
@@ -463,17 +463,17 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </div>
     <ul class="keys col">
       <li><b>Drag</b> to spin the card; it keeps turning, then settles back to face you. <b>Scroll</b> to zoom.</li>
-      <li><b>R</b> or the button for a new card; with the music it changes every 8 bars by itself.</li>
+      <li><b>R</b> or the button for a new card; with the music it changes every 8 bars by itself (<b>Auto change</b>, on by default), or every 10 s without it.</li>
       <li><b>M</b> or the speaker button for sound; <b>C</b> copies a link to the exact moment.</li>
       <li>The panel: card, scene and seed; the hologram's colour, bandwidth, swelling, viewing zone and dispersion; rings and their tracks; the glass and its reflection; the motion.</li>
-      <li><b>Space</b> pauses, <b>F</b> goes fullscreen and hides the UI, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot.</li>
+      <li><b>Space</b> pauses, <b>F</b> goes fullscreen and hides the UI, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
     </ul>
   </section>
   <footer class="col">
     <div class="meta">
       <span><b>three.js</b> r187</span><span>WebGL2</span><span>white-light hologram replay</span><span>beat-mapped with batec</span><span>started in <b>Antigravity</b> with Gemini 4 Carbon, finished in <b>Claude Code</b> with Opus 5.5</span>
     </div>
-    Day 15 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/15/">spite.github.io/codevember-2026/15</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/15">15/ of the codevember-2026 repository</a>. The holographic shader is spite's own, brought into the <a href="../modules/pipeline/explainer.html">photographic pipeline</a> here.
+    Day 15 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/15/">spite.github.io/codevember-2026/15</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/15">15/ of the codevember-2026 repository</a>. The card, the tunnel and the light are rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>.
   </footer>
 </main>
 
