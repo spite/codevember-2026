@@ -124,6 +124,9 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
   .fig { padding: 16px; }
   main { gap: 56px; }
 }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
 </style>
 </head>
 <body>
@@ -146,7 +149,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">The idea</div>
       <h2>A living mass, lit like a specimen</h2>
-      <p>Day 16's prompt was Spore. The references were macro photographs that don't exist: a clump of pollen-like grains floating in the dark, a waxy yellow crust in patches over dark, glossy beads, a shaft of light cutting through dust behind it, and the clump's own shadow running down the beam. The piece builds that clump out of particles and keeps it alive: it folds slowly, swells in uneven pulses, lets ripe patches burst, buds off lobes that wander and come back, and splits into two or three colonies that drift apart and fuse again.</p>
+      <p>Day 16's prompt was Spore. It is shot like a macro photograph that couldn't be taken: a clump of pollen-like grains floating in the dark, a waxy yellow crust in patches over dark, glossy beads, a shaft of light cutting through dust behind it, and the clump's own shadow running down the beam. The piece builds that clump out of particles and keeps it alive: it folds slowly, swells in uneven pulses, lets ripe patches burst, buds off lobes that wander and come back, and splits into two or three colonies that drift apart and fuse again.</p>
       <p>Everything renders through the <a href="../modules/pipeline/explainer.html">shared photographic pipeline</a>: soft shadows, ambient occlusion and bounce light, depth of field and AgX tonemapping. What is specific to the day is the simulation that drives the grains, the way it changes from one colony to the next, and the light, camera and sound around it.</p>
     </div>
   </section>
@@ -175,7 +178,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <p class="fig-cap">The same recipe on a flat bench: every grain is splatted into a coarse grid, the grid is blurred, and each grain moves down the pressure gradient, up the cohesion gradient near the surface, and along a slowly turning curl current. Turn the current up and the clump throws out lobes; turn cohesion down and they come loose.</p>
     </div>
     <div class="col prose">
-      <p>The step runs on a fixed clock of 60 steps a second, so a seed, the settings and a time always give the same colony. It updates once a step, with drag scaled so that the colony moves and tears as it did with two half-steps, compared on the spores' speeds, intact bonds and the colony's size after half a minute of simulation.</p>
+      <p>The step runs on a fixed clock of 60 steps a second, so a seed, the settings and a time always give the same colony. It updates once a step, with drag scaled to that step's length.</p>
     </div>
   </section>
 
@@ -185,7 +188,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="eyebrow">Two clocks · <b>main.js simStep, spores.js interpolate</b></div>
       <h2>Slow life, quick reflexes</h2>
       <p>Speed runs the physics: how fast spores move, settle and react to anything done to them. Pace runs the colony's own life: how fast its current drifts, how often it pulses, bursts and buds, and how the colonies circle. At the default Pace of 0.5 the colony lives at half speed and still answers a poke or a drag at full speed. The current's push scales with the square root of Pace, so a slow colony still folds as deeply.</p>
-      <p>At a low Speed the steps come only every few frames, which used to show as a stutter. The spores are now drawn between the last two steps, as far between as the next step has come, so the mass moves every frame at any speed, and the motion vectors the pipeline uses for its blur and its AO history follow the drawn positions.</p>
+      <p>At a low Speed the steps come only every few frames, which would show as a stutter, so the spores are drawn between the last two steps, as far between as the next step has come, so the mass moves every frame at any speed, and the motion vectors the pipeline uses for its blur and its AO history follow the drawn positions.</p>
     </div>
   </section>
 
@@ -325,6 +328,26 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <p>Under everything is a bed: a recording time-stretched ten times at its own pitch, by layering half-second grains four deep under smooth windows, read from a point that creeps through the track at a tenth of real time, each grain jittered a little so they don't phase.</p>
       <p>The colony's sounds are synthesized from filtered noise and sines and placed in 3D where they happen, with the listener at the camera, so they come from their side of the colony and move as the camera orbits. The swarm seethes all the time, as lively as the colony; swells breathe a low rush; bursts crackle; buds gulp; hovering over a colony rustles; a tap lands with a low thump; grabbing a colony comes unstuck and stretching it creaks; gathering builds and a fling whooshes; colonies tear apart and fuse with a wet merge; a new colony groans in through an unpitched rush over tumbling ticks. They all go through a soft saturation and a low-pass, so they come out low, rough and muffled, into a shared five-second room where faint knocks come from behind the listener. A hidden tab silences it all.</p>
     </div>
+  </section>
+
+  <!-- 11. Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>Hover to stir the spores; click a colony to puff spores out of it; drag one to stretch it.</li>
+      <li>Hold the right button (long-press on touch) to gather spores, and release to fling them.</li>
+      <li>Drag around the colony to orbit, freely, over and under; scroll or pinch to zoom; <b>Shift</b> + scroll moves the focus. While paused, every drag orbits.</li>
+      <li><b>Look</b>: Palette, Crust, Translucency, Detail. <b>Colony</b>: Wildness, Colonies, Sorting, Spores, Size.</li>
+      <li><b>Motion</b>: Speed, Pace, Flow, Turbulence, Scale. <b>Body</b>: Cohesion, Bonds, Tear, Pressure, Collisions, Drag.</li>
+      <li><b>Life</b>: Pulse, Sporulation, Budding. <b>Touch</b>: Disrupt, Puff.</li>
+      <li><b>Light &amp; air</b>: Halo, Beam, Haze, Dust, Depth of field, Focus, Camera speed, Motion blur, Spin.</li>
+      <li><b>Auto change</b> (on by default): a new colony every 10 s (<b>Change every</b>, 5–60 s), once the last change has settled. After 5 s without input the camera takes over.</li>
+      <li><b>R</b> for a new colony, <b>L</b> copies a link to the view, <b>M</b> or the speaker button toggles sound.</li>
+      <li><b>Space</b> pauses, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
+    </ul>
   </section>
 
 
