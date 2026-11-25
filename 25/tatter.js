@@ -1,7 +1,8 @@
 // What a tattered veil looks like, as two maps over the cloth, made in the veil's worker. Lengths are in cells of the
 // cloth (CELLS_SIDE a side); the cloth hangs from the crown, so "down" is away from it.
 //
-// outline: g is how much of the texel is cloth (holes, ragged hem, loose threads hanging off edges), r how thin it has
+// outline: g is the distance to the edge of the cloth (0.5 at the edge; holes, ragged hem, loose threads hanging off
+// edges), r how thin it has
 // worn (sheer around holes and toward the hem). dirt: what the cloth's colour is multiplied by: an aged tint, grime
 // toward the hem and round the holes, water stains with darker tide lines, mildew specks.
 import { CELLS_SIDE, tatteredCloth } from "./veil-sim.js";
@@ -10,10 +11,14 @@ const TATTER_TEXELS = 16;
 const CROWN = [CELLS_SIDE / 2, CELLS_SIDE / 2 - 6];
 // How far in from the hem holes, wear and grime reach.
 const HOLE_REACH = 13;
-const WEAR_REACH = 1.6;
+const WEAR_REACH = 0.9;
 const GRIME_REACH = 16;
 // Loose threads hang this far (cells) below edges facing down.
-const FRINGE = 2.2;
+const FRINGE = 3.2;
+// The edge distance is stored over this many texels either side.
+const EDGE_RANGE = 4;
+// Loose threads round the crown: about one every 0.3 cells at the hem.
+const THREADS = 520;
 // Stained and grimy colours, linear-ish sRGB 0..255: a grey-brown grime, a yellow-brown stain.
 const GRIME = [92, 84, 72];
 const STAIN = [150, 118, 76];
@@ -142,7 +147,8 @@ function createTatterData(seed) {
       dist[i] = d;
     }
   }
-  for (let i = 0; i < n; i++) if (!joined[i]) edge[i] = -dist[i] / T;
+  // The edge stays the smooth field where it was already outside; only removed islands take the (stepped) distance.
+  for (let i = 0; i < n; i++) if (!joined[i] && edge[i] >= 0) edge[i] = -Math.max(dist[i], 1) / T;
 
   const outline = new Uint8Array(n * 4);
   const dirt = new Uint8Array(n * 4);
@@ -153,37 +159,47 @@ function createTatterData(seed) {
       const e = edge[i];
       const cx = (x + 0.5) / T;
       const cy = (y + 0.5) / T;
-      let cloth = 0;
-      if (e >= 0) {
-        cloth = 1;
-      } else if (e > -FRINGE) {
-        // Outside an edge: loose threads, only where the edge faces down (they hang from the cloth above them).
-        const gx = at(x + 1, y) - at(x - 1, y);
-        const gy = at(x, y + 1) - at(x, y - 1);
+      // Signed distance to the edge of the cloth, in texels (> 0 inside): the shader cuts a smooth edge from it.
+      let d = e * T;
+      // How far outside the cloth this is, truly (the edge field is steeper than a distance around holes), in cells.
+      const out = joined[i] ? 0 : dist[i] / T;
+      if (e < 0 && out < FRINGE) {
+        // Loose threads hang from the cloth above them: from edges that face down, away from the crown.
+        const dd = (xx, yy) => dist[Math.min(size - 1, Math.max(0, yy)) * size + Math.min(size - 1, Math.max(0, xx))];
+        const gx = dd(x + 1, y) - dd(x - 1, y);
+        const gy = dd(x, y + 1) - dd(x, y - 1);
         const l = Math.hypot(gx, gy) || 1;
-        const facing = Math.max(0, -(gx * downX[i] + gy * downY[i]) / l);
-        // Fine threads across, each with its own length, a little wavy.
+        const facing = Math.max(0, (gx * downX[i] + gy * downY[i]) / l);
         const along = Math.hypot(cx - CROWN[0], cy - CROWN[1]);
-        const across = turnOf[i] * 1100 + 1.4 * noise(cx * 1.7, cy * 1.7) + 0.5 * noise(cx * 6, cy * 6);
+        // Spaced by angle round the crown, so each strand runs straight down from it.
+        const across = turnOf[i] * THREADS + 0.6 * noise(cx * 1.7, cy * 1.7);
         const thread = Math.floor(across);
         const h = threadHash(thread, 0);
         const width = Math.abs(across - thread - 0.5) * 2;
-        const length = FRINGE * Math.sqrt(facing) * (0.1 + 0.9 * h ** 3) * (0.6 + 0.4 * noise(thread * 0.37, along * 0.2));
-        if (h > 0.4 && width < 0.35 + 0.25 * threadHash(thread, 1) && -e < length) cloth = 1;
+        const length = FRINGE * smooth(0.05, 0.5, facing) * (0.25 + 0.75 * ((h - 0.5) / 0.5) ** 2) * (0.6 + 0.4 * noise(thread * 0.37, along * 0.2));
+        // A few long strands, none as stubs: a row of short ones reads as a jagged edge.
+        if (h > 0.5 && length > 0.4) {
+          // A strand: so wide across (in threads, then texels) and so long.
+          // Between strands at this radius, in texels; no strand narrower than about two texels.
+          const unit = (2 * Math.PI * along * T) / THREADS;
+          const half = Math.max((0.35 + 0.25 * threadHash(thread, 1)) / 2, 1.1 / unit);
+          d = Math.max(d, Math.min((half - width / 2) * unit, (length - out) * T));
+        }
       }
+      const cloth = d > 0 ? 1 : 0;
       // Worn sheer around every edge, and in patches toward the hem.
       const patches = Math.max(0, fbm(cx * 0.45, cy * 0.45) - 0.15) * hemOf[i] * hemOf[i];
       // Loose threads are whole thread, not gauze, so they show.
-      const thin = e < 0 ? 0.15 * cloth : Math.max(0.85 * (1 - smooth(0, WEAR_REACH, e)), Math.min(0.8, patches * 1.6));
+      const thin = e < 0 ? 0.15 * cloth : Math.max(0.45 * (1 - smooth(0, WEAR_REACH, e)), Math.min(0.8, patches * 1.6));
       const o = i * 4;
       outline[o] = Math.round(255 * thin);
-      outline[o + 1] = outline[o + 2] = cloth * 255;
+      outline[o + 1] = outline[o + 2] = Math.round(255 * Math.min(1, Math.max(0, 0.5 + d / (2 * EDGE_RANGE))));
       outline[o + 3] = 255;
 
       // Dirt: grime gathers toward the hem and round the edges, in blotches and along the hanging folds.
       const grimeReach = smooth(GRIME_REACH, 0, Math.max(0, insideOf[i]));
       const fromCrown = Math.hypot(cx - CROWN[0], cy - CROWN[1]);
-      const nearEdge = 1 - smooth(0, 2.5, Math.max(0, e));
+      const nearEdge = 0.5 * (1 - smooth(0, 2.5, Math.max(0, e)));
       const blotch = fbm(cx * 0.22 + 3.1, cy * 0.22 + 7.4);
       const streak = noise(turnOf[i] * 260, fromCrown / 6, 260) * smooth(6, 14, fromCrown);
       const grime = e < 0 ? 0.7 : Math.min(1, Math.max(0, 0.75 * grimeReach + 0.45 * nearEdge + 0.35 * blotch + 0.08 * streak * grimeReach - 0.18));
@@ -215,7 +231,7 @@ function createTatterData(seed) {
     for (let dy = -size; dy <= size; dy += size) {
       for (let dx = -1; dx <= 1; dx++) {
         const j = i + dy + dx;
-        if (j < 0 || j >= n || x + dx < 0 || x + dx >= size || kept[j] || !outline[j * 4 + 1]) continue;
+        if (j < 0 || j >= n || x + dx < 0 || x + dx >= size || kept[j] || outline[j * 4 + 1] < 128) continue;
         kept[j] = 1;
         queue.push(j);
       }

@@ -12,6 +12,12 @@ const START_Y = 0.225;
 const PIN_RADIUS = 0.015; // around the crown, at x = z = 0
 const SETTLE_STEPS = 20; // the veil lands before it's pinned
 const WARM_STEPS = 120; // simulated before it's first shown
+// A live drop starts this high, above the frame, and falls onto the head as it's seen; the crown is pinned when it
+// lands, and the veil gets its leash once it has had this long to drape.
+const DROP_Y = 0.5;
+const DROP_SETTLE = 1.6;
+// Per step, the share of the way back to the drape a veil is pulled.
+const DRAPE_PULL = 0.012;
 const OFFSET = 0.006; // the cloth rides this far off the surface, unless told otherwise
 const STEP = 1 / 90;
 const MAX_STEPS = 3; // per update
@@ -43,11 +49,11 @@ const MAX_HEAD_MOVE = 0.05;
 const MAX_LAG = 0.012;
 // Three things keep the veil over the face however the head turns. Gravity never leans
 // more than this from the skull's own down, in radians, so the cloth can't pour off.
-const MAX_GRAVITY_TILT = 0.6;
+const MAX_GRAVITY_TILT = 0.85;
 // And no particle strays further from where it settled than a leash, short at the crown
 // and longer toward the hem, which is free to swing.
 const LEASH = 0.03;
-const LEASH_GROWTH = 0.25;
+const LEASH_GROWTH = 0.35;
 // Within CROWN_REACH of the crown along the cloth, how far off the skull the cloth may
 // lift, beyond its offset: CROWN_LIFT, plus CROWN_LIFT_GROWTH per meter from the crown.
 const CROWN_REACH = 0.07;
@@ -245,6 +251,9 @@ class VeilSim {
     // Acceleration of a draft blowing the front of the cloth back onto the face. It's the
     // same everywhere in front, so it presses the cloth on without gathering it anywhere.
     this.draft = 5;
+    // A passing gust, as an acceleration in the skull's space (m/s²); it varies over the cloth and in time (see step).
+    this.wind = [0, 0, 0];
+    this.clock = 0;
     // How much of the head's motion the cloth is left behind by: 0 moves with the head, 1
     // stays where it was.
     this.inertia = 0.6;
@@ -293,16 +302,38 @@ class VeilSim {
     this.linkV = new Uint8Array(count);
     this.gone = new Uint8Array(count);
 
+    // A live drop is a little askew, a different way each time.
+    this.dropTilt = [0, 0];
+    this.falling = false;
+    this.fallTime = 0;
     this.buildConstraints();
     this.reset();
   }
 
+  // Lets go of the head: nothing holds the cloth any more (for the page to blow it away).
+  release() {
+    this.pinned.set(this.gone);
+    this.hasAnchor = false;
+    this.hasRest = false;
+    this.falling = false;
+  }
+
+  // Whether the patch at the crown has come down onto the skull.
+  crownLanded() {
+    for (let i = 0; i < this.count; i++) {
+      if (this.tether[i] > PIN_RADIUS) continue;
+      const o = i * 3;
+      if (this.distance(this.pos[o], this.pos[o + 1], this.pos[o + 2]) < this.offset + 0.004) return true;
+    }
+    return false;
+  }
+
   // Tears the veil to tatters, or makes it whole again, and drops it.
-  setTattered(tattered, seed) {
+  setTattered(tattered, seed, live = false) {
     if (tattered) this.cells = tatteredCells(seed);
     else this.cells.fill(1);
     this.buildConstraints();
-    this.reset();
+    this.reset(live);
   }
 
   buildConstraints() {
@@ -367,8 +398,9 @@ class VeilSim {
     });
   }
 
-  // Lays the cloth flat above the skull and lets it fall and settle, mouth closed and upright.
-  reset() {
+  // Lays the cloth flat above the skull and lets it fall and settle, mouth closed and upright. Live, it starts higher,
+  // a little askew, and falls as the page watches (see update).
+  reset(live = false) {
     const { pos, prev, pinned, tether } = this;
     const spacing = SIZE / (N - 1);
     for (let j = 0; j < N; j++) {
@@ -388,19 +420,44 @@ class VeilSim {
     this.hasAnchor = false;
     this.hasRest = false;
     this.time = 0;
+    this.falling = live;
+    this.fallTime = 0;
+    this.leashBlend = 1;
+    const live_ = live;
     const jawMatrix = this.jawMatrix;
     const jawInverse = this.jawInverse;
     this.jawMatrix = IDENTITY;
     this.jawInverse = IDENTITY;
+    // Settled in still air: the gust that blew the last veil away is still set until the page sends the next update.
+    const wind = this.wind;
+    this.wind = [0, 0, 0];
     for (let s = 0; s < WARM_STEPS; s++) {
       if (s === SETTLE_STEPS) this.pin();
       this.step(0, -GRAVITY, 0);
     }
     this.jawMatrix = jawMatrix;
     this.jawInverse = jawInverse;
+    this.wind = wind;
     this.rest.set(pos);
     for (let i = 0; i < this.count; i++) this.leash[i] = LEASH + LEASH_GROWTH * tether[i];
     this.hasRest = true;
+    if (!live_) return;
+    // Live: the drape just worked out is where the leash will ease it once it lands (see update); the cloth itself
+    // starts over, high above, and falls as it's seen.
+    for (let j = 0; j < N; j++) {
+      for (let i = 0; i < N; i++) {
+        const a = j * N + i;
+        const x = (i - (N - 1) * 0.5) * spacing;
+        const z = CENTER_Z + (j - (N - 1) * 0.5) * spacing;
+        pos[a * 3] = x;
+        pos[a * 3 + 1] = DROP_Y + this.dropTilt[0] * x + this.dropTilt[1] * z;
+        pos[a * 3 + 2] = z;
+      }
+    }
+    prev.set(pos);
+    pinned.set(this.gone);
+    this.hasAnchor = false;
+    this.hasRest = false;
   }
 
   // Pins the patch resting on the crown where it is. From then on no particle can be
@@ -621,10 +678,17 @@ class VeilSim {
       planeD[i] = 1;
       if (pinned[i]) continue;
       const o = i * 3;
-      const ax = gx;
-      const ay = gy;
+      // The gust is patchy: stronger in some places than others, and moving over the cloth.
+      const px = pos[o];
+      const py = pos[o + 1];
+      const pz = pos[o + 2];
+      // Mostly the hanging part: the cloth lying on the head is sheltered by it.
+      const exposed = smoothstep(0.05, 0.2, this.tether[i]);
+      const gust = exposed * (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(px * 37 + py * 23 + this.clock * 3.1) * Math.sin(pz * 29 - py * 41 - this.clock * 2.3)));
+      const ax = gx + this.wind[0] * gust;
+      const ay = gy + this.wind[1] * gust;
       // The draft fades out behind the face.
-      const az = gz - draft * smoothstep(-0.03, 0.05, pos[o + 2]);
+      const az = gz + this.wind[2] * gust - draft * smoothstep(-0.03, 0.05, pos[o + 2]);
       const d = this.distance(pos[o], pos[o + 1], pos[o + 2]);
       const l = Math.hypot(normal[0], normal[1], normal[2]);
       if (l > 1e-6) {
@@ -708,7 +772,15 @@ class VeilSim {
           const dy = pos[o + 1] - rest[o + 1];
           const dz = pos[o + 2] - rest[o + 2];
           const l2 = dx * dx + dy * dy + dz * dz;
-          const reach = leash[i] * slack;
+          const reach = leash[i] * slack * (1 + 6 * (1 - this.leashBlend));
+          // A faint pull back to the drape, so a veil a gust or a turn pushed aside works its way back over a few
+          // seconds (none while it's let loose).
+          if (this.loose <= 0 && it === 0) {
+            const k = DRAPE_PULL * this.leashBlend;
+            pos[o] -= dx * k;
+            pos[o + 1] -= dy * k;
+            pos[o + 2] -= dz * k;
+          }
           if (l2 > reach * reach) {
             const k = reach / Math.sqrt(l2);
             pos[o] = rest[o] + dx * k;
@@ -774,9 +846,40 @@ class VeilSim {
   update(dt, gravity, jawMatrix, jawInverse, delta) {
     this.jawMatrix = jawMatrix;
     this.jawInverse = jawInverse;
-    if (delta) this.applyHeadMotion(delta);
-    // Gravity is kept within a cone around the skull's own down.
-    let [gx, gy, gz] = gravity;
+    // Until it has landed, a dropped veil is carried with the head: left behind, it would miss the crown.
+    if (delta && !(this.falling && !this.hasAnchor)) this.applyHeadMotion(delta);
+    if (this.falling) {
+      if (!this.hasAnchor && (this.crownLanded() || this.fallTime > 2)) {
+        this.pin();
+        this.pinnedAt = this.fallTime;
+        // The leash to the drape worked out at the drop comes in loose and tightens as it settles.
+        this.hasRest = true;
+      }
+      if (this.hasAnchor) {
+        const t = Math.min(1, (this.fallTime - this.pinnedAt) / DROP_SETTLE);
+        this.leashBlend = t * t * (3 - 2 * t);
+        // The crown, pinned wherever it landed, slides to where the drape has it, and the tether's anchor with it.
+        const { pos, prev, rest, pinned, tether, anchor } = this;
+        const k = Math.min(1, dt * 3);
+        anchor[0] = anchor[1] = anchor[2] = 0;
+        let count = 0;
+        for (let i = 0; i < this.count; i++) {
+          if (!pinned[i] || tether[i] > PIN_RADIUS) continue;
+          const o = i * 3;
+          for (let c = 0; c < 3; c++) {
+            pos[o + c] += (rest[o + c] - pos[o + c]) * k;
+            prev[o + c] = pos[o + c];
+            anchor[c] += pos[o + c];
+          }
+          count++;
+        }
+        for (let c = 0; c < 3; c++) anchor[c] /= Math.max(1, count);
+        if (t >= 1) this.falling = false;
+      }
+    }
+    // Gravity is kept within a cone around the skull's own down; while a dropped veil lands it's the skull's down, so
+    // the cloth comes down on the crown however the head is tilted.
+    let [gx, gy, gz] = this.falling && !this.hasAnchor ? [0, -1, 0] : gravity;
     const lean = Math.hypot(gx, gz);
     const tilt = MAX_GRAVITY_TILT + (Math.PI - MAX_GRAVITY_TILT) * Math.max(0, this.loose);
     if (-gy < Math.cos(tilt) * Math.hypot(lean, gy)) {
@@ -790,6 +893,9 @@ class VeilSim {
     while (this.time >= STEP && steps < MAX_STEPS) {
       this.step(gx * GRAVITY, gy * GRAVITY, gz * GRAVITY);
       this.time -= STEP;
+      this.clock += STEP;
+      // Timed in the simulation's own steps, which fall behind the page's when it can't keep up.
+      if (this.falling) this.fallTime += STEP;
       steps++;
     }
     // If it can't keep up, the cloth runs slow instead of falling further behind.

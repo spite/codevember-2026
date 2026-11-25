@@ -42,6 +42,8 @@ const mirror = new Matrix4().makeScale(-1, 1, 1);
 // ?pose=jump shows each detection as it comes, like the original demo, instead of playing them back smoothly.
 const jump = new URLSearchParams(location.search).get("pose") === "jump";
 const DROPOUT = 350;
+// The blendshapes a take keeps (the ones the skull uses).
+const KEPT_SHAPES = new Set(["jawOpen", "jawLeft", "jawRight", "jawForward", "browDownLeft", "browDownRight", "mouthFrownLeft", "mouthFrownRight"]);
 const _p = new Vector3();
 const _q = new Quaternion();
 const _s = new Vector3();
@@ -72,6 +74,11 @@ function createTracker() {
   let sentFrame = 0;
   // Counts for the panel's readout, over the last second.
   const counts = { frames: 0, results: 0, detect: 0, renders: 0, since: performance.now() };
+  // The tracker's clock: the page's, or a replayed take's (advanced by the page's dt, so a capture reproduces it).
+  let replay = null;
+  const clock = () => (replay ? replay.time : performance.now());
+  // A take being recorded: every detection, with the time its frame was captured.
+  let recording = null;
   state.stats = "";
   const position = new OneEuro(0.5, 0.5);
   let rotation = null;
@@ -107,7 +114,7 @@ function createTracker() {
   // The landmarker in its own worker; on the main thread if a worker can't run it.
   function loadWorker() {
     return new Promise((resolve, reject) => {
-      const w = new Worker(new URL("./tracker-worker.js", import.meta.url));
+      const w = new Worker(new URL(`./tracker-worker.js?v=${Date.now().toString(36)}`, import.meta.url));
       w.onmessage = ({ data }) => {
         if (data.type === "ready") resolve(w);
         else if (data.type === "error" && !worker) reject(new Error(data.message));
@@ -123,8 +130,15 @@ function createTracker() {
     });
   }
 
-  async function start() {
-    if (stream || state.status === "asking" || state.status === "loading") return;
+  // A start while one is under way waits for that one.
+  let starting = null;
+  function start() {
+    starting ??= begin().finally(() => (starting = null));
+    return starting;
+  }
+
+  async function begin() {
+    if (stream) return;
     if (!navigator.mediaDevices?.getUserMedia) {
       state.status = "failed";
       state.error = "No camera access in this browser";
@@ -184,6 +198,14 @@ function createTracker() {
 
   // A detection: filter the pose (One Euro on the position, a speed-dependent slerp on the rotation) into the target.
   function handle(found, matrix, shapes, time) {
+    if (recording) {
+      const r = (v) => Math.round(v * 1e4) / 1e4;
+      recording.events.push({
+        t: Math.max(0, Math.round(time - recording.t0)),
+        f: found ? 1 : 0,
+        ...(found && { m: Array.from(matrix, r), s: Object.fromEntries(shapes.filter(([name]) => KEPT_SHAPES.has(name)).map(([name, v]) => [name, r(v)])) }),
+      });
+    }
     if (!found) {
       // Fast moves blur a frame or two and the face is missed; under a third of a second, play on as if it were there.
       if (state.found && time - lastTime < DROPOUT) return;
@@ -216,7 +238,7 @@ function createTracker() {
     samples.push({ t: time, p: targetPosition.clone(), q: targetRotation.clone() });
     if (samples.length > 8) samples.shift();
     if (state.found && dt > 0) interval += (Math.min(150, dt * 1000) - interval) * 0.2;
-    latency += (Math.min(200, Math.max(0, performance.now() - time)) - latency) * 0.2;
+    latency += (Math.min(200, Math.max(0, clock() - time)) - latency) * 0.2;
     for (const name in state.blendshapes) delete state.blendshapes[name];
     for (const [name, score] of shapes) state.blendshapes[name] = score;
     state.found = true;
@@ -258,9 +280,29 @@ function createTracker() {
     ).normalize();
   }
 
-  // Once a frame: hands a new video frame to the landmarker, and plays the pose back.
+  // Once a frame: hands a new video frame to the landmarker (or the take's next detections to the tracker), and plays the
+  // pose back.
   function update(dt) {
     counts.renders++;
+    if (replay) {
+      if (!replay.paused) replay.time += dt * 1000;
+      const events = replay.take.events;
+      while (replay.next < events.length && events[replay.next].t <= replay.time) {
+        const e = events[replay.next++];
+        handle(!!e.f, e.m ?? null, Object.entries(e.s ?? {}), e.t);
+      }
+      const cues = replay.take.cues ?? [];
+      while (replay.nextCue < cues.length && cues[replay.nextCue].t <= replay.time) replay.onCue?.(cues[replay.nextCue++]);
+      // A take plays round again from the start.
+      if (replay.next >= events.length && replay.loop && replay.time > events.at(-1).t + 100) {
+        replay.next = 0;
+        replay.nextCue = 0;
+        replay.time = 0;
+        lastTime = 0;
+        samples.length = 0;
+        state.found = false;
+      }
+    }
     if (!video.requestVideoFrameCallback && video.currentTime !== lastVideoTime) {
       lastVideoTime = video.currentTime;
       counts.frames++;
@@ -298,13 +340,76 @@ function createTracker() {
     if (state.found && samples.length) {
       // Behind by the detection's latency and a bit over a frame, so there's nearly always a sample on either side.
       delay += (latency + 1.3 * interval - delay) * Math.min(1, dt * 2);
-      sample(jump ? Infinity : performance.now() - delay);
+      sample(jump ? Infinity : clock() - delay);
       state.pose.compose(_p, _q, _s.set(1, 1, 1));
     }
     return state.found;
   }
 
-  return { state, video, start, stop, update };
+  // Records the detections until stopTake(), which returns the take (JSON-able).
+  function startTake() {
+    recording = { mirrored: state.mirrored, events: [], cues: [], t0: performance.now() };
+  }
+  // Something else that happened during the take (a veil change, a gust), played back at the same moment.
+  function addCue(kind, data) {
+    if (recording) recording.cues.push({ t: Math.round(performance.now() - recording.t0), kind, ...data });
+  }
+  function stopTake() {
+    const take = recording && { version: 1, mirrored: recording.mirrored, events: recording.events, cues: recording.cues };
+    recording = null;
+    return take;
+  }
+  // Plays a recorded take instead of the camera (looping).
+  // `start` (seconds) begins partway in, on the look the take had then.
+  // `paused` holds it at `start` (on its pose there) until resumeTake().
+  function playTake(take, { loop = true, onCue, start = 0, paused = false } = {}) {
+    stop();
+    state.mirrored = !!take.mirrored;
+    const time = start * 1000;
+    const cues = take.cues ?? [];
+    const look = takeLookAt(take, start);
+    if (look) onCue?.({ kind: "look", look });
+    replay = {
+      take,
+      time,
+      next: take.events.findIndex((e) => e.t > time - 200),
+      nextCue: Math.max(0, cues.findIndex((c) => c.t > time)),
+      loop,
+      onCue,
+      paused,
+    };
+    if (replay.next < 0) replay.next = take.events.length;
+    if (cues.every((c) => c.t <= time)) replay.nextCue = cues.length;
+    lastTime = 0;
+    samples.length = 0;
+    state.found = false;
+    state.status = "replay";
+  }
+
+  return {
+    state,
+    video,
+    start,
+    stop,
+    update,
+    startTake,
+    stopTake,
+    addCue,
+    playTake,
+    resumeTake: () => replay && (replay.paused = false),
+    get replaying() {
+      return !!replay;
+    },
+    get recording() {
+      return !!recording;
+    },
+  };
 }
 
-export { createTracker };
+// A take's look at `start` seconds: the last one set by then (its first look, changes, skull changes), or null.
+function takeLookAt(take, start) {
+  const before = (take.cues ?? []).filter((c) => c.t <= start * 1000 && c.kind !== "gust");
+  return before.length ? Object.assign({}, ...before.map((c) => c.look)) : null;
+}
+
+export { createTracker, takeLookAt };

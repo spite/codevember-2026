@@ -17,5 +17,5 @@ closed.
 
 `suzanne.glb` is Suzanne, the Blender Foundation's monkey, from the Khronos glTF sample
 donated by Norbert Nopper. Changes: rescaled so her eyes sit where the skull's sockets
-are, eyeballs removed, base color brightened and reduced to a JPEG, and the same two-bone
+are, her eyes marked in the vertex colour, base color brightened and reduced to a JPEG, and the same two-bone
 skin added (her jaw bone moves nothing). `suzanne.sdf.bin` is her distance field.

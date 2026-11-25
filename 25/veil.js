@@ -25,8 +25,9 @@ import {
 } from "three";
 import { PipelineMaterial } from "modules/pipeline/PipelineMaterial.js";
 import { fullscreenVertex, copyFragment } from "shaders/pipeline/copy.js";
-import { SURFACE_SIDE, CELLS_SIDE, loadFields, tatteredCells } from "./veil-sim.js";
+import { SURFACE_SIDE, CELLS_SIDE, loadFields, tatteredCells, VeilSim } from "./veil-sim.js";
 import { emberGLSL } from "./skull.js";
+import { nativeRandom } from "modules/random.js";
 
 
 // A veil of thin cloth draped over the skull. The cloth is simulated in a worker, in the
@@ -52,15 +53,44 @@ uniform sampler2D dirtMap;
 uniform float tattered;
 uniform float veilOpacity;
 uniform float veilFade;
+uniform float veilDiffusion;
+// The share of light the cloth stops, from how much it hides (op): never none while it's there.
+float veilBlocked(float op) {
+  return mix(0.15 + 0.3 * veilDiffusion, 1.0, op);
+}
 float veilHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float veilNoise(vec2 p) {
   vec2 i = floor(p), f = fract(p);
   f = f * f * (3.0 - 2.0 * f);
   return mix(mix(veilHash(i), veilHash(i + vec2(1, 0)), f.x), mix(veilHash(i + vec2(0, 1)), veilHash(i + vec2(1, 1)), f.x), f.y);
 }
-// Soft cloth needs no blocker search: a fixed filter, offset toward the light from whichever side faces it.
+// Soft cloth needs no blocker search: a fixed filter, offset toward the light from whichever side faces it. The cloth's
+// own shadow is stochastic (redrawn every frame), so it takes many taps over a wide disc to read as an even shade.
 float veilShadow(vec3 P, vec3 n) {
-  return getShadowFixed(P, dot(n, lightDirection) < 0.0 ? -n : n, 3.0);
+  if (shadowEnabled < 0.5) return 1.0;
+  vec3 N = dot(n, lightDirection) < 0.0 ? -n : n;
+  vec3 row0 = vec3(shadowMatrix[0][0], shadowMatrix[1][0], shadowMatrix[2][0]);
+  vec3 row2 = vec3(shadowMatrix[0][2], shadowMatrix[1][2], shadowMatrix[2][2]);
+  vec3 L = -normalize(row2);
+  float worldPerUV = 2.0 / length(row0);
+  float worldPerDepth = 2.0 / length(row2);
+  float ndl = dot(N, L);
+  if (ndl <= 0.0) return 1.0;
+  float texelWorld = worldPerUV / shadowMapSize.x;
+  vec4 sc = shadowMatrix * vec4(P + N * (shadowNormalBias + texelWorld * (1.5 + 3.0 * (1.0 - ndl))), 1.0);
+  vec3 c = sc.xyz / sc.w * 0.5 + 0.5;
+  vec2 edge = min(c.xy, 1.0 - c.xy);
+  float fade = smoothstep(0.0, 0.02, min(edge.x, edge.y)) * step(0.0, c.z);
+  if (fade <= 0.0) return 1.0;
+  vec2 grad = shadowPlaneGradient(N, ndl, worldPerUV, worldPerDepth);
+  float texel = 1.0 / shadowMapSize.x;
+  float radius = 9.0 * texel;
+  float lit = 0.0;
+  for (int i = 0; i < 32; i++) {
+    vec2 o = shadowVogel(i, 32, 0.0, 0.5) * radius;
+    lit += textureGrad(shadowMapCmp, vec3(c.xy + o, shadowRef(min(c.z, 1.0), grad, o, texel)), vec2(0.0), vec2(0.0));
+  }
+  return mix(1.0, lit / 32.0, fade * smoothstep(0.0, 0.12, ndl));
 }
 // Coverage of the pixel by cloth, with how thin it's worn and its dirt.
 float veilCloth(vec2 uv, out float thin, out vec3 dirt) {
@@ -69,7 +99,9 @@ float veilCloth(vec2 uv, out float thin, out vec3 dirt) {
   dirt = vec3(1.0);
   if (tattered > 0.5) {
     vec4 o = texture(outlineMap, uv);
-    coverage = o.g;
+    // The edge distance (texels) cut over one pixel, so edges stay smooth however close.
+    float d = (o.g - 0.5) * 8.0;
+    coverage = clamp(0.5 + d / max(fwidth(d), 1e-4), 0.0, 1.0);
     thin = o.r;
     dirt = texture(dirtMap, uv).rgb;
   }
@@ -88,13 +120,15 @@ function clothUniforms() {
     tattered: { value: 0 },
     veilOpacity: { value: 0.2 },
     veilFade: { value: 0 },
+    veilDiffusion: { value: 0.2 },
   };
 }
 
-// The near side, drawn by the composite over a blurred picture of what's behind it.
+// The cloth as seen, from either side, drawn by the composite over a blurred picture of what's behind it.
 function createFrontMaterial(cloth, ember, behind) {
   return new PipelineMaterial({
     color: 0xdedede,
+    side: DoubleSide,
     roughness: 0.9,
     sheen: 0.4,
     sheenRoughness: 0.85,
@@ -131,8 +165,8 @@ void surface(inout Surface s) {
   });
 }
 
-// The far side, hanging behind the skull, drawn in the main pass. It also casts the whole veil's shadow, half the
-// light let through as a checkerboard that the shadow filtering evens out.
+// The far side, hanging behind the skull, drawn in the main pass. It also casts the whole veil's shadow: as much of the
+// light as the cloth stops (see PIPELINE_SHADOW).
 function createRearMaterial(cloth, ember) {
   const material = new PipelineMaterial({
     color: 0xdedede,
@@ -142,6 +176,7 @@ function createRearMaterial(cloth, ember) {
     transmission: TRANSLUCENCY,
     side: BackSide,
     transparent: true,
+    stochasticShadows: true,
     uniforms: { ...cloth, ...ember },
     fragmentPars: /* glsl */ `
 ${clothGLSL}
@@ -152,13 +187,15 @@ void surface(inout Surface s) {
   float thin;
   vec3 dirt;
   float coverage = veilCloth(vUv, thin, dirt);
-#ifdef PIPELINE_SHADOW
-  float checker = mod(floor(gl_FragCoord.x) + floor(gl_FragCoord.y), 2.0);
-  s.alpha = coverage > 0.35 && thin < 0.6 ? checker : 0.0;
-#else
-  s.specular = 0.0;
   float dirtiness = 1.0 - dirt.g;
   float op = mix(veilOpacity, 1.0, ${DIRT_OPACITY.toFixed(2)} * dirtiness) * (1.0 - ${THINNESS.toFixed(2)} * thin);
+#ifdef PIPELINE_SHADOW
+  // Any cloth stops some light: its threads cover part of it, and the more it scatters (diffusion) the more of the beam
+  // it turns away; what it hides on top of that (opacity) it stops too. That share is the chance of blocking, redrawn
+  // every frame (stochasticShadows) and averaged by the shadow filter and its denoiser.
+  s.alpha = coverage * veilBlocked(op);
+#else
+  s.specular = 0.0;
   s.albedo *= dirt;
   s.alpha = coverage * op;
   s.shadow = veilShadow(vWorldPosition, normalize(s.normal));
@@ -297,11 +334,67 @@ class VeilComposite {
   }
 }
 
+const LOAD_ID = Date.now().toString(36);
+const CAPTURE = new URLSearchParams(location.search).has("capture");
+
+// The cloth worker's job done on the page, answering at once (for captures): the same messages as veil-worker.js.
+class PageSim {
+  constructor() {
+    this.onmessage = null;
+    this.onerror = null;
+    this.sim = null;
+    this.created = null;
+    this.generation = 0;
+  }
+
+  // After the frame's own update is done, as a worker's answer would be.
+  send(data) {
+    queueMicrotask(() => this.onmessage?.({ data }));
+  }
+
+  surface(positions, normals) {
+    this.sim.writeSurface(positions, normals);
+    this.send({ type: "surface", positions, normals, generation: this.generation });
+  }
+
+  async postMessage(data) {
+    try {
+      if (data.type === "init") {
+        this.created = loadFields(data.fields).then((fields) => {
+          this.sim = new VeilSim(fields, data.offset);
+          this.surface(new Float32Array(SURFACE_SIDE * SURFACE_SIDE * 3), new Float32Array(SURFACE_SIDE * SURFACE_SIDE * 3));
+        });
+        return;
+      }
+      if (!this.sim) await this.created;
+      const sim = this.sim;
+      if (data.type === "update") {
+        sim.draft = data.draft;
+        sim.loose = data.loose;
+        sim.wind = data.wind;
+        sim.update(data.dt, data.gravity, data.jawMatrix, data.jawInverse, data.delta);
+        this.surface(data.positions, data.normals);
+      } else if (data.type === "tatter" || data.type === "reset") {
+        this.generation = data.generation;
+        sim.dropTilt = [(nativeRandom() - 0.5) * 0.3, (nativeRandom() - 0.5) * 0.3];
+        if (data.type === "tatter") sim.setTattered(data.tattered, data.seed, data.live);
+        else sim.reset(data.live);
+      } else if (data.type === "release") {
+        sim.release();
+      }
+    } catch (e) {
+      this.send({ type: "error", message: e.message });
+    }
+  }
+}
+
 class Veil {
   // `fieldsUrl`: the skull's distance fields; `offset`: how far off the surface the cloth rides, in metres.
   constructor(fieldsUrl, { offset, ember, composite, fields }) {
     this.draft = 5;
     this.loose = 0;
+    // A gust, as an acceleration in the skull's space (m/s²).
+    this.wind = [0, 0, 0];
     this.ready = false;
     this.error = "";
     this.tattered = false;
@@ -329,6 +422,7 @@ class Veil {
       (e) => (this.error = e.message),
     );
     this.tatterTextures = null;
+    this.maps = new Map();
 
     const M = SURFACE_SIDE;
     const uvs = new Float32Array(M * M * 2);
@@ -365,7 +459,10 @@ class Veil {
     this.buffers = null;
     this.pendingTime = 0;
     this.pendingMotion = new Matrix4();
-    this.worker = new Worker(new URL("./veil-worker.js", import.meta.url), { type: "module" });
+    // A fresh url each load: a worker's imports can come from the HTTP cache even after a hard reload.
+    // Captures render slower than real time, so there the cloth is simulated on the page, a step with each frame;
+    // otherwise in its worker.
+    this.worker = CAPTURE ? new PageSim() : new Worker(new URL(`./veil-worker.js?v=${LOAD_ID}`, import.meta.url), { type: "module" });
     this.worker.onmessage = ({ data }) => this.receive(data);
     this.worker.onerror = (e) => (this.error = e.message || "The veil's worker failed to load");
     this.worker.postMessage({ type: "init", fields: new URL(fieldsUrl, document.baseURI).href, offset });
@@ -385,9 +482,9 @@ class Veil {
     this.geometry.setIndex(index);
   }
 
-  // Tears the veil to tatters (each seed differently), or makes it whole, and drops it.
-  setTattered(tattered, seed) {
-    if (tattered === this.tattered && (!tattered || seed === this.tatterSeed)) return this.drop();
+  // Tears the veil to tatters (each seed differently), or makes it whole, and drops it (live: from above, as it's seen).
+  setTattered(tattered, seed, live = false) {
+    if (tattered === this.tattered && (!tattered || seed === this.tatterSeed)) return this.drop(live);
     this.tattered = tattered;
     this.tatterSeed = seed;
     const cells = tattered ? tatteredCells(seed) : null;
@@ -396,30 +493,49 @@ class Veil {
       this.tatterTextures.outline.dispose();
       this.tatterTextures.dirt.dispose();
     }
-    // The worker sends the maps of a tattered cut before its first surface.
+    // The maps come from their own worker (made ahead by prepareMaps when possible).
     this.tatterTextures = null;
     this.cloth.outlineMap.value = this.cloth.dirtMap.value = null;
     this.cloth.tattered.value = 0;
-    this.worker.postMessage({ type: "tatter", tattered, seed, generation: ++this.generation });
+    if (tattered) this.prepareMaps(seed).then((maps) => {
+      if (this.tattered && this.tatterSeed === seed) this.setTatterMaps(maps);
+    });
+    this.worker.postMessage({ type: "tatter", tattered, seed, live, generation: ++this.generation });
   }
 
-  // Drops the veil again.
-  drop() {
-    this.worker.postMessage({ type: "reset", generation: ++this.generation });
+  // Drops the veil again (live: from above, as it's seen).
+  drop(live = false) {
+    this.worker.postMessage({ type: "reset", live, generation: ++this.generation });
   }
 
-  // True once the surface of the last drop has come back.
+  // Lets go of the head, for the page to blow the veil away.
+  release() {
+    this.worker.postMessage({ type: "release" });
+  }
+
+  // True once the surface of the last drop has come back (and, tattered, its maps).
   get settled() {
-    return this.shownGeneration === this.generation;
+    return this.shownGeneration === this.generation && (!this.tattered || !!this.tatterTextures);
+  }
+
+  // Starts making the maps of a tattered cut, so they're ready by the time it's dropped. Each seed's are kept.
+  prepareMaps(seed) {
+    if (!this.maps.has(seed)) {
+      this.maps.set(seed, new Promise((resolve) => {
+        const worker = new Worker(new URL(`./tatter-worker.js?v=${LOAD_ID}`, import.meta.url), { type: "module" });
+        worker.onmessage = ({ data }) => {
+          worker.terminate();
+          resolve(data);
+        };
+        worker.postMessage({ seed });
+      }));
+    }
+    return this.maps.get(seed);
   }
 
   receive(data) {
     if (data.type === "error") {
       this.error = data.message;
-      return;
-    }
-    if (data.type === "tatter") {
-      if (data.seed === this.tatterSeed && this.tattered) this.setTatterMaps(data);
       return;
     }
     this.buffers = [data.positions, data.normals];
@@ -461,7 +577,8 @@ class Veil {
     this.cloth.tattered.value = 1;
   }
 
-  setLook({ color, opacity, fade }) {
+  setLook({ color, opacity, diffusion, fade }) {
+    this.cloth.veilDiffusion.value = diffusion;
     this.frontMaterial.color.set(color);
     this.rearMaterial.color.set(color);
     this.cloth.veilOpacity.value = opacity;
@@ -478,7 +595,8 @@ class Veil {
   // The worker's surfaces come a few frames apart; the cloth is drawn between the last two, one surface behind, so it
   // moves every frame.
   present() {
-    const t = Math.min(1, Math.max(0, (performance.now() - this.arrival) / this.interval));
+    // On the page each frame's surface is this frame's: nothing to draw between.
+    const t = CAPTURE ? 1 : Math.min(1, Math.max(0, (performance.now() - this.arrival) / this.interval));
     const { prevSurface, surface, prevNormals, normals, display } = this;
     const normal = this.geometry.getAttribute("normal");
     const n = normal.array;
@@ -558,6 +676,7 @@ class Veil {
         dt: this.pendingTime,
         draft: this.draft,
         loose: this.loose,
+        wind: this.wind,
         gravity: gravity.toArray(),
         jawMatrix: jawMatrix.toArray(),
         jawInverse: jawInverse.toArray(),
