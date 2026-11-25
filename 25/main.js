@@ -110,6 +110,7 @@ const replayStart = Number(new URLSearchParams(location.search).get("replayStart
 const touch = matchMedia("(pointer: coarse)").matches;
 const chooser = createChooser({
   touch,
+  status: () => tracker.state.status,
   async onChoose(mode) {
     params.control.set(mode);
     lastControl = mode;

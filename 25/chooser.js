@@ -23,6 +23,14 @@ const css = `
 .veil-card li { display: flex; gap: 11px; align-items: flex-start; margin: 0 0 9px; }
 .veil-card li .icon { width: 24px; height: 24px; margin-top: -1px; opacity: 0.75; }
 .veil-card .note { font-size: 13px; color: rgb(255, 170, 140); margin: -6px 0 12px; }
+.veil-card .waiting { text-align: center; padding: 6px 0 2px; }
+.veil-card .waiting .icon { width: 40px; height: 40px; color: rgb(230, 120, 110); animation: veil-pulse 1.6s ease-in-out infinite; }
+.veil-card .waiting h2 { justify-content: center; margin-top: 8px; }
+.veil-card .waiting .sub { margin-bottom: 14px; }
+.veil-card button.instead { border: 0; background: none; color: inherit; font: inherit; font-size: 13px; opacity: 0.7;
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 4px 8px; }
+.veil-card button.instead:hover, .veil-card button.instead:focus-visible { opacity: 1; outline: none; }
+@keyframes veil-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
 .veil-card button.go { padding: 9px 22px; border-radius: 999px; border: 0; background: rgb(232, 222, 214); color: rgb(20, 16, 14);
   font: inherit; font-weight: 600; cursor: pointer; }
 `;
@@ -57,7 +65,8 @@ function instructions(mode, touch) {
     : [["mouse", "Move the mouse to turn the head"], ["jaw", "Hold the button to open the jaw; hold on and the eyes light up"], ["orbit", "Scroll to zoom"], veil, change];
 }
 
-export function createChooser({ touch = false, onChoose }) {
+// status() (optional) tells how the camera is getting on: "asking" or "loading".
+export function createChooser({ touch = false, onChoose, status }) {
   const style = document.createElement("style");
   style.textContent = css;
   document.head.append(style);
@@ -92,20 +101,26 @@ export function createChooser({ touch = false, onChoose }) {
   let pending = 0;
   async function choose(mode) {
     const ticket = ++pending;
-    card.innerHTML = `<h2>${mode === "camera" ? "Allow the camera…" : "…"}</h2>`;
-    // The permission prompt can be left unanswered: offer a way out meanwhile.
+    card.innerHTML = `<h2>…</h2>`;
+    // While the camera starts: what it's waiting for, and (the prompt can be left unanswered) a way out meanwhile.
+    let poll = 0;
     if (mode === "camera") {
-      const p = document.createElement("p");
-      p.className = "sub";
-      p.textContent = "Your browser is asking to use it. The video stays on your device.";
-      const alt = document.createElement("button");
-      alt.className = "choice";
-      alt.innerHTML = `${icon(touch ? "tap" : "mouse")}<div><b></b></div>`;
-      alt.querySelector("b").textContent = touch ? "Use touch instead" : "Use the mouse instead";
+      card.innerHTML = `<div class="waiting">${icon("camera")}<h2></h2><p class="sub"></p><button class="instead"></button></div>`;
+      const title = card.querySelector("h2");
+      const sub = card.querySelector(".sub");
+      const show = () => {
+        const loading = status?.() === "loading";
+        title.textContent = loading ? "Loading the face tracker…" : "Waiting for the camera…";
+        sub.textContent = loading ? "Almost there." : "Allow it in your browser's prompt. The video stays on your device.";
+      };
+      show();
+      poll = setInterval(show, 200);
+      const alt = card.querySelector("button.instead");
+      alt.textContent = touch ? "Use touch instead" : "Use the mouse instead";
       alt.addEventListener("click", () => choose("mouse"));
-      card.append(p, alt);
     }
     const { mode: got, note } = await onChoose(mode);
+    clearInterval(poll);
     if (ticket !== pending) return;
     const c = CHOICES.find((x) => x.mode === got);
     card.innerHTML = `<h2>${icon((touch && c.touchIcon) || c.icon)}<span></span></h2><p class="sub">How it works</p>`;
