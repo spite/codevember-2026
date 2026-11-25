@@ -1,0 +1,1633 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Veil Hangs</title>
+<meta name="description" content="How Codevember 2026 day 25, Veil, follows a face through the webcam with MediaPipe in a worker, plays the pose back smoothly by capture time, rigs a skull with a moving jaw and eyes that burn when you frown, and drapes it in position-based cloth that collides with distance fields of the bone, casts a stochastic shadow, tears into tatters and blows away.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Bone, parchment, oxblood and ember. */
+:root {
+  --bg: #ebe6de;
+  --panel: #f5f1ea;
+  --ink: #1c1817;
+  --muted: #6b625b;
+  --line: #d8d0c5;
+  --accent: #9b2b22;
+  --accent2: #3c5d7a;
+  --stage: #e2dcd2;
+  --stage-ink: #776d64;
+  --stage-line: #cfc6ba;
+  --bone: #d6cbb9;
+  --bone2: #a89a84;
+  --ember: #d8341f;
+  --cloth: #7d2a2a;
+  --sick: #5b8a2a;
+  --shade: #2a2220;
+  --display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --text: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e0c0c; --panel: #181514; --ink: #ece4da; --muted: #a2978c; --line: #2c2725;
+    --accent: #e06a52; --accent2: #8fb3cf; --stage: #141110; --stage-ink: #8e8379; --stage-line: #2a2422;
+    --bone: #cfc3b1; --bone2: #8f8370; --ember: #ff5a3a; --cloth: #d4c6b8; --sick: #9fd05a; --shade: #f1e9de;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e0c0c; --panel: #181514; --ink: #ece4da; --muted: #a2978c; --line: #2c2725;
+  --accent: #e06a52; --accent2: #8fb3cf; --stage: #141110; --stage-ink: #8e8379; --stage-line: #2a2422;
+  --bone: #cfc3b1; --bone2: #8f8370; --ember: #ff5a3a; --cloth: #d4c6b8; --sick: #9fd05a; --shade: #f1e9de;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--text); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.03em; }
+h2 { font-weight: 600; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.015em; }
+h3 { font-weight: 600; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 36ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .glow { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .glow { background: linear-gradient(100deg, var(--accent) 10%, var(--ember) 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; background: var(--stage); }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.live { font: 600 14px/1 var(--mono); display: inline-flex; gap: 8px; align-items: center; text-decoration: none; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; border-radius: 3px; background: var(--stage); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+.controls select { font: 400 13px/1 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 5px 6px; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+button { font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px; padding: 9px 14px; cursor: pointer; }
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 600 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: pre; }
+.formula .c { color: var(--muted); }
+.table-wrap { overflow-x: auto; background: var(--panel); border-radius: 4px; }
+table { border-collapse: collapse; width: 100%; font: 400 14px/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+td.num, th.num { text-align: right; }
+td.wrap { white-space: normal; min-width: 260px; }
+tr:last-child td { border-bottom: 0; }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+footer ul { margin: 8px 0 12px; padding-left: 18px; }
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+}
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
+.items { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; margin: 8px 0 0; }
+.items.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.items.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.items.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.item { background: var(--panel); border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.item img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; background: #060607; }
+.item > div { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; }
+.item h3 { font-size: 16px; }
+.item p { font-size: 13.5px; line-height: 1.45; color: var(--muted); margin: 0; }
+@media (max-width: 760px) {
+  .items.four, .items.five { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .items.two { grid-template-columns: minmax(0, 1fr); }
+  .item > div { padding: 10px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 25</b> · Veil</div>
+      <h1>How Veil <span class="glow">hangs</span></h1>
+      <p class="lede">A skull under a thin veil turns as you turn, leans in as you lean in and opens its jaw when you open yours; frown, and its empty sockets fill with light that shines through the cloth. Here is how it is lit and shaded, bone in a dark studio, light inside the sockets, sheer cloth that filters what is behind it, casts a partial shadow and tears; then how it moves, from a face read by a camera at its own pace to 4,096 particles of cloth hanging on the head and blowing away; and what it sounds like.</p>
+      <a class="live" href="./">See it live <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M3 1.8v8.4c0 .5.5.8.9.5l6.6-4.2a.6.6 0 0 0 0-1L3.9 1.3c-.4-.3-.9 0-.9.5z" fill="currentColor"/></svg></a>
+    </div>
+    <figure>
+      <img src="../screenshots/25.jpg" width="1080" height="1080" alt="A skull under a pale, sheer veil, its eyes glowing red through the cloth, on black." fetchpriority="high" decoding="async">
+      <figcaption>A sheer veil, the eyes burning through the cloth.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>A face under a shroud</h2>
+      <p>The prompt was <em>Veil</em>. The piece is a mirror that answers with a skull: the webcam watches your head, and a life-size skull in a dark room copies it, under a square of thin cloth that rests on its crown and hangs over its face. The cloth is simulated, so every turn of the head swings it, every gust lifts it, and it settles back by itself. Without a camera the skull follows the mouse or a finger instead, and when nobody is there it looks about on its own.</p>
+      <p>Everything is in real units. The skulls are modelled in metres, resting on <code>y = 0</code> and facing <code>+z</code>; MediaPipe gives the head's pose in centimetres with the webcam at the origin; the world is in decimetres. The skull is scaled by 100 into centimetres and offset by <code>(0, −8.9, −4.1)</code> cm so that its sockets sit on MediaPipe's canonical eyes, and the head group is then scaled by 0.1 into the world. The cloth is simulated in the skull's own space, in metres. The view's camera sits about a metre away.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>64 × 64 particles</b><span>A 52 cm square of cloth, stepped at 90 Hz with five constraint passes, in its own worker.</span></div>
+      <div class="fact"><b>Detection off the main thread</b><span>MediaPipe's Face Landmarker runs on the CPU in a worker, so tracking never waits on a frame and a frame never waits on tracking.</span></div>
+      <div class="fact"><b>Played back by capture time</b><span>A Catmull-Rom curve through the last eight detections, sampled the detection latency plus 1.3 camera frames behind.</span></div>
+      <div class="fact"><b>A shadow that is a chance</b><span>Every texel of the veil blocks the key with the probability that the cloth stops the light there, redrawn every frame.</span></div>
+    </div>
+  </section>
+  <!-- 9. Skull -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The skull · <b>skull.js, assets/</b></div>
+      <h2>A jaw that reaches every pass</h2>
+      <p>There are three heads, picked in the panel: <em>Evil</em> (the default), <em>Realistic</em> and <em>Suzanne</em>. The realistic one is a scanned human skull with its 1024-pixel colour and normal maps; the evil one is the same scan with a lowered brow, wider cheekbones, hollow temples, a longer chin and pointed canines; Suzanne is Blender's monkey, scaled so her eyes sit where the sockets are. Each glTF carries a two-bone skin: <code>CraniumBone</code>, and <code>JawBone</code> on the jaw joint, carrying the mandible and lower teeth (Suzanne's moves nothing). The first one loads behind the loading pill, the others in the background once the first frame is up.</p>
+      <p>The skin is not used as a skin. On load, each vertex's weight for joint 1 is summed into a <code>jawWeight</code> attribute, the skin attributes are deleted, and the mesh is drawn with one <code>PipelineMaterial</code> whose <code>displace()</code> moves the vertex by the jaw's matrix in proportion to that weight, normal included. Because <code>displace()</code> runs in every variant of the pipeline's shaders, the jaw moves in the shadow map, the prepass (so ambient occlusion, GI and velocity see it) and the main pass alike. The jaw's matrix turns about the joint's rest position, <code>rotateY(0.2·side) · rotateX(open)</code>, after a slide of <code>(8 mm·side, 0, 6 mm·forward)</code>; the cloth's simulation is handed the same matrix for its jaw field.</p>
+      <p>In <code>surface()</code> the bone's colour map multiplies the albedo, and its normal map perturbs the normal through a tangent frame built from screen-space derivatives of the position and the uv (the meshes carry no tangents; glTF's green channel is flipped to match the frame). Roughness is 0.62 for the evil skull, 0.6 for the realistic one and 0.7 for Suzanne, metalness 0.</p>
+    </div>
+      <div class="items four">
+      <article class="item"><img src="explainer/close-bare.jpg" alt="A close-up of a pale, pitted skull with deep dark eye sockets, lit from the upper right." loading="lazy" width="720" height="720"><div><h3>Evil</h3><p>The default head: the scan with a lowered brow, hollow temples and long canines.</p></div></article>
+      <article class="item"><img src="explainer/close-bare-jaw.jpg" alt="The same skull with its jaw dropped open and the eyes glowing red." loading="lazy" width="720" height="720"><div><h3>The jaw, open</h3><p>displace() swings the mandible and lower teeth on their skin weight; shadows and AO follow.</p></div></article>
+      <article class="item"><img src="explainer/realistic.jpg" alt="A veiled skull with a rounder, plainer cranium showing through the cloth." loading="lazy" width="540" height="540"><div><h3>Realistic</h3><p>The plain scan under a bone-white veil.</p></div></article>
+      <article class="item"><img src="explainer/suzanne.jpg" alt="A veil draped over a monkey head with large ears and a broad muzzle." loading="lazy" width="540" height="540"><div><h3>Suzanne</h3><p>Blender's monkey, with her eyes; the veil sits closer, 8 mm off.</p></div></article>
+    </div>
+  </section>
+  <!-- Studio and bone -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Studio and bone · <b>main.js, skull.js, modules/pipeline</b></div>
+      <h2>One light in a dark room</h2>
+      <p>The light is a photographer's studio, built procedurally and baked once at load: a seamless cyc (floor sweeping up into a back wall) with a floor albedo of 0.08 and walls of 0.06, so the room barely shows; a softbox key 20° across (<code>keySize = 0.35</code> rad, aspect 0.8) from <code>(0.5, 1, 1)</code>, which puts it 42° above the head and 27° to the right of the view, at intensity 7; and a fill panel on the other side, 8° up and 17° to the left, 1.6 times as wide and only 0.12 bright. The room is rendered into a cube map and prefiltered (PMREM) for reflections, and rendered again without the key into nine spherical-harmonic coefficients for diffuse light. The key's diffuse share comes instead from a directional light along its axis, so it can be shadowed: its colour is the panel's power over the square of its distance. The background is a flat <code>#060607</code>.</p>
+      <p>The shadow pretends the key is smaller than the panel: 7° across (<code>shadowLightSize = tan 3.5°</code>) rather than the 32° the softbox would give. The reflections keep the big soft panel; the shadows are tighter, so the shadow of cloth a few centimetres off the bone survives (see the veil's shadow, below). Shadows are PCSS soft shadows, filtered over at least 3.5 texels and denoised in screen space.</p>
+      <p>The bone is a plain dielectric: albedo from its colour map, no metal, specular F0 of 0.04, roughness 0.62 (evil), 0.6 (realistic) or 0.7 (Suzanne), and the normal map bent onto the surface through the derivative tangent frame. Each pixel adds up:</p>
+    </div>
+    <div class="formula"><span class="c">// per pixel, in the main pass</span>
+E         = lightColor · max(N·L, 0) · shadow                 <span class="c">// the key, PCSS-shadowed, denoised</span>
+direct    = E · albedo/π  +  E · D<sub>GGX</sub> · V<sub>Smith</sub> · F<sub>Schlick</sub>(0.04)
+ao        = GTAO (half res, multi-bounce by albedo) · occlusion   <span class="c">// occlusion carries the veil's cut</span>
+indirect  = kD · (SH(N) · ao + SSIL)  +  prefiltered env(R) · split-sum · specular occlusion
+emissive  = albedo · (ember irradiance / π + through-bone glow)
+colour    = (direct + indirect) · lit + emissive                <span class="c">// lit = smoothstep(0, 0.5, presence)</span></div>
+    <div class="col prose">
+      <p>The ambient light is the studio's spherical harmonics in the normal's direction, darkened by ground-truth ambient occlusion (traced at half resolution, accumulated over frames and blurred) and lifted by one bounce of screen-space indirect light, so the sockets, the gap under the cheekbones and the inside of the jaw go dark while the cheek facing the lit brow picks up a little of its colour. The specular half reads the prefiltered environment at the roughness's mip, with a multiple-scattering term so rough bone doesn't lose energy, and is dimmed where AO says the surface can't see out. Under the veil, two more factors come from the cloth (see the veil's shadow): the soft light is cut through <code>occlusion</code>, and the albedo is tinted by the cloth's hue.</p>
+      <p>When the face is lost and the head drifts off, the key's colour and the environment's intensity are both scaled by <code>smoothstep(0, 0.5, presence)</code>, so by the time it has gone halfway it has gone dark; the embers fade with it. The frame then goes through bloom (0.06, radius 0.7), exposure 1.1 and AgX, a vignette of 0.32 and grain of 0.03: the glow of the sockets is the only thing hot enough to bloom.</p>
+    </div>
+      <div class="items five">
+      <article class="item"><img src="explainer/pass-albedo.jpg" alt="The skull's colour map, a flat brownish bone colour with no lighting." loading="lazy" width="540" height="540"><div><h3>Albedo</h3><p>The colour map alone.</p></div></article>
+      <article class="item"><img src="explainer/pass-normals.jpg" alt="The skull in rainbow normal colours." loading="lazy" width="540" height="540"><div><h3>Normals</h3><p>With the normal map, in world space.</p></div></article>
+      <article class="item"><img src="explainer/pass-ao.jpg" alt="The skull in white with dark sockets, nasal cavity and gaps between the teeth." loading="lazy" width="540" height="540"><div><h3>Ambient occlusion</h3><p>Half-res GTAO: sockets, nose and teeth go dark.</p></div></article>
+      <article class="item"><img src="explainer/pass-shadow.jpg" alt="The skull in white, with the shadow of the brow over the sockets in black." loading="lazy" width="540" height="540"><div><h3>Key shadow</h3><p>The denoised shadow mask, no veil.</p></div></article>
+      <article class="item"><img src="explainer/bare.jpg" alt="The lit skull, small in a dark frame." loading="lazy" width="540" height="540"><div><h3>Lit</h3><p>Everything together, then AgX.</p></div></article>
+    </div>
+  </section>
+  <!-- 10. Embers -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The eyes · <b>skull.js</b></div>
+      <h2>Light deep in the sockets</h2>
+      <p>The glow has no visible source. Four point lights sit inside the head: one deep in each socket, at <code>(±32, 115, 54)</code> mm in the skull's space, and a weaker pair (weight 0.3) in either half of the nasal cavity, behind its opening at <code>(±6, 85, 76)</code> mm. They are evaluated in the bone's own shader rather than as scene lights, because they must behave like light trapped in a cavity: inside a socket (within about one socket radius, 20 mm, of the light, faded between 0.7 and 1.3 radii) a surface is lit directly from the light; outside it, the light only leaves through the cavity's <em>mouth</em>, a forward-facing disc 16 mm in front of the light along the socket's axis <code>(±0.25, −0.12, 1)</code> (10 mm along <code>(0, −0.3, 1)</code> for the nose), so only what is in front of the opening is lit, and the brow and cheekbones catch it.</p>
+    </div>
+    <div class="formula"><span class="c">// per light i, R = socket radius; inside = 1 − smoothstep(0.7R, 1.3R, |L|)</span>
+E += wᵢ · ( inside · max(n·l, 0) / (|L|² + 0.25R²)
+         + (1 − inside) · max(axisᵢ·(−m), 0) · max(n·m, 0) / (|M|² + 0.5R²) · 0.5 )
+<span class="c">// bone is a little translucent: a glow through it, whichever way it faces</span>
+G  = throughBone · Σ wᵢ · e^(−|Pᵢ − P| / 0.55R) / R²
+emissive += albedo · (E / π + G) · radiance
+radiance  = colour · strength · glow · flicker · area · 0.0085      area = (eyeScale · scale)²
+flicker   = 0.9 + 0.07·sin(9t) + 0.03·sin(23t + 1)</div>
+    <div class="col prose">
+      <p>The through-bone term (0.25 for the skulls) adds a glow that falls off over about a centimetre around each light, so the thin bone of the socket floors and the nasal septum seem to glow from inside. The light's radiance scales with the ember's area in world units, so its irradiance is right whatever the scale. The same irradiance, two-sided, is added to the veil's shader, scaled by the cloth's translucency (0.6) and opacity, so the light inside the head shows on the cloth over the sockets.</p>
+      <p>The <em>Eyes</em> select picks the colour: <em>Hellfire</em> <code>(1, 0.03, 0.008)</code> at strength 1, <em>Pale</em> <code>(0.86, 0.93, 1)</code> at 1.1 and <em>Sick</em> <code>(0.4, 1, 0.1)</code> at 0.9, balanced to read about as strongly through the veil. <em>Glow</em> (0 to 3) scales it, and the presence's light factor dims it with the head. Suzanne has eyes, so her sockets are not empty: her eyeball vertices are marked in the vertex colour, which becomes an <code>eyeball</code> attribute, and they glow themselves at 1.5 × the radiance, while her socket lights drop to weight 0.12 (a little light spilling round the eyes), her sockets are 1.8 times bigger, her through-bone glow is 0.04, and she has no nose lights at all.</p>
+    </div>
+      <div class="items two">
+      <article class="item"><img src="explainer/close-bare-glow.jpg" alt="A close-up skull with glowing red light filling its eye sockets and nasal cavity." loading="lazy" width="720" height="720"><div><h3>Hellfire, bare</h3><p>No source shows: the socket walls, the brow's underside and the nasal cavity are lit from inside, and the thin socket floors glow through.</p></div></article>
+      <article class="item"><img src="explainer/close-veil-glow.jpg" alt="A skull under a pale sheer veil, the eye sockets two blurred red glows through the cloth." loading="lazy" width="720" height="720"><div><h3>Under the veil</h3><p>The same light reaches the inside of the cloth and blooms through it.</p></div></article>
+    </div>
+    <div class="items four">
+      <article class="item"><img src="explainer/eyes-hellfire.jpg" alt="A veiled skull with red light in its eyes." loading="lazy" width="540" height="540"><div><h3>Hellfire</h3><p>(1, 0.03, 0.008) at strength 1.</p></div></article>
+      <article class="item"><img src="explainer/eyes-pale.jpg" alt="A veiled skull with cold white light in its eyes." loading="lazy" width="540" height="540"><div><h3>Pale</h3><p>(0.86, 0.93, 1) at 1.1.</p></div></article>
+      <article class="item"><img src="explainer/eyes-sick.jpg" alt="A veiled skull with green light in its eyes." loading="lazy" width="540" height="540"><div><h3>Sick</h3><p>(0.4, 1, 0.1) at 0.9.</p></div></article>
+      <article class="item"><img src="explainer/suzanne-glow.jpg" alt="A veiled monkey head with two round red glowing eyes." loading="lazy" width="540" height="540"><div><h3>Suzanne's eyes</h3><p>Her eyeballs glow themselves, 1.5 times the radiance.</p></div></article>
+    </div>
+  </section>
+  <!-- 16. Rendering -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Drawing the veil · <b>veil.js, modules/pipeline</b></div>
+      <h2>Thin cloth over a blurred room</h2>
+      <p>The scene goes through the shared photographic pipeline: soft shadows, half-resolution ambient occlusion and one bounce of GI, a multisampled main pass, bloom (0.06, radius 0.7), AgX at an exposure of 1.1, a 0.32 vignette and 0.03 grain, on a near-black <code>#060607</code>. The studio is the dark room with one light described above.</p>
+      <p>The veil is one surface drawn twice. The <em>far side</em>, the cloth hanging behind the skull, is a back-faced mesh in the skull's group, drawn in the main pass with depth writes off; it is also the mesh that casts the veil's shadow. The <em>near side</em>, the cloth between you and the bone, needs what is behind it, diffused, which a forward pass cannot give it, so it is drawn in the pipeline's <code>composite</code> hook, after the lit image exists:</p>
+    </div>
+    <div class="formula"><span class="c">// VeilComposite.render(hdr, { depthTexture, camera })  — skipped when no veil is shown</span>
+half   = copy(hdr)                            <span class="c">// half resolution</span>
+blurB  = blur(blur(half,  ±step·x), ±step·y)  <span class="c">// quarter resolution, 9 taps, w = e^(−i²/8)</span>
+blurB  = blur(blur(blurB, ±2step·x), ±2step·y)   step = 0.2 + 1.3·diffusion texels
+layer  = clear(0) · fill depth from the prepass (gl_FragDepth, no colour) <span class="c">// multisampled like the main pass</span>
+layer += veil, both sides, depth-tested       <span class="c">// premultiplied</span>
+out    = hdr · (1 − layer.a) + layer.rgb</div>
+    <div class="col prose">
+      <p>Because the layer is filled with the scene's depth first, the bone hides the cloth wherever it is in front of it, and because the layer is multisampled like the main pass, that edge is antialiased the same way. Only depth is written into it, not colour. The blur is two rounds, the second twice as wide, since a single wide round would show its taps; with the default diffusion of 0.2 a tap is 0.46 quarter-resolution texels apart in the first round. What the near side's material does with that copy is below.</p>
+      <p>The opacity <code>op</code> at each point is the <em>Veil opacity</em> slider (0.05 to 0.5) raised toward 1 by half the dirt and cut by up to 85% where the cloth is worn thin; <em>Veil diffusion</em> (0 to 0.5) sets the blur. The cloth's colour, opacity and diffusion follow the panel live. The near side's program is compiled with the others before the first frame, in its own throwaway scene.</p>
+    </div>
+  </section>
+  <!-- Cloth shading -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Shading the cloth · <b>veil.js, modules/pipeline</b></div>
+      <h2>What a pixel of veil is made of</h2>
+      <p>Sheer cloth is two things at once: a surface that catches light, and a filter for what is behind it. The opacity <code>op</code> splits each pixel between them. The cloth part is a rough, matte fabric: albedo the veil's colour times the dirt map, roughness 0.9, no specular reflection at all (woven fibres scatter it into the diffuse), and a sheen of 0.4 at roughness 0.85, the soft velvet-like rim that fabric gets at grazing angles (Charlie distribution, Neubelt visibility). The albedo, the sheen and the transmission are all scaled by <code>op</code>, so a sheer veil catches little light of its own. The other part, <code>1 − op</code>, is the blurred room behind, tinted by the cloth's colour, and added as emission so the lighting doesn't touch it again:</p>
+    </div>
+    <div class="formula"><span class="c">// near side, in the composite; the far side does the same in the main pass</span>
+cloth     = veilColor · dirt                                  <span class="c">// the dirt map multiplies</span>
+op        = mix(veilOpacity, 1, 0.5·dirtiness) · (1 − 0.85·thin)
+behind    = blurred(gl_FragCoord) · mix(1, cloth, mix(0.6, 1, dirtiness))
+albedo    = cloth · op        sheen = 0.4 · op        transmission = 0.6 · op
+shadow    = veilShadow(P, N)                                   <span class="c">// the cloth's own, 32 taps</span>
+emissive  = behind · (1 − op)  +  cloth · op · 0.6/π · ember irradiance
+alpha     = coverage                                           <span class="c">// the tatter cut, antialiased</span></div>
+    <div class="col prose">
+      <p>Seen through, the room is tinted 60% of the way to the cloth's colour, all the way where the cloth is dirty: a crimson veil turns the bone behind it crimson, while its own lit surface stays dark if the cloth is dark. Light passing the other way does the same, which is why the bone's albedo is tinted by the cloth's hue in its own shader.</p>
+      <p>Transmission is the pipeline's <em>thin sheet</em>: a sheet lets light through from its back side. The key lights it from behind only where it is geometrically behind the sheet, shadowed from that side; the environment comes through from the far side, scaled by how open that side is, here 0.25, since most of what the cloth sees behind it is skull. So the hanging edges glow faintly when the light is behind them, and the cloth over the face stays dark where the head hides the room. The embers light the cloth from inside: their irradiance at each point, through a translucency of 0.6, lights the cloth in their own colour, so the red of the sockets blooms on the inside of the veil before it shows through.</p>
+      <p>The far side, behind the skull, is the same surface drawn as back faces in the main pass, with the same dirt, opacity, shadow and ember terms; it doesn't need the blurred copy, since what is behind it is only the dark room, so its <code>1 − op</code> is plain alpha blending. Its alpha is <code>coverage · op</code> in colour, and the chance of blocking in the shadow pass.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>One pixel of veil</h3>
+        <div class="controls">
+          <label>colour <select id="pxC"><option value="#b9b2a8">bone white</option><option value="#6e1c1c">red</option><option value="#4a1414">oxblood</option><option value="#2b292d">charcoal</option><option value="#53284f">plum</option></select></label>
+          <label>opacity <input id="pxO" type="range" min="0.05" max="0.5" step="0.01" value="0.2"><output id="pxOo"></output></label>
+          <label>dirt <input id="pxD" type="range" min="0" max="1" step="0.05" value="0"><output id="pxDo"></output></label>
+          <label>worn <input id="pxT" type="range" min="0" max="1" step="0.05" value="0"><output id="pxTo"></output></label>
+          <label>eyes <input id="pxG" type="range" min="0" max="1" step="0.05" value="0"><output id="pxGo"></output></label>
+        </div>
+      </div>
+      <canvas id="pixelFig" aria-label="Two swatches of the veil, over lit bone and over the dark room, and stacked bars of what makes up each: the room seen through, the cloth lit by the key and the room, its sheen, light through it, and the embers' light."></canvas>
+      <div class="readout" id="pxR"></div>
+      <p class="fig-cap">The formula above, per channel, with stand-in light: a key irradiance of 2 on the cloth, the room's 0.15 from behind, bone behind lit to about 0.5, the dark room behind at 0.003, and the eyes' light at full strength 6. Swatches go through exposure 1.1 and a simple filmic curve; bars are in linear light. Dirt here is a uniform brown.</p>
+    </div>
+      <div class="items two">
+      <article class="item"><img src="explainer/diff-0.jpg" alt="A pale veil with the skull's features fairly crisp beneath it." loading="lazy" width="540" height="540"><div><h3>Diffusion 0</h3><p>The blur at its narrowest: the skull reads sharply through the cloth.</p></div></article>
+      <article class="item"><img src="explainer/diff-5.jpg" alt="The same veil with the skull beneath blurred into soft shapes." loading="lazy" width="540" height="540"><div><h3>Diffusion 0.5</h3><p>The widest: features melt into light and dark.</p></div></article>
+    </div>
+    <div class="items four">
+      <article class="item"><img src="explainer/look-crimson.jpg" alt="A crimson veil, almost opaque, over a skull." loading="lazy" width="540" height="540"><div><h3>Crimson, 0.45</h3><p>Dense: the cloth's own lit surface dominates, and the bone shows only as shape.</p></div></article>
+      <article class="item"><img src="explainer/look-charcoal.jpg" alt="A sheer charcoal veil with the skull clearly visible through it." loading="lazy" width="540" height="540"><div><h3>Charcoal, 0.14</h3><p>Sheer and dark: the skull comes through tinted, the cloth barely lit.</p></div></article>
+      <article class="item"><img src="explainer/look-plum.jpg" alt="A plum-coloured veil over a skull, the face a soft blur." loading="lazy" width="540" height="540"><div><h3>Plum, 0.35</h3><p>Mid opacity, high diffusion: the face is a soft shape.</p></div></article>
+      <article class="item"><img src="explainer/look-ash.jpg" alt="A pale grey veil over a skull." loading="lazy" width="540" height="540"><div><h3>Ash, 0.3</h3><p>A pale grey, in between.</p></div></article>
+    </div>
+  </section>
+  <!-- 17. Shadow -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The veil's shadow · <b>veil.js, modules/pipeline</b></div>
+      <h2>A shadow made of chances</h2>
+      <p>A shadow map stores one depth per texel: something blocks the light, or it does not. Sheer cloth blocks some of it. The far side's material uses the pipeline's <em>stochastic shadows</em>: in the shadow pass its alpha is the chance that a texel blocks the key, and each texel compares it with a fresh interleaved-gradient noise value every frame (cycling over 64 frames) and is drawn or discarded. One frame's shadow is a speckle; the pipeline's shadow filter averages it over its disc and the shadow denoiser over time, and the result converges to a partial shadow of exactly that strength, which multiplies through where the cloth is folded over itself.</p>
+      <p>The chance is the share of the light the cloth stops, <code>veilBlocked(op) = mix(0.15 + 0.3·diffusion, 1, op)</code>, times its coverage. Any cloth stops some light: its threads cover part of the beam, at least 15%, and the more it scatters, the more of the beam it turns away; what it hides on top of that, its opacity, it stops too. Dirt and wear reach it through <code>op</code>. So there is never no shadow while there is cloth, and a dirty, diffusing veil throws a deep one.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Blocking by chance</h3>
+        <div class="controls">
+          <label>opacity <input id="shO" type="range" min="0.05" max="0.5" step="0.01" value="0.2"><output id="shOo"></output></label>
+          <label>diffusion <input id="shD" type="range" min="0" max="0.5" step="0.01" value="0.2"><output id="shDo"></output></label>
+          <label>dirt <input id="shG" type="range" min="0" max="1" step="0.05" value="0"><output id="shGo"></output></label>
+          <label>worn <input id="shW" type="range" min="0" max="1" step="0.05" value="0"><output id="shWo"></output></label>
+        </div>
+      </div>
+      <canvas id="shadowFig" aria-label="Left: the chance of blocking against the cloth's opacity for three diffusions and the current one, with the current cloth marked. Right: one frame of stochastic shadow texels, the same filtered over a disc, and averaged over sixteen frames."></canvas>
+      <div class="readout" id="shR"></div>
+      <p class="fig-cap">Left, <code>veilBlocked</code> against the cloth's effective opacity; the dot is the cloth the sliders make. Right, a patch of shadow-map texels: this frame's draw from the same interleaved-gradient noise, the same averaged over a 3.5-texel disc (the pipeline's smallest filter for this day), and that averaged over the last 16 frames, standing in for the denoiser.</p>
+    </div>
+    <div class="col prose">
+      <p>A noisy blocker needs a wide filter, so the day sets the pipeline's <code>shadowMinTexels</code> to 3.5: no shadow lookup averages over a smaller disc. And a filter that is too wide loses the veil altogether, because the cloth rides only a few centimetres off the bone: a penumbra much wider than that gap smears its shadow into nothing on surfaces tilted toward the light. So the key is made small, about 7° across (<code>shadowLightSize = tan 3.5°</code>), instead of the studio's wide softbox; its shadow of cloth a few centimetres off the bone survives on the cheekbones and the brow.</p>
+      <p>The cloth's own shadow needs no blocker search: it is soft and thin, so both of its sides use a fixed 32-tap Vogel disc of 9 texels, offset toward the light from whichever side faces it, by the normal bias plus 1.5 to 4.5 texels depending on the angle, faded out near the edges of the map and at grazing light. It takes many taps because the shadow it reads is the stochastic one.</p>
+      <p>The cloth also takes light away from the bone that a shadow map cannot: the soft studio light around it. The bone's material multiplies its occlusion by <code>1 − veilBlock·(1 − 0.35·down)</code>, where <code>veilBlock</code> is the same share as above for the panel's opacity and diffusion, times the veil's fade and 0.8 for a tattered veil (its holes let some through), and <code>down</code> is how much the surface faces downward, since the hem is open underneath. And light that came through the cloth took its colour: the bone's albedo is multiplied by a filter lerped from white toward the cloth's hue (normalised to a maximum channel of 1, since brightness is the shadow's job) by <code>min(1, 0.9·veilBlock)</code>. The embers' light is inside the cloth, so it is added after the filter and keeps its colour.</p>
+    </div>
+      <div class="items two">
+      <article class="item"><img src="explainer/pass-shadow.jpg" alt="A white skull with the brow's shadow over the sockets." loading="lazy" width="540" height="540"><div><h3>No veil</h3><p>The key's shadow on bare bone.</p></div></article>
+      <article class="item"><img src="explainer/pass-shadow-veil.jpg" alt="A white skull with a grey partial shadow over it and the veil's outline around it." loading="lazy" width="540" height="540"><div><h3>Veiled, opacity 0.2</h3><p>The cloth's partial shadow over the whole head, deeper where it folds.</p></div></article>
+    </div>
+  </section>
+  <!-- 18. Tatters -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Tatters · <b>veil-sim.js, tatter.js, tatter-worker.js</b></div>
+      <h2>Holes, rips and loose threads</h2>
+      <p>A tattered veil (<em>Tattered</em>, and <em>Tatters</em> 0–15 for which set) is cut at two scales. The simulation cuts its grid: each of the four edges gets a run of triangular notches, 3 to 6.5 cells wide and up to 5 cells deep, laid end to end; along the front they reach 6 cells, and toward its middle, over the mouth, up to 11 cells and half as wide, so the cloth there hangs in narrow shreds rather than leaving a window. A cell of the 63 × 63 is kept if any of nine points in it is inside the outline, and only cells joined to the centre through their sides are kept, so no scrap floats loose. The links and the drawn triangles follow the cells.</p>
+      <p>The look is cut much finer, by two maps made in a worker of their own, 16 texels a cell (1008 × 1008), so they can be made while the old veil is still blowing away. Each seed's maps are kept once made. The <em>outline</em> map holds, in green, the signed distance to the edge of the cloth in texels, and in red how worn thin it is; the <em>dirt</em> map holds what the cloth's colour is multiplied by.</p>
+    </div>
+    <div class="formula"><span class="c">// per texel, in cells; down = away from the crown at (31.5, 25.5)</span>
+inside = notched outline − 0.25·n(1.3x) − 0.12·n(4.1x)          <span class="c">// the hem wanders</span>
+hem    = smoothstep(13, 0, inside)                              <span class="c">// near the hem</span>
+eaten  = 0.55·hang(64, 9) + 0.28·hang(131, 3.5) + 0.17·hang(211, 1.1)
+rip    = hang(23, 12)                                           <span class="c">// hang(bumps round the crown, period down it)</span>
+level  = max(eaten − (0.9 − 0.72·hem), rip − (1.05 − 0.45·hem))
+edge   = min(inside, −7·level)                                  <span class="c">// &gt; 0 where there is cloth</span></div>
+    <div class="col prose">
+      <p>The noise that eats the holes <em>hangs</em>: it is value noise of the angle round the crown (wrapping, so the bumps meet at the back) and the distance down from it, longer than wide, so holes and rips run down the cloth the way a hanging fabric tears. Holes are more likely toward the hem, and a few big rips start further in. Then everything not joined to the crown through the cloth (a flood fill) is removed, and a two-pass chamfer distance measures how far outside the joined cloth every texel is, which gives the removed islands a proper outside distance.</p>
+      <p>Loose threads hang from edges that face <em>down</em>, away from the crown, up to 3.2 cells below them. Strands are spaced by angle round the crown, 520 of them, so each runs straight down; about half of them exist, with a hashed length that favours a few long strands over a row of stubs (a row of short ones reads as a jagged edge), a width of 0.35 to 0.6 of their spacing and never under about two texels. They are written into the distance field as thin strips, so the shader cuts them like any other edge, and a last 8-connected flood fill from the crown drops any thread that does not reach the cloth.</p>
+      <p>Wear: the cloth goes sheer, up to 45%, within 0.9 cells of every edge, and in fractal patches toward the hem, up to 80%; loose threads are whole thread, only 15%. Dirt starts from an aged off-white with blotches; water stains are dried pools (a smoothstep of low-frequency noise) with a darker tide line round each, a Gaussian 0.025 wide at the pool's edge; grime, a grey-brown, gathers toward the hem (within 16 cells), round the edges, in blotches and in streaks down the folds; and mildew is sparse dark specks where it is grimy. The dirt also raises the opacity (by half its amount) and takes the cloth's tint over what is behind.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The tatter maps</h3>
+        <div class="controls">
+          <label>seed <input id="ttS" type="range" min="0" max="15" step="1" value="3"><output id="ttSo"></output></label>
+          <label>show <select id="ttV"><option value="look">cloth</option><option value="cut">coverage</option><option value="edge">edge field</option><option value="wear">wear</option><option value="dirt">dirt</option></select></label>
+          <label>zoom <input id="ttZ" type="range" min="2" max="40" step="1" value="10"><output id="ttZo"></output></label>
+          <label><input id="ttA" type="checkbox" checked> antialiased cut</label>
+        </div>
+      </div>
+      <canvas id="tatterFig" aria-label="Left: a tattered veil's maps for the chosen seed, laid out with the crown at the top and the front hem at the bottom. Right: a magnified view of the cut at the marked spot, antialiased from the stored edge distance or cut hard."></canvas>
+      <div class="readout" id="ttR"></div>
+      <p class="fig-cap">The same functions as <code>tatter.js</code> at 12 texels a cell instead of 16. Left, the whole cloth, crown at the top, the front hem (over the face) at the bottom; click it to move the magnifier. Right, the cut at that spot, from the 8-bit distance as the shader decodes it, one pixel wide at any zoom; untick the cut to see a plain <code>d &gt; 0</code> test. The <em>cloth</em> view shows bone-white cloth at an opacity of 0.45 over black.</p>
+    </div>
+    <div class="col prose">
+      <p>The distance is stored over ±4 texels around the edge in 8 bits, and the shader cuts it over exactly one pixel: <code>coverage = clamp(0.5 + d / fwidth(d), 0, 1)</code>, with <code>d = (g − 0.5)·8</code>. Up close, the edge is a smooth line, not a staircase of texels. Far away, threads are finer than a pixel, so the outline map is mipmapped (trilinear, 8× anisotropic) and its averaged distance gives coverage per pixel, and a fringe of threads thins into a soft fuzz. The coverage is the alpha on both sides, and in the shadow pass it multiplies the chance of blocking, so a hole lets light through onto the bone.</p>
+    </div>
+      <div class="items two">
+      <article class="item"><img src="explainer/tattered.jpg" alt="A dark red tattered veil over a skull, shredded into strips at the hem, teeth showing through a rip." loading="lazy" width="540" height="540"><div><h3>Tattered, oxblood</h3><p>Rips run down from the hem; one opens over the teeth.</p></div></article>
+      <article class="item"><img src="explainer/tatter-close.jpg" alt="A close-up of the ragged hem of a dark red veil, with threads hanging from its torn edges." loading="lazy" width="720" height="720"><div><h3>At the hem</h3><p>Strips, notches and the loose threads hanging from edges that face down.</p></div></article>
+    </div>
+  </section>
+  <!-- 2. Start -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Choosing · <b>chooser.js, main.js</b></div>
+      <h2>Camera or mouse</h2>
+      <p>When the first frame is up, a card asks how to play: <em>Use my camera</em> (the skull follows your face; the card says the video never leaves the device) or <em>Use the mouse</em> (<em>Use touch</em> on a coarse pointer). It does not appear under <code>?capture</code> or when a take is being replayed. Behind it the skull already moves by itself, and clicks, wheel and pointer events on the card are stopped so they never reach the scene.</p>
+      <p>Choosing the camera starts it at once and the card turns into a waiting screen, refreshed every 200 ms from the tracker's status: <em>Waiting for the camera…</em> with a pointer to the browser's prompt, or <em>Starting the camera…</em> when the Permissions API says the camera is already granted, then <em>Loading the face tracker…</em> while the model downloads. A <em>Use the mouse instead</em> link is there all along, since a permission prompt can be left unanswered. If the camera ends up denied or unsupported, the mode falls back to the mouse and the card says why. Either way it ends on a short list of that mode's instructions and a <em>Start</em> button, and hides by itself after 15 s.</p>
+      <p><code>C</code>, or the camera button next to randomize, brings the card back. The button's icon shows whether the camera is on. In mouse mode the mouse turns the head, so the orbit controls lose their rotation (zoom stays); with the camera, dragging orbits the view. The view is a 30° camera framed so that 2.7 dm above and below the target and 2.1 dm either side always fit, which puts it about 1 m away on a landscape screen (further on a portrait one); zoom goes from 3 to 16 dm, with no panning.</p>
+    </div>
+  </section>
+  <!-- 3. Tracking -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Tracking · <b>tracker.js, tracker-worker.js</b></div>
+      <h2>A face, in a worker</h2>
+      <p>The camera is opened with <code>getUserMedia</code>, facing the user, asking for 640 × 480, and then for the highest frame rate its track reports in its capabilities if that is more than it picked. The video is muted and inline and is never shown. Each new frame is noticed with <code>requestVideoFrameCallback</code>, which also gives the moment it was captured (<code>captureTime</code>, else its expected display time); without that callback the tracker watches <code>video.currentTime</code> once per rendered frame instead.</p>
+      <p>Detection is MediaPipe Tasks Vision 1.1.0 and its float16 Face Landmarker model, both from their CDNs, in VIDEO mode, one face, with the facial transformation matrix and the 52 blendshapes. It runs in a classic worker (MediaPipe loads its wasm with <code>importScripts</code>), which downloads the model itself and creates the landmarker on the CPU delegate. Once a frame, if a new camera frame exists and the worker is idle, the page grabs the video as an <code>ImageBitmap</code> and transfers it along with its capture time; the worker detects, closes the bitmap and sends back the matrix and the blendshape scores with that same time. Only one frame is ever in flight, so a slow detection drops frames instead of queuing them. If the worker cannot start, the landmarker is created on the main thread instead, on the GPU delegate, falling back to the CPU (<code>?tracker=main</code> asks for this).</p>
+      <p>The panel's <em>Tracking</em> line counts over each second: camera frames against the camera's maximum, the mean detection time, where it ran, and the page's frame rate, e.g. <code>cam 30/30 · 14 ms worker · 120 fps</code>. <em>Camera</em> reads <em>asking for the camera…</em>, <em>loading the face tracker…</em>, <em>following your face</em>, <em>looking for a face…</em>, <em>no permission</em>, <em>unavailable</em>, <em>off (mouse)</em> or <em>off (capture)</em>.</p>
+    </div>
+  </section>
+  <!-- 4. One Euro -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Smoothing · <b>tracker.js</b></div>
+      <h2>Still when still, quick when quick</h2>
+      <p>A detected pose jitters by a few millimetres and a fraction of a degree from frame to frame, which a skull a metre away magnifies into a visible tremor. A plain low-pass filter that removes the tremor also makes every real turn lag. The position therefore goes through a <a href="https://gery.casiez.net/1euro/">One Euro filter</a> (Casiez et al. 2012): a low-pass whose cutoff rises with the speed of the signal. Each axis keeps its value and a speed, the speed itself low-passed at 1 Hz, and the cutoff is <code>minCutoff + β·|speed|</code>, with <code>minCutoff = 0.5 Hz</code> and <code>β = 0.5</code>. Held still, the head is filtered at half a hertz; moving at 30 cm/s, at 15.5 Hz.</p>
+    </div>
+    <div class="formula"><span class="c">// a(dt, fc) = 1 / (1 + 1 / (2π · fc · dt)), dt from capture times</span>
+speed += a(dt, 1)                     · ((raw − x) / dt − speed)
+x     += a(dt, 0.5 + 0.5 · |speed|)   · (raw − x)
+<span class="c">// rotation: the angular speed (rad/s) filtered the same way, then a slerp</span>
+ω     += a(dt, 1)                     · (angle(q, q_raw) / dt − ω)
+q      = slerp(q, q_raw, a(dt, 0.5 + 5 · ω))</div>
+    <div class="fig">
+      <div class="fig-head"><h3>The One Euro filter on a noisy turn</h3>
+        <div class="controls">
+          <label>min cutoff <input id="oeC" type="range" min="0.05" max="3" step="0.05" value="0.5"><output id="oeCo"></output></label>
+          <label>β <input id="oeB" type="range" min="0" max="2" step="0.05" value="0.5"><output id="oeBo"></output></label>
+          <label>noise <input id="oeN" type="range" min="0" max="1" step="0.05" value="0.35"><output id="oeNo"></output></label>
+        </div>
+      </div>
+      <canvas id="euroFig" aria-label="A head position in centimetres over six seconds: noisy detections as dots, the true motion as a thin line and the One Euro output as a bold line, with the filter's cutoff frequency plotted underneath on a log scale."></canvas>
+      <div class="readout" id="oeR"></div>
+      <p class="fig-cap">Detections arrive every 30 to 46 ms with Gaussian noise. While the head is still the cutoff sits near the minimum and the output is calm; during the fast 14 cm move it jumps to tens of hertz and the output keeps up. Set β to 0 to see a plain low-pass: smooth, and late.</p>
+    </div>
+    <div class="col prose">
+      <p>The rotation is filtered the same way in spirit: its angular speed is low-passed at 1 Hz and the shown rotation slerps toward each detected one by a factor whose cutoff is <code>0.5 + 5·ω</code> Hz. All the <code>dt</code>s come from when the frames were <em>captured</em>, not from when their detections came back, which varies with the load on the worker. The filters reset whenever the face is lost.</p>
+      <p>Then the pose is mirrored, because a webcam is used like a mirror: turning your head to your left should turn the skull to the left of the screen. Flipping x in the world alone would leave a reflection, which is not a rotation and would turn the skull inside out. So the matrix is mirrored on both sides, <code>S·M·S</code> with <code>S = scale(−1, 1, 1)</code>: in the world and in the head's own space. The skull is symmetric, so mirroring its own space changes nothing about how it looks, and the result is a proper rotation again. A rear-facing camera (<code>facingMode: "environment"</code>) is not mirrored.</p>
+    </div>
+  </section>
+  <!-- 5. Playback -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Playback · <b>tracker.js</b></div>
+      <h2>Played back by when it was seen</h2>
+      <p>A webcam gives 20 to 30 frames a second and the page draws up to 120, so showing each detection as it arrives would make the skull jump to a new pose every four or five frames, by an uneven amount, at uneven times. Instead the tracker keeps the last eight filtered detections, each stamped with its frame's capture time, and the skull is shown where a smooth curve through them was a little while ago.</p>
+      <p>The curve is a uniform Catmull-Rom spline through the positions, and through the four components of the quaternions (each made to lie in the same hemisphere as the one before, so the blend takes the short way round), renormalised. It is sampled at <code>now − delay</code>. The delay eases, at <code>min(1, 2·dt)</code> a frame, toward the detection latency plus 1.3 frame intervals, both measured as running averages (20% a detection) of the capture-to-result time, capped at 200 ms, and of the gap between captures, capped at 150 ms. That is just enough to have a detection on either side of the sampled moment nearly always; typically 80 to 120 ms behind real time.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Jumping versus playing back</h3>
+        <div class="controls">
+          <label>camera <input id="crF" type="range" min="12" max="60" step="1" value="25"><output id="crFo"></output></label>
+          <label>latency <input id="crL" type="range" min="10" max="120" step="1" value="40"><output id="crLo"></output></label>
+          <label><input id="crM" type="checkbox"> miss 200 ms</label>
+          <label>show <select id="crS"><option value="both">both</option><option value="play">playback</option><option value="jump">jump</option></select></label>
+        </div>
+      </div>
+      <canvas id="crFig" aria-label="A head's yaw in degrees over one and a half seconds: the true motion, the detections at their capture times, the stepped pose of showing each detection when it arrives, and the smooth Catmull-Rom playback that runs a fixed delay behind."></canvas>
+      <div class="readout" id="crR"></div>
+      <p class="fig-cap">The same machinery as <code>tracker.js</code> run at 120 frames a second: frames captured with ±25% jitter, each detection back after its own latency. <em>Jump</em> shows the newest detection, as <code>?pose=jump</code> does on the page. <em>Playback</em> is smooth and follows the true motion shifted by the delay (dashed). Missed frames are bridged by the curve and then by a short extrapolation.</p>
+    </div>
+    <div class="col prose">
+      <p>Past the newest sample the curve carries on in a straight line at the speed of the last two samples (lerp and slerp past 1), for at most 1.5 frame intervals, and then holds. Before the oldest it holds too. Fast moves blur a frame or two and the landmarker misses the face; a miss less than 350 ms after the last good detection is ignored, so the skull plays on through it. A longer one counts as the face being lost: the filters and the samples are cleared, and the next detection starts the curve afresh.</p>
+    </div>
+  </section>
+  <!-- 6. Mapping -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Mapping · <b>main.js</b></div>
+      <h2>Where the head goes, and what it does</h2>
+      <p>The skull is placed as the webcam sees the face: in the same direction from the view's camera as the face is from the webcam, and as far from the orbit target as the face is from 50 cm. The face's position in centimetres is scaled by <code>D / 50</code>, where <code>D</code> is the view camera's distance to its target, carried into the world by the camera's matrix, and taken relative to the target. A face 50 cm straight in front of the webcam puts the skull exactly at its usual place; leaning 10 cm in brings it a fifth of the way to the lens and makes it bigger, and moving sideways moves it across the screen at the same angle. Because it goes through the camera's own matrix, this holds wherever the view is orbited to. The rotation is the face's, unchanged.</p>
+      <p>The expression comes from eight of the blendshapes. The jaw opens by <code>0.6 · jawOpen</code> radians, at most 0.45 rad (26°). It swings sideways by <code>clamp(2.5·(jawLeft − jawRight))</code> (flipped when mirrored), as 0.2 rad of turn and 8 mm of slide at full deflection, and slides forward up to 6 mm with <code>jawForward</code>. All three ease toward their targets at <code>1 − e<sup>−20·dt</sup></code> a frame, since blendshapes are not filtered. The frown is the larger of the mean of <code>browDownLeft/Right</code> and of <code>mouthFrownLeft/Right</code>; the panel plots it as <em>Frown</em>. The eyes' glow aims for <code>smoothstep(t − 0.08, t + 0.08, frown)</code>, with the <em>Frown threshold</em> <code>t</code> (0.4 by default, 0.1–0.9), and eases there at <code>1 − e<sup>−8·dt</sup></code>, so the light comes up over a few tenths of a second and goes as you relax.</p>
+    </div>
+  </section>
+  <!-- 7. Mouse & idle -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Without a camera · <b>main.js</b></div>
+      <h2>On a spring, and on its own</h2>
+      <p>With the mouse or a finger, the head turns toward the pointer: a yaw of <code>(x − 0.5)·1.2</code> rad and a pitch of <code>(y − 0.45)·0.8</code> rad, from its position as a fraction of the window. It does not jump there. Yaw and pitch each follow a critically damped spring with <code>k = 7</code> (acceleration <code>k²·(target − θ) − 2k·θ′</code>), so a fast flick of the mouse swings the head, and the cloth with it, and settles without overshoot. The head also rolls by <code>−0.05·yaw′</code> as it turns, leaning into the turn, and moves 6 cm across and 3 cm up and down with the pointer. Pressing the button (or a finger) on the canvas opens the jaw to <code>0.8 · smoothstep(0, 0.25, held)</code>; held for 0.7 to 1.1 s the brows come down to a full scowl, which is a frown, and the eyes light up.</p>
+      <p>When no one is moving it, the skull moves by itself. Every 4 to 9 s it picks a new direction to look, up to ±0.55 rad of yaw, reached on its own critically damped spring (<code>k = 9</code>), and on top of that it wanders slowly: smooth value noise of time adds up to 0.15 rad of yaw, a pitch of <code>0.16·n − 0.04</code> rad, 0.1 rad of roll, and 0.8, 0.5 and 1.5 cm of drift, each channel at its own slow rate, 0.07 to 0.21 noise cells a second. It chatters in bursts (<code>max(0, n − 0.35)·2.2</code> times a 17 rad/s clatter), gapes slowly now and then (<code>max(0, n − 0.45)·2.4</code>), shifts its jaw ±0.25 sideways, and scowls when another noise channel passes 0.05 to 0.35, which lights its eyes.</p>
+      <p>The two blend. The pointer's share of the pose eases toward 1 while the pointer has moved in the last 8 s (and the start card is not up), and toward 0 otherwise, at <code>1.5·dt</code> a frame; the pose is a lerp and slerp between the idle pose and the pointer's, and every blendshape a lerp. So a mouse left alone for 8 s hands the head back to its own wandering over a second or two, and a nudge takes it back. Before anything is chosen, the skull is idle.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The pointer's spring, and holding</h3>
+        <div class="controls">
+          <label>k <input id="spK" type="range" min="2" max="20" step="0.5" value="7"><output id="spKo"></output></label>
+          <label>frown threshold <input id="spT" type="range" min="0.1" max="0.9" step="0.01" value="0.4"><output id="spTo"></output></label>
+        </div>
+      </div>
+      <canvas id="springFig" aria-label="Left: the head's yaw after the pointer jumps across the window, for the chosen spring constant and for the idle spring, with the roll it leans into. Right: the jaw opening, the scowl and the eyes' glow against how long the button is held."></canvas>
+      <div class="readout" id="spR"></div>
+      <p class="fig-cap">Left, the pointer jumps from a quarter to 85% across at 0.1 s; the bold line is the yaw on the spring, stepped at 60 fps as the page does, the dashed line the idle spring, the thin one the roll. Right, holding the button: the jaw shape, the scowl, and the glow it gives for the threshold.</p>
+    </div>
+  </section>
+  <!-- 8. Presence -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Presence · <b>main.js</b></div>
+      <h2>Drifting off into the dark</h2>
+      <p>A skull that froze when the face was lost would look broken, and one that snapped to an idle pose would look worse. So the head has a <em>presence</em>, from 1 (here) to 0 (gone), which falls over 2.2 s when the face is lost and rises over 2 s when it is back. With <code>away = smootherstep(1 − presence)</code>, the head recedes 75 cm into the room, drifts up to 5 cm sideways and 3 cm up and down on sines of the presence, and tumbles about a point 5 cm behind its origin: 0.5 rad of pitch, 1.8 rad of yaw and 0.7 rad of roll at full absence, each with a 0.25 rad sway. The key light and the environment are scaled by <code>smoothstep(0, 0.5, presence)</code>, so by the time it is gone it is lost in the dark.</p>
+      <p>When the presence reaches 0 with no face, the head switches to idle and comes back by itself in its idle pose; if the face turns up again on the way out it turns around and returns to the face. When a face is found while idle, the pose blends from wherever the head is to the face's over 1.2 s with a smootherstep (at once, if it was fully gone). Changing the skull uses the same path: the old one drifts off, is hidden at presence 0, and the new one comes back in its place, with a fresh veil.</p>
+      <p>The cloth follows the head out and back. While the head is receding, returning, or gliding to a newly found face, the cloth is carried along and feels only the turning, not the travel. It is let loose as the head leaves (<code>loose = smootherstep(1 − presence / 0.75)</code>, which relaxes the limits that keep it over the face, see below), and on the way back, past a presence of 0.75, the leash is <em>shortened</em> by up to 70% on a sine, <code>−0.7·sin(π·(p − 0.75)/0.25)</code>, which draws the veil back into place before the head arrives.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Gone and back</h3>
+        <div class="controls">
+          <label>t <input id="prT" type="range" min="0" max="5" step="0.01" value="1.2"><output id="prTo"></output></label>
+          <button id="prP" class="ghost">play</button>
+        </div>
+      </div>
+      <canvas id="presenceFig" aria-label="Left: presence, away, light and the veil's looseness over five seconds as the face is lost and the head returns. Right: a side view of the head receding 75 cm, drifting and tumbling, dimmed by the light."></canvas>
+      <div class="readout" id="prR"></div>
+      <p class="fig-cap">The face is lost at 0 (after the 350 ms grace); the head is gone at 2.2 s and comes back idle by 4.2 s. Right, from the side: the head's offset and its pitch (the yaw is given in the readout), dimmed as the light goes.</p>
+    </div>
+  </section>
+  <!-- 11. Cloth -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The cloth · <b>veil-sim.js</b></div>
+      <h2>Four thousand particles and their links</h2>
+      <p>The veil is a 52 cm square of 64 × 64 particles, 8.25 mm apart, solved with position-based dynamics. It is laid flat 22.5 cm above the skull's base, centred 5 cm forward of the crown so that more of it hangs over the face. Each particle has a position and a previous position (Verlet integration); every step moves it by its velocity times 0.97, plus its acceleration times the step squared, and clamps the move to 12 mm, so a particle can never jump deep into the skull in one step. The step is 1/90 s, at most three steps per update; if the simulation falls further behind than that, it runs slow rather than catching up.</p>
+      <p>Then five passes over the constraints, each a pair of particles and a rest length, moved toward that length by their stiffness and shared between whichever of the two is free:</p>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Link</th><th class="num">Apart</th><th class="num">Stiffness</th><th>Job</th></tr></thead>
+      <tbody>
+        <tr><td>Structural</td><td class="num">1 along a row or column</td><td class="num">1</td><td class="wrap">Keeps the cloth from stretching.</td></tr>
+        <tr><td>Shear</td><td class="num">both diagonals of a cell</td><td class="num">1</td><td class="wrap">Keeps each cell square, so the weave does not skew.</td></tr>
+        <tr><td>Bend</td><td class="num">2</td><td class="num">1</td><td class="wrap">Resists bending, so folds are round.</td></tr>
+        <tr><td>Far bend</td><td class="num">4, from every other particle</td><td class="num">0.4</td><td class="wrap">Keeps folds from collapsing flat into a pinch.</td></tr>
+      </tbody>
+    </table></div>
+    <div class="col prose">
+      <p>Solving in grid order drags the cloth to one side and gathers the error into one big fold, so the list is shuffled once with a fixed generator (seed 12345) and solved in that order every pass. Links exist only where there is cloth: a pair is joined when a cell on either side of the line between them is there, shear links need their own cell, and bend links need every link along their span, so a tattered veil does not resist bending across a tear.</p>
+      <p>The cloth is pinned at the crown. Once a dropped veil has come down on the head (after 20 steps when it is dropped unseen, when its crown lands when it is dropped live), every particle within 15 mm of the crown along the flat cloth is fixed where it lies. From then on a tether keeps every particle no further from the pin's centre than 1.02 times its distance along the flat cloth, which stops the veil from stretching under gravity and gusts however long it hangs.</p>
+    </div>
+  </section>
+  <!-- 12. Collision -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Collision · <b>veil-sim.js, tools/bake_sdf.cpp</b></div>
+      <h2>Two fields of bone</h2>
+      <p>The cloth collides with signed distance fields of the head, baked offline on 3 mm grids: one for the cranium with the upper teeth and one for the jaw with the lower teeth, both in the skull's rest space. They are not the raw mesh distance. The bake closes every cavity that a ball of 2 cm radius cannot roll into, so the cloth sees the eye sockets, the nose and the gaps between the teeth as filled and drapes over them like real cloth rather than falling in. Each field is stored as 8-bit values between its minimum and maximum, about a megabyte for both, and sampled trilinearly with an analytic gradient; outside its grid it counts as a metre of free space. The jaw's field is sampled at the point taken into the jaw's rest space by the inverse of its current matrix, and its gradient turned back, so the cloth over the chin moves when the jaw opens; the head's distance is whichever field is nearer.</p>
+      <p>Every particle rides 6 mm off the bone (8 mm on Suzanne, whose sharp brow and ears would otherwise poke through between particles). Sampling the fields is the expensive part, so at the start of each step every particle within 45 mm of the head records the tangent plane under it, and the first four constraint passes only push particles out of those planes. The last pass samples the fields for real: a particle closer than its offset is pushed out along the gradient and loses 30% of its velocity along the surface (friction). Around the crown, where the pin holds the cloth, it cannot slide back when the head looks up, and would buckle into standing folds, so within 7 cm of the crown it is also pulled back down if it lifts further than 6 mm plus 15% of its distance from the crown.</p>
+      <p>Two neighbours can end up on either side of something thin, an ear or a brow, held apart by it however hard their link pulls. They give themselves away by being more than 2.5 spacings apart while the midpoint between them is within 4 cm of the bone; both are lifted off the surface by up to 3 mm a step, from that midpoint, until they slide over the top to the same side.</p>
+      <p>Folds stack instead of passing through each other: every other step, particles that are not within two of each other on the grid are kept at least one spacing (8.25 mm) apart. They are binned in a hash grid of that cell size over the cloth's bounds, with an empty cell all round so no lookup needs a bounds check, and each particle only looks at the 27 cells around its own.</p>
+    </div>
+  </section>
+  <!-- 13. Staying on -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Staying on · <b>veil-sim.js, main.js</b></div>
+      <h2>Kept over the face, however it turns</h2>
+      <p>A real veil on a real head that bows, looks up and turns sideways would sooner or later slide off. This one must stay over the face, so three limits keep it there, all of which can be let go (<code>loose</code>, from 0 to 1) when the head floats away or the veil is blown off:</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>A cone for gravity</b><span>Gravity, expressed in the skull's space, never leans more than 0.85 rad (49°) from the skull's own down; <code>loose</code> widens the cone to anything.</span></div>
+      <div class="fact"><b>A leash to the drape</b><span>Each particle stays within <code>30 mm + 0.35·d</code> of where it settled, <code>d</code> its distance from the crown: short on the head, long at the hem. Up to 9× longer when loose.</span></div>
+      <div class="fact"><b>A cap on lag</b><span>The cloth is left behind by 60% of the head's motion each update, but never by more than 12 mm (9× when loose).</span></div>
+    </div>
+    <div class="col prose">
+      <p>The drape that the leash measures from is worked out when a veil is dropped: the flat cloth falls onto the upright head, in still air and with the mouth closed, for 120 steps (pinned after 20), and where every particle ends up is its rest position. A faint pull, 1.2% of the way back per step in the first constraint pass, draws a veil that a gust or a turn pushed aside back to that drape over a few seconds; it is off while the veil is loose.</p>
+      <p>The head's motion reaches the cloth as a matrix: each update the page sends <code>inverse(now) · before</code> of the skull's world matrix, which takes a point that stayed still in the world from the skull's space before to its space after. The cloth applies 60% of it to every free particle (and to its previous position, so the velocity carries over). A tracker glitch should not fling the veil, so if a point 10 cm in front of the face would move more than 5 cm in one update, the motion is ignored as a jump. Gravity is the world's down taken into the skull's space, inside its cone.</p>
+      <p>A draft of 5 m/s² (<em>Draft</em>, 0 to 12) blows the front of the cloth back onto the face, the same everywhere in front of it, so it presses the cloth onto the features without gathering it anywhere; it fades out between 5 cm in front of the crown and 3 cm behind it, so the back hangs free. Gusts blow in the room: every 4 to 12 s after the last one ends (the first comes within 3 to 8 s), a gust picks a horizontal direction at random (its depth component halved, a breath of up), a peak of 2.5 to 5.5 m/s², a rise of 0.7 to 1.5 s with a smoothstep and a fall of 1.8 to 3.3 s, and a flutter of <code>0.8 + 0.2·sin(7.3t)·sin(3.1t + 1)</code> while it blows. Its direction goes into the skull's space like gravity's. Over the cloth it is patchy, <code>0.35 + 0.65</code> times a product of two sines of the particle's position drifting with time, and it mostly moves the part that hangs: the cloth within 5 cm of the crown is sheltered by the head, and it is fully exposed from 20 cm.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A slice of the veil</h3>
+        <div class="controls">
+          <label>head pitch <input id="clT" type="range" min="-80" max="80" step="1" value="0"><output id="clTo"></output></label>
+          <label>jaw <input id="clJ" type="range" min="0" max="0.45" step="0.01" value="0"><output id="clJo"></output></label>
+          <label>draft <input id="clD" type="range" min="0" max="12" step="0.5" value="5"><output id="clDo"></output></label>
+          <label>gust <input id="clG" type="range" min="0" max="6" step="0.1" value="0"><output id="clGo"></output></label>
+          <label><input id="clC" type="checkbox" checked> gravity cone</label>
+          <label><input id="clL" type="checkbox" checked> leash</label>
+          <button id="clDrop" class="ghost">drop again</button>
+          <button id="clBlow" class="ghost">blow away</button>
+        </div>
+      </div>
+      <canvas id="clothFig" aria-label="A live side view of one column of the veil's particles over a skull-shaped distance field: the crown pin, the drape it is leashed to, gravity and its cone, and the cloth reacting to the head's pitch, the jaw, the draft and gusts."></canvas>
+      <div class="readout" id="clR"></div>
+      <p class="fig-cap">One column of 64 particles through the middle of the veil, run live with the same step, damping, speed cap, links, tether, leash, drape pull, offset, friction, crown lift limit, draft, patchy gust, gravity cone and drop sequence as <code>veil-sim.js</code>, against a stand-in skull drawn from its own distance field (face to the right). Pitch the head and the cloth is left behind, then pulled back; untick the cone and it pours off. In the slice the blow-away's sideways push is drawn along the face's axis.</p>
+    </div>
+  </section>
+  <!-- 14. Drop & release -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Drop and release · <b>veil-sim.js</b></div>
+      <h2>Falling onto the head, and letting go</h2>
+      <p>A new veil is dropped live. The simulation first works out its drape unseen, as above, and then starts the cloth over, flat, 50 cm above the skull's base (above the top of the frame), tilted a little by a random slope of up to ±0.15 each way so no two drops fall alike. While it falls it is carried with the head (left behind, it would miss the crown), and its gravity is the skull's own down, so it comes down on the crown however the head is tilted. When the patch at the crown comes within 4 mm of its offset from the bone, or after 2 s of falling, it is pinned where it landed and the leash to the drape comes on: 7 times its length at first, tightening with a smoothstep over 1.6 s, while the pinned crown slides to where the drape has it at <code>3·dt</code> a frame. The fall is timed in the simulation's own steps, so it plays the same however the page keeps up.</p>
+      <p>Letting go is the reverse: the pins are released and the tether, the leash and the drape are dropped, so nothing holds the cloth any more. The page then sets <code>loose</code> to 1 and blows: an acceleration up and to one side, <code>normalize(±1, 0.9, −0.2…0.2)</code> in the room, building to 16 m/s² over 0.9 s with a smoothstep. The veil slides off the head and away.</p>
+    </div>
+  </section>
+  <!-- 15. Hand-off -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Hand-off · <b>veil-worker.js, veil.js</b></div>
+      <h2>A worker, and the frames between</h2>
+      <p>The simulation runs in a module worker with no dependencies (it loads the fields itself). Once a frame, the page sends it the time since the last message (capped at 0.1 s), the draft, how loose the veil is, the gust, gravity, the jaw's matrix and its inverse, and the head's motion since the last message (all the frames' motions composed); along with them it transfers two buffers, which come back filled with the surface to draw. There is never more than one message in flight: while the worker is busy the page keeps adding up time and motion. Each drop bumps a generation number, and a surface from an earlier generation is thrown away, so a veil that has been replaced never shows for a frame.</p>
+      <p>The surface is smoother than the particles: a uniform cubic B-spline through them, sampled at every particle and halfway between, 127 × 127 vertices, with normals from the cross product of its tangents. The spline stops at the edges of the cloth and at its tears by repeating the last particle. Particles keep off the bone, but the surface between two of them can still cut through a sharp ridge and show bone in front of the veil, so every vertex is pushed out of the fields to the offset, in up to two steps, since around a thin part the way out bends.</p>
+      <p>Surfaces come back every few frames (the page measures the gap, a running average capped at 100 ms), so the page draws between the last two: each frame, the shown surface is the previous one blended toward the latest by how far into the measured gap it is. The cloth moves every frame, one surface behind. Then the cloth on the jaw is moved with it: a surface comes back shaped around where the jaw was when it was sent, so each vertex within 4 cm of the jaw field is carried by the jaw's motion since then, fully within 12 mm and with a smoothstep beyond. Which vertices those are, and their weights, is worked out once per surface, so a frame only moves the few near the jaw.</p>
+    </div>
+  </section>
+  <!-- 19. New veil -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">A new veil · <b>main.js</b></div>
+      <h2>Blown away, then dropped</h2>
+      <p><code>R</code> (or the dice) randomizes the veil, seeded, so a link reproduces it. The colour is one of nine muted ones (red, oxblood, crimson, black, charcoal, bone white, ash, purple, plum), darkened or lightened by 0.85 to 1.15. The diffusion is 0.15 to 0.5. The opacity depends on how dark the colour is (<code>dark = 1 − min(1, luminance / 0.25)</code>): from <code>0.12 + 0.13·dark</code> up to 0.5, since dark, sheer cloth all but disappears over a dark face, and with little blur any cloth over the face does. The eyes get one of the three lights, the draft 3 to 7 m/s² in half steps, and the panel randomizes whether it is tattered and which tatters. The skull, the control mode, the threshold and the glow are not randomized.</p>
+      <p>A veil never changes its cut in place. When the look calls for a new one (a randomize, <code>D</code>, the panel's <em>Drop the veil again</em>, a change of <em>Tattered</em> or <em>Tatters</em>, auto change), the old one goes first, in its own look: it is released and blown away for 1.8 s, with a gust's sound, and dissolves over the last 0.5 s of that through a two-octave noise threshold (0.65 × noise at 14 per uv plus 0.35 × at 41), so it breaks up into wisps rather than fading as a sheet. Meanwhile the new cut's tatter maps are being made. Then the new look is applied, the new veil is dropped from above the frame, the page waits for its first surface (and its maps) to come back, and it falls onto the head over the next 2 s. Only then does the state go back to idle, and auto change (on by default, every 15 s) starts its count again; it waits while a swap is under way.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>One swap</h3>
+        <div class="controls">
+          <label>t <input id="swT" type="range" min="0" max="6" step="0.01" value="1.5"><output id="swTo"></output></label>
+          <button id="swP" class="ghost">play</button>
+        </div>
+      </div>
+      <canvas id="swapFig" aria-label="A six-second timeline of a veil change: the out, wait, in and idle states; the blow-away wind, the old veil's fade, the new veil's crown falling and landing, the leash tightening, and the wind bed's level."></canvas>
+      <div class="readout" id="swR"></div>
+      <p class="fig-cap">The page's swap states with the simulation's drop. The new crown's fall is one particle under the cloth's step, damping and 12 mm-per-step cap, from 50 cm down onto a crown taken as 21 cm up; the leash then tightens over 1.6 s.</p>
+    </div>
+    <div class="col prose">
+      <p>The first veil arrives the same way: when a skull appears, its veil is dropped from above as it comes into view. The first frame of a capture waits for that veil to settle (<code>app.preload()</code> resolves once every head is loaded and the first veil has landed).</p>
+    </div>
+      <div class="items four">
+      <article class="item"><img src="explainer/swap-blow.jpg" alt="A veil streaming sideways off the skull, blown away." loading="lazy" width="720" height="720"><div><h3>Blown away</h3><p>0.9 s in: released, the wind takes it.</p></div></article>
+      <article class="item"><img src="explainer/swap-gone.jpg" alt="The bare skull with no veil." loading="lazy" width="540" height="540"><div><h3>Bare</h3><p>Waiting for the new veil's first surface and maps.</p></div></article>
+      <article class="item"><img src="explainer/swap-in-1.jpg" alt="A flat dark red veil landing on top of the skull like a disc." loading="lazy" width="720" height="720"><div><h3>Landing</h3><p>The new veil, flat, coming down on the crown.</p></div></article>
+      <article class="item"><img src="explainer/swap-in-3.jpg" alt="The new tattered veil hanging over the skull." loading="lazy" width="540" height="540"><div><h3>Draped</h3><p>1.2 s later it hangs, and the leash tightens.</p></div></article>
+    </div>
+  </section>
+  <!-- 20. Sound -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Sound · <b>sound.js</b></div>
+      <h2>A dungeon, through cloth and stone</h2>
+      <p>The sound is a room you cannot see. A wind bed loops under everything at a gain of 0.18 and rises to 0.48 with the wind: its level is <code>0.18 + 0.3·min(1, w)</code>, where <code>w</code> is the gust's strength over 5.5 m/s², or 1 while a veil is being blown away, eased with a 0.4 s time constant. Each gust and each blow-away also plays one of two gust samples, at 0.22 to 0.44 depending on its peak, panned up to ±0.4. Water drips at random somewhere in the dark every 1.5 to 6 s, one of six samples at 0.3 to 0.5, panned up to ±0.8, pitched 0.9 to 1.15, and a quarter of the time a second, quieter drop (0.2) falls from the same place 0.25 to 0.75 s later. Every 10 to 25 s (the first after 8 s) a chain drags in another room: one of two samples at 0.55 to 0.8, panned up to ±0.7.</p>
+      <p>Everything goes through a gentle low-pass at 1.6 kHz (Q 0.5), as if heard through the veil and the stone; the chains go through a second one at 1.1 kHz first, because they are further off. Every sample is levelled per kind in its file, so these gains set the balance: drips, chains and gusts about equally loud, the wind under them. Each play picks a variant never the same as the last of its kind and spreads it by ±6% of pitch and up to −20% of gain. All variation uses the unseeded generator, so sound never shifts the seeded look.</p>
+      <p>The audio context is created on load and resumed on the first gesture (<code>pointerdown</code>, <code>touchend</code>, <code>click</code>, <code>keydown</code>), but nothing plays until the first rendered frame calls <code>sound.start()</code>. Pausing suspends the context; <code>M</code> or the speaker button mutes it. The samples download as a loading step. A capture cannot play sound, so it is handed each sound as a cue (name, delay, gain, pan, rate, whether it is far) and the wind bed's level ten times a second, to build the soundtrack from.</p>
+    </div>
+  </section>
+  <!-- 21. Frames & takes -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Frames, takes and captures · <b>main.js, tracker.js, veil.js</b></div>
+      <h2>Even frames, recorded faces</h2>
+      <p>A frame that sometimes makes a display refresh and sometimes misses it judders, and every jolt shows in the cloth. So frames go out on every <em>N</em>th refresh. The refresh period is measured from the gaps between animation callbacks (between 2 and 50 ms, each counted at most as 1.5 periods, averaged at 5%), and <code>N = round(1 / 120 / period)</code>, at most about 120 fps, plus a step-down. A drawn frame is late if more than <code>N + 0.9</code> periods passed since the last; every 120 drawn frames, more than 30 late ones step <em>N</em> up by one (as long as that still gives 30 fps or more), and five clean windows in a row (fewer than 3 late) step it back down. The time of skipped callbacks is carried into the next drawn frame, capped at 0.1 s. <code>?fps=</code> sets the most, <code>?fps=0</code> draws every refresh.</p>
+      <p>The page renders at most at a 1.5× pixel ratio, which a soft, dark scene does not show; only the page's own default is capped, so <code>?dpr=</code> and the 2× screenshot keep theirs. The loading pill weighs its steps 1 for the studio, 3 for the skull, 1 for its fields, 1 for the sounds and 4 for compiling every program, the veil's near side included.</p>
+      <p><code>Shift+T</code> records a <em>take</em> for videos: every detection (its capture time from the start, whether a face was found, the matrix and the eight blendshapes the skull uses, to four decimals) and cues for what happened around it: the look it started on, each veil change with the look it lands on and which way the old veil blew, each gust with its direction, peak, rise and fall, and each change of skull. <code>Shift+T</code> again downloads it as JSON. <code>?replay=take.json</code> plays one back instead of the camera, looping 100 ms after its last detection, with auto change and random gusts off since the take brings its own; <code>&amp;replayStart=</code> starts partway in, on the look the take had then, set before the first veil drops. The tracker's clock is then the take's, advanced by the page's time step, so a capture at its own virtual time reproduces it exactly; under <code>?capture</code> it holds at the start until the recorder calls <code>app.resumeTake()</code>.</p>
+      <p>Under <code>?capture</code> the camera stays off, the frame cap is lifted, and the cloth is simulated on the page instead of in a worker, one update per frame with the same messages answered at once, because a capture renders slower than real time and a worker would run ahead of it. There, each frame's surface is that frame's, so nothing is drawn between surfaces.</p>
+    </div>
+  </section>
+  <!-- Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>The start card: <b>Use my camera</b> or <b>Use the mouse</b> (<b>Use touch</b>). <b>C</b> or the camera button brings it back.</li>
+      <li>Camera: turn and tilt your head, lean in and back, open your jaw and push it sideways, frown to light the eyes. Drag to orbit, scroll to zoom.</li>
+      <li>Mouse or touch: move to turn the head; hold the button or a finger to open the jaw, hold on to light the eyes. Scroll or pinch to zoom. Left alone 8 s, the skull moves by itself.</li>
+      <li><b>R</b> or the dice: a new veil. <b>D</b> or <b>Drop the veil again</b>: blow it away and drop the same cut.</li>
+      <li><b>Skull</b> (Evil, Realistic, Suzanne), <b>Control</b>, <b>Eyes</b> (Hellfire, Pale, Sick), <b>Frown threshold</b>, <b>Glow</b>; the <b>Camera</b>, <b>Tracking</b>, <b>Take</b> readouts and the <b>Frown</b> graph.</li>
+      <li><b>Veil</b> on/off, <b>Veil color</b>, <b>Veil opacity</b>, <b>Veil diffusion</b>, <b>Tattered</b>, <b>Tatters</b>, <b>Draft</b>; <b>Auto change</b> and <b>Change every</b> (15 s by default); the <b>Rendering</b> section.</li>
+      <li><b>M</b> or the speaker button: sound on/off. <b>Space</b> pauses, <b>F</b> goes fullscreen, <b>Tab</b> hides the UI, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
+      <li><b>Shift+T</b> records a take of your face, <b>Shift+T</b> again downloads it; <code>?replay=take.json&amp;replayStart=s</code> plays one back. <code>?pose=jump</code> shows raw detections, <code>?tracker=main</code> detects on the main thread, <code>?fps=</code> and <code>?dpr=</code> lift the caps.</li>
+    </ul>
+  </section>
+
+  <footer class="col">
+    <div class="meta">
+      <span><b>three.js</b> r187</span><span>WebGL2</span><span>photographic pipeline</span><span>MediaPipe Face Landmarker</span><span>position-based cloth</span><span>signed distance fields</span><span>stochastic shadows</span><span>Web Audio</span><span>started in <b>Antigravity</b> with Fable 5.2, finished in <b>Claude Code</b> with Opus 5.5</span>
+    </div>
+    Day 25 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/25/">spite.github.io/codevember-2026/25</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/25">25/ of the codevember-2026 repository</a>.
+    <br><br>Credits:
+    <ul>
+      <li>Skull: based on <a href="https://sketchfab.com/models/1a9db900738d44298b0bc59f68123393">"Skull downloadable"</a> by <a href="https://sketchfab.com/martinjario">martinjario</a>, <a href="http://creativecommons.org/licenses/by/4.0/">CC-BY 4.0</a>: rescaled, textures reduced, a two-bone skin added, and for the evil skull a reshaped brow, cheekbones, temples, chin and canines.</li>
+      <li>Suzanne: the Blender Foundation's monkey, from the Khronos glTF sample models, donated by Norbert Nopper.</li>
+      <li>Face tracking: <a href="https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker">MediaPipe Face Landmarker</a>.</li>
+      <li>One Euro filter: Géry Casiez, Nicolas Roussel and Daniel Vogel, <a href="https://gery.casiez.net/1euro/">1€ Filter</a>, CHI 2012.</li>
+    </ul>
+    Sounds: CC0 recordings on freesound.org. Wind: "spooky ghost wind 01" by TitanKaempfer (582300), "Muffled Eerie Wind" by IanStarGem (269591) and "Soft Wind" by florianreichelt (459977). Drips: "Water Drop Dark" by Ev-Dawg (337525), "Water Dripping in Cave" by Sclolex (177958) and "Water drops with reverb" by Patrick_Corra (696438). Chains: "Steel Chain Dragged, Hard Reverb" and "Steel chain dragged, shower reverb" by ani_music (167912, 167914).
+  </footer>
+</main>
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const clamp01 = (x) => clamp(x, 0, 1);
+  const smoothstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+  const smootherstep = (x) => { const t = clamp01(x); return t * t * t * (t * (t * 6 - 15) + 10); };
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+  const rgb = (hex) => { const c = document.createElement("canvas").getContext("2d"); c.fillStyle = hex; const s = c.fillStyle; if (s[0] === "#") return [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16)); return s.match(/\d+/g).slice(0, 3).map(Number); };
+  const rgba = (hex, a) => `rgba(${rgb(hex).join(",")},${a})`;
+  const mulberry = (seed) => () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const gauss = (r) => { let u = 0; for (let i = 0; i < 6; i++) u += r(); return (u - 3) / Math.SQRT1_2; };
+
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1, W = 0, H = 0;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      W = canvas.clientWidth || 600; H = Math.round(W * (typeof aspect === "function" ? aspect(W) : aspect));
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, W, H);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    new MutationObserver(() => fit(true)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return { redraw: () => fit(true), paint: () => { if (W) draw(ctx, W, H); }, size: () => [W, H] };
+  }
+  const bind = (id, out, fmt, fn) => { const el = $(id); const o = $(out); const show = () => { if (o) o.textContent = fmt(+el.value); }; el.addEventListener("input", () => { show(); fn(); }); show(); return el; };
+  const stage = (ctx, W, H) => { ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H); };
+  const label = (ctx, text, x, y, color = css("--stage-ink"), size = 11, align = "left") => { ctx.fillStyle = color; ctx.font = font(size); ctx.textAlign = align; ctx.fillText(text, x, y); ctx.textAlign = "left"; };
+  function player(btn, input, speed, loop) {
+    let on = false, last = 0;
+    const step = (t) => {
+      if (!on) return;
+      const dt = last ? Math.min(0.05, (t - last) / 1000) : 0; last = t;
+      let v = +input.value + dt * speed;
+      const max = +input.max, min = +input.min;
+      if (v > max) v = loop ? min + (v - max) : max;
+      input.value = v; input.dispatchEvent(new Event("input"));
+      if (!loop && v >= max) { on = false; btn.textContent = "play"; return; }
+      requestAnimationFrame(step);
+    };
+    btn.addEventListener("click", () => { on = !on; btn.textContent = on ? "pause" : "play"; last = 0; if (on) { if (!loop && +input.value >= +input.max) input.value = input.min; requestAnimationFrame(step); } });
+  }
+  // A plot box with grid lines and tick labels; returns the mappings.
+  function axes(ctx, b, xr, yr, { xt = [], yt = [], xf = (v) => v, yf = (v) => v, xl = "", yl = "", logY = false } = {}) {
+    const ty = (v) => (logY ? Math.log10(v) : v);
+    const X = (v) => b.x + ((v - xr[0]) / (xr[1] - xr[0])) * b.w;
+    const Y = (v) => b.y + b.h - ((ty(v) - ty(yr[0])) / (ty(yr[1]) - ty(yr[0]))) * b.h;
+    ctx.strokeStyle = css("--stage-line"); ctx.lineWidth = 1;
+    for (const v of yt) { ctx.beginPath(); ctx.moveTo(b.x, Y(v)); ctx.lineTo(b.x + b.w, Y(v)); ctx.stroke(); label(ctx, yf(v), b.x - 6, Y(v) + 3.5, css("--stage-ink"), 10, "right"); }
+    for (const v of xt) { ctx.beginPath(); ctx.moveTo(X(v), b.y); ctx.lineTo(X(v), b.y + b.h); ctx.stroke(); label(ctx, xf(v), X(v), b.y + b.h + 14, css("--stage-ink"), 10, "center"); }
+    if (xl) label(ctx, xl, b.x + b.w, b.y + b.h + 28, css("--stage-ink"), 10, "right");
+    if (yl) label(ctx, yl, b.x, b.y - 8, css("--stage-ink"), 10);
+    return { X, Y };
+  }
+  function line(ctx, pts, X, Y, color, width = 1.6, dash = null) {
+    ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y))));
+    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.stroke(); ctx.setLineDash([]);
+  }
+  function onScreen(el) {
+    const s = { visible: false };
+    new IntersectionObserver((e) => { s.visible = e[0].isIntersecting; }).observe(el);
+    return s;
+  }
+  const range = (a, b, n) => Array.from({ length: n + 1 }, (_, i) => a + ((b - a) * i) / n);
+
+  // ---- 1. One Euro ----
+  {
+    const sf = (dt, fc) => 1 / (1 + 1 / (2 * Math.PI * fc * dt));
+    const truth = (t) => 14 * smootherstep((t - 1.5) / 0.35) - 10 * smootherstep((t - 3.6) / 1.1) + 0.5 * Math.sin(1.7 * t);
+    let data = [];
+    const build = () => {
+      const noise = +$("oeN").value, minC = +$("oeC").value, beta = +$("oeB").value;
+      const r = mulberry(5);
+      data = [];
+      let x = null, speed = 0, last = 0;
+      for (let t = 0; t < 6; t += 0.03 + 0.016 * r()) {
+        const raw = truth(t) + noise * gauss(r);
+        let cutoff = minC;
+        if (x === null) x = raw;
+        else {
+          const dt = t - last;
+          speed += sf(dt, 1) * ((raw - x) / dt - speed);
+          cutoff = minC + beta * Math.abs(speed);
+          x += sf(dt, cutoff) * (raw - x);
+        }
+        last = t;
+        data.push({ t, raw, f: x, c: cutoff, truth: truth(t) });
+      }
+    };
+    const fig = setup($("euroFig"), (W) => (W < 520 ? 0.95 : 0.52), (ctx, W, H) => {
+      build();
+      stage(ctx, W, H);
+      const top = { x: 44, y: 22, w: W - 60, h: H * 0.6 - 22 };
+      const bot = { x: 44, y: H * 0.6 + 26, w: W - 60, h: H * 0.4 - 62 };
+      const a = axes(ctx, top, [0, 6], [-4, 17], { yt: [0, 5, 10, 15], yf: (v) => v, yl: "position, cm" });
+      for (const d of data) { ctx.fillStyle = rgba(css("--stage-ink"), 0.55); ctx.beginPath(); ctx.arc(a.X(d.t), a.Y(d.raw), 1.7, 0, 7); ctx.fill(); }
+      line(ctx, range(0, 6, 300).map((t) => [t, truth(t)]), a.X, a.Y, rgba(css("--ink"), 0.35), 1);
+      line(ctx, data.map((d) => [d.t, d.f]), a.X, a.Y, css("--accent"), 2.2);
+      const b = axes(ctx, bot, [0, 6], [0.1, 40], { xt: [0, 1, 2, 3, 4, 5, 6], xf: (v) => v + " s", yt: [0.1, 1, 10], yf: (v) => v + " Hz", yl: "cutoff (log)", logY: true });
+      line(ctx, data.map((d) => [d.t, clamp(d.c, 0.1, 40)]), b.X, b.Y, css("--accent2"), 1.6);
+      label(ctx, "detections", a.X(0.1), a.Y(2.6), css("--stage-ink"));
+      label(ctx, "One Euro", a.X(2.15), a.Y(15.6), css("--accent"));
+      const still = data.filter((d) => d.t > 0.5 && d.t < 1.4);
+      const rms = Math.sqrt(still.reduce((s, d) => s + (d.f - d.truth) ** 2, 0) / Math.max(1, still.length));
+      const cross = (key) => { for (const d of data) if (d.t > 1.4 && d[key] >= 7) return d.t; return NaN; };
+      const lag = (cross("f") - cross("truth")) * 1000;
+      $("oeR").innerHTML = `<span>jitter while still <b>±${rms.toFixed(2)} cm</b></span><span>lag on the turn <b>${isNaN(lag) ? "–" : Math.max(0, lag).toFixed(0) + " ms"}</b></span><span>peak cutoff <b>${Math.max(...data.map((d) => d.c)).toFixed(1)} Hz</b></span>`;
+    });
+    for (const [id, f] of [["oeC", (v) => v.toFixed(2) + " Hz"], ["oeB", (v) => v.toFixed(2)], ["oeN", (v) => v.toFixed(2) + " cm"]]) bind(id, id + "o", f, fig.redraw);
+  }
+
+  // ---- 2. Catmull-Rom playback ----
+  {
+    const truth = (t) => 18 * Math.sin(2 * Math.PI * 0.8 * t) + 6 * Math.sin(2 * Math.PI * 2.1 * t + 1);
+    function sampleAt(samples, t, interval) {
+      const n = samples.length;
+      if (t <= samples[0].t || n === 1) return samples[0].p;
+      if (t >= samples[n - 1].t) {
+        const b = samples[n - 2], c = samples[n - 1];
+        const k = 1 + Math.min(t - c.t, 1.5 * interval) / Math.max(c.t - b.t, 1);
+        return b.p + (c.p - b.p) * k;
+      }
+      let i = 0;
+      while (samples[i + 1].t <= t) i++;
+      const a = samples[Math.max(0, i - 1)], b = samples[i], c = samples[i + 1], d = samples[Math.min(n - 1, i + 2)];
+      const u = (t - b.t) / (c.t - b.t), u2 = u * u, u3 = u2 * u;
+      return a.p * (-0.5 * u3 + u2 - 0.5 * u) + b.p * (1.5 * u3 - 2.5 * u2 + 1) + c.p * (-1.5 * u3 + 2 * u2 + 0.5 * u) + d.p * (0.5 * u3 - 0.5 * u2);
+    }
+    let sim = null;
+    const run = () => {
+      const fps = +$("crF").value, lat = +$("crL").value, miss = $("crM").checked;
+      const r = mulberry(21);
+      const dets = [];
+      let lastArrival = -Infinity;
+      for (let t = -1000; t < 1700; t += (1000 / fps) * (0.75 + 0.5 * r())) {
+        const l = lat * (0.75 + 0.5 * r());
+        if (miss && t > 620 && t < 820) continue;
+        const arrival = Math.max(t + l, lastArrival + 1);
+        lastArrival = arrival;
+        dets.push({ t, p: truth(t / 1000), arrival });
+      }
+      const samples = [];
+      let interval = 40, latency = 30, delay = 80, lastTime = 0, k = 0, found = false;
+      const out = { play: [], jump: [], dets: dets.filter((d) => d.t >= 0 && d.t <= 1500), delays: [] };
+      for (let now = -1000; now <= 1500; now += 1000 / 120) {
+        while (k < dets.length && dets[k].arrival <= now) {
+          const d = dets[k++];
+          const dt = lastTime && d.t > lastTime ? (d.t - lastTime) / 1000 : 0;
+          lastTime = d.t;
+          samples.push({ t: d.t, p: d.p });
+          if (samples.length > 8) samples.shift();
+          if (found && dt > 0) interval += (Math.min(150, dt * 1000) - interval) * 0.2;
+          latency += (Math.min(200, Math.max(0, now - d.t)) - latency) * 0.2;
+          found = true;
+        }
+        if (!samples.length) continue;
+        delay += (latency + 1.3 * interval - delay) * Math.min(1, 2 / 120);
+        if (now >= 0) {
+          out.play.push([now / 1000, sampleAt(samples, now - delay, interval)]);
+          out.jump.push([now / 1000, samples.at(-1).p]);
+          out.delays.push(delay);
+        }
+      }
+      sim = out;
+    };
+    const fig = setup($("crFig"), (W) => (W < 520 ? 0.85 : 0.46), (ctx, W, H) => {
+      run();
+      stage(ctx, W, H);
+      const b = { x: 44, y: 22, w: W - 60, h: H - 64 };
+      const a = axes(ctx, b, [0, 1.5], [-30, 30], { xt: [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5], xf: (v) => v + " s", yt: [-20, 0, 20], yf: (v) => v + "°", yl: "yaw" });
+      if ($("crM").checked) { ctx.fillStyle = rgba(css("--accent2"), 0.12); ctx.fillRect(a.X(0.62), b.y, a.X(0.82) - a.X(0.62), b.h); label(ctx, "missed", a.X(0.64), b.y + 12, css("--accent2")); }
+      const mean = sim.delays.reduce((s, v) => s + v, 0) / sim.delays.length;
+      const show = $("crS").value;
+      line(ctx, range(0, 1.5, 300).map((t) => [t, truth(t)]), a.X, a.Y, rgba(css("--ink"), 0.3), 1);
+      line(ctx, range(0, 1.5, 300).map((t) => [t, truth(t - mean / 1000)]), a.X, a.Y, rgba(css("--accent"), 0.45), 1, [4, 4]);
+      for (const d of sim.dets) {
+        ctx.fillStyle = css("--ink"); ctx.beginPath(); ctx.arc(a.X(d.t / 1000), a.Y(d.p), 2.2, 0, 7); ctx.fill();
+        ctx.strokeStyle = rgba(css("--stage-ink"), 0.6); ctx.beginPath(); ctx.moveTo(a.X(d.arrival / 1000), b.y + b.h); ctx.lineTo(a.X(d.arrival / 1000), b.y + b.h - 6); ctx.stroke();
+      }
+      if (show !== "play") {
+        ctx.beginPath(); sim.jump.forEach(([t, v], i) => { if (i) ctx.lineTo(a.X(t), a.Y(sim.jump[i - 1][1])); i ? ctx.lineTo(a.X(t), a.Y(v)) : ctx.moveTo(a.X(t), a.Y(v)); });
+        ctx.strokeStyle = css("--accent2"); ctx.lineWidth = 1.5; ctx.stroke();
+      }
+      if (show !== "jump") line(ctx, sim.play, a.X, a.Y, css("--accent"), 2.2);
+      label(ctx, "ticks: when each detection comes back", b.x + 4, b.y + b.h - 10, css("--stage-ink"), 10);
+      const err = (arr, f) => Math.sqrt(arr.reduce((s, [t, v]) => s + (v - f(t)) ** 2, 0) / arr.length);
+      const pe = err(sim.play, (t) => truth(t - mean / 1000));
+      const je = err(sim.jump, (t) => truth(t - mean / 1000));
+      $("crR").innerHTML = `<span>delay <b>${mean.toFixed(0)} ms</b></span><span>playback vs delayed truth <b>±${pe.toFixed(2)}°</b></span><span>jump vs delayed truth <b>±${je.toFixed(2)}°</b></span>`;
+    });
+    bind("crF", "crFo", (v) => v + " fps", fig.redraw);
+    bind("crL", "crLo", (v) => v + " ms", fig.redraw);
+    $("crM").addEventListener("change", fig.redraw);
+    $("crS").addEventListener("change", fig.redraw);
+  }
+
+  // ---- 3. Pointer spring and holding ----
+  {
+    const springRun = (k) => {
+      const dt = 1 / 60; let yaw = (0.25 - 0.5) * 1.2, speed = 0;
+      const out = [];
+      for (let t = 0; t <= 1.5; t += dt) {
+        const x = t < 0.1 ? 0.25 : 0.85;
+        speed += (k * k * ((x - 0.5) * 1.2 - yaw) - 2 * k * speed) * dt;
+        yaw += speed * dt;
+        out.push([t, yaw, -0.05 * speed]);
+      }
+      return out;
+    };
+    const fig = setup($("springFig"), (W) => (W < 620 ? 1.15 : 0.44), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const narrow = W < 620;
+      const L = narrow ? { x: 44, y: 22, w: W - 60, h: H / 2 - 56 } : { x: 44, y: 22, w: W * 0.55 - 60, h: H - 64 };
+      const R = narrow ? { x: 44, y: H / 2 + 22, w: W - 60, h: H / 2 - 64 } : { x: W * 0.55 + 40, y: 22, w: W * 0.45 - 56, h: H - 64 };
+      const k = +$("spK").value;
+      const a = axes(ctx, L, [0, 1.5], [-0.45, 0.6], { xt: [0, 0.5, 1, 1.5], xf: (v) => v + " s", yt: [-0.3, 0, 0.3, 0.42], yf: (v) => v.toFixed(2), yl: "yaw, rad · roll ×5" });
+      const s = springRun(k), idle = springRun(9);
+      line(ctx, [[0, -0.3], [0.1, -0.3], [0.1, 0.42], [1.5, 0.42]], a.X, a.Y, rgba(css("--ink"), 0.3), 1);
+      line(ctx, idle.map((p) => [p[0], p[1]]), a.X, a.Y, css("--accent2"), 1.3, [5, 4]);
+      line(ctx, s.map((p) => [p[0], p[2] * 5]), a.X, a.Y, rgba(css("--accent"), 0.6), 1);
+      line(ctx, s.map((p) => [p[0], p[1]]), a.X, a.Y, css("--accent"), 2.2);
+      label(ctx, "pointer", a.X(0.13), a.Y(0.5), css("--stage-ink"));
+      label(ctx, "idle k = 9", a.X(0.55), a.Y(0.3), css("--accent2"));
+      label(ctx, "roll", a.X(0.4), a.Y(-0.32), css("--accent"));
+      const thr = +$("spT").value;
+      const b = axes(ctx, R, [0, 1.5], [0, 1.05], { xt: [0, 0.5, 1, 1.5], xf: (v) => v + " s held", yt: [0, 0.5, 1], yf: (v) => v.toFixed(1) });
+      const ts = range(0, 1.5, 150);
+      line(ctx, ts.map((t) => [t, 0.8 * smoothstep(0, 0.25, t)]), b.X, b.Y, css("--bone2"), 2);
+      line(ctx, ts.map((t) => [t, smoothstep(0.7, 1.1, t)]), b.X, b.Y, css("--accent2"), 1.6);
+      let g = 0; const glow = [];
+      for (let t = 0; t <= 1.5; t += 1 / 60) { const target = smoothstep(thr - 0.08, thr + 0.08, smoothstep(0.7, 1.1, t)); g += (target - g) * (1 - Math.exp(-8 / 60)); glow.push([t, g]); }
+      line(ctx, glow, b.X, b.Y, css("--ember"), 2.2);
+      label(ctx, "jaw", b.X(0.27), b.Y(0.86), css("--bone2"));
+      label(ctx, "scowl", b.X(1.12), b.Y(0.94), css("--accent2"));
+      label(ctx, "glow", b.X(1.2), b.Y(0.55), css("--ember"));
+      const settle = s.find((p) => p[0] > 0.1 && Math.abs(p[1] - 0.42) < 0.05 * 0.72);
+      const peakRoll = Math.max(...s.map((p) => Math.abs(p[2])));
+      const lit = glow.find((p) => p[1] > 0.5);
+      $("spR").innerHTML = `<span>95% of the turn after <b>${settle ? ((settle[0] - 0.1) * 1000).toFixed(0) + " ms" : "–"}</b></span><span>peak roll <b>${((peakRoll * 180) / Math.PI).toFixed(1)}°</b></span><span>eyes half lit after <b>${lit ? lit[0].toFixed(2) + " s" : "never"}</b> held</span>`;
+    });
+    bind("spK", "spKo", (v) => v.toFixed(1), fig.redraw);
+    bind("spT", "spTo", (v) => v.toFixed(2), fig.redraw);
+  }
+
+  // ---- 4. Presence ----
+  {
+    const at = (t) => {
+      let p, arriving;
+      if (t < 2.2) { p = 1 - t / 2.2; arriving = false; } else if (t < 4.2) { p = (t - 2.2) / 2; arriving = true; } else { p = 1; arriving = true; }
+      const away = smootherstep(1 - p);
+      const lit = smoothstep(0, 0.5, p);
+      const loose = arriving && p > 0.75 ? -0.7 * Math.sin((Math.PI * (p - 0.75)) / 0.25) : smootherstep(1 - p / 0.75);
+      return { p, away, lit, loose, z: -75 * away, x: 5 * Math.sin(p * Math.PI) * away, y: 3 * Math.sin(p * 5) * away, pitch: (0.5 + 0.25 * Math.sin(p * 6)) * away, yaw: 1.8 * away };
+    };
+    const fig = setup($("presenceFig"), (W) => (W < 620 ? 1.1 : 0.42), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const narrow = W < 620;
+      const L = narrow ? { x: 44, y: 22, w: W - 60, h: H / 2 - 56 } : { x: 44, y: 22, w: W * 0.56 - 60, h: H - 64 };
+      const t = +$("prT").value;
+      const a = axes(ctx, L, [0, 5], [-0.75, 1.05], { xt: [0, 1, 2, 3, 4, 5], xf: (v) => v + " s", yt: [-0.5, 0, 0.5, 1], yf: (v) => v.toFixed(1) });
+      const ts = range(0, 5, 250);
+      const series = [["p", css("--ink"), "presence"], ["away", css("--accent2"), "away"], ["lit", css("--ember"), "light"], ["loose", css("--accent"), "loose"]];
+      series.forEach(([k, c, n], i) => { line(ctx, ts.map((u) => [u, at(u)[k]]), a.X, a.Y, c, k === "p" ? 2.2 : 1.6); label(ctx, n, L.x + 8 + i * 70, L.y + 12, c); });
+      ctx.strokeStyle = css("--ink"); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(a.X(t), L.y); ctx.lineTo(a.X(t), L.y + L.h); ctx.stroke(); ctx.setLineDash([]);
+      const s = at(t);
+      const R = narrow ? { x: 20, y: H / 2 + 10, w: W - 40, h: H / 2 - 30 } : { x: W * 0.56 + 16, y: 18, w: W * 0.44 - 32, h: H - 36 };
+      const camX = R.x + R.w - 14, cy = R.y + R.h * 0.5;
+      const sc = (R.w - 40) / 100;
+      ctx.strokeStyle = css("--stage-line"); ctx.beginPath(); ctx.moveTo(R.x, cy); ctx.lineTo(camX, cy); ctx.stroke();
+      ctx.fillStyle = css("--stage-ink"); ctx.beginPath(); ctx.moveTo(camX + 8, cy - 7); ctx.lineTo(camX + 8, cy + 7); ctx.lineTo(camX - 4, cy); ctx.closePath(); ctx.fill();
+      label(ctx, "view", camX - 8, cy - 12, css("--stage-ink"), 10, "right");
+      const hx = camX - 20 * sc + s.z * sc, hy = cy - s.y * sc * 3;
+      const r = 9 * sc * 0.9 + 4;
+      ctx.save(); ctx.translate(hx, hy); ctx.rotate(-s.pitch); ctx.globalAlpha = 0.25 + 0.75 * s.lit;
+      ctx.fillStyle = css("--bone"); ctx.beginPath(); ctx.ellipse(0, 0, r, r * 0.9, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = css("--ember"); ctx.beginPath(); ctx.arc(r * 0.75, -r * 0.1, 2.5, 0, 7); ctx.fill();
+      ctx.restore(); ctx.globalAlpha = 1;
+      label(ctx, "−75 cm", camX - 20 * sc - 75 * sc, cy + r + 16, css("--stage-ink"), 10, "center");
+      ctx.strokeStyle = rgba(css("--stage-ink"), 0.5); ctx.beginPath(); ctx.moveTo(camX - 20 * sc - 75 * sc, cy + r + 4); ctx.lineTo(camX - 20 * sc - 75 * sc, cy + r - 2); ctx.stroke();
+      $("prR").innerHTML = `<span>presence <b>${s.p.toFixed(2)}</b></span><span>back <b>${(-s.z).toFixed(0)} cm</b></span><span>yaw <b>${((s.yaw * 180) / Math.PI).toFixed(0)}°</b></span><span>light <b>${(s.lit * 100).toFixed(0)}%</b></span><span>loose <b>${s.loose.toFixed(2)}</b></span>`;
+    });
+    const el = bind("prT", "prTo", (v) => v.toFixed(2) + " s", fig.redraw);
+    player($("prP"), el, 1, true);
+  }
+
+  // ---- 5. Cloth slice ----
+  {
+    const N = 64, SIZE = 0.52, SP = SIZE / (N - 1), CENTER_Z = 0.05, START_Y = 0.225, PIN_R = 0.015;
+    const STEP = 1 / 90, ITER = 5, DAMP = 0.97, MAX_MOVE = 0.012, FRICTION = 0.3, OFFSET = 0.006;
+    const LEASH = 0.03, LEASH_G = 0.35, CROWN_REACH = 0.07, CROWN_LIFT = 0.006, CROWN_LIFT_G = 0.15, LOOSE_SLACK = 8;
+    const DRAPE_PULL = 0.012, TETHER_SLACK = 1.02, CONTACT = 0.045, MAX_TILT = 0.85, DROP_Y = 0.5, DROP_SETTLE = 1.6;
+    const INERTIA = 0.6, MAX_LAG = 0.012, MAX_HEAD_MOVE = 0.05, PIVOT = [0.041, 0.089];
+    const sdEllipse = (z, y, cz, cy, rz, ry) => (Math.hypot((z - cz) / rz, (y - cy) / ry) - 1) * Math.min(rz, ry);
+    const sdBox = (z, y, cz, cy, hz, hy, r) => { const qz = Math.abs(z - cz) - hz + r, qy = Math.abs(y - cy) - hy + r; return Math.hypot(Math.max(qz, 0), Math.max(qy, 0)) + Math.min(Math.max(qz, qy), 0) - r; };
+    const JOINT = [0.004, 0.056];
+    let jaw = 0;
+    const sdCranium = (z, y) => Math.min(sdEllipse(z, y, -0.005, 0.118, 0.098, 0.088), sdBox(z, y, 0.062, 0.075, 0.03, 0.034, 0.012));
+    const sdJaw = (z, y) => {
+      const c = Math.cos(jaw), s = Math.sin(jaw), dz = z - JOINT[0], dy = y - JOINT[1];
+      const rz = JOINT[0] + dz * c - dy * s, ry = JOINT[1] + dz * s + dy * c;
+      return Math.min(sdBox(rz, ry, 0.052, 0.022, 0.03, 0.011, 0.009), sdBox(rz, ry, 0.008, 0.04, 0.01, 0.024, 0.008));
+    };
+    const sdf = (z, y) => Math.min(sdCranium(z, y), sdJaw(z, y));
+    const grad = (z, y) => { const e = 0.0005; return [(sdf(z + e, y) - sdf(z - e, y)) / (2 * e), (sdf(z, y + e) - sdf(z, y - e)) / (2 * e)]; };
+
+    const pz = new Float64Array(N), py = new Float64Array(N), qz = new Float64Array(N), qy = new Float64Array(N);
+    const restZ = new Float64Array(N), restY = new Float64Array(N), leash = new Float64Array(N), tether = new Float64Array(N), z0 = new Float64Array(N);
+    const pinned = new Uint8Array(N), planeD = new Float64Array(N), planeNz = new Float64Array(N), planeNy = new Float64Array(N), planePz = new Float64Array(N), planePy = new Float64Array(N);
+    const S = { hasAnchor: false, hasRest: false, anchor: [0, 0], leashBlend: 1, falling: false, fallTime: 0, pinnedAt: 0, loose: 0, time: 0, clock: 0, wind: [0, 0], draft: 5, tilt: 0, dropTilt: 0, pendingTurn: 0, state: "idle", outTime: 0, blow: [1, 0.9], fade: 1 };
+    for (let i = 0; i < N; i++) { z0[i] = CENTER_Z + (i - (N - 1) / 2) * SP; tether[i] = Math.abs(z0[i]); }
+    const cons = [];
+    for (let i = 0; i < N; i++) {
+      if (i + 1 < N) cons.push([i, i + 1, SP, 1]);
+      if (i + 2 < N) cons.push([i, i + 2, 2 * SP, 1]);
+      if (i % 2 === 0 && i + 4 < N) cons.push([i, i + 4, 4 * SP, 0.4]);
+    }
+    let seed = 12345;
+    for (let k = cons.length - 1; k > 0; k--) { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; const o = (seed >>> 8) % (k + 1); [cons[k], cons[o]] = [cons[o], cons[k]]; }
+
+    function pin() {
+      let n = 0; S.anchor = [0, 0];
+      for (let i = 0; i < N; i++) if (tether[i] <= PIN_R) { pinned[i] = 1; S.anchor[0] += pz[i]; S.anchor[1] += py[i]; n++; }
+      S.anchor[0] /= n; S.anchor[1] /= n; S.hasAnchor = true;
+    }
+    function collidePlanes() {
+      for (let i = 0; i < N; i++) {
+        if (pinned[i] || planeD[i] > CONTACT) continue;
+        const d = planeD[i] + planeNz[i] * (pz[i] - planePz[i]) + planeNy[i] * (py[i] - planePy[i]);
+        if (d < OFFSET) { pz[i] += planeNz[i] * (OFFSET - d); py[i] += planeNy[i] * (OFFSET - d); }
+      }
+    }
+    function collide() {
+      for (let i = 0; i < N; i++) {
+        if (pinned[i]) continue;
+        const d = sdf(pz[i], py[i]);
+        const lift = OFFSET + CROWN_LIFT + CROWN_LIFT_G * tether[i];
+        if (d >= OFFSET && (d <= lift || tether[i] > CROWN_REACH)) continue;
+        const [gz, gy] = grad(pz[i], py[i]); const l = Math.hypot(gz, gy); if (l < 1e-6) continue;
+        const nz = gz / l, ny = gy / l;
+        if (d > lift) { pz[i] -= nz * (d - lift); py[i] -= ny * (d - lift); continue; }
+        pz[i] += nz * (OFFSET - d); py[i] += ny * (OFFSET - d);
+        const vz = pz[i] - qz[i], vy = py[i] - qy[i], vn = vz * nz + vy * ny;
+        qz[i] += (vz - nz * vn) * FRICTION; qy[i] += (vy - ny * vn) * FRICTION;
+      }
+    }
+    function step(gz, gy) {
+      const h2 = STEP * STEP;
+      for (let i = 0; i < N; i++) {
+        planeD[i] = 1;
+        if (pinned[i]) continue;
+        const exposed = smoothstep(0.05, 0.2, tether[i]);
+        const gust = exposed * (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(py[i] * 23 + S.clock * 3.1) * Math.sin(pz[i] * 29 - py[i] * 41 - S.clock * 2.3)));
+        const az = gz + S.wind[0] * gust - S.draft * smoothstep(-0.03, 0.05, pz[i]);
+        const ay = gy + S.wind[1] * gust;
+        const d = sdf(pz[i], py[i]); const [ngz, ngy] = grad(pz[i], py[i]); const l = Math.hypot(ngz, ngy);
+        if (l > 1e-6) { planePz[i] = pz[i]; planePy[i] = py[i]; planeNz[i] = ngz / l; planeNy[i] = ngy / l; planeD[i] = d; }
+        let vz = (pz[i] - qz[i]) * DAMP + az * h2, vy = (py[i] - qy[i]) * DAMP + ay * h2;
+        const sp = Math.hypot(vz, vy); if (sp > MAX_MOVE) { vz *= MAX_MOVE / sp; vy *= MAX_MOVE / sp; }
+        qz[i] = pz[i]; qy[i] = py[i]; pz[i] += vz; py[i] += vy;
+      }
+      const leashOn = $("clL").checked;
+      for (let it = 0; it < ITER; it++) {
+        for (const [a, b, rest, st] of cons) {
+          const wa = pinned[a] ? 0 : 1, wb = pinned[b] ? 0 : 1; if (wa + wb === 0) continue;
+          const dz = pz[b] - pz[a], dy = py[b] - py[a], l = Math.hypot(dz, dy); if (l < 1e-9) continue;
+          const s = (((l - rest) / l) * st) / (wa + wb);
+          pz[a] += dz * s * wa; py[a] += dy * s * wa; pz[b] -= dz * s * wb; py[b] -= dy * s * wb;
+        }
+        if (S.hasAnchor) for (let i = 0; i < N; i++) {
+          if (pinned[i]) continue;
+          const dz = pz[i] - S.anchor[0], dy = py[i] - S.anchor[1], l = Math.hypot(dz, dy), reach = tether[i] * TETHER_SLACK;
+          if (l > reach) { pz[i] = S.anchor[0] + (dz * reach) / l; py[i] = S.anchor[1] + (dy * reach) / l; }
+        }
+        if (S.hasRest && leashOn) {
+          const slack = 1 + (S.loose > 0 ? LOOSE_SLACK : 1) * S.loose;
+          for (let i = 0; i < N; i++) {
+            if (pinned[i]) continue;
+            const dz = pz[i] - restZ[i], dy = py[i] - restY[i];
+            const reach = leash[i] * slack * (1 + 6 * (1 - S.leashBlend));
+            if (S.loose <= 0 && it === 0) { const k = DRAPE_PULL * S.leashBlend; pz[i] -= dz * k; py[i] -= dy * k; }
+            const l = Math.hypot(dz, dy);
+            if (l > reach) { pz[i] = restZ[i] + (dz * reach) / l; py[i] = restY[i] + (dy * reach) / l; }
+          }
+        }
+        if (it < ITER - 1) collidePlanes(); else collide();
+      }
+    }
+    function layFlat(y0, slope) {
+      for (let i = 0; i < N; i++) { pz[i] = qz[i] = z0[i]; py[i] = qy[i] = y0 + slope * z0[i]; }
+      pinned.fill(0); S.hasAnchor = false; S.hasRest = false;
+    }
+    function reset(live) {
+      layFlat(START_Y, 0);
+      S.time = 0; S.falling = live; S.fallTime = 0; S.leashBlend = 1;
+      const jawNow = jaw, wind = S.wind; jaw = 0; S.wind = [0, 0];
+      for (let s = 0; s < 120; s++) { if (s === 20) pin(); step(0, -9.81); }
+      jaw = jawNow; S.wind = wind;
+      for (let i = 0; i < N; i++) { restZ[i] = pz[i]; restY[i] = py[i]; leash[i] = LEASH + LEASH_G * tether[i]; }
+      S.hasRest = true;
+      if (live) layFlat(DROP_Y, (Math.random() - 0.5) * 0.3);
+    }
+    const crownLanded = () => { for (let i = 0; i < N; i++) if (tether[i] <= PIN_R && sdf(pz[i], py[i]) < OFFSET + 0.004) return true; return false; };
+    function headTurn(delta) {
+      const c = Math.cos(-delta), s = Math.sin(-delta);
+      const move = (z, y) => [PIVOT[0] + (z - PIVOT[0]) * c - (y - PIVOT[1]) * s, PIVOT[1] + (z - PIVOT[0]) * s + (y - PIVOT[1]) * c];
+      const [tz, ty] = move(0.1, 0.1);
+      if (Math.hypot(tz - 0.1, ty - 0.1) > MAX_HEAD_MOVE) return;
+      const maxLag = MAX_LAG * (1 + LOOSE_SLACK * Math.max(0, S.loose));
+      for (let i = 0; i < N; i++) {
+        if (pinned[i]) continue;
+        const [mz, my] = move(pz[i], py[i]);
+        let dz = INERTIA * (mz - pz[i]), dy = INERTIA * (my - py[i]);
+        const l = Math.hypot(dz, dy); if (l > maxLag) { dz *= maxLag / l; dy *= maxLag / l; }
+        pz[i] += dz; py[i] += dy; qz[i] += dz; qy[i] += dy;
+      }
+    }
+    function gravity() {
+      let gz = -Math.sin(S.tilt), gy = -Math.cos(S.tilt);
+      if (S.falling && !S.hasAnchor) { gz = 0; gy = -1; }
+      const world = [gz, gy];
+      const tilt = $("clC").checked ? MAX_TILT + (Math.PI - MAX_TILT) * Math.max(0, S.loose) : Math.PI;
+      const ang = Math.atan2(gz, -gy);
+      if (Math.abs(ang) > tilt) { const a = Math.sign(ang) * tilt; gz = Math.sin(a); gy = -Math.cos(a); }
+      return { world, g: [gz, gy], tilt };
+    }
+    function update(dt) {
+      if (S.state === "blowing") {
+        S.outTime += dt;
+        const k = 16 * smoothstep(0, 0.9, S.outTime);
+        S.wind = [S.blow[0] * k, S.blow[1] * k]; S.loose = 1;
+        S.fade = 1 - smoothstep(1.3, 1.8, S.outTime);
+        if (S.outTime >= 1.8) { S.state = "idle"; S.loose = 0; S.fade = 1; S.wind = [0, 0]; reset(true); }
+      } else {
+        const g = +$("clG").value;
+        S.wind = [g * (0.8 + 0.2 * Math.sin(S.clock * 7.3) * Math.sin(S.clock * 3.1 + 1)), 0];
+      }
+      S.draft = +$("clD").value;
+      if (S.pendingTurn && !(S.falling && !S.hasAnchor)) headTurn(S.pendingTurn);
+      S.pendingTurn = 0;
+      if (S.falling) {
+        if (!S.hasAnchor && (crownLanded() || S.fallTime > 2)) { pin(); S.pinnedAt = S.fallTime; S.hasRest = true; }
+        if (S.hasAnchor) {
+          const t = Math.min(1, (S.fallTime - S.pinnedAt) / DROP_SETTLE);
+          S.leashBlend = t * t * (3 - 2 * t);
+          const k = Math.min(1, dt * 3); let n = 0; S.anchor = [0, 0];
+          for (let i = 0; i < N; i++) {
+            if (!pinned[i] || tether[i] > PIN_R) continue;
+            pz[i] += (restZ[i] - pz[i]) * k; py[i] += (restY[i] - py[i]) * k; qz[i] = pz[i]; qy[i] = py[i];
+            S.anchor[0] += pz[i]; S.anchor[1] += py[i]; n++;
+          }
+          S.anchor[0] /= Math.max(1, n); S.anchor[1] /= Math.max(1, n);
+          if (t >= 1) S.falling = false;
+        }
+      }
+      const { g } = gravity();
+      S.time += dt; let steps = 0;
+      while (S.time >= STEP && steps < 3) { step(g[0] * 9.81, g[1] * 9.81); S.time -= STEP; S.clock += STEP; if (S.falling) S.fallTime += STEP; steps++; }
+      if (S.time >= STEP) S.time = 0;
+    }
+    reset(false);
+
+    let headImg = null, headKey = "";
+    const view = { z0: -0.32, z1: 0.42, y0: -0.2, y1: 0.56 };
+    function headLayer(W, H, s, ox, oy) {
+      const key = `${W}x${H}|${jaw}|${css("--bone")}`;
+      if (key === headKey) return headImg;
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      const w = Math.round(W * dpr), h = Math.round(H * dpr);
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      const g = c.getContext("2d"); const img = g.createImageData(w, h);
+      const [r, gg, b] = rgb(css("--bone")); const [r2, g2, b2] = rgb(css("--bone2"));
+      const px = 1 / (s * dpr);
+      for (let j = 0; j < h; j++) {
+        const y = (oy - j / dpr) / s;
+        if (y < -0.05 || y > 0.23) continue;
+        for (let i = 0; i < w; i++) {
+          const z = (i / dpr - ox) / s;
+          if (z < -0.12 || z > 0.12) continue;
+          const d = sdf(z, y); const cov = clamp01(0.5 - d / px);
+          if (cov <= 0) continue;
+          const shade = clamp01(-d / 0.02);
+          const o = (j * w + i) * 4;
+          img.data[o] = r2 + (r - r2) * shade; img.data[o + 1] = g2 + (gg - g2) * shade; img.data[o + 2] = b2 + (b - b2) * shade; img.data[o + 3] = 255 * cov;
+        }
+      }
+      g.putImageData(img, 0, 0);
+      headImg = c; headKey = key;
+      return c;
+    }
+    const fig = setup($("clothFig"), (W) => (W < 520 ? 1.05 : 0.7), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const s = Math.min(W / (view.z1 - view.z0), H / (view.y1 - view.y0));
+      const ox = W / 2 - ((view.z0 + view.z1) / 2) * s, oy = H / 2 + ((view.y0 + view.y1) / 2) * s;
+      const X = (z) => ox + z * s, Y = (y) => oy - y * s;
+      ctx.drawImage(headLayer(W, H, s, ox, oy), 0, 0, W, H);
+      label(ctx, "face →", X(0.12), Y(0.08), css("--stage-ink"));
+      if (S.hasRest && $("clL").checked) {
+        ctx.setLineDash([3, 3]); ctx.strokeStyle = rgba(css("--accent2"), 0.7); ctx.lineWidth = 1;
+        ctx.beginPath(); for (let i = 0; i < N; i++) (i ? ctx.lineTo(X(restZ[i]), Y(restY[i])) : ctx.moveTo(X(restZ[i]), Y(restY[i]))); ctx.stroke(); ctx.setLineDash([]);
+        const slack = 1 + (S.loose > 0 ? LOOSE_SLACK : 1) * S.loose;
+        for (let i = 3; i < N; i += 10) { ctx.strokeStyle = rgba(css("--accent2"), 0.35); ctx.beginPath(); ctx.arc(X(restZ[i]), Y(restY[i]), leash[i] * slack * (1 + 6 * (1 - S.leashBlend)) * s, 0, 7); ctx.stroke(); }
+        label(ctx, "drape + leash", X(restZ[N - 1]) + 6, Y(restY[N - 1]), css("--accent2"), 10);
+      }
+      ctx.globalAlpha = S.fade;
+      ctx.beginPath(); for (let i = 0; i < N; i++) (i ? ctx.lineTo(X(pz[i]), Y(py[i])) : ctx.moveTo(X(pz[i]), Y(py[i])));
+      ctx.strokeStyle = css("--cloth"); ctx.lineWidth = 2.6; ctx.lineJoin = "round"; ctx.stroke();
+      for (let i = 0; i < N; i++) { ctx.fillStyle = pinned[i] ? css("--accent") : rgba(css("--cloth"), 0.8); ctx.beginPath(); ctx.arc(X(pz[i]), Y(py[i]), pinned[i] ? 3 : 1.3, 0, 7); ctx.fill(); }
+      ctx.globalAlpha = 1;
+      if (S.hasAnchor) label(ctx, "crown pin", X(S.anchor[0]) + 8, Y(S.anchor[1]) - 10, css("--accent"), 10);
+      const { world, g, tilt } = gravity();
+      const gx = 40, gy = 44, L = 26;
+      ctx.fillStyle = rgba(css("--accent"), 0.1); ctx.beginPath(); ctx.moveTo(gx, gy); ctx.arc(gx, gy, L + 4, Math.PI / 2 - Math.min(tilt, Math.PI), Math.PI / 2 + Math.min(tilt, Math.PI)); ctx.closePath(); ctx.fill();
+      const arrow = (v, c, w) => { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx + v[0] * L, gy - v[1] * L); ctx.stroke(); ctx.fillStyle = c; ctx.beginPath(); ctx.arc(gx + v[0] * L, gy - v[1] * L, 2.5, 0, 7); ctx.fill(); };
+      arrow(world, css("--stage-ink"), 1); arrow(g, css("--accent"), 2);
+      label(ctx, "gravity", gx + 34, gy + 4, css("--accent"), 10);
+      let stray = 0; if (S.hasRest) for (let i = 0; i < N; i++) stray = Math.max(stray, Math.hypot(pz[i] - restZ[i], py[i] - restY[i]));
+      let touching = 0; for (let i = 0; i < N; i++) if (sdf(pz[i], py[i]) < OFFSET + 0.002) touching++;
+      const state = S.state === "blowing" ? "blowing away" : S.falling ? (S.hasAnchor ? "landed, leash tightening" : "falling") : "draped";
+      $("clR").innerHTML = `<span>state <b>${state}</b></span><span>furthest from drape <b>${S.hasRest ? (stray * 100).toFixed(1) + " cm" : "–"}</b></span><span>on the bone <b>${touching}</b> of 64</span>`;
+    });
+    const tiltEl = bind("clT", "clTo", (v) => v + "°", () => { const t = (+tiltEl.value * Math.PI) / 180; S.pendingTurn += t - S.tilt; S.tilt = t; });
+    bind("clJ", "clJo", (v) => v.toFixed(2) + " rad", () => { jaw = +$("clJ").value; });
+    bind("clD", "clDo", (v) => v + " m/s²", () => {});
+    bind("clG", "clGo", (v) => v.toFixed(1) + " m/s²", () => {});
+    $("clDrop").addEventListener("click", () => { if (S.state === "idle") reset(true); });
+    $("clBlow").addEventListener("click", () => {
+      if (S.state !== "idle") return;
+      pinned.fill(0); S.hasAnchor = false; S.hasRest = false; S.falling = false;
+      const side = Math.random() < 0.5 ? -1 : 1, l = Math.hypot(1, 0.9);
+      S.blow = [side / l, 0.9 / l]; S.state = "blowing"; S.outTime = 0;
+    });
+    const vis = onScreen($("clothFig"));
+    let last = 0;
+    const loop = (t) => {
+      const dt = last ? Math.min(0.05, (t - last) / 1000) : 0; last = t;
+      if (vis.visible && dt > 0) { update(dt); fig.paint(); }
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+
+  // ---- 6. Stochastic shadow ----
+  {
+    const fract = (x) => x - Math.floor(x);
+    const ign = (x, y, f) => { const o = 5.588238 * (f % 64); return fract(52.9829189 * fract((x + o) * 0.06711056 + (y + o) * 0.00583715)); };
+    const blocked = (op, diff) => (0.15 + 0.3 * diff) + (1 - (0.15 + 0.3 * diff)) * op;
+    const G = 44;
+    let frame = 0;
+    const history = [];
+    const disc = []; for (let y = -4; y <= 4; y++) for (let x = -4; x <= 4; x++) if (x * x + y * y <= 3.5 * 3.5) disc.push([x, y]);
+    const params = () => {
+      const opacity = +$("shO").value, diff = +$("shD").value, dirt = +$("shG").value, worn = +$("shW").value;
+      const op = (opacity + (1 - opacity) * 0.5 * dirt) * (1 - 0.85 * worn);
+      return { opacity, diff, dirt, worn, op, p: blocked(op, diff) };
+    };
+    const fig = setup($("shadowFig"), (W) => (W < 620 ? 1.05 : 0.4), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const narrow = W < 620;
+      const P = params();
+      const L = narrow ? { x: 44, y: 22, w: W - 60, h: H * 0.5 - 56 } : { x: 44, y: 22, w: W * 0.4 - 56, h: H - 64 };
+      const a = axes(ctx, L, [0, 1], [0, 1], { xt: [0, 0.5, 1], xf: (v) => v.toFixed(1), yt: [0, 0.15, 0.5, 1], yf: (v) => v.toFixed(2), xl: "op", yl: "chance of blocking" });
+      for (const d of [0, 0.25, 0.5]) line(ctx, [[0, blocked(0, d)], [1, 1]], a.X, a.Y, rgba(css("--stage-ink"), 0.5), 1, [3, 3]);
+      line(ctx, [[0, blocked(0, P.diff)], [1, 1]], a.X, a.Y, css("--accent"), 2);
+      ctx.fillStyle = css("--accent"); ctx.beginPath(); ctx.arc(a.X(P.op), a.Y(P.p), 4.5, 0, 7); ctx.fill();
+      const field = new Float32Array(G * G);
+      for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) field[y * G + x] = P.p > ign(x, y, frame) ? 1 : 0;
+      const filtered = new Float32Array(G * G);
+      for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) { let s = 0, n = 0; for (const [dx, dy] of disc) { const u = x + dx, v = y + dy; if (u < 0 || v < 0 || u >= G || v >= G) continue; s += field[v * G + u]; n++; } filtered[y * G + x] = s / n; }
+      history.push(filtered); while (history.length > 16) history.shift();
+      const accum = new Float32Array(G * G); for (const h of history) for (let i = 0; i < accum.length; i++) accum[i] += h[i] / history.length;
+      const area = narrow ? { x: 16, y: H * 0.5 + 8, w: W - 32, h: H * 0.5 - 40 } : { x: W * 0.4 + 8, y: 20, w: W * 0.6 - 24, h: H - 52 };
+      const cell = Math.floor(Math.min((area.w - 24) / 3, area.h - 10) / G);
+      const size = cell * G;
+      const lit = rgb(css("--bone")), dark = rgb(css("--shade"));
+      const panels = [[field, "this frame"], [filtered, "filtered, 3.5 texels"], [accum, "over 16 frames"]];
+      panels.forEach(([f, name], k) => {
+        const x0 = area.x + k * (size + 12), y0 = area.y;
+        for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+          const b = f[y * G + x];
+          const c = lit.map((v, i) => Math.round(v + (dark[i] - v) * b * 0.85));
+          ctx.fillStyle = `rgb(${c.join(",")})`; ctx.fillRect(x0 + x * cell, y0 + y * cell, cell, cell);
+        }
+        label(ctx, name, x0, y0 + size + 14, css("--stage-ink"), 10);
+      });
+      const mean = accum.reduce((s, v) => s + v, 0) / accum.length;
+      const veilBlock = blocked(P.opacity, P.diff);
+      $("shR").innerHTML = `<span>op <b>${P.op.toFixed(2)}</b></span><span>chance of blocking <b>${P.p.toFixed(2)}</b></span><span>measured <b>${mean.toFixed(2)}</b></span><span>bone's soft light cut <b>${veilBlock.toFixed(2)}</b> (tattered ${(veilBlock * 0.8).toFixed(2)})</span>`;
+    });
+    for (const [id, f] of [["shO", (v) => v.toFixed(2)], ["shD", (v) => v.toFixed(2)], ["shG", (v) => v.toFixed(2)], ["shW", (v) => v.toFixed(2)]]) bind(id, id + "o", f, () => { history.length = 0; fig.redraw(); });
+    const vis = onScreen($("shadowFig"));
+    setInterval(() => { if (vis.visible) { frame++; fig.paint(); } }, 66);
+  }
+
+  // ---- 7. Tatter maps ----
+  {
+    const C = 63;
+    const notchCache = new Map();
+    function notchesFor(seed) {
+      if (notchCache.has(seed)) return notchCache.get(seed);
+      let state = 2024 + seed * 7919;
+      const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; };
+      const edges = [];
+      for (let edge = 0; edge < 4; edge++) {
+        const notches = []; let at = random() * 2;
+        while (at < C) {
+          const middle = edge === 0 ? Math.max(0, 1 - Math.abs(at + 1.5 - C / 2) / 16) : 0;
+          const width = (3 + random() * 3.5) * (1 - 0.5 * middle);
+          const reach = edge === 0 ? 6 + 5 * middle : 5;
+          notches.push({ center: at + width / 2, depth: reach * (0.5 + 0.5 * random()), halfWidth: width * 0.55 });
+          at += width;
+        }
+        edges.push(notches);
+      }
+      notchCache.set(seed, edges);
+      return edges;
+    }
+    function tatteredCloth(x, y, seed) {
+      const notches = notchesFor(seed);
+      let inside = Infinity;
+      const sides = [[C - y, x], [y, x], [x, y], [C - x, y]];
+      for (let edge = 0; edge < 4; edge++) {
+        const [depth, along] = sides[edge]; let cut = 0;
+        for (const n of notches[edge]) cut = Math.max(cut, n.depth * (1 - Math.abs(along - n.center) / n.halfWidth));
+        inside = Math.min(inside, depth - cut);
+      }
+      return inside;
+    }
+    function hasher(seed) {
+      const s = Math.imul(seed + 1, 0x9e3779b1);
+      return (x, y) => { let h = Math.imul(x, 0x27d4eb2d) ^ Math.imul(y, 0x165667b1) ^ s; h = Math.imul(h ^ (h >>> 15), 0x85ebca6b); h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+    }
+    function noiseFn(hash) {
+      return (x, y, wrap = 0) => {
+        const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy;
+        const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+        const x0 = wrap ? ((ix % wrap) + wrap) % wrap : ix, x1 = wrap ? (x0 + 1) % wrap : ix + 1;
+        const a = hash(x0, iy), b = hash(x1, iy), c = hash(x0, iy + 1), d = hash(x1, iy + 1);
+        return (a + (b - a) * u + (c - a + (d - c - b + a) * u) * v) * 2 - 1;
+      };
+    }
+    function createTatterData(seed, T) {
+      const size = C * T, n = size * size;
+      const CROWN = [C / 2, C / 2 - 6];
+      const noise = noiseFn(hasher(seed)), noise2 = noiseFn(hasher(seed + 101)), threadHash = hasher(seed + 7);
+      const hanging = (turn, along, count, period, layer) => noise(turn * count + layer * 7.3, along / period + layer * 31.7, count);
+      const fbm = (x, y) => 0.55 * noise2(x, y) + 0.3 * noise2(x * 2.1 + 5.2, y * 2.1 + 1.3) + 0.15 * noise2(x * 4.3 + 9.1, y * 4.3 + 4.7);
+      const edge = new Float32Array(n), turnOf = new Float32Array(n), downX = new Float32Array(n), downY = new Float32Array(n), hemOf = new Float32Array(n), insideOf = new Float32Array(n);
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        const i = y * size + x, cx = (x + 0.5) / T, cy = (y + 0.5) / T, dx = cx - CROWN[0], dy = cy - CROWN[1];
+        const along = Math.hypot(dx, dy) || 1e-3, turn = Math.atan2(dx, dy) / (2 * Math.PI) + 0.5;
+        turnOf[i] = turn; downX[i] = dx / along; downY[i] = dy / along;
+        const outlineInside = tatteredCloth(cx, cy, seed); insideOf[i] = outlineInside;
+        const inside = outlineInside - 0.25 * noise(cx * 1.3, cy * 1.3) - 0.12 * noise(cx * 4.1, cy * 4.1);
+        const hem = smoothstep(13, 0, inside); hemOf[i] = hem;
+        const warp = 0.35 * noise2(cx * 0.35, cy * 0.35);
+        const eaten = 0.55 * hanging(turn + 0.01 * warp, along, 64, 9, 1) + 0.28 * hanging(turn, along + 2 * warp, 131, 3.5, 2) + 0.17 * hanging(turn, along, 211, 1.1, 3);
+        const rip = hanging(turn, along, 23, 12, 4);
+        const level = Math.max(eaten - (0.9 - 0.72 * hem), rip - (1.05 - 0.45 * hem));
+        edge[i] = Math.min(inside, -level * 7);
+      }
+      const joined = new Uint8Array(n);
+      const stack = [Math.floor(CROWN[1] * T) * size + Math.floor(CROWN[0] * T)]; joined[stack[0]] = 1;
+      while (stack.length) {
+        const i = stack.pop(), x = i % size, y = (i - x) / size;
+        for (const j of [x > 0 ? i - 1 : -1, x < size - 1 ? i + 1 : -1, y > 0 ? i - size : -1, y < size - 1 ? i + size : -1]) { if (j < 0 || joined[j] || edge[j] < 0) continue; joined[j] = 1; stack.push(j); }
+      }
+      const dist = new Float32Array(n); for (let i = 0; i < n; i++) dist[i] = joined[i] ? 0 : 1e9;
+      const D = Math.SQRT2;
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        const i = y * size + x; let d = dist[i];
+        if (x > 0) d = Math.min(d, dist[i - 1] + 1);
+        if (y > 0) { d = Math.min(d, dist[i - size] + 1); if (x > 0) d = Math.min(d, dist[i - size - 1] + D); if (x < size - 1) d = Math.min(d, dist[i - size + 1] + D); }
+        dist[i] = d;
+      }
+      for (let y = size - 1; y >= 0; y--) for (let x = size - 1; x >= 0; x--) {
+        const i = y * size + x; let d = dist[i];
+        if (x < size - 1) d = Math.min(d, dist[i + 1] + 1);
+        if (y < size - 1) { d = Math.min(d, dist[i + size] + 1); if (x < size - 1) d = Math.min(d, dist[i + size + 1] + D); if (x > 0) d = Math.min(d, dist[i + size - 1] + D); }
+        dist[i] = d;
+      }
+      for (let i = 0; i < n; i++) if (!joined[i] && edge[i] >= 0) edge[i] = -Math.max(dist[i], 1) / T;
+      const outline = new Uint8Array(n * 4), dirt = new Uint8Array(n * 4);
+      const GRIME = [92, 84, 72], STAIN = [150, 118, 76], TIDE = [96, 70, 44], AGED = [246, 238, 222];
+      const dd = (xx, yy) => dist[Math.min(size - 1, Math.max(0, yy)) * size + Math.min(size - 1, Math.max(0, xx))];
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        const i = y * size + x, e = edge[i], cx = (x + 0.5) / T, cy = (y + 0.5) / T;
+        let d = e * T;
+        const out = joined[i] ? 0 : dist[i] / T;
+        if (e < 0 && out < 3.2) {
+          const gx = dd(x + 1, y) - dd(x - 1, y), gy = dd(x, y + 1) - dd(x, y - 1), l = Math.hypot(gx, gy) || 1;
+          const facing = Math.max(0, (gx * downX[i] + gy * downY[i]) / l);
+          const along = Math.hypot(cx - CROWN[0], cy - CROWN[1]);
+          const across = turnOf[i] * 520 + 0.6 * noise(cx * 1.7, cy * 1.7);
+          const thread = Math.floor(across), h = threadHash(thread, 0), width = Math.abs(across - thread - 0.5) * 2;
+          const length = 3.2 * smoothstep(0.05, 0.5, facing) * (0.25 + 0.75 * ((h - 0.5) / 0.5) ** 2) * (0.6 + 0.4 * noise(thread * 0.37, along * 0.2));
+          if (h > 0.5 && length > 0.4) {
+            const unit = (2 * Math.PI * along * T) / 520;
+            const half = Math.max((0.35 + 0.25 * threadHash(thread, 1)) / 2, 1.1 / unit);
+            d = Math.max(d, Math.min((half - width / 2) * unit, (length - out) * T));
+          }
+        }
+        const cloth = d > 0 ? 1 : 0;
+        const patches = Math.max(0, fbm(cx * 0.45, cy * 0.45) - 0.15) * hemOf[i] * hemOf[i];
+        const thin = e < 0 ? 0.15 * cloth : Math.max(0.45 * (1 - smoothstep(0, 0.9, e)), Math.min(0.8, patches * 1.6));
+        const o = i * 4;
+        outline[o] = Math.round(255 * thin);
+        outline[o + 1] = outline[o + 2] = Math.round(255 * clamp01(0.5 + d / 8));
+        outline[o + 3] = 255;
+        const grimeReach = smoothstep(16, 0, Math.max(0, insideOf[i]));
+        const fromCrown = Math.hypot(cx - CROWN[0], cy - CROWN[1]);
+        const nearEdge = 0.5 * (1 - smoothstep(0, 2.5, Math.max(0, e)));
+        const blotch = fbm(cx * 0.22 + 3.1, cy * 0.22 + 7.4);
+        const streak = noise(turnOf[i] * 260, fromCrown / 6, 260) * smoothstep(6, 14, fromCrown);
+        const grime = e < 0 ? 0.7 : clamp01(0.75 * grimeReach + 0.45 * nearEdge + 0.35 * blotch + 0.08 * streak * grimeReach - 0.18);
+        const s = fbm(cx * 0.13 + 11.3, cy * 0.13 + 2.9) + 0.06 * noise(cx * 0.8, cy * 0.8) + 0.25 * grimeReach;
+        const stain = smoothstep(0.42, 0.5, s), tide = Math.exp(-(((s - 0.46) / 0.025) ** 2));
+        const speck = Math.max(0, noise(cx * 9, cy * 9) - 0.72) * 4 * grime;
+        for (let k = 0; k < 3; k++) {
+          let c = AGED[k] + 6 * blotch;
+          c += (STAIN[k] - c) * 0.25 * stain; c += (TIDE[k] - c) * 0.4 * tide; c += (GRIME[k] - c) * 0.85 * grime; c *= 1 - 0.6 * Math.min(1, speck);
+          dirt[o + k] = Math.round(clamp(c, 0, 255));
+        }
+        dirt[o + 3] = 255;
+      }
+      const kept = new Uint8Array(n);
+      const start = Math.floor(CROWN[1] * T) * size + Math.floor(CROWN[0] * T);
+      const queue = [start]; kept[start] = 1;
+      while (queue.length) {
+        const i = queue.pop(), x = i % size;
+        for (let dy = -size; dy <= size; dy += size) for (let dx = -1; dx <= 1; dx++) {
+          const j = i + dy + dx;
+          if (j < 0 || j >= n || x + dx < 0 || x + dx >= size || kept[j] || outline[j * 4 + 1] < 128) continue;
+          kept[j] = 1; queue.push(j);
+        }
+      }
+      for (let i = 0; i < n; i++) if (!kept[i]) outline[i * 4] = outline[i * 4 + 1] = outline[i * 4 + 2] = 0;
+      return { size, outline, dirt, T };
+    }
+    const T = 12;
+    const cache = new Map();
+    let maps = null, pending = null;
+    let focus = [C / 2, 57];
+    const decode = (m, x, y) => { x = clamp(x, 0, m.size - 1); y = clamp(y, 0, m.size - 1); return (m.outline[(y * m.size + x) * 4 + 1] / 255 - 0.5) * 8; };
+    const sampleD = (m, u, v) => {
+      const x = Math.floor(u - 0.5), y = Math.floor(v - 0.5), fx = u - 0.5 - x, fy = v - 0.5 - y;
+      const a = decode(m, x, y), b = decode(m, x + 1, y), c = decode(m, x, y + 1), d = decode(m, x + 1, y + 1);
+      return [a + (b - a) * fx + (c - a + (d - c - b + a) * fx) * fy, (b - a) + (d - c - b + a) * fy, (c - a) + (d - c - b + a) * fx];
+    };
+    const palette = () => ({ stage: rgb(css("--stage")), ink: rgb(css("--ink")), inside: rgb(css("--accent2")), outside: rgb(css("--accent")) });
+    const col = [0, 0, 0];
+    function texelColor(m, view, i, cov, pal) {
+      const o = i * 4, st = pal.stage;
+      if (view === "cut") { for (let k = 0; k < 3; k++) col[k] = st[k] + (pal.ink[k] - st[k]) * cov; return col; }
+      if (view === "edge") {
+        const d = (m.outline[o + 1] / 255 - 0.5) * 8, t = 1 - 0.85 * clamp01(Math.abs(d) / 4), c = d > 0 ? pal.inside : pal.outside;
+        for (let k = 0; k < 3; k++) col[k] = st[k] + (c[k] - st[k]) * t;
+        return col;
+      }
+      if (view === "wear") { const w = 230 * (1 - m.outline[o] / 255); for (let k = 0; k < 3; k++) col[k] = st[k] + (w - st[k]) * cov; return col; }
+      if (view === "dirt") { col[0] = m.dirt[o]; col[1] = m.dirt[o + 1]; col[2] = m.dirt[o + 2]; return col; }
+      const dirtiness = 1 - m.dirt[o + 1] / 255;
+      const a = cov * (0.45 + 0.55 * 0.5 * dirtiness) * (1 - 0.85 * (m.outline[o] / 255));
+      const base = [185, 178, 168], dark = [10, 9, 9];
+      for (let k = 0; k < 3; k++) col[k] = dark[k] * (1 - a) + ((base[k] * m.dirt[o + k]) / 255) * a;
+      return col;
+    }
+    let mapCanvas = null, mapKey = "";
+    function mapImage(view, aa) {
+      const key = `${maps.seed}|${view}|${aa}|${document.documentElement.dataset.theme || ""}|${css("--stage")}`;
+      if (key === mapKey) return mapCanvas;
+      const m = maps, size = m.size, c = document.createElement("canvas"); c.width = size; c.height = size;
+      const g = c.getContext("2d"), img = g.createImageData(size, size), pal = palette();
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        const d = decode(m, x, y), fw = Math.abs(decode(m, x + 1, y) - d) + Math.abs(decode(m, x, y + 1) - d);
+        const cov = aa ? clamp01(0.5 + d / Math.max(fw, 1e-4)) : d > 0 ? 1 : 0;
+        const c3 = texelColor(m, view, y * size + x, cov, pal), o = (y * size + x) * 4;
+        img.data[o] = c3[0]; img.data[o + 1] = c3[1]; img.data[o + 2] = c3[2]; img.data[o + 3] = 255;
+      }
+      g.putImageData(img, 0, 0);
+      mapCanvas = c; mapKey = key;
+      return c;
+    }
+    let layout = null;
+    const fig = setup($("tatterFig"), (W) => (W < 620 ? 1.95 : 0.5), (ctx, W, H) => {
+      stage(ctx, W, H);
+      if (!maps || maps.seed !== +$("ttS").value) { label(ctx, "making the maps…", W / 2, H / 2, css("--stage-ink"), 12, "center"); return; }
+      const narrow = W < 620, view = $("ttV").value, aa = $("ttA").checked, zoom = +$("ttZ").value;
+      const side = narrow ? Math.min(W - 32, H / 2 - 30) : Math.min(W / 2 - 24, H - 34);
+      const A = { x: narrow ? (W - side) / 2 : 16, y: 12, s: side };
+      const B = narrow ? { x: (W - side) / 2, y: side + 40, s: side } : { x: W / 2 + 8, y: 12, s: side };
+      layout = { A, narrow };
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(mapImage(view, aa), A.x, A.y, A.s, A.s);
+      const m = maps, px = A.s / C;
+      ctx.fillStyle = css("--accent"); ctx.beginPath(); ctx.arc(A.x + (C / 2) * px, A.y + (C / 2 - 6) * px, 3.5, 0, 7); ctx.fill();
+      label(ctx, "crown", A.x + (C / 2) * px + 7, A.y + (C / 2 - 6) * px + 4, css("--accent"), 10);
+      label(ctx, "front hem ↓", A.x + 4, A.y + A.s + 14, css("--stage-ink"), 10);
+      const zw = B.s / zoom / m.T;
+      ctx.strokeStyle = css("--accent"); ctx.lineWidth = 1.2; ctx.strokeRect(A.x + (focus[0] - zw / 2) * px, A.y + (focus[1] - zw / 2) * px, zw * px, zw * px);
+      const dpr = Math.min(2, devicePixelRatio || 1), w = Math.round(B.s * dpr);
+      const img = ctx.createImageData(w, w), pal = palette();
+      const texPerPx = 1 / (zoom * dpr);
+      const u0 = focus[0] * m.T - (w / 2) * texPerPx, v0 = focus[1] * m.T - (w / 2) * texPerPx;
+      for (let j = 0; j < w; j++) for (let i = 0; i < w; i++) {
+        const u = u0 + i * texPerPx, v = v0 + j * texPerPx;
+        const [d, gx, gy] = sampleD(m, u, v);
+        const fw = (Math.abs(gx) + Math.abs(gy)) * texPerPx;
+        const cov = aa ? clamp01(0.5 + d / Math.max(fw, 1e-4)) : d > 0 ? 1 : 0;
+        const ti = clamp(Math.floor(v), 0, m.size - 1) * m.size + clamp(Math.floor(u), 0, m.size - 1);
+        const c3 = texelColor(m, view, ti, cov, pal), o = (j * w + i) * 4;
+        img.data[o] = c3[0]; img.data[o + 1] = c3[1]; img.data[o + 2] = c3[2]; img.data[o + 3] = 255;
+      }
+      ctx.putImageData(img, B.x * dpr, B.y * dpr);
+      label(ctx, `${zoom} screen px per texel`, B.x + 4, B.y + B.s + 14, css("--stage-ink"), 10);
+      $("ttR").innerHTML = `<span>map <b>${m.size} × ${m.size}</b> here (1008 × 1008 on the page)</span><span>magnifier at <b>(${focus[0].toFixed(1)}, ${focus[1].toFixed(1)})</b> cells</span>`;
+    });
+    const make = () => {
+      const seed = +$("ttS").value;
+      if (cache.has(seed)) { maps = cache.get(seed); mapKey = ""; fig.redraw(); return; }
+      fig.redraw();
+      clearTimeout(pending);
+      pending = setTimeout(() => { const m = createTatterData(seed, T); m.seed = seed; cache.set(seed, m); if (+$("ttS").value === seed) { maps = m; mapKey = ""; fig.redraw(); } }, 30);
+    };
+    bind("ttS", "ttSo", (v) => v, make);
+    bind("ttZ", "ttZo", (v) => v + "×", fig.redraw);
+    $("ttV").addEventListener("change", fig.redraw);
+    $("ttA").addEventListener("change", fig.redraw);
+    $("tatterFig").addEventListener("click", (e) => {
+      if (!layout) return;
+      const r = e.currentTarget.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, A = layout.A;
+      if (x < A.x || y < A.y || x > A.x + A.s || y > A.y + A.s) return;
+      focus = [((x - A.x) / A.s) * C, ((y - A.y) / A.s) * C];
+      fig.redraw();
+    });
+    new IntersectionObserver((e, o) => { if (e[0].isIntersecting) { o.disconnect(); make(); } }, { rootMargin: "400px" }).observe($("tatterFig"));
+  }
+
+  // ---- 9. One pixel of veil ----
+  {
+    const lin = (hex) => rgb(hex).map((c) => Math.pow(c / 255, 2.2));
+    const DIRT = [0.62, 0.55, 0.45];
+    const tone = (x) => { const v = x * 1.1; const t = v / (1 + v); return Math.round(255 * Math.pow(t, 1 / 2.2) * 1.08); };
+    const parts = (behind, P) => {
+      const col = lin(P.c), dirtiness = P.d * 0.45;
+      const cloth = col.map((c, i) => c * (1 - P.d + P.d * DIRT[i]));
+      const op = (P.o + (1 - P.o) * 0.5 * dirtiness) * (1 - 0.85 * P.t);
+      const k = 0.6 + 0.4 * dirtiness;
+      const through = behind.map((b, i) => b * (1 - k + k * cloth[i]) * (1 - op));
+      const lit = cloth.map((c) => c * op * (2 + 0.15) / Math.PI);
+      const sheen = [0, 1, 2].map(() => 0.4 * op * 0.05);
+      const trans = cloth.map((c) => 0.6 * op * c * 0.15 * 0.25 / Math.PI);
+      const ember = cloth.map((c, i) => c * op * 0.6 / Math.PI * 6 * P.g * [1, 0.03, 0.008][i]);
+      return { op, items: [["through", through, "--stage-ink"], ["lit cloth", lit, "--accent2"], ["sheen", sheen, "--cloth"], ["through it", trans, "--muted"], ["embers", ember, "--ember"]] };
+    };
+    const P = {};
+    const fig = setup($("pixelFig"), (W) => (W < 620 ? 0.95 : 200 / W), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const narrow = W < 620;
+      const backs = [["over bone", [0.5, 0.46, 0.4]], ["over the dark", [0.003, 0.003, 0.003]]];
+      const sw = narrow ? (W - 48) / 2 : 150;
+      let op = 0;
+      backs.forEach(([name, b], j) => {
+        const r = parts(b, P); op = r.op;
+        const sum = [0, 1, 2].map((c) => r.items.reduce((a, it) => a + it[1][c], 0));
+        const x = 16 + j * (sw + 16), y = 22;
+        ctx.fillStyle = `rgb(${b.map(tone).join(",")})`; ctx.fillRect(x, y, sw, sw * 0.25);
+        ctx.fillStyle = `rgb(${sum.map(tone).join(",")})`; ctx.fillRect(x, y + sw * 0.25, sw, sw * 0.75);
+        label(ctx, name, x, y - 7);
+        label(ctx, "behind", x + 4, y + 12, css("--stage-ink"), 9);
+        // stacked bar of linear luminance
+        const bx = narrow ? 16 : 16 + 2 * (sw + 16) + 30, bw = narrow ? W - 32 : W - bx - 20;
+        const by = narrow ? y + sw + 24 + j * 44 : 40 + j * 70, bh = 22;
+        const lum = (v) => 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+        const total = Math.max(0.35, lum(sum));
+        label(ctx, `${name}: ${lum(sum).toFixed(3)}`, bx, by - 6, css("--stage-ink"), 10);
+        let cx = bx;
+        for (const [n, v, c] of r.items) {
+          const w = (lum(v) / total) * bw;
+          if (w <= 0.2) continue;
+          ctx.fillStyle = css(c); ctx.fillRect(cx, by, w, bh);
+          if (w > 52) label(ctx, n, cx + 4, by + 15, css("--stage"), 10);
+          cx += w;
+        }
+        ctx.strokeStyle = rgba(css("--stage-ink"), 0.25); ctx.strokeRect(bx, by, bw, bh);
+      });
+      $("pxR").innerHTML = `<span>op <b>${op.toFixed(2)}</b></span><span>seen through <b>${Math.round((1 - op) * 100)}%</b></span><span>tint of what's behind <b>${Math.round((0.6 + 0.4 * P.d * 0.45) * 100)}%</b> toward the cloth</span>`;
+    });
+    const read = () => { P.c = $("pxC").value; P.o = +$("pxO").value; P.d = +$("pxD").value; P.t = +$("pxT").value; P.g = +$("pxG").value; fig.redraw(); };
+    bind("pxO", "pxOo", (v) => v.toFixed(2), read);
+    bind("pxD", "pxDo", (v) => v.toFixed(2), read);
+    bind("pxT", "pxTo", (v) => v.toFixed(2), read);
+    bind("pxG", "pxGo", (v) => v.toFixed(2), read);
+    $("pxC").addEventListener("change", read);
+    read();
+  }
+
+  // ---- 8. Swap timeline ----
+  {
+    const BLOW = 1.8, WAIT = 0.05, IN = 2, SETTLE = 1.6;
+    let land = 0;
+    {
+      let y = 0.5, q = 0.5, t = 0;
+      while (y > 0.212 + 0.004 && t < 2) { let v = (y - q) * 0.97 - 9.81 / 8100; if (Math.abs(v) > 0.012) v = -0.012; q = y; y += v; t += 1 / 90; }
+      land = Math.min(2, t);
+    }
+    const dropStart = BLOW;
+    const at = (t) => {
+      const out = t < BLOW;
+      const wind = out ? smoothstep(0, 0.9, t) : 0;
+      const fade = out ? 1 - smoothstep(BLOW - 0.5, BLOW, t) : 0;
+      const tf = t - dropStart;
+      let crown = null, leash = null;
+      if (tf >= 0) {
+        if (tf < land) crown = 1 - tf / land; else { crown = 0; leash = smoothstep(0, 1, Math.min(1, (tf - land) / SETTLE)); }
+      }
+      const state = out ? "out" : t < BLOW + WAIT ? "wait" : t < BLOW + WAIT + IN ? "in" : "idle";
+      return { wind, fade, crown, leash, state, newFade: t >= BLOW + WAIT ? 1 : 0 };
+    };
+    let bed = [];
+    {
+      let lvl = 0.18; bed = [];
+      for (let t = -1; t <= 6; t += 1 / 60) { const target = 0.18 + 0.3 * (t >= 0 && t < BLOW ? 1 : 0); lvl += (target - lvl) * (1 - Math.exp(-1 / 60 / 0.4)); if (t >= 0) bed.push([t, lvl]); }
+    }
+    const fig = setup($("swapFig"), (W) => (W < 520 ? 0.95 : 0.46), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const t = +$("swT").value;
+      const band = { x: 44, y: 16, w: W - 60, h: 20 };
+      const b = { x: 44, y: 62, w: W - 60, h: H - 104 };
+      const X = (v) => band.x + (v / 6) * band.w;
+      const states = [["out", 0, BLOW, css("--accent")], ["wait", BLOW, BLOW + WAIT, css("--stage-ink")], ["in", BLOW + WAIT, BLOW + WAIT + IN, css("--accent2")], ["idle", BLOW + WAIT + IN, 6, css("--stage-line")]];
+      for (const [n, a0, a1, c] of states) { ctx.fillStyle = rgba(c, 0.35); ctx.fillRect(X(a0), band.y, X(a1) - X(a0), band.h); if (n !== "wait") label(ctx, n, X(a0) + 5, band.y + 14, css("--ink"), 10); }
+      const a = axes(ctx, b, [0, 6], [0, 1.05], { xt: [0, 1, 2, 3, 4, 5, 6], xf: (v) => v + " s", yt: [0, 0.5, 1], yf: (v) => v.toFixed(1) });
+      const ts = range(0, 6, 600);
+      line(ctx, ts.map((u) => [u, at(u).wind]), a.X, a.Y, css("--accent2"), 1.6);
+      line(ctx, ts.map((u) => [u, at(u).fade]), a.X, a.Y, css("--cloth"), 2.2);
+      line(ctx, ts.filter((u) => at(u).crown !== null).map((u) => [u, at(u).crown]), a.X, a.Y, css("--ember"), 2);
+      line(ctx, ts.filter((u) => at(u).leash !== null).map((u) => [u, at(u).leash]), a.X, a.Y, css("--accent"), 1.6, [5, 3]);
+      line(ctx, bed.map(([u, v]) => [u, v]), a.X, a.Y, rgba(css("--ink"), 0.5), 1);
+      const lab = [["blow 16 m/s²", 0.3, 0.75, css("--accent2")], ["old veil", 1.05, 0.97, css("--cloth")], ["new crown height", BLOW + 0.05, 0.84, css("--ember")], ["leash tightens", BLOW + land + 0.15, 0.55, css("--accent")], ["wind bed", 3.6, 0.27, css("--muted")]];
+      for (const [n, x, y, c] of lab) label(ctx, n, a.X(x), a.Y(y), c, 10);
+      ctx.fillStyle = css("--accent"); ctx.beginPath(); ctx.arc(a.X(0), a.Y(1), 3.5, 0, 7); ctx.fill();
+      label(ctx, "gust sound", a.X(0.05), a.Y(1) + 14, css("--accent"), 10);
+      label(ctx, "auto change restarts", X(BLOW + WAIT + IN) + 4, band.y + band.h + 13, css("--stage-ink"), 10);
+      ctx.strokeStyle = css("--ink"); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(a.X(t), band.y); ctx.lineTo(a.X(t), b.y + b.h); ctx.stroke(); ctx.setLineDash([]);
+      const s = at(t);
+      $("swR").innerHTML = `<span>state <b>${s.state}</b></span><span>blow <b>${(16 * s.wind).toFixed(1)} m/s²</b></span><span>old veil <b>${(s.fade * 100).toFixed(0)}%</b></span><span>new crown <b>${s.crown === null ? "–" : s.crown > 0 ? "falling" : "landed at " + (BLOW + land).toFixed(2) + " s"}</b></span>`;
+    });
+    const el = bind("swT", "swTo", (v) => v.toFixed(2) + " s", fig.redraw);
+    player($("swP"), el, 1, true);
+  }
+})();
+</script>
+</body>
+</html>

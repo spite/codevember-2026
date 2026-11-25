@@ -108,10 +108,13 @@ export function createChooser({ touch = false, onChoose, status }) {
       card.innerHTML = `<div class="waiting">${icon("camera")}<h2></h2><p class="sub"></p><button class="instead"></button></div>`;
       const title = card.querySelector("h2");
       const sub = card.querySelector(".sub");
+      // Already allowed (the browser remembers), there's no prompt to point at.
+      let granted = false;
+      navigator.permissions?.query({ name: "camera" }).then((p) => (granted = p.state === "granted"), () => {});
       const show = () => {
         const loading = status?.() === "loading";
-        title.textContent = loading ? "Loading the face tracker…" : "Waiting for the camera…";
-        sub.textContent = loading ? "Almost there." : "Allow it in your browser's prompt. The video stays on your device.";
+        title.textContent = loading ? "Loading the face tracker…" : granted ? "Starting the camera…" : "Waiting for the camera…";
+        sub.textContent = loading ? "Almost there." : granted ? "The video stays on your device." : "Allow it in your browser's prompt. The video stays on your device.";
       };
       show();
       poll = setInterval(show, 200);
