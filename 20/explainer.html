@@ -118,6 +118,9 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
   .fig { padding: 16px; }
   main { gap: 56px; }
 }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
 </style>
 </head>
 <body>
@@ -378,8 +381,8 @@ lit   = albedo / π · (direct + (1, 0.86, 0.7) · left · phase · (1 − direc
       <div class="eyebrow">Bumping into the body · <b>figure.js, main.js</b></div>
       <h2>Sixteen capsules</h2>
       <p>Two things have to stay out of the body: the chips, which otherwise drift straight through a swinging arm, and the lamp, whose circle would sometimes pass through a hand. Neither needs the skin itself. The body is sixteen capsules between bones: the trunk in two (hips to mid-spine, mid-spine to neck, 13 cm), the neck and the head (6 and 10 cm), and on each side the upper arm, forearm and hand (5.5, 4.5, 4.5 cm), thigh, shin and foot (7.5, 5.5, 5 cm). Every sampled point of the skin lies within 8 cm of one, in the walk and in the capoeira. Each frame their ends are read off the bones, and how fast each end moved, in real time.</p>
-      <p>A chip a quarter of a second out of the shell (so not the ones still leaving it) that finds itself inside a capsule is put back on its surface, 1.5 cm out. Its velocity relative to the limb there loses what pointed into it and bounces back 40% of that, is damped to 70%, and is added to the limb's own velocity: a kick bats the chips away, an arm swept through them carries them. That knock is added to the chip's spiral position every step and fades in the air (<code>e<sup>−2.5 t</sup></code>); the spiral simply continues from where the chip has got to, with its distance out raised if it was knocked further, so nothing pulls it back. Halfway through a capoeira hatch, 131 of the 865 chips in the air were riding a knock.</p>
-      <p>The lamp keeps its circle but steps round the body. Where the circle passes within 18 cm of a capsule, the point it would be at is pushed out to 18 cm, and the lamp eases toward that offset at a rate of 8 per second, so it glides round a hand instead of jumping. A last push holds it at least 10 cm off whatever the easing has not caught up with. Over 25 s of capoeira it came no closer than 9 cm to any capsule.</p>
+      <p>A chip a quarter of a second out of the shell (so not the ones still leaving it) that finds itself inside a capsule is put back on its surface, 1.5 cm out. Its velocity relative to the limb there loses what pointed into it and bounces back 40% of that, is damped to 70%, and is added to the limb's own velocity: a kick bats the chips away, an arm swept through them carries them. That knock is added to the chip's spiral position every step and fades in the air (<code>e<sup>−2.5 t</sup></code>); the spiral simply continues from where the chip has got to, with its distance out raised if it was knocked further, so nothing pulls it back.</p>
+      <p>The lamp keeps its circle but steps round the body. Where the circle passes within 18 cm of a capsule, the point it would be at is pushed out to 18 cm, and the lamp eases toward that offset at a rate of 8 per second, so it glides round a hand instead of jumping. A last push holds it at least 10 cm off whatever the easing has not caught up with.</p>
     </div>
   </section>
 
@@ -447,6 +450,23 @@ lit   = albedo / π · (direct + (1, 0.86, 0.7) · left · phase · (1 − direc
         <tr><td>CPU</td><td>300 skinned samples, 100 × 300 distance checks, 16 capsules, up to 900 chips against them</td><td>per frame</td></tr>
       </tbody>
     </table></div>
+  </section>
+
+  <!-- Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>Drag to orbit, scroll or pinch to zoom; after three seconds left alone the camera takes over again.</li>
+      <li><b>Style</b>: Studio, Raw silk, Amber or Nocturne. <b>Motion</b>: one of the eleven clips.</li>
+      <li><b>Thickness</b> of the silk wall and <b>Floss</b>, how much fuzz stands off it.</li>
+      <li><b>Lamp</b> (its brightness), <b>Lamp orbit</b> (how fast it circles) and <b>Speed</b> (the dance's pace).</li>
+      <li><b>Auto change</b> (on by default): counts 10 s (<b>Change every</b>, 5–60 s) once a cocoon is finished, after its own hold; off, a finished cocoon stays.</li>
+      <li><b>R</b> hatches a new one, <b>M</b> or the speaker button toggles sound.</li>
+      <li><b>Space</b> pauses, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
+    </ul>
   </section>
 
   <footer class="col">
