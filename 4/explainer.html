@@ -253,8 +253,8 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">The surface · <b>tangle.js</b></div>
       <h2>A mesh pulled onto the field every frame</h2>
-      <p>The usual way to draw a distance field is to raymarch it: step each pixel's ray forward by the distance until it lands on the surface. The first version of Tangle did that, and it cost about 146 ms a frame. Every step had to search each band's samples for the nearest point, and a pixel needs many steps.</p>
-      <p>Now the coil is an ordinary mesh. Each band is a tube of 256 rings by 36 sides, and on every frame where the coil has changed, a GPU pass with one pixel per vertex puts every vertex on the field. A vertex starts on its band's own section at its ring, where the swept surface's position and normal are known exactly, including how the frame twists and the section changes along the band. A vertex with no other band within reach keeps that position and never evaluates the field; with Merge at 0, every vertex takes this path. The others take three Newton steps, <code>p ← p − f·∇f / |∇f|²</code>, with the factor <code>f / |∇f|²</code> clamped to ±0.1, onto the merged field.</p>
+      <p>The usual way to draw a distance field is to raymarch it: step each pixel's ray forward by the distance until it lands on the surface. Here that would be slow: every step has to search each band's samples for the nearest point, and a pixel needs many steps.</p>
+      <p>So the coil is an ordinary mesh. Each band is a tube of 256 rings by 36 sides, and on every frame where the coil has changed, a GPU pass with one pixel per vertex puts every vertex on the field. A vertex starts on its band's own section at its ring, where the swept surface's position and normal are known exactly, including how the frame twists and the section changes along the band. A vertex with no other band within reach keeps that position and never evaluates the field; with Merge at 0, every vertex takes this path. The others take three Newton steps, <code>p ← p − f·∇f / |∇f|²</code>, with the factor <code>f / |∇f|²</code> clamped to ±0.1, onto the merged field.</p>
       <p>The field there is the vertex's own band, swollen toward its neighbours by the smooth minimum but never replaced by them. Where the other band is nearer, the blend carries on with a tanh that levels off. A vertex next to a fillet slides into it and never jumps onto the other band's surface. Every band is drawn closed, and the depth test takes the union.</p>
       <p>Between samples, a band's centreline is a chain of quadratic Bézier pieces from midpoint to midpoint, and the nearest point on each piece is solved in closed form. To keep the search short, each band is cut into 16 chunks of 8 samples with bounding spheres. Before the Newton steps, capsules around each segment mark the ones within reach in a 128-bit mask.</p>
     </div>
@@ -270,23 +270,8 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <p class="fig-cap">A cross-section through two bands. Vertices of the lower band test the upper one with the shader's capsule bound, reach = 1.75 k + 0.02. Those within reach run the shader's swollen field and Newton step; each press runs one more of the three.</p>
     </div>
     <div class="col prose">
-      <p>A mesh shows its facets in a mirror finish, so the colour pass recomputes the normal per pixel from the same field, for the front-most fragment only (tested against the prepass depth). The ring and side angles reach the fragment as cosines and sines, which interpolate across the seam, and give the band parameter. Each vertex also stores the ids of the two nearest other bands, so the pixel can redo the same smooth union. This added about 4 ms, and the faces now stay smooth at any distance.</p>
+      <p>A mesh shows its facets in a mirror finish, so the colour pass recomputes the normal per pixel from the same field, for the front-most fragment only (tested against the prepass depth). The ring and side angles reach the fragment as cosines and sines, which interpolate across the seam, and give the band parameter. Each vertex also stores the ids of the two nearest other bands, so the pixel can redo the same smooth union. So the faces stay smooth at any distance.</p>
       <p>The projection only runs when something changed: the time, the blend, a re-tie or the section. A paused coil costs none. Last frame's positions stay in a second texture and give the prepass its velocity.</p>
-    </div>
-    <div class="fig">
-      <div class="scroll">
-        <table>
-          <thead><tr><th>GPU per frame</th><th>Time</th></tr></thead>
-          <tbody>
-            <tr><td>First version: raymarch the field</td><td>~146 ms</td></tr>
-            <tr><td>Mesh projected onto the field each frame</td><td>~17–20 ms</td></tr>
-            <tr><td>Exact per-pixel normals</td><td>+~4 ms</td></tr>
-            <tr><td>Current build</td><td><b>~19 ms</b></td></tr>
-            <tr><td>Empty scene, pipeline only</td><td>~14 ms</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="fig-cap">1920 × 1080 at a pixel ratio of 2, five bands, synced to the GPU with <code>readPixels</code>. Timing only <code>requestAnimationFrame</code> had first reported 2.7 ms, because it ignores the GPU. The coil itself costs about 5 ms over the empty studio.</p>
     </div>
   </section>
 
@@ -318,9 +303,9 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">The re-tie · <b>knots.js</b></div>
       <h2>Matching one knot to the next</h2>
-      <p>Every 10 seconds by default (Auto change, 0 to 30), or on T, a new random coil is drawn and the old one morphs into it over 2 seconds with a smoothstep ease. Blending sample j of the old coil with sample j of the new one would fail. A two-turn coil and a three-turn coil reach different places around the hole at the same path angle, so the blend would cut straight across the hole.</p>
+      <p>Every 10 seconds by default (Auto change), or on T, a new random coil is drawn and the old one morphs into it over 2 seconds with a smoothstep ease. Blending sample j of the old coil with sample j of the new one would fail. A two-turn coil and a three-turn coil reach different places around the hole at the same path angle, so the blend would cut straight across the hole.</p>
       <p>So the old coil is matched to the new one first. It is spun about its hole axis by the angle that brings the two rotations closest. Then each new sample gets an old path angle: the same position around the hole, except over one span, where the turn one coil has more than the other grows or shrinks away. The span's start and the phase are found by brute force, scoring the summed squared distance over 128 phases, and 16 starts when the turn counts differ. When both coils have the same number of bands, they pair up in order or in reverse, whichever lies closer. Bands only the new coil has grow from zero width.</p>
-      <p>The blended centreline isn't a blend of positions either. It is rebuilt from blended directions. Each step turns from the old direction to the new one with the blended length, and rises along the hole's axis where the two disagree. The gap left once around is taken off every step in proportion. A blend of positions can double back where a turn shrinks away, and a blend of directions can't. With this change, centreline reversals during re-ties went from 3,289 to 0.</p>
+      <p>The blended centreline isn't a blend of positions either. It is rebuilt from blended directions. Each step turns from the old direction to the new one with the blended length, and rises along the hole's axis where the two disagree. The gap left once around is taken off every step in proportion. A blend of positions can double back where a turn shrinks away, and a blend of directions can't.</p>
       <p>A few guards keep the morph clean. The coil's RMS radius is interpolated so its size doesn't dip, and its rotation is slerped. Wherever the blended centreline bends tighter than a band can follow (its half-width beyond 0.7 of the radius of curvature), the band narrows and thins. On T or the Re-tie button, the new coil's twist may change by whole turns, never past what it had, so the bands' windings match and nothing has to tear. Pressing R or T mid-morph doesn't jump: the running morph hurries to its end in 0.4 s, then the new one starts from what is on screen.</p>
     </div>
     <div class="fig">
@@ -343,9 +328,9 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">The reflections · <b>tangle.js</b></div>
       <h2>Bands reflecting bands</h2>
-      <p>Chrome only convinces when it reflects its surroundings, and most of what surrounds a band is other bands. The environment map can't show them. So whenever the coil changes, the merged field is also baked into a coarse distance volume: 64³ voxels in a cube around the coil, stored as 64 slices in a 512 × 512 half-float atlas. Each texel holds its distance, the distance one voxel further along z (so one fetch interpolates between slices), and the ids of the nearest samples of the two nearest bands. Voxels more than 8 voxels from every chunk's bounding sphere take that bound as their distance and skip the bands.</p>
-      <p>For each front pixel, the reflected ray marches the volume, up to 24 steps of <code>max(|d|, voxel / 2, 0.12·t)</code>. The march is only a search. When the ray passes close to a band it reads the ids stored there and keeps up to three distinct bands, each at the step where the ray came closest. Its own band only counts once the ray has got away from it.</p>
-      <p>Each candidate is then hit exactly. Early versions trusted the voxel's stored sample, which changed between neighbouring pixels and gave staircase edges and patches like torn foil. Now Newton steps refine the sample along the band until it no longer depends on where the search started. There the band is taken as its section swept straight along its tangent, which the ray meets in closed form (a slab test through the rounded rectangle, then the corner circle), over three passes. The pinched, fluted and lens reliefs have no closed form, so they are sphere-traced in 6 steps. Coverage is antialiased over the ray's cone, the hits are composited front to back, and where the ray passes two bands within the blend distance an approximate fillet joins them. A band seen in a reflection mostly darkens what is behind it, with a little of its own blurred reflection.</p>
+      <p>Chrome only convinces when it reflects its surroundings, and most of what surrounds a band is other bands. The environment map can't show them. So whenever the coil changes, the merged field is also baked into a coarse distance volume: 32³ voxels in a cube around the coil, stored as 32 slices in a 192 × 192 half-float atlas. Each texel holds its distance, the distance one voxel further along z (so one fetch interpolates between slices), and the ids of the nearest samples of the two nearest bands. Voxels more than 8 voxels from every chunk's bounding sphere take that bound as their distance and skip the bands.</p>
+      <p>For each front pixel (at half resolution on desktops, full resolution on phones), the reflected ray marches the volume, up to 24 steps (12 on phones) of <code>max(|d|, voxel / 2, 0.12·t)</code>. The march is only a search. When the ray passes close to a band it reads the ids stored there and keeps up to three distinct bands, each at the step where the ray came closest. Its own band only counts once the ray has got away from it.</p>
+      <p>Each candidate is then hit exactly. The voxel's stored sample changes between neighbouring pixels, and used as is it would give staircase edges and patches like torn foil, so Newton steps refine the sample along the band until it no longer depends on where the search started. There the band is taken as its section swept straight along its tangent, which the ray meets in closed form (a slab test through the rounded rectangle, then the corner circle), over three passes. The pinched, fluted and lens reliefs have no closed form, so they are sphere-traced in 6 steps. Coverage is antialiased over the ray's cone, the hits are composited front to back, and where the ray passes two bands within the blend distance an approximate fillet joins them. A band seen in a reflection mostly darkens what is behind it, with a little of its own blurred reflection.</p>
       <p>A mirror-sharp reflection of a curved band shimmers as it moves. So each frame the reflected ray is jittered within a small cone, half the pixel's footprint plus 0.75 times the chrome's roughness of 0.06. The jitter is interleaved gradient noise per pixel, stepped along the R2 sequence each frame, and the results are averaged over time. The history is reprojected through each vertex's previous position and rejected where its depth is off by more than 2 % plus 0.01. While anything moves, it is also clamped to the mean ± 1.25 standard deviations of this frame's 3 × 3 neighbourhood. It averages up to 16 frames in motion and 64 when still.</p>
     </div>
     <div class="fig">
@@ -360,7 +345,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <p class="fig-cap">Illustrative: a made-up reflection of curved stripes, with the jitter cone growing to the right. Each cell is one pixel, jittered with the shader's noise and R2 step, and accumulated with the resolve pass's running average, <code>mix(history, current, 1/n)</code> with n capped.</p>
     </div>
     <div class="facts">
-      <div class="fact warn"><b>Magenta squares on Safari</b><span>On Metal, fast-math <code>cos</code> can overshoot −1 slightly, so the film's <code>0.5 + 0.5·cos</code> dipped below zero, <code>pow</code> of a negative base gave NaN in green, and the blurs spread it into magenta squares. The film is now clamped where it is made, <code>pow</code> gets <code>max(…, 1e-7)</code>, and the history tests for non-finite values on the float bits, which fast-math can't optimise away the way it can <code>isnan</code>.</span></div>
+      <div class="fact warn"><b>No NaNs on Metal</b><span>On Metal, fast-math <code>cos</code> can overshoot −1 slightly, which would take the film's <code>0.5 + 0.5·cos</code> below zero and <code>pow</code> of a negative base to NaN, spread by the blurs into magenta squares. So the film is clamped where it is made, <code>pow</code> gets <code>max(…, 1e-7)</code>, and the history tests for non-finite values on the float bits, which fast-math can't optimise away the way it can <code>isnan</code>.</span></div>
       <div class="fact"><b>Where it runs</b><span>The trace and resolve run inside the pipeline's colour pass, just before the bands draw, so they see this frame's prepass depth and camera, lens and sample jitter included.</span></div>
       <div class="fact"><b>Glass uses it too</b><span>The glass finish marches the same volume along the refracted ray to measure how far it travels through the bands behind, so overlaps absorb more colour. Its dark rims come from the facing angle instead: near the silhouette the body fades to 0.12 of its brightness.</span></div>
       <div class="fact"><b>Front pixels only</b><span>Hidden fragments skip the exact normal and the trace. Each pixel compares its depth to the prepass depth first.</span></div>
@@ -418,7 +403,6 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <figcaption>The share card: the near side in focus, the far bands blurred by the lens.</figcaption>
     </figure>
     <div class="facts">
-      <div class="fact"><b>The extreme-focus clip</b><span>For the video with very shallow focus, the camera itself was jittered across the lens over the 16 motion-blur samples, with a sheared projection so the plane in focus held still.</span></div>
       <div class="fact"><b>Paused, but alive</b><span>Section morphs and finish fades run on wall-clock time, so they play out while the coil is paused. Pausing also restarts the Auto change countdown.</span></div>
       <div class="fact"><b>Never under the floor</b><span>The orbit's lowest tilt depends on the camera distance, so the camera can't sink below the floor, and the camera is kept inside the cyc.</span></div>
     </div>
@@ -438,17 +422,17 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <li><b>Bands</b>: 2 to 5. <b>Merge</b>: how softly neighbours blend.</li>
       <li><b>Section</b>: squircle, pinched, fluted or lens, with <b>Section amount</b>.</li>
       <li><b>Motion</b>: how fast the coil writhes.</li>
-      <li><b>Auto change</b>: seconds between re-ties; 0 turns it off.</li>
+      <li><b>Auto change</b> (on by default): a new knot every 10 s without input (<b>Change every</b>, 5–60 s), counted once the last re-tie has finished morphing.</li>
       <li><b>Reflections</b>: the baked studio or the studio HDR.</li>
       <li><b>Depth of field</b>: the blur, 0 to 0.03.</li>
       <li><b>T</b> or <b>Re-tie</b> ties a new knot; <b>R</b> randomises.</li>
-      <li><b>Space</b> pauses, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot.</li>
+      <li><b>Space</b> pauses, <b>F</b> toggles fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
     </ul>
   </section>
 
   <footer class="col">
     <div class="meta">
-        <span><b>three.js</b> r187</span><span>WebGL2</span><span>desktop and phones</span><span>coded with <b>Claude Code</b> and Opus 5.5</span>
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>desktop and phones</span><span>made in <b>Claude Code</b> with Opus 5.5</span>
       </div>
     Day 4 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/4/">spite.github.io/codevember-2026/4</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/4">4/ of the codevember-2026 repository</a>. Rendered with the repo's shared photographic pipeline, described in the <a href="../modules/pipeline/explainer.html">rendering pipeline explainer</a>. The reflection HDR is Studio Small 03 from Poly Haven (CC0).
   </footer>
