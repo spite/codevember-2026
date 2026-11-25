@@ -112,6 +112,9 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
   .fig { padding: 16px; }
   main { gap: 56px; }
 }
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
 </style>
 </head>
 <body>
@@ -250,7 +253,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <h2>Constant or quick</h2>
       <p>Every piece's motion is plain data both the page and the cutting worker evaluate the same way. In <b>constant</b> motion (the default), nothing ever stops: a turning part spins at one steady rate and lands exactly in line at every pass, like the rings. Its rate is a whole number of steps a period, the slowest that needs little correction: up to a turn a period first (three whole turns physically), then up to two, and whole turns every loop so the grand alignment holds. Where the two gaps don't split the period exactly as the steps do, the speed swells and eases once a period, a sine with no effect at the passes' midpoint, sized so both passes land exactly: a few per cent typically, a third at worst. Keyholes stand where no swell is needed.</p>
       <p>A tunnel's discs differ in how many slits they have for the rod: a count dividing the bob's symmetry (a disc lines up again at every slit), set by each disc's distance from the tunnel's middle, so the tunnel is symmetric and its discs turn at different speeds, the fewer slits the faster; where a disc's count can't turn smoothly (far up the swing, the gaps very uneven), it takes more. Opening parts (shutters, bars, irises) swing smoothly shut and back between passes, open only while the bob goes through.</p>
-      <p><b>Quick</b> motion is the first version: pieces wait, then snap into line. A tick moves right after the bob clears, with a little overshoot; a burst drifts back, then dashes over and lands just before the next pass; a spin turns like a coin over the same window. Shutters, bars and the iris open over 0.12–0.26 s around each pass.</p>
+      <p>In <b>quick</b> motion, pieces wait, then snap into line. A tick moves right after the bob clears, with a little overshoot; a burst drifts back, then dashes over and lands just before the next pass; a spin turns like a coin over the same window. Shutters, bars and the iris open over 0.12–0.26 s around each pass.</p>
       <p>Every turning part makes whole turns (half turns for even bobs) every period or two, so every so often everything comes round at once: the <b>grand alignment</b>. Each turning part carries a gold mark placed so that at time 0 all of them face front, a stripe along each tunnel disc's rim lining up into one bar, a dot on each keyhole disc and ring. When they come round, a bell rings and the marks glow for half a second.</p>
     </div>
     <div class="formula">v(t) = phase + rate·t + swell·sin(2π(t − t̄)/T) &nbsp; rate = n·step/T<br><span class="c">swell = (a·step − rate·g₀) / (2·sin(π·g₀/T)), a = round(n·g₀/T): exact at both passes</span></div>
@@ -350,7 +353,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">Physical · <b>contraption.js support check; design.js physical</b></div>
       <h2>Nothing floating on air</h2>
-      <p>The cut is ruthless: a bob's sweep can split a slab into pieces nothing holds. The <b>Physical</b> switch (off by default) keeps every piece held by something, without changing the designs: each piece has a support (its bottom in the base, a rim in a housing, a single cradle, guide columns for sliding bars, a pin), fragments the cut leaves unsupported are removed, and the design keeps to what can be held: turning parts make whole turns between passes so a disc keeps a single slot for the rod, wall bars slide no further than keeps both halves between their columns, shutter halves keep their feet on a pedestal however far they part, rocker and ring bands reach the floor, and gimbal shutters split along the rod. With it off, a few hundred loose fragments are counted over thirty designs; with it on, about one sliver.</p>
+      <p>The cut is ruthless: a bob's sweep can split a slab into pieces nothing holds. The <b>Physical</b> switch (off by default) keeps every piece held by something, without changing the designs: each piece has a support (its bottom in the base, a rim in a housing, a single cradle, guide columns for sliding bars, a pin), fragments the cut leaves unsupported are removed, and the design keeps to what can be held: turning parts make whole turns between passes so a disc keeps a single slot for the rod, wall bars slide no further than keeps both halves between their columns, shutter halves keep their feet on a pedestal however far they part, rocker and ring bands reach the floor, and gimbal shutters split along the rod.</p>
     </div>
   </section>
 
@@ -384,8 +387,26 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">Rendering · <b>modules/pipeline, materials.js, looks.js</b></div>
       <h2>A product shot in a studio</h2>
-      <p>The day renders through the shared pipeline: soft PCSS shadows from a key light high to one side, half-resolution ambient occlusion and one bounce of light (GTAO and SSIL), MSAA, AgX tonemapping, and a touch of grain and vignette. Motion blur over a 1/90 s shutter (16 samples) streaks the bob at the bottom of its swing and the fastest discs. Clay is rough and matte, the stones are veined procedurally, brass is a polished metal, and the gold marks are an accent glaze that glows when everything lines up. At high quality on a laptop GPU a frame costs about 1.6 ms.</p>
+      <p>The day renders through the shared pipeline: soft PCSS shadows from a key light high to one side, half-resolution ambient occlusion and one bounce of light (GTAO and SSIL), MSAA, AgX tonemapping, and a touch of grain and vignette. Motion blur over a 1/90 s shutter (16 samples) streaks the bob at the bottom of its swing and the fastest discs. Clay is rough and matte, the stones are veined procedurally, brass is a polished metal, and the gold marks are an accent glaze that glows when everything lines up.</p>
     </div>
+  </section>
+
+  <!-- Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>Click or tap a gate to knock it; drag to orbit, scroll or pinch to zoom.</li>
+      <li><b>Motion</b>: constant (the default) or quick. <b>Instant change</b> cuts straight to the next contraption.</li>
+      <li><b>Slow motion</b> slows time as the bob goes through each gate; <b>Pendulum view</b> keeps the rod upright on screen.</li>
+      <li><b>Physical</b> keeps every piece held by something.</li>
+      <li><b>Layout</b>, <b>Hero</b>, <b>Crossing</b>, <b>Bob</b>, <b>Finish</b> and <b>Look</b> pin what R picks; <b>Clearance</b> (1–20 mm) and <b>Speed</b>.</li>
+      <li><b>Auto change</b> (on by default): a new contraption every 15 s (<b>Change every</b>, 5–60 s), once the last has settled.</li>
+      <li><b>R</b> for a new contraption, <b>M</b> or the speaker button toggles sound.</li>
+      <li><b>Space</b> pauses, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
+    </ul>
   </section>
 
   <footer class="col">
