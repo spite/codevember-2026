@@ -371,7 +371,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <div class="eyebrow">Sound · <b>sound.js</b></div>
       <h2>Tic, tac and creak</h2>
       <p>Thirty-four one-shots in ten sets, cut from CC0 recordings on freesound.org. The escapement plays a tick each time a tooth lands, tic and tac a little apart in pitch. The gear whose teeth pass fastest, short of a blur, clicks softly once per tooth. An old machine now and then creaks as it settles, and rust breaking free creaks louder the harder it held. A hand on a gear latches on and ratchets once per tooth. Taking machines apart and putting them together plays levers, clanks, chains, clinks and a latch, each timed to its part and panned to where it is.</p>
-      <p>The rustier the machine, the duller the sound: once there is some rust, a lowpass closes from about 11 kHz toward 3 kHz as it grows. Each play picks a variant (never the same one twice in a row), with its pitch and pan varied by the unseeded random, so the sound never shifts the seeded machine. Twenty-four voices play at most, through a gentle compressor.</p>
+      <p>The rustier the machine, the duller the sound: once there is some rust, a lowpass closes from about 11 kHz toward 3 kHz as it grows. Each play picks a variant (never the same one twice in a row), with its pitch and pan varied by the unseeded random, so the sound never shifts the seeded machine. Twenty-four voices play at most, through a gentle compressor. The recordings download while the page loads; the audio context is created on load and plays at once if the browser allows it, otherwise from the first click, tap or key, with a pill under the hint saying so until then.</p>
     </div>
   </section>
 
@@ -386,14 +386,14 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
       <li><b>Machine</b>: Variation, Gears (6 to 30), Balance wheel (the chance of a lever and balance instead of a pendulum).</li>
       <li><b>Mix</b>: a weight per stage type, from spur to differential; 0 leaves a type out, 1 puts it in every machine.</li>
       <li><b>Finish</b>: Chamfer, Wear, Age, Rust, Rust colour, Grease, Edge pitting, Flaking, Grime, Pendulum (the period, for the balance too) and Speed (how fast the escapement's clock runs, 0.25× to 4×).</li>
-      <li><b>Studio</b>, Auto change and Change every (20 s by default; the machine ages over that time).</li>
+      <li><b>Studio</b>, <b>Auto change</b> (on by default) and <b>Change every</b> (20 s by default, 5–60 s; the machine ages over that time, and the count starts once it has landed).</li>
       <li><b>R</b> makes a new machine, <b>T</b> plays the ageing timelapse, <b>M</b> or the speaker button toggles sound.</li>
-      <li><b>Space</b> pauses, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot.</li>
+      <li><b>Space</b> pauses, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
     </ul>
   </section>
   <footer class="col">
     <div class="meta">
-        <span><b>three.js</b> r187</span><span>WebGL2</span><span>one degree of freedom</span><span>desktop and phones</span><span>coded with <b>Claude Code</b> and Opus 5.5</span>
+        <span><b>three.js</b> r187</span><span>WebGL2</span><span>one degree of freedom</span><span>desktop and phones</span><span>made in <b>Claude Code</b> with Opus 5.5</span>
       </div>
     Day 11 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/11/">spite.github.io/codevember-2026/11</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/11">11/ of the codevember-2026 repository</a>. The machines and studio are rendered with the <a href="../modules/pipeline/explainer.html">photographic pipeline</a>. Rust scans are CC0 from ambientCG and Poly Haven; sounds are CC0 recordings from freesound.org.
   </footer>
