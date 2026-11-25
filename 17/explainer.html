@@ -146,7 +146,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     <div class="col prose">
       <div class="eyebrow">The idea</div>
       <h2>A photograph from the reef</h2>
-      <p>The day started from a small kelp-forest sketch with a CPU fluid and kelp physics, and grew toward one photograph: the classic shot of a California kelp forest from the bottom, columns of giant kelp rising to a canopy at the surface, the sun breaking through in shafts, and every blade between the camera and the sun glowing gold. The camera stays fixed on that view; the sea does the moving.</p>
+      <p>The day is built around one photograph: the classic shot of a California kelp forest from the bottom, columns of giant kelp rising to a canopy at the surface, the sun breaking through in shafts, and every blade between the camera and the sun glowing gold. The camera stays fixed on that view; the sea does the moving.</p>
       <p>Unlike most days this month, it doesn't use the shared rendering pipeline. Underwater light is mostly about what happens in the water between things, so the day has its own small renderer built around that, and borrows the pipeline's bloom and final pass (exposure, AgX, vignette, grain) for the finish.</p>
     </div>
   </section>
@@ -296,7 +296,7 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </div>
     <div class="facts">
       <div class="fact"><b>About 2M triangles</b><span>Thirty thousand blades, about four thousand of them simulated; a coarser half-million-triangle copy for the shadow map.</span></div>
-      <div class="fact"><b>Fixed steps</b><span>Kelp and water step at 60 Hz on the main thread, about 2 ms each, so the motion is the same at any frame rate.</span></div>
+      <div class="fact"><b>Fixed steps</b><span>Kelp and water step at 60 Hz on the main thread, so the motion is the same at any frame rate.</span></div>
       <div class="fact"><b>Phones</b><span>Fewer stipes and blades, lighter meshes, the water stepped at 30 Hz, a smaller shadow map and fewer shaft steps.</span></div>
       <div class="fact"><b>Randomize</b><span>Silt clouds the water while a new forest is built in the worker: the composed plants moved, leaned, resized and mirrored half the time.</span></div>
       <div class="fact"><b>Exposure</b><span>Follows the view as a camera would, opening up to 1.9× looking down into the dark and stopping down toward the sun, easing over about half a second.</span></div>
@@ -324,9 +324,25 @@ footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px so
     </div>
   </section>
 
+  <!-- Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>The camera stays on the reef. Move the pointer (drag on touch) to stir the water.</li>
+      <li><b>Surge</b> sets how strong the surges are; <b>Probe sphere</b> turns the flying sphere on or off.</li>
+      <li><b>Stir the water</b> (or <b>S</b>) sends two broad impulses through the forest; the <b>Surge</b> button starts a big surge now.</li>
+      <li><b>Auto change</b> (on by default): a new forest every 15 s (<b>Change every</b>, 5–60 s), counted once the silt has cleared.</li>
+      <li><b>Quality</b>, in the Rendering section: auto (with the tier it picked), high, medium or low; a change reloads the page.</li>
+      <li><b>R</b> for a new forest, <b>Space</b> pauses, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel, <b>P</b> saves a screenshot (<b>Shift+P</b> at 2×).</li>
+    </ul>
+  </section>
+
   <footer class="col">
     <div class="meta">
-      <span><b>three.js</b> r187</span><span>WebGL2</span><span>CPU kelp physics and fluid</span><span>its own underwater renderer</span><span>made in <b>Claude Code</b> with Opus 5.5</span>
+      <span><b>three.js</b> r187</span><span>WebGL2</span><span>CPU kelp physics and fluid</span><span>its own underwater renderer</span><span>started in <b>Antigravity</b> with Gemini 4 Hydrogen, finished in <b>Claude Code</b> with Opus 5.5</span>
     </div>
     Day 17 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/17/">spite.github.io/codevember-2026/17</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/17">17/ of the codevember-2026 repository</a>. Caustics after Evan Wallace's WebGL Water.
   </footer>
