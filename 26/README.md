@@ -1,14 +1,47 @@
-November 26, 2026
+# 26 · Anamorph
 
-"Anamorph"
+Impossible figures as real objects. Each one is a solid sculpture in matte painted wood, cut along the line of sight
+of a single viewpoint and its pieces pushed apart in depth: from that sweet spot they weld into a Penrose triangle, an
+Escher cube, an impossible ring or one of 31 figures in all; from anywhere else they come apart. Most then split into
+blocks that march around the loop.
 
-Forced-perspective and orthographic impossible objects built from untwisted 3D solids split along the sightline of a single sweet-spot camera (`ring`, `figure-8`, `trefoil`, Penrose `triangle`, `square`, `diamond`, `divided-diamond`, `pentagon`, `hexagon`, `star`, `reutersvard`, `valknut`, `hex-cross`, `hooked-tribar`, `stairs`, `waterfall`, `escher-cube`, `archway`, `ladder`, `chair`, `cross`, `pinwheel`, `frame`, `s-hook`, `meander`, `spiral-tribar`, `triquetra`, `double-tribar`, `borromean`, `borromean-tribar`, and `hourglass`). From the sweet spot, the separated 3D pieces weld into an impossible figure while discrete blocks march endlessly around the loop; orbiting off-axis exposes the forced-perspective 3D depth breaks.
+Started from a zip of the figures and their sweet-spot split, ported to the shared Pipeline's look.
 
-Controls: drag to orbit and reveal the 3D split, scroll or pinch to zoom. Press L (or click "Snap to sweet spot") to ease back into alignment, P to switch between true forced-perspective (`PerspectiveCamera`) and parallel (`OrthographicCamera`) anamorphosis, [ / ] to cycle all 31 objects, S to toggle discrete segments vs. continuous solid meshes, Space to pause, E to toggle edge outlines, and R to randomize.
+## Controls
 
-Notable:
+- Drag to orbit and break the illusion, scroll to zoom. Letting go eases back to the sweet spot (L does it too).
+- M (or the speaker button) turns the sound on and off.
+- R (or the dice) for a new figure, with a random split style, gap, size and thickness. [ and ] step through the
+  figures in order. S toggles the blocks, E the ink outlines, P perspective / ortho.
+- Left alone it changes by itself (Auto change). Each figure orbits in, clicks into the sweet spot, splits and marches,
+  then merges back and dissolves where it stands before the next one swings in.
+- The panel picks the figure, whether it splits and how (together, wave, alternate, halving, from the joins, both
+  ways, slide), the block length, gap, size and thickness, the look (painted, dark, studio, wireframe), the shadow
+  strength, the camera sway, and how long each part of the transition takes.
 
-- In `perspective` mode, every vertex and edge is mapped through the exact $PGL(4, \mathbb{R})$ projective homology $(x, y, z) \mapsto \frac{D}{D + \kappa z}(x, y, \kappa z)$, preserving straight 3D lines, planar Penrose faces, and linear depth-buffer precision while scaling background pieces into huge Ames-room monoliths and foreground pieces into miniatures that align pixel-for-pixel from `(0, 0, D)` (and Physically re-normalizing via the analytical cofactor $J^{-T}$ when orbited).
-- The impossible ring is built from two untwisted 180° half-torus meshes split at the minor-axis middle, with the second half rotated 180° around the camera sightline (`(u, v, z) -> (-u, -v, z)`), shaded with $C^\infty$ continuous ribbon normals across both splits from the sweet spot.
-- Adjustable 3D `Chamfer` (`0..0.45`) turns every beam into an 8-sided octagonal molding that miters across 90° Penrose L-corners without creasing the coplanar ribbons, welds across sightline portals (`(ua, ub) -> (-ua, ub)` invariant on the ring), and bevels discrete block end-caps with 45° collars.
-- Illusion-space `Shadows` (`0..1`) bake pre-homology sweet-spot coordinates onto the mesh and evaluate analytic PCSS-like OBB key shadows + normal-biased hemisphere and contact crease AO in the surface shader (defaulting to a luminous gallery-white `studio` look with ink `edges` and `autoSnap`) — unwinding sightline portal cliffs locally so seams stay invisible while compressing over/under crossings so bars cast crisp sculptural drop shadows onto each other that remain painted onto the separated 3D pieces when orbited.
+## How it works
+
+- `objects.js`: the figures. Each is one or more loops (beams on an isometric cube lattice, curved rings, flat plates)
+  with *portals*: points where the loop is cut along the sightline and the rest moved in depth, so the sweet-spot view
+  is unchanged but the solid is no longer one piece. The valknut places each triangle's cut where nothing covers it.
+- `anamorph.js`: builds the meshes every frame. Blocks are laid out along each loop, clipped at the portals into
+  pieces at their depths, chamfered as whole blocks so the bevel slides through a cut, and their gaps open in the
+  chosen order. Open paths (a ladder's rungs, a waterfall's columns) stay solid while the loops march. In perspective
+  the pieces are mapped through a projective transform so they still line up from the sweet spot.
+- Shadows are traced per pixel in *illusion space*: against boxes placed where each piece appears from the sweet spot,
+  with the depth jumps at the cuts unwound, so the impossible figure casts consistent shadows on itself. They fade out
+  as the camera leaves the sweet spot, where they would no longer match. The Pipeline's own shadow maps and screen-space
+  AO are off: both see the real depth, which breaks at every cut.
+- The paint is a slow tone drift and long, faint brush lines along each beam, running in loop coordinates so they
+  ride with the blocks and continue across closed seams.
+- The camera is driven by a damped spring chasing a guide path, so it glides into the sweet spot and settles there; a
+  slow sway about the sightline keeps the alignment.
+
+## Sound
+
+- A swoosh of pink noise through a band-pass, its level and pitch following how fast the camera swings around the
+  figure.
+- A wooden click as the figure locks into its sweet spot (when the pieces' depth offsets move them by less than a
+  pixel), and a knock of toy wooden blocks for every gap that opens or closes, lower when closing.
+- Samples, CC0 from freesound.org: "Wooden Click" by BenjaminNelan (321083) and single hits cut from
+  "Toy-Wooden-Blocks_Child.wav" by rzSHI (395675).

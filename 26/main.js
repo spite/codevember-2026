@@ -11,8 +11,12 @@ import {
   keysHelp,
   setDay,
   showHint,
+  showSoundHint,
+  addActionButton,
+  onPause,
   loadingStep,
   addKey,
+  randomize,
   Maf,
 } from "common";
 import { GUI } from "guspira";
@@ -36,6 +40,7 @@ import { PipelineMaterial } from "modules/pipeline/PipelineMaterial.js";
 import { globalUniforms } from "modules/pipeline/uniforms.js";
 import { createStudioEnvironmentAsync, applyEnvironment } from "modules/pipeline/studio.js";
 import { createAutoChange } from "modules/autoChange.js";
+import { createSound } from "./sound.js";
 import { nativeRandom } from "modules/random.js";
 import { Easings } from "easings";
 import { AnamorphicRig, createShadowState } from "./anamorph.js";
@@ -158,11 +163,11 @@ const defaults = {
   thickness: 0.44,
   chamfer: 0.1,
   speed: 0.07,
-  cameraSway: 8,
+  cameraSway: 14,
   reverse: false,
   autoSnap: true,
   look: "painted",
-  shadows: 0.92,
+  shadows: 0.7,
   edges: false,
   auto: true,
   autoTime: 14,
@@ -173,7 +178,16 @@ const defaults = {
 };
 
 const params = fromDefaults(defaults);
-const load = { studio: loadingStep(1), compile: loadingStep(3) };
+const load = { studio: loadingStep(1), sound: loadingStep(1), compile: loadingStep(3) };
+
+const sound = createSound({ onProgress: load.sound.set });
+load.sound.track(sound.loaded);
+const soundButton = addActionButton("../assets/sound.svg", "Sound", () => toggleSound());
+function toggleSound() {
+  sound.on = !sound.on;
+  soundButton.querySelector("img").src = `../assets/${sound.on ? "sound" : "sound-off"}.svg`;
+}
+onPause((running) => sound.pause(!running));
 
 defaultControls.enabled = false;
 
@@ -257,8 +271,8 @@ function snapToSweetSpot() {
 // is empty) to the orbit's start, and swings around the new shape until it clicks into the sweet spot.
 const SHAPE_KEYS = ["object", "blockLength", "gap", "radius", "thickness", "chamfer", "splitStyle"];
 // Segmentable figures land whole, open their gaps while marching, and close them again before leaving.
-const EXIT_SCALE = 5;
-const ORBIT_SWEEP = Math.PI * 1.5;
+const EXIT_SCALE = 1.5;
+const ORBIT_SWEEP = Math.PI * 2.2;
 const ORBIT_PITCH = 0.5;
 const ORBIT_DOLLY = 1.35;
 const show = {
@@ -317,8 +331,11 @@ function startOrbit(sweetDist) {
   show.side = nativeRandom() < 0.5 ? -1 : 1;
   show.wave = nativeRandom() * Math.PI * 2;
   show.split = 0;
-  show.swayT = 0;
+  show.landed = false;
+  sound.whoosh({ gain: 0.5 });
   show.duration = params.orbitTime();
+  // The sway passes upright exactly as the orbit lands, and keeps rolling while the figure is on screen.
+  show.swayT = -show.duration;
   if (!dragging) {
     show.drive = true;
     snapping = false;
@@ -366,7 +383,7 @@ function updateShow(dt, sweetDist) {
   if (show.phase === "exit") {
     const u = Maf.clamp(show.t / params.exitTime(), 0, 1);
     show.scale = Maf.lerp(show.scale0, EXIT_SCALE, Easings.InQuad(u));
-    show.dissolve = Easings.InQuad(Maf.clamp((u - 0.35) / 0.65, 0, 1));
+    show.dissolve = Easings.InOutSine(u);
     if (u >= 1) startOrbit(sweetDist);
   } else if (show.phase === "orbit") {
     const u = Maf.clamp(show.t / show.duration, 0, 1);
@@ -392,7 +409,8 @@ function orbitGuide(u, sweetDist) {
   const k = Easings.OutCubic(u);
   const settle = 1 - k;
   return [
-    show.from.yaw * (1 - (0.7 * Easings.OutQuad(u) + 0.3 * u)),
+    // Fast for most of the swing, then a long smooth brake into the sweet spot.
+    show.from.yaw * (1 - Easings.OutQuart(u)),
     show.from.pitch * settle + 0.22 * Math.sin(show.wave + u * Math.PI * 3) * settle,
     Maf.lerp(show.from.dist, sweetDist, Easings.InOutCubic(u)),
     Maf.lerp(show.from.zoom, 1, Easings.InOutCubic(u)),
@@ -400,8 +418,8 @@ function orbitGuide(u, sweetDist) {
 }
 
 // Under-damped spring chasing the guide: a soft overshoot and settle instead of an eased stop.
-const SPRING_OMEGA = 5.5;
-const SPRING_ZETA = 0.62;
+const SPRING_OMEGA = 7;
+const SPRING_ZETA = 0.7;
 function followSpring(cam, ctrl, target, dt) {
   const { x, v } = show.spring;
   const steps = Math.max(1, Math.ceil(dt / (1 / 240)));
@@ -438,13 +456,15 @@ function toggleProjection() {
 }
 
 addKey("KeyL", "snap to sweet spot", snapToSweetSpot);
+addKey("KeyM", "toggle sound", toggleSound);
+showSoundHint(() => !sound.running);
 addKey("KeyP", "toggle perspective / ortho", toggleProjection);
 addKey("KeyS", "toggle segments", () => params.segmented.set(!params.segmented()));
 addKey("KeyE", "toggle edge outlines", () => params.edges.set(!params.edges()));
 addKey("BracketLeft", "previous object", () => stepObject(-1));
 addKey("BracketRight", "next object", () => stepObject(1));
 
-const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: true });
+const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
 const section = {
   geometry: gui.addSection("Geometry"),
   motion: gui.addSection("Motion & View"),
@@ -1878,16 +1898,7 @@ const bodyMaterial = new PipelineMaterial({
     }
   `,
   surface: /* glsl */ `
-    void surface(inout Surface s) {
-      if (uDissolve > 0.0) {
-        // 4x4 Bayer dither.
-        ivec2 b = ivec2(gl_FragCoord.xy) & 3;
-        int bayer[16] = int[16](0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5);
-        if ((float(bayer[b.y * 4 + b.x]) + 0.5) / 16.0 < uDissolve) {
-          s.alpha = 0.0;
-          return;
-        }
-      }
+    void surfaceBase(inout Surface s) {
       #ifndef PIPELINE_COLOR
       return;
       #endif
@@ -1936,6 +1947,20 @@ const bodyMaterial = new PipelineMaterial({
       s.occlusion *= mix(0.08, 1.0, occVis);
       s.specular *= mix(0.12, 1.0, (1.0 - keyDrop * 0.9) * (1.0 - aoTight * 0.5));
       s.roughness = mix(s.roughness, min(0.92, s.roughness + 0.16), keyDrop * 0.65);
+    }
+
+    // The exit fades the figure into the backdrop behind it: its own light goes and the backdrop's colour comes in.
+    void surface(inout Surface s) {
+      surfaceBase(s);
+      #ifdef PIPELINE_COLOR
+      if (uDissolve > 0.0) {
+        float f = smoothstep(0.0, 1.0, uDissolve);
+        vec2 screenUv = gl_FragCoord.xy / max(resolution, vec2(1.0));
+        s.albedo *= 1.0 - f;
+        s.specular *= 1.0 - f;
+        s.emissive = mix(s.emissive, evalBackdropGradient(screenUv, resolution, uBgInner, uBgTop, uBgEdge), f);
+      }
+      #endif
     }
   `,
 });
@@ -2149,10 +2174,11 @@ function updateLoopInfo(form, isSegmented) {
       info[li].set(0, 0, 1, 0);
       continue;
     }
-    const raw = isSegmented ? conveyorPhase * (loop.phaseScale ?? 1) + (loop.phaseOffset ?? 0) : 0;
+    // The paint follows the march phase even while the figure is whole, so it never jumps when the gaps open or close.
+    const raw = conveyorPhase * (loop.phaseScale ?? 1) + (loop.phaseOffset ?? 0);
     const phase = raw - Math.floor(raw);
     const marching = isSegmented && !loop.open;
-    info[li].set(marching ? phase : 0, marching ? Math.max(1, loop.segments | 0) : 0, loopLength(loop), 0);
+    info[li].set(loop.open ? 0 : phase, marching ? Math.max(1, loop.segments | 0) : 0, loopLength(loop), 0);
   }
 }
 
@@ -2205,7 +2231,12 @@ function rebuildGeometry() {
   // a camera a few degrees off still sees the split edge-on instead of a sliver of the front piece's side.
   const camLen = activeCam.position.length() || 1;
   _camDir.copy(activeCam.position).divideScalar(camLen);
-  const lock = 1 - Maf.smoothStep(LOCK_IN, LOCK_OUT, Math.acos(Maf.clamp(_camDir.z, -1, 1)));
+  // Only for a hand-placed camera: the staged orbit lands exactly, and turning the figure as it glides in reads as a
+  // second motion on top of the camera's.
+  const camAngle = Math.acos(Maf.clamp(_camDir.z, -1, 1));
+  const lock = show.drive
+    ? 0
+    : 1 - Maf.smoothStep(LOCK_IN, LOCK_OUT, camAngle);
   _lockQ.setFromUnitVectors(Z_AXIS, _camDir);
   rig.group.quaternion.identity().slerp(_lockQ, lock);
   _invLockQ.copy(rig.group.quaternion).invert();
@@ -2225,8 +2256,13 @@ function rebuildGeometry() {
     rig.setEdgesVisible(edgesVal);
   }
   // Shadows fade out as the exiting shape grows past the camera: unreadable there, and the trace is per pixel.
+  // Shadows are cast in illusion space, so they only hold near the sweet spot: fade them out as the camera leaves it.
+  const offAngle = Math.acos(Maf.clamp(_camDir.z, -1, 1));
+  const shadowOnAxis = 1 - Maf.smoothStep(Maf.toRadians(3), Maf.toRadians(15), offAngle);
   shadowState.uniforms.uShadowStrength.value =
-    params.look() === "wireframe" ? 0 : params.shadows() * Maf.clamp((1.5 - show.scale) / 0.4, 0, 1);
+    params.look() === "wireframe"
+      ? 0
+      : params.shadows() * Maf.clamp((1.5 - show.scale) / 0.4, 0, 1) * shadowOnAxis;
 
   if (
     cachedForm !== lastRigForm ||
@@ -2287,12 +2323,33 @@ window.app = {
   },
   rig,
   objectNames: OBJECT_NAMES,
+  sound,
+  // Recording: restart the staged entrance now, and move to a new figure ({ object, splitStyle } or random).
+  restartShow() {
+    show.started = false;
+    show.held = null;
+  },
+  nextLook(pick) {
+    if (!pick) return randomize();
+    requestShapeChange();
+    if (pick.object) params.object.set(pick.object);
+    if (pick.splitStyle) params.splitStyle.set(pick.splitStyle);
+  },
   show,
 };
 
 let lastWallTime = performance.now();
 
+let soundStarted = false;
+let prevOpenGaps = 0;
+const _prevCamDir = new Vector3(0, 0, 1);
+const _camNow = new Vector3();
+
 render(({ time, dt }) => {
+  if (!soundStarted) {
+    soundStarted = true;
+    sound.start();
+  }
   const now = performance.now();
   const wallDt = Maf.clamp((now - lastWallTime) / 1000, 0, 0.1);
   lastWallTime = now;
@@ -2301,7 +2358,9 @@ render(({ time, dt }) => {
   syncLook(params.look());
 
   const dir = params.reverse() ? -1 : 1;
-  if (params.segmented() && canSegment()) {
+  // The march belongs to the figure on screen (during a merge the panel already shows the next one), and only runs while
+  // its gaps are open, so a whole figure holds still.
+  if (canSegmentShown() && show.split > 0) {
     conveyorPhase = (conveyorPhase + dt * params.speed() * dir) % 1;
     if (conveyorPhase < 0) conveyorPhase += 1;
   }
@@ -2315,9 +2374,11 @@ render(({ time, dt }) => {
   rig.group.scale.setScalar(Math.max(1e-3, show.scale));
   rig.group.visible = show.scale > 1e-3 && show.dissolve < 1;
   paintUniforms.uDissolve.value = show.dissolve;
+  edgeMaterial.transparent = show.dissolve > 0;
+  edgeMaterial.opacity = 1 - show.dissolve;
   // A slow sway about the sightline, centred on upright, so every figure keeps its intended orientation.
   if (!dragging) show.swayT += dt;
-  show.roll = Maf.toRadians(params.cameraSway()) * Math.sin((show.swayT * Math.PI * 2) / 24);
+  show.roll = Maf.toRadians(params.cameraSway()) * Math.sin((show.swayT * Math.PI * 2) / 14);
 
   if (snapping && !dragging) {
     const alpha = 1 - Math.exp(-wallDt * 9);
@@ -2358,8 +2419,38 @@ render(({ time, dt }) => {
   }
 
   ctrl.update();
+  // Swoosh by how fast the camera swings around the figure.
+  _camNow.copy(cam.position).normalize();
+  if (dt > 0) {
+    const turn = Math.acos(Maf.clamp(_camNow.dot(_prevCamDir), -1, 1));
+    // A cut between orbits jumps the camera: not a swing.
+    const speed = turn / dt;
+    sound.swoosh(speed > 20 ? 0 : speed, _camNow.x);
+  } else sound.swoosh(0, 0);
+  _prevCamDir.copy(_camNow);
+  // The figure setting into place: once per orbit, as the camera reaches the sweet spot.
+  if (show.phase === "orbit" || show.phase === "click") {
+    // At 0.12° the pieces' depth offsets shift them less than a pixel: that's when they visibly lock together.
+    if (!show.landed && show.drive && show.scale > 0.5 && _camNow.z > Math.cos(Maf.toRadians(0.12))) {
+      show.landed = true;
+      sound.land({ gain: 1 });
+    }
+  }
   // Rolling the camera about the sightline keeps the sweet-spot alignment and the light fixed on the shape.
   cam.rotateZ(show.roll);
   rebuildGeometry();
+  // A wooden click for each gap that opens or closes, a burst when they go together.
+  const openGaps = rig.openGapCount ?? 0;
+  const changed = Math.min(8, Math.abs(openGaps - prevOpenGaps));
+  for (let i = 0; i < changed; i++) {
+    const opening = openGaps > prevOpenGaps;
+    sound.split({
+      gain: (opening ? 0.9 : 0.65) / Math.sqrt(changed),
+      rate: opening ? 1 : 0.85,
+      delay: changed > 1 ? i * 0.012 + nativeRandom() * 0.02 : 0,
+      pan: nativeRandom() * 1.2 - 0.6,
+    });
+  }
+  prevOpenGaps = openGaps;
   pipeline.render(scene, getActiveCamera(), time);
 });

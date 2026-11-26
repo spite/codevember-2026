@@ -1117,12 +1117,15 @@ function emitHalfSpaceClippedToUnit(
   const capZPortal = (rawVertCount > 0 ? _rawTag[2] : 0) + zOffset;
   const capLapJump = rawVertCount > 0 ? _rawTag[3] : 0;
 
-  const evalVertSignedD = (iPos, qTag) => {
-    const sv = _rawTag[qTag + 1];
-    if (sv < sCut - sGuardBefore) return -sign;
-    if (sv > sCut + sGuardAfter) return sign;
-    return sign * ((_rawPos[iPos] - cx) * ux + (_rawPos[iPos + 1] - cy) * uy);
+  // Past the guards a vertex is forced to its side, but keeps its true distance to the plane (only its sign is
+  // forced), so triangles that span the guard are still cut along the straight plane, not at an interpolated jag.
+  const forceSide = (real, sv) => {
+    if (sv < sCut - sGuardBefore) return -sign < 0 ? Math.min(real, -1e-7) : Math.max(real, 1e-7);
+    if (sv > sCut + sGuardAfter) return sign < 0 ? Math.min(real, -1e-7) : Math.max(real, 1e-7);
+    return real;
   };
+  const evalVertSignedD = (iPos, qTag) =>
+    forceSide(sign * ((_rawPos[iPos] - cx) * ux + (_rawPos[iPos + 1] - cy) * uy), _rawTag[qTag + 1]);
 
   const pushOutVert = (px, py, pz, nx, ny, nz, snx, sny, snz, t0, t1, t2, t3) => {
     if (vOut >= MAX_MESH_VERTS) return;
@@ -1367,11 +1370,7 @@ function emitHalfSpaceClippedToUnit(
     let by = _rawEdge[o + 4];
     let bz = _rawEdge[o + 5];
 
-    const edgeD = (x, y, sv) => {
-      if (sv < sCut - sGuardBefore) return -sign;
-      if (sv > sCut + sGuardAfter) return sign;
-      return sign * ((x - cx) * ux + (y - cy) * uy);
-    };
+    const edgeD = (x, y, sv) => (Number.isNaN(sv) ? sign * ((x - cx) * ux + (y - cy) * uy) : forceSide(sign * ((x - cx) * ux + (y - cy) * uy), sv));
     const da = edgeD(ax, ay, _rawEdgeS[e * 2]);
     const db = edgeD(bx, by, _rawEdgeS[e * 2 + 1]);
 
@@ -2614,6 +2613,7 @@ export class AnamorphicRig {
       buildBarCrossRow(loops, this._cachedLoopInfos, depthScale, this._cachedCrossRow);
     }
     const loopInfos = this._cachedLoopInfos;
+    this.openGapCount = 0;
     this.shadowBoxData.set(this._cachedCrossRow, 10 * MAX_SHADOW_BOXES * 4);
 
     if (!segmented) {
@@ -3174,6 +3174,7 @@ export class AnamorphicRig {
           return t * t * (3 - 2 * t);
         };
         const gapS = gap / n;
+        if (!isOpen) for (let j = 0; j < n; j++) if (gapOpen(j) > 0.12) this.openGapCount++;
 
 
         for (let k = kStart; k <= kEnd; k++) {
