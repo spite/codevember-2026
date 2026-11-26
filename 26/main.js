@@ -1977,6 +1977,8 @@ scene.add(rig.group);
 onResize((w, h, dpr) => pipeline.setSize(w, h, dpr));
 
 
+const shapeBag = { key: null, left: [] };
+
 onRandomize(() => {
   requestShapeChange();
   const r = Math.random;
@@ -1985,8 +1987,18 @@ onRandomize(() => {
   const pool = OBJECT_NAMES.filter((n) =>
     params.pool() === "segmented" ? segmentable(n) : params.pool() === "solid" ? !segmentable(n) : true,
   );
-  const others = pool.filter((n) => n !== params.object());
-  const nextObj = pick(others.length ? others : pool);
+  // A shuffled bag: every figure in the pool comes up once before any repeats, and never twice in a row.
+  if (shapeBag.key !== params.pool() || !shapeBag.left.length) {
+    const fresh = pool.slice();
+    for (let i = fresh.length - 1; i > 0; i--) {
+      const j = Math.floor(r() * (i + 1));
+      [fresh[i], fresh[j]] = [fresh[j], fresh[i]];
+    }
+    if (fresh.length > 1 && fresh[fresh.length - 1] === params.object()) fresh.unshift(fresh.pop());
+    shapeBag.key = params.pool();
+    shapeBag.left = fresh;
+  }
+  const nextObj = shapeBag.left.pop();
   params.object.set(nextObj);
   params.gap.set(snapStep(0.08 + r() * 0.14, 0.01));
   params.radius.set(snapStep(0.92 + r() * 0.22, 0.01));
