@@ -458,7 +458,7 @@ function toggleProjection() {
 addKey("KeyL", "snap to sweet spot", snapToSweetSpot);
 addKey("KeyM", "toggle sound", toggleSound);
 showSoundHint(() => !sound.running);
-addKey("KeyP", "toggle perspective / ortho", toggleProjection);
+addKey("KeyO", "toggle ortho / perspective", toggleProjection);
 addKey("KeyS", "toggle segments", () => params.segmented.set(!params.segmented()));
 addKey("KeyE", "toggle edge outlines", () => params.edges.set(!params.edges()));
 addKey("BracketLeft", "previous object", () => stepObject(-1));
@@ -499,7 +499,7 @@ gui.addSlider("Thickness", params.thickness, 0.22, 0.58, 0.01);
 gui.addSlider("Chamfer", params.chamfer, 0, 0.45, 0.01, { randomizable: false });
 
 gui.into(section.motion);
-gui.addSegmented("Projection (P)", params.projection, ["perspective", "ortho"], { randomizable: false });
+gui.addSegmented("Projection (O)", params.projection, ["perspective", "ortho"], { randomizable: false });
 gui.addSlider("FOV", params.fov, 28, 70, 1, { randomizable: false, disabledWhen: notPerspective });
 gui.addSlider("Speed", params.speed, 0, 0.35, 0.005, { randomizable: false, disabledWhen: notSegmented });
 gui.addSlider("Camera sway (°)", params.cameraSway, 0, 30, 1, { randomizable: false });

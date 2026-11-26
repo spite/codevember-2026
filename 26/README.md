@@ -12,7 +12,7 @@ Started from a zip of the figures and their sweet-spot split, ported to the shar
 - Drag to orbit and break the illusion, scroll to zoom. Letting go eases back to the sweet spot (L does it too).
 - M (or the speaker button) turns the sound on and off.
 - R (or the dice) for a new figure, with a random split style, gap, size and thickness. [ and ] step through the
-  figures in order. S toggles the blocks, E the ink outlines, P perspective / ortho.
+  figures in order. S toggles the blocks, E the ink outlines, O ortho / perspective, P a screenshot.
 - Left alone it changes by itself (Auto change). Each figure orbits in, clicks into the sweet spot, splits and marches,
   then merges back and dissolves where it stands before the next one swings in.
 - The panel picks the figure, whether it splits and how (together, wave, alternate, halving, from the joins, both

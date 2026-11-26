@@ -1,0 +1,849 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Anamorph Fakes</title>
+<meta name="description" content="How Codevember 2026 day 26, Anamorph, builds 31 impossible figures as real painted-wood solids cut along one sightline, splits them into blocks that march around the loop, keeps them welded in perspective with a projective warp, traces their shadows in illusion space, and flies the camera into the one viewpoint where they make sense.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Warm grey studio, off-white painted wood, ink. */
+:root {
+  --bg: #ebe8e2;
+  --panel: #f5f3ef;
+  --ink: #1b1c20;
+  --muted: #67625a;
+  --line: #d8d3ca;
+  --accent: #a4472d;
+  --accent2: #2f4f78;
+  --stage: #b8b2a8;
+  --stage-ink: #4a463f;
+  --stage-line: #a29c91;
+  --wood: #e4ddd0;
+  --wood2: #c9c0b0;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --text: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151513; --panel: #1f1e1b; --ink: #ece8e0; --muted: #a39d93; --line: #322f2b;
+    --accent: #e2805f; --accent2: #86a8dc; --stage: #4b4741; --stage-ink: #d6d0c5; --stage-line: #5f5a52;
+    --wood: #ddd5c6; --wood2: #b2a996;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151513; --panel: #1f1e1b; --ink: #ece8e0; --muted: #a39d93; --line: #322f2b;
+  --accent: #e2805f; --accent2: #86a8dc; --stage: #4b4741; --stage-ink: #d6d0c5; --stage-line: #5f5a52;
+  --wood: #ddd5c6; --wood2: #b2a996;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--text); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .glow { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .glow { background: linear-gradient(100deg, var(--accent) 10%, var(--accent2) 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; background: var(--stage); }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.live { font: 600 14px/1 var(--mono); display: inline-flex; gap: 8px; align-items: center; text-decoration: none; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; border-radius: 3px; background: var(--stage); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+.controls select { font: 400 13px/1 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 5px 6px; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+button { font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px; padding: 9px 14px; cursor: pointer; }
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: pre; }
+.formula .c { color: var(--muted); }
+.table-wrap { overflow-x: auto; background: var(--panel); border-radius: 4px; }
+table { border-collapse: collapse; width: 100%; font: 400 14px/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+td.num, th.num { text-align: right; }
+td.wrap { white-space: normal; min-width: 260px; }
+tr:last-child td { border-bottom: 0; }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+footer ul { margin: 8px 0 12px; padding-left: 18px; }
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+}
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 26</b> · Anamorph</div>
+      <h1>How Anamorph <span class="glow">fakes</span></h1>
+      <p class="lede">A Penrose triangle that is a real object: matte painted wood, lit by a soft studio key, casting shadows on itself. It is cut along one line of sight and its pieces are pushed apart in depth, so it only closes from one place. Here is how 31 such figures are built, how they split into blocks that march around the loop, how they stay welded in perspective, how they shadow themselves as if they were possible, and how the camera finds the one viewpoint where they are.</p>
+      <a class="live" href="./">See it live <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M3 1.8v8.4c0 .5.5.8.9.5l6.6-4.2a.6.6 0 0 0 0-1L3.9 1.3c-.4-.3-.9 0-.9.5z" fill="currentColor"/></svg></a>
+    </div>
+    <figure>
+      <img src="../screenshots/26.jpg" width="1080" height="1080" alt="A Penrose impossible triangle in matte off-white painted wood, split into eleven chamfered blocks with narrow gaps, on a warm grey studio backdrop." fetchpriority="high" decoding="async">
+      <figcaption>The triangle from its sweet spot, its eleven blocks marching around the loop.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>An impossible object you could build</h2>
+      <p>Impossible figures are drawings: a Penrose triangle, an Escher cube, Reutersvärd's cubes. Each one is locally fine, a beam meeting a beam at a right angle, and globally contradictory: follow the loop and you come back in front of where you started. There is a classic way to build one anyway. Make the solid open, with one end far in front of the other, and stand where the two ends line up. From that one viewpoint the gap is hidden behind itself and the eye closes the loop. This is an <em>anamorphosis</em>: a picture that only resolves from one place.</p>
+      <p>The day builds every figure that way, as a real solid, and then makes the trick its subject. Each figure flies in on a long orbit and is seen from the side, where it makes no sense; the camera brakes into the sweet spot, the pieces lock together with a wooden click, and the figure breaks into blocks that march around the impossible loop. Then the blocks close up, the figure fades into the backdrop, and the next one swings in.</p>
+      <p>The aim is a product shot, not a diagram: matte off-white paint over wood with brush lines in it, soft chamfered edges, a single soft key and soft shadows. That last part is the hard one, because a real shadow would give the trick away, so the figures cast shadows from the shape you see, not from the shape that is there.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>31 figures, 29 that march</b><span>Penrose polygons, Escher's cube and waterfall, Reutersvärd's cubes, rings, knots and interlocks. The Escher cube and the chair always stay whole.</span></div>
+      <div class="fact"><b>One cut, 4.59 deep</b><span>The default triangle has one cut, and the piece after it sits <code>√3 · L = 4.59</code> nearer the camera than the piece before it.</span></div>
+      <div class="fact"><b>Up to 220 shadow boxes</b><span>Traced per pixel against where each piece <em>appears</em> to be, not where it is.</span></div>
+    </div>
+  </section>
+
+  <!-- 2. The cut -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The cut · <b>objects.js, anamorph.js</b></div>
+      <h2>Cut along the line of sight</h2>
+      <p>The sweet spot looks straight down −z: the camera is on the +z axis, at 12 units in orthographic mode, framing 4.3 units of height. Every figure is built in that frame. A <em>portal</em> is a point on a loop where it is cut by a plane that contains the line of sight: the plane is vertical in z, and across the beam on screen (its normal is the beam's screen direction, with no z). Everything past the cut is then moved along z by a jump <code>jz</code>. Since the move is along the line of sight and the cut plane contains it, the two faces of the cut project onto exactly the same outline on screen: from the sweet spot there is nothing to see, and the beam looks whole.</p>
+      <p>A Penrose triangle is three beams along three axes of a cube, at right angles to each other in 3D. Seen in isometric projection each axis drops away from the camera by the same amount, so walking around the three beams, each of length <code>L</code>, ends <code>√3 · L</code> further back than it started, right behind the start on screen. One portal halfway along the first beam with <code>jz = √3 · L</code> pays that depth back. The solid is then a single bent bar whose two ends meet on screen and are 4.59 units apart in depth at the default size (<code>L = 2.55 × radius 1.04 = 2.65</code>).</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The triangle, off its sweet spot</h3>
+        <div class="controls">
+          <label>orbit <input id="cuT" type="range" min="-35" max="35" step="0.5" value="14"><output id="cuTo"></output></label>
+          <button id="cuZ" class="ghost">sweet spot</button>
+        </div>
+      </div>
+      <canvas id="cutFig" aria-label="Left: the default Penrose triangle drawn as square beams, seen orthographically after orbiting about the vertical axis by the chosen angle; at zero the cut ends meet. Right: a top view of the same solid with the jump at the cut and the camera's sightlines."></canvas>
+      <div class="readout" id="cuR"></div>
+      <p class="fig-cap">The same basis, lengths and cut as <code>buildTriangle</code>: three square beams of half-width 0.185 on the isometric lattice, cut halfway along the bottom beam. Right, from above: the two ends of the cut are on one sightline at 0°. Orbit and they slide apart on screen by <code>jz · sin θ</code>; the readout also gives what the day does to its shadows at that angle.</p>
+    </div>
+    <div class="col prose">
+      <p>Cuts sit on straight runs of beam, between corners, and where no other beam crosses in front of them on screen. Some figures need several: the S-hook and the hexagon-cross have two, the triquetra, pinwheel and hooked tribar three, the double tribar three per triangle. Their jumps can be in either direction; the S-hook's cancel each other out (<code>+1.6·arm</code>, then <code>−1.6·arm</code>).</p>
+    </div>
+  </section>
+
+  <!-- 3. Figures -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The figures · <b>objects.js</b></div>
+      <h2>Thirty-one figures on a cube lattice</h2>
+      <p>Most figures are made of straight beams along the three axes of a cube, drawn in isometric. <code>makeCubeLatticeBasis</code> builds that triad: the axes <code>x</code>, <code>y</code> and <code>−z</code>, turned 45° about the vertical, pitched forward by the isometric angle <code>asin(√(1/3)) = 35.264°</code>, each flipped if needed so it points away from the camera, then turned about the line of sight so the first axis points at the figure's own screen angle, in counter-clockwise order. (The pitch would move 0.42° for every degree of tilt away from 45°; the day keeps the tilt at 45° and the roll at 53°, which every figure is tuned for.) Each axis gets a weight <code>w = −E.z / √(1/3)</code>, 1 at the isometric angle, so that a step of one along each axis together always drops straight back:</p>
+    </div>
+    <div class="formula"><span class="c">// for any tilt and roll: the three steps close on screen and recede along the sightline</span>
+w₀·E₀ + w₁·E₁ + w₂·E₂ = (0, 0, −√3)
+<span class="c">// a loop of bars [axis, sign, nominal length] is built from it, and a portal's jump is in the same units</span>
+bar length = nominal · w[axis]        jz = nominal jump · √3</div>
+    <div class="col prose">
+      <p><code>createCubeLatticeLoop</code> takes a list of bars and portals and returns a loop. The beam's square cross-section is carried from bar to bar through each 90° corner with a mitre (each corner offset is reflected across the two bar directions), so the cross-section never twists. The beam's half-width is the figure's thickness times a factor of its own, at most 43% of the shortest bar. The loop is centred on screen by its corners, and in depth halfway between its nearest and furthest point, so the orbit turns about the middle of the solid. Then it is reordered to begin at the first portal, which becomes loop position <code>s = 0</code>, and <code>s</code> runs by length to 1. With a chamfer the square becomes an octagon: each corner is cut back to 1 − chamfer of the half-width, 0.9 at the default chamfer of 0.1.</p>
+      <p>Around every portal the loop keeps a <em>continuation chain</em>: the beam before the cut, continued straight through it and around the next corners as if there were no jump, shifted back by <code>jz</code>. A block that straddles a cut is built from that chain as one unbroken prism and then cut in two (see below). Each portal also stores its plane (point, direction), its jump, an overhang <code>min(0.14, 1.55·h / loop length)</code> in loop position (how far a beam's end can reach past the cut point on screen), and guard distances: the length of the straight runs on either side.</p>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>family</th><th>figures</th><th>built as</th></tr></thead>
+      <tbody>
+        <tr><td>Curved ribbons (3)</td><td class="wrap">ring, figure-8, trefoil</td><td class="wrap">Smooth curves with a rectangular section. The ring is two half-tori tilted 45°, the second turned 180° about the line of sight, cut at s = 0 and 0.5. The figure-8 (after Fernando Cortell) has one cut at its top and its side walls flip across the waist; the trefoil is a torus-knot ribbon with three cuts.</td></tr>
+        <tr><td>Penrose polygons (4)</td><td class="wrap">square, diamond, pentagon, hexagon</td><td class="wrap">An N-sided loop of flat rhombus prisms with C<sub>N</sub> symmetry, each bar's inner front face continuing into the next bar's bevel around every corner; one cut.</td></tr>
+        <tr><td>Lattice loops (12)</td><td class="wrap">triangle, frame, s-hook, triquetra, hourglass, stairs, meander, cross, pinwheel, star, hooked-tribar, reutersvard</td><td class="wrap">One closed loop of beams on the cube lattice: 3 bars (triangle) up to 12 (stairs, cross, star, hooked tribar). The self-crossing ones (s-hook, triquetra, hourglass, meander, hooked tribar) pass over themselves. Reutersvärd's figure is nine floating cubes while whole and a tribar of blocks while it marches.</td></tr>
+        <tr><td>Interlocked loops (4)</td><td class="wrap">double-tribar, valknut, borromean, borromean-tribar</td><td class="wrap">Two or three loops that pass over and under each other: two Penrose triangles in a star of David, Odin's three triangles, three golden frames, and three square plates with round-cornered holes.</td></tr>
+        <tr><td>Loops with open paths (6)</td><td class="wrap">divided-diamond, spiral-tribar, hex-cross, waterfall, archway, ladder</td><td class="wrap">A loop plus open beams welded onto it: a spine through a rhombus, an inner spiral arm, two rear pillars, Escher's waterfall towers, a viaduct's middle column, a ladder's three rungs that change sides.</td></tr>
+        <tr><td>Pillar figures (2)</td><td class="wrap">escher-cube, chair</td><td class="wrap">Built from square frames and open pillars, some pillars cut twice so their middle sits in front of or behind a crossing beam. They never split: 6 and 7 pieces that only make sense whole.</td></tr>
+      </tbody>
+    </table></div>
+    <div class="col prose">
+      <p>Three families need more than bars. The <strong>valknut</strong> is three triangles, each turned 120° from the last and pushed 0.228·L out from the centre (at 12° off the line between two of its axes). Its cuts can't go halfway along a beam, where another triangle may lie across them, so each triangle's cut is placed by search: 99 candidate points along each of its three bars, keeping the one farthest from every other bar on screen, its own and the other two triangles'. The <strong>borromean tribar</strong> is three square plates, one in each lattice plane, each with a hole whose outline is straight on two legs and a smooth arch between (the arch's shape ratio is 0.46). Its rim is a band of constant width around the hole, the outer edge being the hole's outline pushed out along its normal by 0.34 of the plate's half-size (the hole's radius is 0.66 of it), and <code>s</code> runs by arc length along the middle of the band (looked up from a table of sampled lengths), so equal steps of <code>s</code> give equal blocks. Each plate is cut three times, in units of its half-size: from 0 to +1.35 in front, to −(1.55 + 1.35·i) behind, and back to 0, which threads the three through each other. The <strong>curves</strong> are parametrised directly: the figure-8 is two circles of radius 0.63 × radius with a depth of <code>zAmp·sin(2πs) + 0.64·(0.5 − s)</code>, and its back walls lean down-left on its left half and up-right on its right, which is the impossible flip.</p>
+    </div>
+  </section>
+
+  <!-- 4. Building a block -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Building · <b>anamorph.js buildStations, buildRawPrism</b></div>
+      <h2>A prism, rebuilt every frame</h2>
+      <p>The rig builds the meshes on the CPU, every frame the figure changes: as the blocks march, as the gaps open, as the camera leaves the sweet spot. A piece of loop from <code>s₀</code> to <code>s₁</code> becomes a prism in <code>buildRawPrism</code>. First the <em>stations</em>: slices along the piece at every corner, every hinge (the start and end of a corner's mitre) and every collar boundary, sorted and de-duplicated, with straight runs of a lattice beam left as single spans and curves cut into steps (14 per block on the curves, 192 to 216 for a whole curve). Each station is a ring of 4 or 8 corners from the loop's own sampler. Between two rings each wall is two triangles, with its normal taken from the diagonals <code>(p₁₁ − p₀₀) × (p₁₀ − p₀₁)</code>, which stays exact even when one edge collapses to a point. Normals are averaged across a station when the two walls are within 16° of each other (a dot product above 0.96), and kept sharp otherwise.</p>
+      <p>All buffers are allocated once, as typed arrays sized for the largest piece (8 corners, 282 stations), in a pool of mesh units that grows as needed and hides what it doesn't use; nothing is allocated per frame. Each vertex carries, besides its position and normal, its <em>sweet-spot</em> position and normal and a tag: which loop and bar it belongs to, its loop position <code>s</code>, its accumulated portal depth and the loop's total jump per lap. The paint and the shadows run on those.</p>
+      <p>The edges of a block are bevelled with a <em>collar</em>: near each end of the block the ring shrinks toward its centroid, by up to the chamfer, over a length set so the bevel is at 45° (<code>chamfer × half-width</code>, the same for long and short pieces). The collar is sized on the <strong>whole block</strong>, not on the piece being built, so a block cut in two at a portal keeps one continuous taper through the cut. It is limited to 28% of the block, stops at 65% of the distance to a corner or hinge inside the block, and fades out when a block end lands within a corner's mitre (closer than 0.03 of loop position, or 1.15× the corner-to-hinge distance). The bevel also grows with the gap: it is <code>min(1, 5 × opening)</code> of full size, so it is complete by the time a gap is a fifth open and a flat, unbevelled end never shows in a narrow slot. The optional ink outlines (<code>E</code>) are line segments pushed 0.0042 out along the corner normals, drawn at a block's end only once its gap is 8% open.</p>
+    </div>
+  </section>
+
+  <!-- 5. Clipping -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Clipping · <b>anamorph.js emitHalfSpaceClippedToUnit, update</b></div>
+      <h2>Two halves of one prism</h2>
+      <p>A block near a portal is built once, as a single unbroken prism from the portal's continuation chain, and clipped against the portal's plane twice: <code>d = (x − cₓ)·uₓ + (y − c<sub>y</sub>)·u<sub>y</sub></code>. The side with <code>d ≤ 0</code> is kept where it is, the side with <code>d ≥ 0</code> is kept and moved by <code>jz</code>. The clip is Sutherland–Hodgman on each triangle, which leaves 3 or 4 vertices, interpolating position, normals and tags at the crossings. Because both halves come from the same prism, cut by the same plane, their outlines match exactly on screen, with the same bevels and normals on both sides.</p>
+      <p>A beam's cross-section reaches past the cut point on screen, so the plane would also slice a beam that turns a corner just after it and crosses back. To stop that, every vertex further than a <em>guard</em> from the cut along the loop (the straight run's length, at most <code>max(0.12, 2.2 × overhang)</code>) is forced to its own side. Only the sign is forced: the vertex keeps its real distance to the plane, so a triangle that spans the guard is still cut along the straight plane, not at an interpolated jag. A block that lies wholly on one side is copied without clipping; a block that reaches two portals is split halfway between the cuts first.</p>
+      <p>From the sweet spot the cut faces can't be seen, so none are drawn. Off it, the clip collects the chords where it crossed each triangle and fans them from their centroid into a cap facing along the plane's normal, with its own outline. That is the <code>offAxis</code> state, which begins once the camera is more than <code>√(1.5·10⁻³)</code> × (distance / 12) from the sweet spot, about 0.19°; past 0.15 in blend the overhang pad is dropped too. The shading normals stay the sweet-spot ones at any angle, so the light on a figure never jumps as it orbits. When the figure is whole, a closed loop with portals is built per piece as a clipped head, an unclipped middle and a clipped tail; open paths and pillars with one or two portals become two or four clipped sections.</p>
+    </div>
+  </section>
+
+  <!-- 6. Marching -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Marching · <b>main.js balanceSegments, anamorph.js gapOpen, gapDelay</b></div>
+      <h2>Blocks on a conveyor</h2>
+      <p>Once landed, a figure splits into blocks. Their number comes from the figure's own size: the target block is <code>Block length × 0.28</code> on screen (0.616 at the default 2.2), and a loop of screen length <code>ℓ</code> (measured along its centre line in 256 steps) gets <code>round(ℓ / 0.616)</code> blocks, at least 3. A loop with corners prefers a multiple of its corner count, the same pattern on every beam, when that keeps the block within 12% of the target. The triangle is 6.47 long: 9 blocks would be 0.72 (17% long), so it takes 11.</p>
+      <p>The loop is a conveyor: <code>n</code> blocks, each <code>1/n</code> of the loop minus its share of the gap. <em>Gap</em> (0.11 by default) is the fraction of the loop that is gap when every gap is open, so each gap is <code>gap / n</code>. A phase advances at <em>Speed</em>, 0.07 loops a second (a lap in 14.3 s, backwards with <em>Reverse</em>), only while the gaps are open, and every block is shifted by it; a block that crosses a portal is clipped in two there, and from the sweet spot just slides through the cut. Open paths (a ladder's rungs, the waterfall's towers) stay one solid piece while the loops march.</p>
+      <p>The split is one number that rises from 0 to 1 over <em>Split / merge</em> (4 s) once the camera has settled, and falls back over the same time before the figure leaves; the rig sees it eased by <code>InOutSine</code>. Each gap <code>j</code> has a delay in [0, 1] from the split style, opens over a window of <code>min(1, 3/n)</code> (1 for alternate) and eases with a smoothstep. <em>Together</em> opens them all at once as <code>1 − (1 − split)³</code>, fast at first, since a narrow gap is the hardest thing to shadow.</p>
+    </div>
+    <div class="formula"><span class="c">// gap j opens when the split passes its delay</span>
+t = clamp((split · (1 + spread) − delay(j)) / spread),  open(j) = t²(3 − 2t)
+<span class="c">// block k, between gaps k−1 and k (slide: the block behind falls back instead)</span>
+s₀ = (k − ½)/n + phase + ½·(gap/n)·open(k−1)       s₁ = (k + ½)/n + phase − ½·(gap/n)·open(k)
+<span class="c">// delays</span>
+wave, slide   j / n                    alternate   0 for even j, 1 for odd
+both ways     min(j, n − j) / (n/2)    halving     level at which j appears halving the loop / ⌈log₂ n⌉
+joins         distance from the gap to the nearest cut, / 0.5    (with the phase: it moves as they march)</div>
+    <div class="fig">
+      <div class="fig-head"><h3>Gaps opening around a loop</h3>
+        <div class="controls">
+          <label>style <select id="blS"><option>together</option><option selected>wave</option><option>alternate</option><option>halving</option><option>joins</option><option>both ways</option><option>slide</option></select></label>
+          <label>split <input id="blP" type="range" min="0" max="1" step="0.005" value="0.6"><output id="blPo"></output></label>
+          <label>blocks <input id="blN" type="range" min="3" max="19" step="1" value="11"><output id="blNo"></output></label>
+          <label>gap <input id="blG" type="range" min="0.07" max="0.45" step="0.01" value="0.11"><output id="blGo"></output></label>
+          <button id="blPl" class="ghost">play</button>
+        </div>
+      </div>
+      <canvas id="blockFig" aria-label="Left: a closed loop drawn as a circle with its blocks as arcs and the portal cut marked at the top; the gaps open as the split slider rises. Right: one row per gap with its delay and how open it is."></canvas>
+      <div class="readout" id="blR"></div>
+      <p class="fig-cap">The loop unrolled onto a circle, starting at its cut (top). Each block is an arc; on the right, each gap's delay (tick) and how far it is open (bar). Play runs the split over 4 s as the day does, then lets the blocks march at 0.07 loops a second. A gap counts as open for the sound once it passes 0.12.</p>
+    </div>
+  </section>
+
+  <!-- 7. Perspective -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Perspective · <b>anamorph.js warpBuffersForPerspective</b></div>
+      <h2>The same pixels in perspective</h2>
+      <p>The figures are designed for orthographic projection, where every sightline is parallel to z and a cut plane containing z works everywhere. In perspective the sightlines fan out from the camera, so a piece moved along z would slide across the screen. The day is orthographic by default; <code>O</code> switches to perspective at the <em>FOV</em> slider's angle (52°, widened on portrait screens so the horizontal angle is kept), with the camera at <code>D = 4.3 / (2·tan(fov/2))</code>, 4.41 at 52°, so the sweet-spot frame is the same 4.3 units tall.</p>
+      <p>In perspective each vertex goes through a projective transform that keeps lines straight and planes flat and lands every point on the same pixel as the orthographic view from the sweet spot:</p>
+    </div>
+    <div class="formula"><span class="c">// κ compresses depth so D + κz never comes near 0: κ = min(1, 0.62·D / (5.1 · radius))</span>
+(x, y, z)  →  D / (D + κz) · (x, y, κz)          <span class="c">// denominator clamped at 0.16·D</span>
+<span class="c">// seen from (0, 0, D):  x′ / (D − z′) = x / D   for every z, which is the orthographic view</span></div>
+    <div class="col prose">
+      <p>Points in front shrink toward the camera's axis and points behind grow away from it, exactly as much as perspective then magnifies and shrinks them. At the default size <code>κ = 0.62 × 4.41 / 5.30 = 0.52</code>. Switching projection keeps the camera's direction and its distance relative to the sweet spot (mapped to the orthographic zoom, 0.45 to 2.6), and dragging the FOV slider while sitting at the sweet spot moves the camera with it.</p>
+    </div>
+  </section>
+
+  <!-- 8. Paint -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Paint · <b>main.js paintSurface</b></div>
+      <h2>Brush lines that ride with the blocks</h2>
+      <p>The wood is painted in the fragment shader, with no textures, in <em>loop coordinates</em> rather than in space, so the pattern rides with a marching block and continues across a closed seam. Each loop sends its march phase, its block count and its screen length. The loop position, minus the phase, becomes a point on a circle whose circumference is the loop's length: <code>ring = (cos a, sin a) · ℓ / 2π</code>, seamless all the way around. The across coordinate is the sweet-spot position projected on the beam's screen normal, where the beam's direction is found from screen derivatives: the gradient of <code>s</code> (wrapped, so a lap boundary doesn't spike) mapped through the inverse of the position's screen Jacobian. Because the across coordinate is taken in the sweet-spot view, the pattern lines up across a portal from there.</p>
+    </div>
+    <div class="formula"><span class="c">// simplex noise, seeded per loop (loop index · 7.3)</span>
+drift = snoise(ring · 0.45, across · 0.45)                 <span class="c">// slow tone, never repeating across a beam</span>
+lines = snoise(ring · 0.35, (across + 0.012·warp) · 55) · (0.5 + 0.5·snoise(ring · 0.9, across · 2))
+albedo    ×= 1 + 0.012·drift + 0.004·lines
+roughness  = clamp(roughness + 0.05·lines + 0.03·drift, 0.3, 0.95)
+normal     = bump(height = 0.35·lines, scale 0.0006)      <span class="c">// surface-gradient bump from screen derivatives</span></div>
+    <div class="col prose">
+      <p>The brush lines are long along the beam and 55 to the unit across it, wobbled by a third noise so they never line up. They barely touch the colour (0.4%) and mostly show in the roughness, in the highlight, as a satin finish does, and as a faint ridge on the shading normal. On end caps and faces seen edge-on there is no beam direction, so the directional strokes fade out by <code>smoothstep(0.2, 0.6, …)</code> of how strongly <code>s</code> changes across the pixel, and the drift falls back to plain screen-space noise.</p>
+    </div>
+  </section>
+
+  <!-- 9. Light -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Light · <b>main.js LOOKS, modules/pipeline</b></div>
+      <h2>A studio without shadow maps</h2>
+      <p>The figures render through the shared photographic pipeline with two of its parts off. Shadow maps and screen-space AO and GI both see real depth, and real depth is wrong at every cut: a shadow map would show the triangle's far end shadowing nothing and its near end floating, and AO would darken nothing where the pieces meet. Both are replaced by the traced shadows below. What remains is the studio environment, MSAA, bloom 0.02, AgX, grain 0.006 and a vignette.</p>
+      <p>The <em>painted</em> look is matte off-white paint, <code>#e4ddd0</code>, at roughness 0.62 and specular 0.6, against a warm grey studio: a key from the upper left and front (direction −0.55, 0.62, 0.56, intensity 6.5, size 0.5), fill 0.32, floor 0.22 and walls 0.42, exposure 1 and vignette 0.1. Direct light is only occluded at 35% by the AO (<code>aoDirect</code>). The backdrop is a full-screen triangle drawn first, a gradient from (0.62, 0.60, 0.56) to (0.42, 0.405, 0.38) along a sweep of 68% height and 32% width, falling off by up to 74% toward (0.25, 0.24, 0.225) away from a centre at (0.52, 0.46) of the screen, dithered by ±0.1%. Three more looks swap all of it: <em>dark</em> (near-black paint against black, a pale ink), <em>studio</em> (bright blue-grey cyclorama, a white body, shadows tinted <code>#282c36</code>) and <em>wireframe</em> (the body takes the backdrop's colour, so only the outlines show).</p>
+    </div>
+  </section>
+
+  <!-- 10. Shadows -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Illusion space · <b>anamorph.js _writeOBB, main.js evalBoxShadowsFused</b></div>
+      <h2>Shadows from the shape you see</h2>
+      <p>An impossible figure, if it existed, would shadow itself consistently: the beam that passes in front casts onto the one behind, and a corner darkens its inside. The real solid can't do that, because its beams are not where they appear to be. So the shadows are traced per pixel in <em>illusion space</em>: a space in which every piece sits where it seems to be from the sweet spot.</p>
+      <p>Each frame the rig describes the figure as a list of oriented boxes, one per straight run (split at corners and cuts, and each block on its own while marching; curved runs in short chords): centre, three axes and half-sizes, its two end planes, the chamfer, its loop position and half-length, and its accumulated portal depth. They go into a 220 × 13 float texture. In the fragment shader the receiving pixel knows the same about itself from its vertex tags, and every box is moved into the receiver's frame by a rule that depends on how the two are related:</p>
+    </div>
+    <div class="formula"><span class="c">// same loop: undo both portal depths, and pick the lap that is within half a loop of the receiver</span>
+ds = wrap(s_box − s_rx) into [−½, ½)        lap = round(s_box − s_rx − ds)
+z_box = z_box − zPortal_box + zPortal_rx + lap · lapJump
+fade  = 1 − smoothstep(0.38, 0.48, |ds|)    <span class="c">// half a loop away the lap is ambiguous</span>
+<span class="c">// a different loop, or a crossing: lifted to just above the receiver, never far in front of it</span>
+z_box = z_rx + g · (1 − e^(−(z_box − z_rx) / g))        g = max(0.14, 1.65 × mean half-thickness)</div>
+    <div class="col prose">
+      <p>Unwinding is the core of it. Within one loop, the portal depths are taken back out, so the loop becomes a continuous beam that never closes: the triangle unwound is an endless descending spiral, dropping <code>lapJump</code> per lap. Seen from any point on it, the beam half a loop ahead and half a loop behind is where the eye believes it is. A box at <code>ds</code> along the loop from the receiver is placed on the receiver's own turn of that spiral.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The triangle, unwound</h3>
+        <div class="controls">
+          <label>receiver s <input id="uwS" type="range" min="0" max="0.999" step="0.001" value="0.85"><output id="uwSo"></output></label>
+        </div>
+      </div>
+      <canvas id="unwindFig" aria-label="Depth against loop position for the default Penrose triangle: the real solid is a sawtooth that jumps up at every cut; the illusion-space line through the receiver is straight, and it is used for half a loop either side, fading out near the ends."></canvas>
+      <div class="readout" id="uwR"></div>
+      <p class="fig-cap">Depth along the loop for the default triangle (z toward the camera). The real solid drops 4.59 per lap and jumps forward at the cut, a sawtooth. The receiver sees blockers on the straight line through itself, half a loop either way, fading over 0.38 to 0.48: near its end of the loop, blocks just past the cut are placed a full lap lower than they really are.</p>
+    </div>
+    <div class="col prose">
+      <p>Self-crossing and interlocked loops have one more source of truth: which beam is really in front where two cross on screen. For figures with portals and up to 14 bars, the rig builds a crossing table once per figure, from the bars' screen segments: where bar A crosses bar B and B is really nearer the camera, B is an <em>overpass</em> for A, stored with their depth difference in unwound space. Overpasses are carried across a corner when the crossing sits within 28% of a bar's end, and a short bar tucked between two bars that both pass over it inherits the overpass too (the meander's U-turns). Ring halves, washers, welded bridges, lapped rungs and fixed pillars each have a rule of their own.</p>
+      <p>Then, per box: a quick test of whether the ray to the light passes within the box's bounding sphere, and whether any part of the box rises at least 0.014 above the receiver's tangent plane (faded in up to 0.052). The distance along the ray to the box's signed distance field (a box with chamfered edges and slanted end planes, read in the box's frame) is minimised by a golden-section search of 6 steps and a parabolic step, and the minimum distance <code>sd</code> becomes occlusion with a penumbra that widens along the ray, as a soft light's does. A block also skips itself: boxes of the same loop within the receiver's block (plus a pad of at most 0.004, kept inside the gap) are not tested, so a block's own end never shadows its face.</p>
+    </div>
+    <div class="formula"><span class="c">// key: toward the look's key direction, rotated with the figure</span>
+soft = 0.013 + 0.072·t     reach 2.45 (0.52–0.86 across loops, 0.48–0.64 within a cut loop)
+<span class="c">// AO: a ray leaning toward the camera, normalize(0.48·n + (0, 0, 0.88))</span>
+soft = 0.022 + 0.14·t      reach 0.68 (0.42–0.60 across loops)      tight AO: 0.015 + 0.095·t, within 0.24–0.48
+occlusion = 1 − smoothstep(−0.65·soft, soft, sd)    × fade near the reach (from 65%) × receiver n·l gate (0.01–0.18)
+<span class="c">// painted look, with Shadows s (0.7):</span>
+shadow    = mix(1, key, s)
+occlusion ×= mix(1, mix(1, ao, 0.7) · mix(1, tightAo, 0.85), s)</div>
+    <div class="col prose">
+      <p>Three figure types are traced against their exact shapes instead of boxes. The borromean tribar's three plates are traced as square-washer SDFs (the constant-width band around its round-cornered hole), sampled at 9 points along the ray, refined with 7 golden-section steps and a parabola; the plates of other loops are lifted over the receiver like any crossing, with a clip that keeps only the post or the overpass that really crosses it. The whole figure-8 and trefoil are traced against the curve itself: the closest curve parameter to the ray is seeded from 7 samples per piece, skipping the receiver's own neighbourhood (0.085 of the loop), then refined 6 times by alternating a Newton step on the curve with the closest point on the ray to the beam's sheared octagonal section.</p>
+      <p>Illusion-space shadows only match the picture near the sweet spot, so they fade with the camera's angle off it, <code>1 − smoothstep(3°, 15°, θ)</code>, and as a figure grows on its way out (<code>(1.5 − scale) / 0.4</code>). Further out the figure is lit without them, which reads as an unshadowed object rather than a wrong one.</p>
+    </div>
+  </section>
+
+  <!-- 11. The show -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The show · <b>main.js updateShow, startOrbit, orbitGuide, followSpring</b></div>
+      <h2>Orbit, click, split, leave</h2>
+      <p>Every figure plays the same four phases. <strong>Orbit</strong>: the camera cuts, unseen, to a point 2.2 turns (396°) around the figure, to a random side, pitched by <code>0.5·sin(wave)</code> with a random wave, and 1.35 times further out (in orthographic, zoomed out to 1/1.35). The figure grows in from nothing over <em>Grow in</em> (0.6 s, <code>OutCubic</code>) while a deep whoosh plays, and the camera swings around it for <em>Orbit</em> (7 s), seeing the impossible figure from every side as the nonsense it really is. <strong>Click</strong>: it lands on the sweet spot. <strong>Split</strong>: once it has settled, the gaps open and the blocks march. <strong>Merge and exit</strong>: when the next figure is asked for, the gaps close over the same 4 s, then the figure grows to 1.5× (<code>InQuad</code>) and fades into the backdrop over <em>Exit</em> (1.2 s), and the next orbit starts.</p>
+      <p>The camera doesn't follow an easing curve to the sweet spot; that stops dead and looks animated. A <em>guide path</em> sets where the camera ought to be: the yaw closes as <code>from · (1 − OutQuart(u))</code>, fast for most of the swing and then a long brake, the pitch settles by <code>OutCubic</code> with a little wave, <code>0.22·sin(wave + 3πu)</code>, and the distance and zoom ease in and out. An under-damped spring chases it, <code>ω = 7</code>, <code>ζ = 0.7</code>, integrated at 240 Hz whatever the frame rate, and starts moving at the guide's own speed. It lags the guide through the fast part of the swing, which rounds off the start and the turn into the brake, and catches up during the long brake. With the default 7 s orbit it overshoots by 0.002°, far under a pixel, and comes within 0.12° about 0.7 s before the guide ends; with a 1 s orbit the guide brakes so hard that the spring overshoots by almost 4° and swings back. Once, after the guide has arrived, the error is under 2·10⁻⁴ and the speed under 2·10⁻³, the camera is pinned exactly at the sweet spot.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Landing on the sweet spot</h3>
+        <div class="controls">
+          <label>orbit (s) <input id="spT" type="range" min="1" max="15" step="0.5" value="7"><output id="spTo"></output></label>
+          <label>ω <input id="spW" type="range" min="2" max="14" step="0.5" value="7"><output id="spWo"></output></label>
+          <label>ζ <input id="spZ" type="range" min="0.3" max="1.2" step="0.05" value="0.7"><output id="spZo"></output></label>
+          <button id="spN" class="ghost">new swing</button>
+        </div>
+      </div>
+      <canvas id="springFig" aria-label="Top: the camera's yaw over time for the guide path and the spring that chases it, from 396 degrees down to zero. Bottom: the last seconds magnified to a few degrees, with the click and the settle marked."></canvas>
+      <div class="readout" id="spR"></div>
+      <p class="fig-cap">The yaw of one orbit, simulated with the day's code at 60 fps (4 spring substeps a frame). Top, the whole swing; bottom, the landing magnified, with the moment the camera comes within 0.12° (the click) and the moment it is pinned. ω and ζ are fixed in the day; the sliders show what they do. Shorten the orbit to see the spring overshoot.</p>
+    </div>
+    <div class="col prose">
+      <p>The landing plays a wooden click when the camera's direction comes within 0.12° of the sweet spot, which is when the pieces' depth offsets shift them by less than a pixel and they visibly lock. While the figure is on screen the camera also <em>sways</em>: it rolls about the line of sight by <em>Camera sway</em> (14°) times <code>sin(2π·t / 14 s)</code>. A roll about the sightline keeps the alignment exact and keeps the light fixed on the figure, so the figure seems to rock while staying welded. The sway clock starts at minus the orbit time, so it passes upright exactly as the camera lands, and it holds while you drag.</p>
+      <p><em>Auto change</em> asks for a new figure 14 s after the last change or interaction, counting across the phases but not during a merge or an exit. <code>R</code> picks a figure from the <em>Randomize from</em> pool (all, only those that split, only the whole ones), never the one on screen, with a random split style, a gap of 0.08 to 0.22, a radius of 0.92 to 1.14 and a thickness of 0.34 to 0.48. The panel's shape settings for the figure on screen are held while it merges and exits, so a change never reshapes the figure that is leaving.</p>
+      <p>The exit fades the figure into exactly what is behind it: in the shader, albedo and specular go to 0 and the emission goes to the backdrop gradient computed for that pixel, through <code>smoothstep</code> of the dissolve, while the outlines fade with it. A figure that has dissolved has no edge left to pop when it is removed.</p>
+    </div>
+  </section>
+
+  <!-- 12. Hand camera -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">By hand · <b>main.js, modules/FreeOrbitControls.js</b></div>
+      <h2>Breaking the illusion yourself</h2>
+      <p>Dragging takes the camera away from the show at any time; the orbit uses the shared gimbal-free controls with damping 0.08 and no panning. The point of dragging is to break the figure: a few degrees off and the cut ends step apart, further and the figure falls into its real, open shape. Letting go eases back to the sweet spot by <code>1 − e<sup>−9·dt</sup></code> a frame (with <em>Auto-snap</em>, or at any time with <code>L</code>), and the show takes over again at the next figure.</p>
+      <p>A hand-placed camera is never exactly on the axis, and a figure built for the axis shows a sliver of the front piece's side a degree away from it. So near the sweet spot the figure turns to meet the camera: within 2.5° it is rotated fully so its sightline points at the camera, fading to no turn at 7° (a <code>smoothstep</code> on the angle). In perspective it also takes the camera's distance as its own. The light's direction is turned back by the same rotation for the shadows. The staged orbit does without this: it lands exactly, and a figure turning as the camera glides in would read as a second motion.</p>
+    </div>
+  </section>
+
+  <!-- 13. Sound -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Sound · <b>sound.js</b></div>
+      <h2>Air, a click and wooden blocks</h2>
+      <p>The orbit has two sounds. As it sets off, one of two deep whoosh recordings plays at half gain. Under it runs a synthesized swoosh that follows how fast the camera swings around the figure: three seconds of stereo pink-ish noise (three one-pole filters summed) loop through three layers, a low body, a band that sweeps up and flutters, and high air. Each frame the camera's angular speed sets a level <code>L = √min(1, speed / 4)</code>, a gentle curve so it carries through the slow end of the glide, and the layers follow it with short time constants (60 to 120 ms). The swoosh pans with the camera's side, up to ±0.8. A jump of more than 20 rad/s is a cut between orbits, not a swing, and is ignored.</p>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>layer</th><th>filter</th><th>tracks the level L</th></tr></thead>
+      <tbody>
+        <tr><td>body</td><td>low-pass, Q 2.5</td><td class="wrap">cutoff 110 + 220·L Hz, gain 0.4·L</td></tr>
+        <tr><td>band</td><td>band-pass, Q 1.4</td><td class="wrap">centre 260 + 1500·L² Hz, gain 0.32·L, tremolo at 2 + 10·L Hz with depth 0.25·L</td></tr>
+        <tr><td>air</td><td>high-pass 4.5 kHz</td><td class="wrap">gain 0.1·L³, only at speed</td></tr>
+      </tbody>
+    </table></div>
+    <div class="col prose">
+      <p>The landing plays a single wooden click. The split is made of knocks: the rig counts the gaps that are more than 12% open each frame, and for every gap that opens or closes the day plays one of three hits cut from a recording of toy wooden blocks, never the same one twice in a row, at 0.9 gain opening and 0.65 closing (and at 0.85 of the pitch, lower, when closing), divided by the square root of how many changed that frame, up to 8, spread by 12 ms each plus up to 20 ms at random, and panned up to ±0.6. <em>Together</em> makes one burst; <em>wave</em> makes a run of knocks around the loop. Every sample also varies by ±10% in pitch and −30% to +10% in gain.</p>
+      <p>Everything goes through a master gain of 0.8 and a compressor (−12 dB, 3:1), with a send to a short room: a 2.2 s impulse of noise decaying as <code>(1 − t)<sup>3.2</sup></code>, mixed in at 0.16. The audio context is created on load and resumes on the first gesture, nothing plays before the first frame, and the variations use the unseeded random so the seed's figures don't change with the sound. For recordings the whole sound can render into an <code>OfflineAudioContext</code>, with each event placed at its own time.</p>
+    </div>
+  </section>
+
+  <!-- Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>Drag to orbit and break the illusion, scroll or pinch to zoom. Letting go eases back to the sweet spot; <b>L</b> does it any time.</li>
+      <li><b>R</b> (or the dice) for a new figure; <b>[</b> and <b>]</b> step through the 31 in order.</li>
+      <li><b>S</b> toggles the blocks, <b>E</b> the ink outlines, <b>O</b> orthographic / perspective.</li>
+      <li><b>Geometry</b>: figure, randomize pool, split style, block length (1.2–4), gap (0.07–0.45), radius, thickness, chamfer (0–0.45).</li>
+      <li><b>Motion &amp; View</b>: projection, FOV (28–70°), march speed, camera sway (0–30°), reverse, auto-snap.</li>
+      <li><b>Look</b>: painted, dark, studio or wireframe, the shadow strength and the outlines. <b>Transition</b>: grow in, orbit, split / merge and exit times.</li>
+      <li><b>M</b> or the speaker button toggles sound, <b>Space</b> pauses, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel.</li>
+      <li>Left alone, it changes figure every 14 s (<b>Auto change</b>).</li>
+    </ul>
+  </section>
+
+  <footer class="col">
+    <div class="meta">
+      <span><b>three.js</b> r187</span><span>WebGL2</span><span>photographic pipeline</span><span>illusion-space traced shadows</span><span>sightline cuts</span><span>started in <b>Antigravity</b> with Gemini 4 Carbon, finished in <b>Claude Code</b> with Opus 5.5</span>
+    </div>
+    Day 26 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/26/">spite.github.io/codevember-2026/26</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/26">26/ of the codevember-2026 repository</a>.
+    <br><br>Sounds: CC0 recordings on freesound.org:
+    <ul>
+      <li>"Wooden Click" by BenjaminNelan (321083), the landing</li>
+      <li>single hits cut from "Toy-Wooden-Blocks_Child.wav" by rzSHI (395675), the split knocks</li>
+      <li>"Deep Whoosh Speed Ramp" by oMzig (789075) and "Deep Whoosh #5" by Kinoton (558827), the orbit whoosh</li>
+    </ul>
+  </footer>
+</main>
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const clamp01 = (x) => clamp(x, 0, 1);
+  const smoothstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+  const rgb = (hex) => { const c = document.createElement("canvas").getContext("2d"); c.fillStyle = hex; const s = c.fillStyle; if (s[0] === "#") return [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16)); return s.match(/\d+/g).slice(0, 3).map(Number); };
+  const rgba = (hex, a) => `rgba(${rgb(hex).join(",")},${a})`;
+  const DEG = Math.PI / 180;
+
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1, W = 0, H = 0;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      W = canvas.clientWidth || 600; H = Math.round(W * (typeof aspect === "function" ? aspect(W) : aspect));
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, W, H);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    new MutationObserver(() => fit(true)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return { redraw: () => fit(true) };
+  }
+  const bind = (id, out, fmt, fn) => { const el = $(id); const o = $(out); const show = () => { if (o) o.textContent = fmt(+el.value); }; el.addEventListener("input", () => { show(); fn(); }); show(); return el; };
+  const stage = (ctx, W, H) => { ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H); };
+  const label = (ctx, text, x, y, color = css("--stage-ink"), size = 11, align = "left") => { ctx.fillStyle = color; ctx.font = font(size); ctx.textAlign = align; ctx.fillText(text, x, y); ctx.textAlign = "left"; };
+
+  // ---- Cube-lattice basis (as objects.js makeCubeLatticeBasis) ----
+  const S13 = Math.sqrt(1 / 3);
+  const ISO_PITCH_DEG = Math.asin(S13) / DEG;
+  function makeBasis(tiltDeg, rollDeg, yawDeg = 45) {
+    const p = (ISO_PITCH_DEG + (tiltDeg - 45) * 0.42) * DEG, y = yawDeg * DEG;
+    const cy = Math.cos(y), sy = Math.sin(y), cp = Math.cos(p), sp = Math.sin(p);
+    const raw = [[1, 0, 0], [0, 1, 0], [0, 0, -1]].map(([vx, vy, vz]) => {
+      const x1 = cy * vx + sy * vz, y1 = vy, z1 = -sy * vx + cy * vz;
+      return [x1, cp * y1 - sp * z1, sp * y1 + cp * z1];
+    });
+    for (const r of raw) if (r[2] > 0) { r[0] = -r[0]; r[1] = -r[1]; r[2] = -r[2]; }
+    const d = rollDeg * DEG - Math.atan2(raw[0][1], raw[0][0]), cd = Math.cos(d), sd = Math.sin(d);
+    const E = raw.map(([x, y2, z]) => [x * cd - y2 * sd, x * sd + y2 * cd, z]);
+    if (E[0][0] * E[1][1] - E[0][1] * E[1][0] < 0) { const t = E[1]; E[1] = E[2]; E[2] = t; }
+    return { E, weights: E.map((e) => -e[2] / S13) };
+  }
+  const add = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+  // ---- The default triangle (buildTriangle with radius 1.04, thickness 0.44) ----
+  const TRI_L = 2.55 * 1.04, TRI_H = Math.min(0.44 * 0.42, TRI_L * 0.43), JZ = TRI_L * Math.sqrt(3);
+  const tri = (() => {
+    const { E, weights } = makeBasis(45, 0);
+    const T = E.map((e, i) => e.map((c) => c * weights[i]));
+    // vertices before centring: S, C (cut), V1, V2
+    let pts = [[0, 0, 0]];
+    let p = [0, 0, 0];
+    const C0 = add(p, T[0], TRI_L * 0.5);
+    const C1 = add(C0, [0, 0, JZ]);
+    const V1 = add(C1, T[0], TRI_L * 0.5), V2 = add(V1, T[1], TRI_L), V3 = add(V2, T[2], TRI_L);
+    const all = [p, C0, C1, V1, V2, V3];
+    let mnx = 0, mxx = 0, mny = 0, mxy = 0, q = [0, 0];
+    for (let i = 0; i < 3; i++) { q = [q[0] + TRI_L * T[i][0], q[1] + TRI_L * T[i][1]]; mnx = Math.min(mnx, q[0]); mxx = Math.max(mxx, q[0]); mny = Math.min(mny, q[1]); mxy = Math.max(mxy, q[1]); }
+    const sx = -0.5 * (mnx + mxx), sy = -0.5 * (mny + mxy);
+    const zs = all.map((v) => v[2]);
+    const zMid = 0.5 * (Math.min(...zs) + Math.max(...zs));
+    const sh = (v) => [v[0] + sx, v[1] + sy, v[2] - zMid];
+    const [S, C, Cf, A, B] = [p, C0, C1, V1, V2].map(sh);
+    const Eu = E.map((e) => { const l = Math.hypot(...e); return e.map((c) => c / l); });
+    const u2 = [Eu[0][0], Eu[0][1], 0]; const ul = Math.hypot(u2[0], u2[1]); u2[0] /= ul; u2[1] /= ul;
+    const h = TRI_H;
+    // each corner cube belongs to one piece, so no faces overlap
+    const pieces = [
+      { P: Cf, Q: add(A, Eu[0], -h), ax: 0, clipStart: Cf },
+      { P: add(A, Eu[1], -h), Q: add(B, Eu[1], h), ax: 1 },
+      { P: add(B, Eu[2], h), Q: add(S, Eu[2], h), ax: 2 },
+      { P: add(S, Eu[0], h), Q: C, ax: 0, clipEnd: C },
+    ];
+    return { E: Eu, pieces, u2, h, S, C, Cf, A, B };
+  })();
+
+  function triQuads() {
+    const quads = [];
+    const { E, pieces, u2, h } = tri;
+    for (const pc of pieces) {
+      const Tn = E[pc.ax], Aa = E[(pc.ax + 1) % 3], Bb = E[(pc.ax + 2) % 3];
+      const offs = [add(add([0, 0, 0], Aa, -h), Bb, -h), add(add([0, 0, 0], Aa, h), Bb, -h), add(add([0, 0, 0], Aa, h), Bb, h), add(add([0, 0, 0], Aa, -h), Bb, h)];
+      const sideN = [Bb.map((c) => -c), Aa, Bb, Aa.map((c) => -c)];
+      const ringAt = (base, clipPt) => offs.map((d) => {
+        const c = add(base, d);
+        if (!clipPt) return c;
+        const t = -((c[0] - clipPt[0]) * u2[0] + (c[1] - clipPt[1]) * u2[1]) / (Tn[0] * u2[0] + Tn[1] * u2[1]);
+        return add(c, Tn, t);
+      });
+      const r0 = ringAt(pc.P, pc.clipStart), r1 = ringAt(pc.Q, pc.clipEnd);
+      const len = Math.hypot(pc.Q[0] - pc.P[0], pc.Q[1] - pc.P[1], pc.Q[2] - pc.P[2]);
+      const M = Math.max(2, Math.round(len / 0.12));
+      const ring = (i) => r0.map((a, c) => add(a, [r1[c][0] - a[0], r1[c][1] - a[1], r1[c][2] - a[2]], i / M));
+      let prev = ring(0);
+      for (let i = 1; i <= M; i++) {
+        const cur = ring(i);
+        for (let w = 0; w < 4; w++) { const w1 = (w + 1) % 4; quads.push({ p: [prev[w], prev[w1], cur[w1], cur[w]], n: sideN[w] }); }
+        prev = cur;
+      }
+      const capN0 = pc.clipStart ? [-u2[0], -u2[1], 0] : Tn.map((c) => -c);
+      const capN1 = pc.clipEnd ? u2 : Tn;
+      quads.push({ p: r0, n: capN0 }, { p: r1, n: capN1 });
+    }
+    return quads;
+  }
+  const TRI_QUADS = triQuads();
+  const KEY = (() => { const k = [-0.55, 0.62, 0.56], l = Math.hypot(...k); return k.map((c) => c / l); })();
+
+  // ---- 1. The cut ----
+  {
+    const T = $("cuT");
+    const fig = setup($("cutFig"), (W) => (W < 600 ? 1.45 : 0.56), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const th = +T.value * DEG, c = Math.cos(th), s = Math.sin(th);
+      const narrow = W < 600;
+      const mainW = narrow ? W : W * 0.6, mainH = narrow ? H * 0.62 : H;
+      // main view: orbit about y, ortho
+      const scale = Math.min(mainW, mainH) / 3.4;
+      const ox = mainW / 2, oy = mainH / 2 + scale * 0.05;
+      const wood = rgb(css("--wood"));
+      const rot = (v) => [v[0] * c - v[2] * s, v[1], v[0] * s + v[2] * c];
+      const list = [];
+      for (const q of TRI_QUADS) {
+        const n = rot(q.n);
+        if (n[2] <= 1e-4) continue;
+        const pr = q.p.map(rot);
+        const z = pr.reduce((a, v) => a + v[2], 0) / 4;
+        const lit = 0.38 + 0.62 * Math.max(0, dot(q.n, KEY));
+        list.push({ pr, z, lit });
+      }
+      list.sort((a, b) => a.z - b.z);
+      for (const q of list) {
+        const col = `rgb(${wood.map((v) => Math.round(v * q.lit)).join(",")})`;
+        ctx.beginPath();
+        q.pr.forEach((v, i) => { const x = ox + v[0] * scale, y = oy - v[1] * scale; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
+        ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 0.6; ctx.stroke();
+      }
+      label(ctx, "seen from the camera", 14, 20);
+      label(ctx, `orbit ${(+T.value).toFixed(1)}°`, 14, 36, css("--accent"));
+      // top view
+      const tx0 = narrow ? 0 : mainW, ty0 = narrow ? mainH : 0, tw = narrow ? W : W - mainW, th2 = narrow ? H - mainH : H;
+      ctx.strokeStyle = css("--stage-line"); ctx.lineWidth = 1;
+      ctx.beginPath(); if (narrow) { ctx.moveTo(10, ty0); ctx.lineTo(W - 10, ty0); } else { ctx.moveTo(tx0, 10); ctx.lineTo(tx0, H - 10); } ctx.stroke();
+      const { S, C, Cf, A, B } = tri;
+      const ts = Math.min(tw / 3.6, th2 / 6.2);
+      const tcx = tx0 + tw / 2, tcy = ty0 + th2 / 2 + 6;
+      const P = (v) => [tcx + v[0] * ts, tcy - v[2] * ts];
+      // sightlines
+      const dir = [s, c];
+      ctx.setLineDash([3, 4]); ctx.strokeStyle = css("--accent2"); ctx.lineWidth = 1;
+      for (const v of [C, Cf]) {
+        const [x, y] = P(v); const k = 400;
+        ctx.beginPath(); ctx.moveTo(x - dir[0] * k, y + dir[1] * k); ctx.lineTo(x + dir[0] * k, y - dir[1] * k); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      const seg = (a, b, col, w) => { const [x0, y0] = P(a), [x1, y1] = P(b); ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); };
+      const w = Math.max(3, TRI_H * 2 * ts);
+      seg(S, C, css("--wood2"), w); seg(Cf, A, css("--wood2"), w); seg(A, B, css("--wood2"), w); seg(B, S, css("--wood2"), w);
+      seg(S, C, css("--ink"), 1.2); seg(Cf, A, css("--ink"), 1.2); seg(A, B, css("--ink"), 1.2); seg(B, S, css("--ink"), 1.2);
+      ctx.setLineDash([2, 3]); seg(C, Cf, css("--accent"), 1.4); ctx.setLineDash([]);
+      const [jx, jy] = P([0.5 * (C[0] + Cf[0]), 0, 0.5 * (C[2] + Cf[2])]);
+      label(ctx, "jz = 4.59", jx + 14, jy + 16, css("--accent"));
+      label(ctx, "from above (x, z)", tx0 + 14, ty0 + 20);
+      label(ctx, "camera ↑", tx0 + 14, ty0 + 36, css("--accent2"));
+    });
+    const upd = () => {
+      const th = +T.value, gap = JZ * Math.abs(Math.sin(th * DEG));
+      const fade = 1 - smoothstep(3, 15, Math.abs(th));
+      $("cuR").innerHTML = `<span>step at the cut on screen <b>${gap.toFixed(3)}</b> (${(gap / (2 * TRI_H)).toFixed(2)} beam widths)</span><span>shadows <b>${Math.round(fade * 100)}%</b></span><span>cut caps <b>${Math.abs(th) > 0.19 ? "drawn" : "none"}</b></span>`;
+      fig.redraw();
+    };
+    bind("cuT", "cuTo", (v) => `${v.toFixed(1)}°`, upd);
+    $("cuZ").addEventListener("click", () => { T.value = 0; T.dispatchEvent(new Event("input")); });
+    upd();
+  }
+
+  // ---- 2. Blocks ----
+  {
+    const wrapHalf = (x) => { let r = (x + 0.5) % 1; if (r < 0) r += 1; return r - 0.5; };
+    const easeInOutSine = (t) => -(Math.cos(Math.PI * t) - 1) / 2;
+    const state = { phase: 0 };
+    function layout(style, splitRaw, n, gapIn, phase) {
+      const split = easeInOutSine(splitRaw);
+      const gap = Math.min(0.85, Math.max(0.02, gapIn));
+      const levels = Math.max(1, Math.ceil(Math.log2(n)));
+      const cuts = [0];
+      const delay = (jj) => {
+        switch (style) {
+          case "wave": case "slide": return jj / n;
+          case "alternate": return jj % 2 ? 1 : 0;
+          case "halving": for (let L = 0; L <= levels; L++) { const x = (jj * 2 ** L) / n; if (Math.abs(x - Math.round(x)) < (0.5 * 2 ** L) / n) return L / levels; } return 1;
+          case "both ways": return Math.min(jj, n - jj) / Math.max(1, n / 2);
+          case "joins": { const sg = (jj + 0.5) / n + phase; let d = 0.5; for (const c of cuts) d = Math.min(d, Math.abs(wrapHalf(sg - c))); return Math.min(1, d / 0.5); }
+          default: return 0;
+        }
+      };
+      const open = (j) => {
+        if (split >= 1) return 1;
+        if (style === "together") return 1 - (1 - Math.max(0, split)) ** 3;
+        const jj = ((j % n) + n) % n;
+        const spread = style === "alternate" ? 1 : Math.min(1, 3 / n);
+        const t = clamp01((split * (1 + spread) - delay(jj)) / spread);
+        return t * t * (3 - 2 * t);
+      };
+      const gapS = gap / n, slide = style === "slide";
+      const blocks = [];
+      for (let k = 0; k < n; k++) {
+        const oS = open(k - 1), oE = open(k);
+        const b0 = (k - 0.5) / n + phase + (slide ? 0 : 0.5 * gapS * oS);
+        const b1 = (k + 0.5) / n + phase - (slide ? gapS * oE : 0.5 * gapS * oE);
+        blocks.push([b0, b1]);
+      }
+      const gaps = [];
+      for (let j = 0; j < n; j++) gaps.push({ delay: style === "together" ? 0 : delay(j), open: open(j) });
+      return { blocks, gaps, split };
+    }
+    const P = $("blP"), N = $("blN"), G = $("blG"), Sst = $("blS");
+    const fig = setup($("blockFig"), (W) => (W < 600 ? 1.5 : 0.5), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const n = +N.value;
+      const L = layout(Sst.value, +P.value, n, +G.value, state.phase);
+      const narrow = W < 600;
+      const ringW = narrow ? W : W * 0.5, ringH = narrow ? H * 0.55 : H;
+      const cx = ringW / 2, cy = ringH / 2, R = Math.min(ringW, ringH) * 0.34, bw = Math.max(10, R * 0.16);
+      const ang = (s) => -Math.PI / 2 + s * Math.PI * 2;
+      ctx.strokeStyle = rgba(css("--ink"), 0.12); ctx.lineWidth = bw + 6;
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineCap = "butt";
+      L.blocks.forEach(([a, b], k) => {
+        ctx.strokeStyle = css("--ink"); ctx.lineWidth = bw + 2;
+        ctx.beginPath(); ctx.arc(cx, cy, R, ang(a), ang(b)); ctx.stroke();
+        ctx.strokeStyle = k % 2 ? css("--wood2") : css("--wood"); ctx.lineWidth = bw;
+        ctx.beginPath(); ctx.arc(cx, cy, R, ang(a) + 0.004, ang(b) - 0.004); ctx.stroke();
+      });
+      // cut
+      ctx.strokeStyle = css("--accent"); ctx.lineWidth = 2; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(cx, cy - R - bw); ctx.lineTo(cx, cy - R + bw); ctx.stroke(); ctx.setLineDash([]);
+      label(ctx, "cut (s = 0)", cx, cy - R - bw - 6, css("--accent"), 11, "center");
+      label(ctx, `split ${L.split.toFixed(2)} (eased)`, cx, cy + 4, css("--stage-ink"), 11, "center");
+      // rows
+      const rx = narrow ? 14 : ringW + 10, ry = narrow ? ringH + 6 : 18, rw = (narrow ? W : W - ringW) - 28, rh = (narrow ? H - ringH : H) - 30;
+      const rowH = Math.min(22, rh / n);
+      const tx = rx + 52, trw = rw - 60;
+      label(ctx, "gap   delay ▾ / open ▬", rx, ry + 2);
+      L.gaps.forEach((g, j) => {
+        const y = ry + 12 + j * rowH;
+        label(ctx, `${j}`, rx + 6, y + rowH * 0.7);
+        ctx.fillStyle = rgba(css("--ink"), 0.1); ctx.fillRect(tx, y + rowH * 0.25, trw, rowH * 0.5);
+        ctx.fillStyle = g.open > 0.12 ? css("--accent") : rgba(css("--accent"), 0.45);
+        ctx.fillRect(tx, y + rowH * 0.25, trw * g.open, rowH * 0.5);
+        const dx = tx + trw * g.delay;
+        ctx.fillStyle = css("--accent2"); ctx.beginPath(); ctx.moveTo(dx - 4, y + rowH * 0.1); ctx.lineTo(dx + 4, y + rowH * 0.1); ctx.lineTo(dx, y + rowH * 0.32); ctx.closePath(); ctx.fill();
+      });
+      const openCount = L.gaps.filter((g) => g.open > 0.12).length;
+      $("blR").innerHTML = `<span>block <b>${(1 / n - (+G.value) / n).toFixed(4)}</b> of the loop when open</span><span>gap <b>${((+G.value) / n).toFixed(4)}</b> each</span><span>gaps open (&gt; 0.12) <b>${openCount}</b> / ${n}</span><span>phase <b>${state.phase.toFixed(3)}</b></span>`;
+    });
+    const redraw = () => fig.redraw();
+    bind("blP", "blPo", (v) => v.toFixed(2), redraw);
+    bind("blN", "blNo", (v) => `${v}`, redraw);
+    bind("blG", "blGo", (v) => v.toFixed(2), redraw);
+    Sst.addEventListener("change", redraw);
+    let on = false, last = 0;
+    const btn = $("blPl");
+    const step = (t) => {
+      if (!on) return;
+      const dt = last ? Math.min(0.05, (t - last) / 1000) : 0; last = t;
+      const v = +P.value;
+      if (v < 1) { P.value = Math.min(1, v + dt / 4); $("blPo").textContent = (+P.value).toFixed(2); }
+      if (+P.value > 0) state.phase = (state.phase + dt * 0.07) % 1;
+      redraw();
+      requestAnimationFrame(step);
+    };
+    btn.addEventListener("click", () => { on = !on; btn.textContent = on ? "pause" : "play"; last = 0; if (on) { if (+P.value >= 1) { P.value = 0; } requestAnimationFrame(step); } });
+  }
+
+  // ---- 3. Spring landing ----
+  {
+    const outQuart = (t) => 1 - (1 - t) ** 4;
+    const outCubic = (t) => 1 - (1 - t) ** 3;
+    let side = 1, wave = 1.1;
+    function simulate(dur, omega, zeta) {
+      const SWEEP = Math.PI * 2.2;
+      const from = { yaw: -side * SWEEP, pitch: 0.5 * Math.sin(wave) };
+      const guide = (u) => [from.yaw * (1 - outQuart(u)), from.pitch * (1 - outCubic(u)) + 0.22 * Math.sin(wave + u * Math.PI * 3) * (1 - outCubic(u))];
+      const g0 = guide(0), g1 = guide(1e-3);
+      const x = g0.slice(), v = g0.map((g, i) => (g1[i] - g) / 1e-3 / dur);
+      const dt = 1 / 60, out = [];
+      let t = 0, phase = "orbit", tPhase = 0, click = null, settled = null, maxOver = 0;
+      for (let f = 0; f < 60 * (dur + 6); f++) {
+        tPhase += dt; t += dt;
+        let target;
+        if (phase === "orbit") { const u = clamp01(tPhase / dur); target = guide(u); if (u >= 1) { phase = "click"; tPhase = 0; } }
+        else target = [0, 0];
+        if (settled === null) {
+          const steps = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / steps;
+          for (let k = 0; k < steps; k++) for (let i = 0; i < 2; i++) { v[i] += (omega * omega * (target[i] - x[i]) - 2 * zeta * omega * v[i]) * h; x[i] += v[i] * h; }
+          if (phase === "click") {
+            const err = Math.max(Math.abs(x[0]), Math.abs(x[1])), vel = Math.max(Math.abs(v[0]), Math.abs(v[1]));
+            if (err < 2e-4 && vel < 2e-3) { settled = t; x[0] = x[1] = 0; }
+          }
+        }
+        const angle = Math.acos(clamp(Math.cos(x[0]) * Math.cos(x[1]), -1, 1));
+        if (click === null && t > 0.6 && angle < 0.12 * DEG) click = t;
+        if (Math.sign(x[0]) === side) maxOver = Math.max(maxOver, Math.abs(x[0]));
+        out.push({ t, yaw: x[0], guide: phase === "orbit" ? target[0] : 0 });
+      }
+      return { out, click, settled, maxOver, dur };
+    }
+    const Tn = $("spT"), Wn = $("spW"), Zn = $("spZ");
+    const fig = setup($("springFig"), (W) => (W < 600 ? 1.05 : 0.56), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const sim = simulate(+Tn.value, +Wn.value, +Zn.value);
+      const tEnd = sim.dur + 3;
+      const pad = 40, topH = H * 0.5;
+      const plot = (y0, h, tA, tB, yMin, yMax, title) => {
+        const X = (t) => pad + ((t - tA) / (tB - tA)) * (W - pad - 14);
+        const Y = (v) => y0 + h - ((v - yMin) / (yMax - yMin)) * h;
+        ctx.strokeStyle = css("--stage-line"); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(pad, Y(0)); ctx.lineTo(W - 14, Y(0)); ctx.stroke();
+        label(ctx, title, pad, y0 - 6);
+        label(ctx, `${yMax.toFixed(yMax > 10 ? 0 : 1)}°`, pad - 6, Y(yMax) + 4, css("--stage-ink"), 10, "right");
+        label(ctx, `${yMin.toFixed(yMin < -10 ? 0 : 1)}°`, pad - 6, Y(yMin) + 4, css("--stage-ink"), 10, "right");
+        label(ctx, "0", pad - 6, Y(0) + 4, css("--stage-ink"), 10, "right");
+        const curve = (key, col, w, dash) => {
+          ctx.save(); ctx.beginPath(); ctx.rect(pad, y0 - 2, W - pad - 14, h + 4); ctx.clip();
+          ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash(dash || []);
+          ctx.beginPath(); let first = true;
+          for (const p of sim.out) { if (p.t < tA || p.t > tB) continue; const x = X(p.t), y = Y(p[key] / DEG * side * -1); if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y); }
+          ctx.stroke(); ctx.restore();
+        };
+        curve("guide", css("--accent2"), 1.4, [4, 3]);
+        curve("yaw", css("--accent"), 2);
+        const mark = (t, txt, col, row) => { if (t === null || t < tA || t > tB) return; ctx.strokeStyle = col; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(X(t), y0); ctx.lineTo(X(t), y0 + h); ctx.stroke(); ctx.setLineDash([]); label(ctx, txt, X(t) + 4, y0 + 12 + row * 14, col); };
+        mark(sim.dur, "guide arrives", css("--stage-ink"), 0);
+        mark(sim.click, "click", css("--accent"), 1);
+        mark(sim.settled, "pinned", css("--ink"), 2);
+        label(ctx, `${tA.toFixed(1)} s`, X(tA), y0 + h + 14, css("--stage-ink"), 10);
+        label(ctx, `${tB.toFixed(1)} s`, X(tB), y0 + h + 14, css("--stage-ink"), 10, "right");
+      };
+      plot(26, topH - 30, 0, tEnd, -40, 400, "yaw from the sweet spot (degrees): spring — guide - -");
+      const tA = Math.max(0, sim.dur * 0.55);
+      plot(topH + 34, H - topH - 58, tA, tEnd, -3, 6, "the landing, magnified");
+      $("spR").innerHTML = `<span>overshoot <b>${(sim.maxOver / DEG).toFixed(3)}°</b></span><span>click at <b>${sim.click === null ? "—" : sim.click.toFixed(2) + " s"}</b></span><span>pinned at <b>${sim.settled === null ? "—" : sim.settled.toFixed(2) + " s"}</b></span>`;
+    });
+    const redraw = () => fig.redraw();
+    bind("spT", "spTo", (v) => `${v}`, redraw);
+    bind("spW", "spWo", (v) => `${v}`, redraw);
+    bind("spZ", "spZo", (v) => v.toFixed(2), redraw);
+    $("spN").addEventListener("click", () => { side = Math.random() < 0.5 ? -1 : 1; wave = Math.random() * Math.PI * 2; redraw(); });
+  }
+
+  // ---- 4. Unwinding ----
+  {
+    const S = $("uwS");
+    const K = JZ;
+    const fig = setup($("unwindFig"), (W) => (W < 600 ? 0.95 : 0.46), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const sA = +S.value;
+      const s0 = -0.6, s1 = 1.6, pad = 44;
+      const zTop = K / 2, zMin = -K * 1.25, zMax = K * 0.75;
+      const X = (s) => pad + ((s - s0) / (s1 - s0)) * (W - pad - 16);
+      const Y = (z) => 18 + (1 - (z - zMin) / (zMax - zMin)) * (H - 46);
+      const real = (s) => zTop - K * (s - Math.floor(s));
+      // lap boundaries
+      ctx.strokeStyle = css("--stage-line"); ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+      for (let k = 0; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(X(k), 14); ctx.lineTo(X(k), H - 26); ctx.stroke(); label(ctx, "cut", X(k) + 4, H - 30, css("--accent")); }
+      ctx.setLineDash([]);
+      // real sawtooth
+      ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2;
+      for (let k = -1; k <= 1; k++) {
+        const a = Math.max(s0, k), b = Math.min(s1, k + 1 - 1e-4);
+        if (b <= a) continue;
+        ctx.beginPath(); ctx.moveTo(X(a), Y(real(a))); ctx.lineTo(X(b), Y(real(b))); ctx.stroke();
+      }
+      // illusion line through the receiver
+      const zA = real(sA);
+      const N = 120;
+      for (let i = 0; i < N; i++) {
+        const d0 = -0.5 + i / N, d1 = -0.5 + (i + 1) / N;
+        const fade = 1 - smoothstep(0.38, 0.48, Math.abs(0.5 * (d0 + d1)));
+        ctx.strokeStyle = rgba(css("--accent"), 0.15 + 0.85 * fade); ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.moveTo(X(sA + d0), Y(zA - K * d0)); ctx.lineTo(X(sA + d1), Y(zA - K * d1)); ctx.stroke();
+      }
+      // receiver
+      ctx.fillStyle = css("--accent2"); ctx.beginPath(); ctx.arc(X(sA), Y(zA), 5, 0, Math.PI * 2); ctx.fill();
+      label(ctx, "receiver", X(sA) + 8, Y(zA) - 8, css("--accent2"));
+      label(ctx, "real solid", X(-0.55), Y(real(-0.55)) - 8, css("--ink"));
+      label(ctx, "illusion space for this receiver", X(sA - 0.45), Y(zA + K * 0.45) - 14, css("--accent"));
+      label(ctx, "loop position s →", W - 16, H - 8, css("--stage-ink"), 10, "right");
+      label(ctx, "depth (toward camera ↑)", 8, 12, css("--stage-ink"), 10);
+      // a blocker example: the point just past the cut, ahead of the receiver
+      const sB = 0.05;
+      const ds = ((sB - sA + 0.5) % 1 + 1) % 1 - 0.5;
+      const lap = Math.round(sB - sA - ds);
+      const zB = real(sB) + lap * K;
+      $("uwR").innerHTML = `<span>block at s = 0.05: <b>${ds >= 0 ? "+" : ""}${ds.toFixed(2)}</b> along the loop, lap <b>${lap}</b></span><span>placed at depth <b>${zB.toFixed(2)}</b> (really ${real(sB).toFixed(2)})</span><span>weight <b>${(1 - smoothstep(0.38, 0.48, Math.abs(ds))).toFixed(2)}</b></span>`;
+    });
+    bind("uwS", "uwSo", (v) => v.toFixed(3), () => fig.redraw());
+  }
+})();
+</script>
+</body>
+</html>
