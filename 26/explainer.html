@@ -111,6 +111,13 @@ footer ul { margin: 8px 0 12px; padding-left: 18px; }
   .fig { padding: 16px; }
   main { gap: 56px; }
 }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.tile { margin: 0; position: relative; cursor: pointer; background: var(--stage); border-radius: 3px; overflow: hidden; }
+.tile img { display: block; width: 100%; height: auto; aspect-ratio: 1; }
+.tile img.real { position: absolute; inset: 0; opacity: 0; transition: opacity 0.35s; }
+.tile:hover img.real, .tile.on img.real, .gallery.all .tile img.real { opacity: 1; }
+.gallery.all .tile.on img.real { opacity: 0; }
+.tile figcaption { position: absolute; left: 8px; bottom: 6px; font: 400 11px/1 var(--mono); color: #3d3a36; }
 .keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
 .keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
 .keys b { font: 600 13px/1 var(--mono); }
@@ -147,6 +154,48 @@ footer ul { margin: 8px 0 12px; padding-left: 18px; }
     </div>
   </section>
 
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Gallery</div>
+      <h2>All thirty-one</h2>
+      <p>Every figure whole, from its sweet spot. Hover or tap one to see it split into its marching blocks, or split them all; the Escher cube and the chair always stay whole.</p>
+    </div>
+    <div class="controls"><button id="galAll" class="ghost" type="button">split them all</button></div>
+    <div class="gallery" id="gallery">
+      <figure class="tile"><img src="gallery/ring-a.jpg" alt="ring from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/ring-split.jpg" alt="ring split into blocks" loading="lazy" width="360" height="360"><figcaption>ring</figcaption></figure>
+      <figure class="tile"><img src="gallery/figure-8-a.jpg" alt="figure-8 from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/figure-8-split.jpg" alt="figure-8 split into blocks" loading="lazy" width="360" height="360"><figcaption>figure-8</figcaption></figure>
+      <figure class="tile"><img src="gallery/trefoil-a.jpg" alt="trefoil from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/trefoil-split.jpg" alt="trefoil split into blocks" loading="lazy" width="360" height="360"><figcaption>trefoil</figcaption></figure>
+      <figure class="tile"><img src="gallery/triangle-a.jpg" alt="triangle from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/triangle-split.jpg" alt="triangle split into blocks" loading="lazy" width="360" height="360"><figcaption>triangle</figcaption></figure>
+      <figure class="tile"><img src="gallery/square-a.jpg" alt="square from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/square-split.jpg" alt="square split into blocks" loading="lazy" width="360" height="360"><figcaption>square</figcaption></figure>
+      <figure class="tile"><img src="gallery/diamond-a.jpg" alt="diamond from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/diamond-split.jpg" alt="diamond split into blocks" loading="lazy" width="360" height="360"><figcaption>diamond</figcaption></figure>
+      <figure class="tile"><img src="gallery/divided-diamond-a.jpg" alt="divided-diamond from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/divided-diamond-split.jpg" alt="divided-diamond split into blocks" loading="lazy" width="360" height="360"><figcaption>divided-diamond</figcaption></figure>
+      <figure class="tile"><img src="gallery/pentagon-a.jpg" alt="pentagon from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/pentagon-split.jpg" alt="pentagon split into blocks" loading="lazy" width="360" height="360"><figcaption>pentagon</figcaption></figure>
+      <figure class="tile"><img src="gallery/hexagon-a.jpg" alt="hexagon from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/hexagon-split.jpg" alt="hexagon split into blocks" loading="lazy" width="360" height="360"><figcaption>hexagon</figcaption></figure>
+      <figure class="tile"><img src="gallery/star-a.jpg" alt="star from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/star-split.jpg" alt="star split into blocks" loading="lazy" width="360" height="360"><figcaption>star</figcaption></figure>
+      <figure class="tile"><img src="gallery/reutersvard-a.jpg" alt="reutersvard from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/reutersvard-split.jpg" alt="reutersvard split into blocks" loading="lazy" width="360" height="360"><figcaption>reutersvard</figcaption></figure>
+      <figure class="tile"><img src="gallery/valknut-a.jpg" alt="valknut from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/valknut-split.jpg" alt="valknut split into blocks" loading="lazy" width="360" height="360"><figcaption>valknut</figcaption></figure>
+      <figure class="tile"><img src="gallery/hex-cross-a.jpg" alt="hex-cross from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/hex-cross-split.jpg" alt="hex-cross split into blocks" loading="lazy" width="360" height="360"><figcaption>hex-cross</figcaption></figure>
+      <figure class="tile"><img src="gallery/hooked-tribar-a.jpg" alt="hooked-tribar from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/hooked-tribar-split.jpg" alt="hooked-tribar split into blocks" loading="lazy" width="360" height="360"><figcaption>hooked-tribar</figcaption></figure>
+      <figure class="tile"><img src="gallery/stairs-a.jpg" alt="stairs from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/stairs-split.jpg" alt="stairs split into blocks" loading="lazy" width="360" height="360"><figcaption>stairs</figcaption></figure>
+      <figure class="tile"><img src="gallery/waterfall-a.jpg" alt="waterfall from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/waterfall-split.jpg" alt="waterfall split into blocks" loading="lazy" width="360" height="360"><figcaption>waterfall</figcaption></figure>
+      <figure class="tile"><img src="gallery/escher-cube-a.jpg" alt="escher-cube from its sweet spot" loading="lazy" width="360" height="360"><figcaption>escher-cube · always whole</figcaption></figure>
+      <figure class="tile"><img src="gallery/archway-a.jpg" alt="archway from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/archway-split.jpg" alt="archway split into blocks" loading="lazy" width="360" height="360"><figcaption>archway</figcaption></figure>
+      <figure class="tile"><img src="gallery/ladder-a.jpg" alt="ladder from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/ladder-split.jpg" alt="ladder split into blocks" loading="lazy" width="360" height="360"><figcaption>ladder</figcaption></figure>
+      <figure class="tile"><img src="gallery/chair-a.jpg" alt="chair from its sweet spot" loading="lazy" width="360" height="360"><figcaption>chair · always whole</figcaption></figure>
+      <figure class="tile"><img src="gallery/cross-a.jpg" alt="cross from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/cross-split.jpg" alt="cross split into blocks" loading="lazy" width="360" height="360"><figcaption>cross</figcaption></figure>
+      <figure class="tile"><img src="gallery/pinwheel-a.jpg" alt="pinwheel from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/pinwheel-split.jpg" alt="pinwheel split into blocks" loading="lazy" width="360" height="360"><figcaption>pinwheel</figcaption></figure>
+      <figure class="tile"><img src="gallery/frame-a.jpg" alt="frame from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/frame-split.jpg" alt="frame split into blocks" loading="lazy" width="360" height="360"><figcaption>frame</figcaption></figure>
+      <figure class="tile"><img src="gallery/s-hook-a.jpg" alt="s-hook from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/s-hook-split.jpg" alt="s-hook split into blocks" loading="lazy" width="360" height="360"><figcaption>s-hook</figcaption></figure>
+      <figure class="tile"><img src="gallery/meander-a.jpg" alt="meander from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/meander-split.jpg" alt="meander split into blocks" loading="lazy" width="360" height="360"><figcaption>meander</figcaption></figure>
+      <figure class="tile"><img src="gallery/spiral-tribar-a.jpg" alt="spiral-tribar from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/spiral-tribar-split.jpg" alt="spiral-tribar split into blocks" loading="lazy" width="360" height="360"><figcaption>spiral-tribar</figcaption></figure>
+      <figure class="tile"><img src="gallery/triquetra-a.jpg" alt="triquetra from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/triquetra-split.jpg" alt="triquetra split into blocks" loading="lazy" width="360" height="360"><figcaption>triquetra</figcaption></figure>
+      <figure class="tile"><img src="gallery/double-tribar-a.jpg" alt="double-tribar from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/double-tribar-split.jpg" alt="double-tribar split into blocks" loading="lazy" width="360" height="360"><figcaption>double-tribar</figcaption></figure>
+      <figure class="tile"><img src="gallery/borromean-a.jpg" alt="borromean from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/borromean-split.jpg" alt="borromean split into blocks" loading="lazy" width="360" height="360"><figcaption>borromean</figcaption></figure>
+      <figure class="tile"><img src="gallery/borromean-tribar-a.jpg" alt="borromean-tribar from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/borromean-tribar-split.jpg" alt="borromean-tribar split into blocks" loading="lazy" width="360" height="360"><figcaption>borromean-tribar</figcaption></figure>
+      <figure class="tile"><img src="gallery/hourglass-a.jpg" alt="hourglass from its sweet spot" loading="lazy" width="360" height="360"><img class="real" src="gallery/hourglass-split.jpg" alt="hourglass split into blocks" loading="lazy" width="360" height="360"><figcaption>hourglass</figcaption></figure>
+    </div>
+  </section>
+
   <!-- 2. The cut -->
   <section>
     <div class="col prose">
@@ -176,15 +225,7 @@ footer ul { margin: 8px 0 12px; padding-left: 18px; }
     <div class="col prose">
       <div class="eyebrow">The figures · <b>objects.js</b></div>
       <h2>Thirty-one figures on a cube lattice</h2>
-      <p>Most figures are made of straight beams along the three axes of a cube, drawn in isometric. <code>makeCubeLatticeBasis</code> builds that triad: the axes <code>x</code>, <code>y</code> and <code>−z</code>, turned 45° about the vertical, pitched forward by the isometric angle <code>asin(√(1/3)) = 35.264°</code>, each flipped if needed so it points away from the camera, then turned about the line of sight so the first axis points at the figure's own screen angle, in counter-clockwise order. (The pitch would move 0.42° for every degree of tilt away from 45°; the day keeps the tilt at 45° and the roll at 53°, which every figure is tuned for.) Each axis gets a weight <code>w = −E.z / √(1/3)</code>, 1 at the isometric angle, so that a step of one along each axis together always drops straight back:</p>
-    </div>
-    <div class="formula"><span class="c">// for any tilt and roll: the three steps close on screen and recede along the sightline</span>
-w₀·E₀ + w₁·E₁ + w₂·E₂ = (0, 0, −√3)
-<span class="c">// a loop of bars [axis, sign, nominal length] is built from it, and a portal's jump is in the same units</span>
-bar length = nominal · w[axis]        jz = nominal jump · √3</div>
-    <div class="col prose">
-      <p><code>createCubeLatticeLoop</code> takes a list of bars and portals and returns a loop. The beam's square cross-section is carried from bar to bar through each 90° corner with a mitre (each corner offset is reflected across the two bar directions), so the cross-section never twists. The beam's half-width is the figure's thickness times a factor of its own, at most 43% of the shortest bar. The loop is centred on screen by its corners, and in depth halfway between its nearest and furthest point, so the orbit turns about the middle of the solid. Then it is reordered to begin at the first portal, which becomes loop position <code>s = 0</code>, and <code>s</code> runs by length to 1. With a chamfer the square becomes an octagon: each corner is cut back to 1 − chamfer of the half-width, 0.9 at the default chamfer of 0.1.</p>
-      <p>Around every portal the loop keeps a <em>continuation chain</em>: the beam before the cut, continued straight through it and around the next corners as if there were no jump, shifted back by <code>jz</code>. A block that straddles a cut is built from that chain as one unbroken prism and then cut in two (see below). Each portal also stores its plane (point, direction), its jump, an overhang <code>min(0.14, 1.55·h / loop length)</code> in loop position (how far a beam's end can reach past the cut point on screen), and guard distances: the length of the straight runs on either side.</p>
+      <p>Most figures are straight beams along the three axes of a cube, drawn in isometric: the axes are turned 45° about the vertical and pitched by the isometric angle, 35.26°, so each one drops away from the camera by the same amount and one step along all three lands straight behind where it started. A loop is a list of bars and cuts; the beam's square section, an octagon with the chamfer of 0.1, is carried round every 90° corner with a mitre so it never twists, and the loop position <code>s</code> runs by length from the first cut, from 0 to 1.</p>
     </div>
     <div class="table-wrap"><table>
       <thead><tr><th>family</th><th>figures</th><th>built as</th></tr></thead>
@@ -198,49 +239,26 @@ bar length = nominal · w[axis]        jz = nominal jump · √3</div>
       </tbody>
     </table></div>
     <div class="col prose">
-      <p>Three families need more than bars. The <strong>valknut</strong> is three triangles, each turned 120° from the last and pushed 0.228·L out from the centre (at 12° off the line between two of its axes). Its cuts can't go halfway along a beam, where another triangle may lie across them, so each triangle's cut is placed by search: 99 candidate points along each of its three bars, keeping the one farthest from every other bar on screen, its own and the other two triangles'. The <strong>borromean tribar</strong> is three square plates, one in each lattice plane, each with a hole whose outline is straight on two legs and a smooth arch between (the arch's shape ratio is 0.46). Its rim is a band of constant width around the hole, the outer edge being the hole's outline pushed out along its normal by 0.34 of the plate's half-size (the hole's radius is 0.66 of it), and <code>s</code> runs by arc length along the middle of the band (looked up from a table of sampled lengths), so equal steps of <code>s</code> give equal blocks. Each plate is cut three times, in units of its half-size: from 0 to +1.35 in front, to −(1.55 + 1.35·i) behind, and back to 0, which threads the three through each other. The <strong>curves</strong> are parametrised directly: the figure-8 is two circles of radius 0.63 × radius with a depth of <code>zAmp·sin(2πs) + 0.64·(0.5 − s)</code>, and its back walls lean down-left on its left half and up-right on its right, which is the impossible flip.</p>
+      <p>Two families need more than bars. The <b>valknut</b>'s three triangles lie across each other, so a cut halfway along a beam could land under another triangle; each triangle's cut is placed by search instead, at the point of its outline farthest from every other bar on screen. The <b>borromean tribar</b>'s three plates have rims of constant width around their round-cornered holes, and <code>s</code> runs by arc length along the middle of the band, so equal steps make equal blocks.</p>
     </div>
   </section>
 
-  <!-- 4. Building a block -->
-  <section>
+    <section>
     <div class="col prose">
-      <div class="eyebrow">Building · <b>anamorph.js buildStations, buildRawPrism</b></div>
-      <h2>A prism, rebuilt every frame</h2>
-      <p>The rig builds the meshes on the CPU, every frame the figure changes: as the blocks march, as the gaps open, as the camera leaves the sweet spot. A piece of loop from <code>s₀</code> to <code>s₁</code> becomes a prism in <code>buildRawPrism</code>. First the <em>stations</em>: slices along the piece at every corner, every hinge (the start and end of a corner's mitre) and every collar boundary, sorted and de-duplicated, with straight runs of a lattice beam left as single spans and curves cut into steps (14 per block on the curves, 192 to 216 for a whole curve). Each station is a ring of 4 or 8 corners from the loop's own sampler. Between two rings each wall is two triangles, with its normal taken from the diagonals <code>(p₁₁ − p₀₀) × (p₁₀ − p₀₁)</code>, which stays exact even when one edge collapses to a point. Normals are averaged across a station when the two walls are within 16° of each other (a dot product above 0.96), and kept sharp otherwise.</p>
-      <p>All buffers are allocated once, as typed arrays sized for the largest piece (8 corners, 282 stations), in a pool of mesh units that grows as needed and hides what it doesn't use; nothing is allocated per frame. Each vertex carries, besides its position and normal, its <em>sweet-spot</em> position and normal and a tag: which loop and bar it belongs to, its loop position <code>s</code>, its accumulated portal depth and the loop's total jump per lap. The paint and the shadows run on those.</p>
-      <p>The edges of a block are bevelled with a <em>collar</em>: near each end of the block the ring shrinks toward its centroid, by up to the chamfer, over a length set so the bevel is at 45° (<code>chamfer × half-width</code>, the same for long and short pieces). The collar is sized on the <strong>whole block</strong>, not on the piece being built, so a block cut in two at a portal keeps one continuous taper through the cut. It is limited to 28% of the block, stops at 65% of the distance to a corner or hinge inside the block, and fades out when a block end lands within a corner's mitre (closer than 0.03 of loop position, or 1.15× the corner-to-hinge distance). The bevel also grows with the gap: it is <code>min(1, 5 × opening)</code> of full size, so it is complete by the time a gap is a fifth open and a flat, unbevelled end never shows in a narrow slot. The optional ink outlines (<code>E</code>) are line segments pushed 0.0042 out along the corner normals, drawn at a block's end only once its gap is 8% open.</p>
+      <div class="eyebrow">Building · <b>anamorph.js</b></div>
+      <h2>Prisms, cut in two</h2>
+      <p>The meshes are rebuilt on the CPU every frame the figure changes, into buffers allocated once. A piece of loop becomes a prism: rings of 4 or 8 corners at every corner, hinge and bevel boundary, joined by walls with exact normals. Each vertex also carries its sweet-spot position and normal and a tag (loop, bar, <code>s</code>, portal depth), which the paint and the shadows run on. Block ends are bevelled at 45°, sized on the whole block so a block cut at a portal keeps one taper through the cut, and the bevel grows with its gap.</p>
+      <p>A block that straddles a cut is built once as an unbroken prism and clipped against the cut's plane twice, one half kept and the other moved by <code>jz</code>, so both halves share one outline on screen. Vertices far along the loop are forced to their own side so a beam turning back past the cut isn't sliced too, but they keep their true distance to the plane, so the cut stays straight. From the sweet spot the cut faces can't be seen and aren't drawn; off it they are capped.</p>
     </div>
   </section>
 
-  <!-- 5. Clipping -->
   <section>
     <div class="col prose">
-      <div class="eyebrow">Clipping · <b>anamorph.js emitHalfSpaceClippedToUnit, update</b></div>
-      <h2>Two halves of one prism</h2>
-      <p>A block near a portal is built once, as a single unbroken prism from the portal's continuation chain, and clipped against the portal's plane twice: <code>d = (x − cₓ)·uₓ + (y − c<sub>y</sub>)·u<sub>y</sub></code>. The side with <code>d ≤ 0</code> is kept where it is, the side with <code>d ≥ 0</code> is kept and moved by <code>jz</code>. The clip is Sutherland–Hodgman on each triangle, which leaves 3 or 4 vertices, interpolating position, normals and tags at the crossings. Because both halves come from the same prism, cut by the same plane, their outlines match exactly on screen, with the same bevels and normals on both sides.</p>
-      <p>A beam's cross-section reaches past the cut point on screen, so the plane would also slice a beam that turns a corner just after it and crosses back. To stop that, every vertex further than a <em>guard</em> from the cut along the loop (the straight run's length, at most <code>max(0.12, 2.2 × overhang)</code>) is forced to its own side. Only the sign is forced: the vertex keeps its real distance to the plane, so a triangle that spans the guard is still cut along the straight plane, not at an interpolated jag. A block that lies wholly on one side is copied without clipping; a block that reaches two portals is split halfway between the cuts first.</p>
-      <p>From the sweet spot the cut faces can't be seen, so none are drawn. Off it, the clip collects the chords where it crossed each triangle and fans them from their centroid into a cap facing along the plane's normal, with its own outline. That is the <code>offAxis</code> state, which begins once the camera is more than <code>√(1.5·10⁻³)</code> × (distance / 12) from the sweet spot, about 0.19°; past 0.15 in blend the overhang pad is dropped too. The shading normals stay the sweet-spot ones at any angle, so the light on a figure never jumps as it orbits. When the figure is whole, a closed loop with portals is built per piece as a clipped head, an unclipped middle and a clipped tail; open paths and pillars with one or two portals become two or four clipped sections.</p>
-    </div>
-  </section>
-
-  <!-- 6. Marching -->
-  <section>
-    <div class="col prose">
-      <div class="eyebrow">Marching · <b>main.js balanceSegments, anamorph.js gapOpen, gapDelay</b></div>
+      <div class="eyebrow">Marching · <b>main.js, anamorph.js</b></div>
       <h2>Blocks on a conveyor</h2>
-      <p>Once landed, a figure splits into blocks. Their number comes from the figure's own size: the target block is <code>Block length × 0.28</code> on screen (0.616 at the default 2.2), and a loop of screen length <code>ℓ</code> (measured along its centre line in 256 steps) gets <code>round(ℓ / 0.616)</code> blocks, at least 3. A loop with corners prefers a multiple of its corner count, the same pattern on every beam, when that keeps the block within 12% of the target. The triangle is 6.47 long: 9 blocks would be 0.72 (17% long), so it takes 11.</p>
-      <p>The loop is a conveyor: <code>n</code> blocks, each <code>1/n</code> of the loop minus its share of the gap. <em>Gap</em> (0.11 by default) is the fraction of the loop that is gap when every gap is open, so each gap is <code>gap / n</code>. A phase advances at <em>Speed</em>, 0.07 loops a second (a lap in 14.3 s, backwards with <em>Reverse</em>), only while the gaps are open, and every block is shifted by it; a block that crosses a portal is clipped in two there, and from the sweet spot just slides through the cut. Open paths (a ladder's rungs, the waterfall's towers) stay one solid piece while the loops march.</p>
-      <p>The split is one number that rises from 0 to 1 over <em>Split / merge</em> (4 s) once the camera has settled, and falls back over the same time before the figure leaves; the rig sees it eased by <code>InOutSine</code>. Each gap <code>j</code> has a delay in [0, 1] from the split style, opens over a window of <code>min(1, 3/n)</code> (1 for alternate) and eases with a smoothstep. <em>Together</em> opens them all at once as <code>1 − (1 − split)³</code>, fast at first, since a narrow gap is the hardest thing to shadow.</p>
+      <p>Each loop gets as many blocks as make them Block length × 0.28 long on screen (0.62 at the default), preferring a multiple of its corners when that stays within 12%: the triangle gets 11. The loop is a conveyor of <code>n</code> blocks and <code>n</code> gaps, and a phase moving at 0.07 loops a second shifts them all; a block crossing a cut is clipped in two there and, from the sweet spot, just slides through it. Open paths, a ladder's rungs or the waterfall's towers, stay whole while the loops march.</p>
+      <p>The split is one number rising from 0 to 1 over 4 s once the camera settles, and falling back before the figure leaves. Each gap opens after a delay set by the split style: all at once (together, fast at first, since a narrow slot is the hardest thing to shadow), one after another (wave, and slide, where the block behind falls back), every other one first (alternate), by halving the loop (halving), outward from the cuts (joins) or both ways from one point.</p>
     </div>
-    <div class="formula"><span class="c">// gap j opens when the split passes its delay</span>
-t = clamp((split · (1 + spread) − delay(j)) / spread),  open(j) = t²(3 − 2t)
-<span class="c">// block k, between gaps k−1 and k (slide: the block behind falls back instead)</span>
-s₀ = (k − ½)/n + phase + ½·(gap/n)·open(k−1)       s₁ = (k + ½)/n + phase − ½·(gap/n)·open(k)
-<span class="c">// delays</span>
-wave, slide   j / n                    alternate   0 for even j, 1 for odd
-both ways     min(j, n − j) / (n/2)    halving     level at which j appears halving the loop / ⌈log₂ n⌉
-joins         distance from the gap to the nearest cut, / 0.5    (with the phase: it moves as they march)</div>
     <div class="fig">
       <div class="fig-head"><h3>Gaps opening around a loop</h3>
         <div class="controls">
@@ -257,66 +275,22 @@ joins         distance from the gap to the nearest cut, / 0.5    (with the phase
     </div>
   </section>
 
-  <!-- 7. Perspective -->
   <section>
     <div class="col prose">
-      <div class="eyebrow">Perspective · <b>anamorph.js warpBuffersForPerspective</b></div>
-      <h2>The same pixels in perspective</h2>
-      <p>The figures are designed for orthographic projection, where every sightline is parallel to z and a cut plane containing z works everywhere. In perspective the sightlines fan out from the camera, so a piece moved along z would slide across the screen. The day is orthographic by default; <code>O</code> switches to perspective at the <em>FOV</em> slider's angle (52°, widened on portrait screens so the horizontal angle is kept), with the camera at <code>D = 4.3 / (2·tan(fov/2))</code>, 4.41 at 52°, so the sweet-spot frame is the same 4.3 units tall.</p>
-      <p>In perspective each vertex goes through a projective transform that keeps lines straight and planes flat and lands every point on the same pixel as the orthographic view from the sweet spot:</p>
-    </div>
-    <div class="formula"><span class="c">// κ compresses depth so D + κz never comes near 0: κ = min(1, 0.62·D / (5.1 · radius))</span>
-(x, y, z)  →  D / (D + κz) · (x, y, κz)          <span class="c">// denominator clamped at 0.16·D</span>
-<span class="c">// seen from (0, 0, D):  x′ / (D − z′) = x / D   for every z, which is the orthographic view</span></div>
-    <div class="col prose">
-      <p>Points in front shrink toward the camera's axis and points behind grow away from it, exactly as much as perspective then magnifies and shrinks them. At the default size <code>κ = 0.62 × 4.41 / 5.30 = 0.52</code>. Switching projection keeps the camera's direction and its distance relative to the sweet spot (mapped to the orthographic zoom, 0.45 to 2.6), and dragging the FOV slider while sitting at the sweet spot moves the camera with it.</p>
+      <div class="eyebrow">Look · <b>main.js</b></div>
+      <h2>Paint, light and perspective</h2>
+      <p>The paint has no textures. It runs in loop coordinates, so it rides with a marching block and continues across a closed seam: a slow drift of tone at ±1.2%, and long brush lines, 55 to the unit across the beam and wobbled so they never line up, which barely touch the colour and mostly show in the roughness, as a satin finish does, with a faint bump on the normal.</p>
+      <p>The figures render through the shared photographic pipeline, matte off-white (#e4ddd0) under a soft key from the upper left in a warm grey studio, with its shadow maps and screen-space AO and GI turned off: both see the real depth, which is wrong at every cut. The traced shadows below replace them.</p>
+      <p>The figures are built for orthographic projection, the default. In perspective (O), every vertex is moved by a projective transform, <code>(x, y, z) → D / (D + κz) · (x, y, κz)</code>, that keeps lines straight and lands each point on the pixel the orthographic view would, so the figure still welds from the sweet spot.</p>
     </div>
   </section>
 
-  <!-- 8. Paint -->
   <section>
     <div class="col prose">
-      <div class="eyebrow">Paint · <b>main.js paintSurface</b></div>
-      <h2>Brush lines that ride with the blocks</h2>
-      <p>The wood is painted in the fragment shader, with no textures, in <em>loop coordinates</em> rather than in space, so the pattern rides with a marching block and continues across a closed seam. Each loop sends its march phase, its block count and its screen length. The loop position, minus the phase, becomes a point on a circle whose circumference is the loop's length: <code>ring = (cos a, sin a) · ℓ / 2π</code>, seamless all the way around. The across coordinate is the sweet-spot position projected on the beam's screen normal, where the beam's direction is found from screen derivatives: the gradient of <code>s</code> (wrapped, so a lap boundary doesn't spike) mapped through the inverse of the position's screen Jacobian. Because the across coordinate is taken in the sweet-spot view, the pattern lines up across a portal from there.</p>
-    </div>
-    <div class="formula"><span class="c">// simplex noise, seeded per loop (loop index · 7.3)</span>
-drift = snoise(ring · 0.45, across · 0.45)                 <span class="c">// slow tone, never repeating across a beam</span>
-lines = snoise(ring · 0.35, (across + 0.012·warp) · 55) · (0.5 + 0.5·snoise(ring · 0.9, across · 2))
-albedo    ×= 1 + 0.012·drift + 0.004·lines
-roughness  = clamp(roughness + 0.05·lines + 0.03·drift, 0.3, 0.95)
-normal     = bump(height = 0.35·lines, scale 0.0006)      <span class="c">// surface-gradient bump from screen derivatives</span></div>
-    <div class="col prose">
-      <p>The brush lines are long along the beam and 55 to the unit across it, wobbled by a third noise so they never line up. They barely touch the colour (0.4%) and mostly show in the roughness, in the highlight, as a satin finish does, and as a faint ridge on the shading normal. On end caps and faces seen edge-on there is no beam direction, so the directional strokes fade out by <code>smoothstep(0.2, 0.6, …)</code> of how strongly <code>s</code> changes across the pixel, and the drift falls back to plain screen-space noise.</p>
-    </div>
-  </section>
-
-  <!-- 9. Light -->
-  <section>
-    <div class="col prose">
-      <div class="eyebrow">Light · <b>main.js LOOKS, modules/pipeline</b></div>
-      <h2>A studio without shadow maps</h2>
-      <p>The figures render through the shared photographic pipeline with two of its parts off. Shadow maps and screen-space AO and GI both see real depth, and real depth is wrong at every cut: a shadow map would show the triangle's far end shadowing nothing and its near end floating, and AO would darken nothing where the pieces meet. Both are replaced by the traced shadows below. What remains is the studio environment, MSAA, bloom 0.02, AgX, grain 0.006 and a vignette.</p>
-      <p>The <em>painted</em> look is matte off-white paint, <code>#e4ddd0</code>, at roughness 0.62 and specular 0.6, against a warm grey studio: a key from the upper left and front (direction −0.55, 0.62, 0.56, intensity 6.5, size 0.5), fill 0.32, floor 0.22 and walls 0.42, exposure 1 and vignette 0.1. Direct light is only occluded at 35% by the AO (<code>aoDirect</code>). The backdrop is a full-screen triangle drawn first, a gradient from (0.62, 0.60, 0.56) to (0.42, 0.405, 0.38) along a sweep of 68% height and 32% width, falling off by up to 74% toward (0.25, 0.24, 0.225) away from a centre at (0.52, 0.46) of the screen, dithered by ±0.1%. Three more looks swap all of it: <em>dark</em> (near-black paint against black, a pale ink), <em>studio</em> (bright blue-grey cyclorama, a white body, shadows tinted <code>#282c36</code>) and <em>wireframe</em> (the body takes the backdrop's colour, so only the outlines show).</p>
-    </div>
-  </section>
-
-  <!-- 10. Shadows -->
-  <section>
-    <div class="col prose">
-      <div class="eyebrow">Illusion space · <b>anamorph.js _writeOBB, main.js evalBoxShadowsFused</b></div>
+      <div class="eyebrow">Illusion space · <b>anamorph.js, main.js</b></div>
       <h2>Shadows from the shape you see</h2>
-      <p>An impossible figure, if it existed, would shadow itself consistently: the beam that passes in front casts onto the one behind, and a corner darkens its inside. The real solid can't do that, because its beams are not where they appear to be. So the shadows are traced per pixel in <em>illusion space</em>: a space in which every piece sits where it seems to be from the sweet spot.</p>
-      <p>Each frame the rig describes the figure as a list of oriented boxes, one per straight run (split at corners and cuts, and each block on its own while marching; curved runs in short chords): centre, three axes and half-sizes, its two end planes, the chamfer, its loop position and half-length, and its accumulated portal depth. They go into a 220 × 13 float texture. In the fragment shader the receiving pixel knows the same about itself from its vertex tags, and every box is moved into the receiver's frame by a rule that depends on how the two are related:</p>
-    </div>
-    <div class="formula"><span class="c">// same loop: undo both portal depths, and pick the lap that is within half a loop of the receiver</span>
-ds = wrap(s_box − s_rx) into [−½, ½)        lap = round(s_box − s_rx − ds)
-z_box = z_box − zPortal_box + zPortal_rx + lap · lapJump
-fade  = 1 − smoothstep(0.38, 0.48, |ds|)    <span class="c">// half a loop away the lap is ambiguous</span>
-<span class="c">// a different loop, or a crossing: lifted to just above the receiver, never far in front of it</span>
-z_box = z_rx + g · (1 − e^(−(z_box − z_rx) / g))        g = max(0.14, 1.65 × mean half-thickness)</div>
-    <div class="col prose">
-      <p>Unwinding is the core of it. Within one loop, the portal depths are taken back out, so the loop becomes a continuous beam that never closes: the triangle unwound is an endless descending spiral, dropping <code>lapJump</code> per lap. Seen from any point on it, the beam half a loop ahead and half a loop behind is where the eye believes it is. A box at <code>ds</code> along the loop from the receiver is placed on the receiver's own turn of that spiral.</p>
+      <p>An impossible figure, if it existed, would shadow itself consistently. The real solid can't, because its beams aren't where they appear to be. So the shadows are traced per pixel in illusion space, where every piece sits where it seems to be from the sweet spot. Each frame the figure is described as up to 220 boxes, one per straight run or block, and each pixel traces the key light and a short ambient ray against them, with a penumbra that widens with distance.</p>
+      <p>Within one loop the cut depths are taken back out, so the loop becomes an endless spiral that never closes, and a box is placed on the receiver's own turn of it: the beam half a loop ahead and half a loop behind sits where the eye believes it is. Boxes from other loops, or crossing over, are lifted to just above the receiver. Curved figures and the borromean tribar's plates are traced against their exact shapes.</p>
     </div>
     <div class="fig">
       <div class="fig-head"><h3>The triangle, unwound</h3>
@@ -329,30 +303,16 @@ z_box = z_rx + g · (1 − e^(−(z_box − z_rx) / g))        g = max(0.14, 1.6
       <p class="fig-cap">Depth along the loop for the default triangle (z toward the camera). The real solid drops 4.59 per lap and jumps forward at the cut, a sawtooth. The receiver sees blockers on the straight line through itself, half a loop either way, fading over 0.38 to 0.48: near its end of the loop, blocks just past the cut are placed a full lap lower than they really are.</p>
     </div>
     <div class="col prose">
-      <p>Self-crossing and interlocked loops have one more source of truth: which beam is really in front where two cross on screen. For figures with portals and up to 14 bars, the rig builds a crossing table once per figure, from the bars' screen segments: where bar A crosses bar B and B is really nearer the camera, B is an <em>overpass</em> for A, stored with their depth difference in unwound space. Overpasses are carried across a corner when the crossing sits within 28% of a bar's end, and a short bar tucked between two bars that both pass over it inherits the overpass too (the meander's U-turns). Ring halves, washers, welded bridges, lapped rungs and fixed pillars each have a rule of their own.</p>
-      <p>Then, per box: a quick test of whether the ray to the light passes within the box's bounding sphere, and whether any part of the box rises at least 0.014 above the receiver's tangent plane (faded in up to 0.052). The distance along the ray to the box's signed distance field (a box with chamfered edges and slanted end planes, read in the box's frame) is minimised by a golden-section search of 6 steps and a parabolic step, and the minimum distance <code>sd</code> becomes occlusion with a penumbra that widens along the ray, as a soft light's does. A block also skips itself: boxes of the same loop within the receiver's block (plus a pad of at most 0.004, kept inside the gap) are not tested, so a block's own end never shadows its face.</p>
-    </div>
-    <div class="formula"><span class="c">// key: toward the look's key direction, rotated with the figure</span>
-soft = 0.013 + 0.072·t     reach 2.45 (0.52–0.86 across loops, 0.48–0.64 within a cut loop)
-<span class="c">// AO: a ray leaning toward the camera, normalize(0.48·n + (0, 0, 0.88))</span>
-soft = 0.022 + 0.14·t      reach 0.68 (0.42–0.60 across loops)      tight AO: 0.015 + 0.095·t, within 0.24–0.48
-occlusion = 1 − smoothstep(−0.65·soft, soft, sd)    × fade near the reach (from 65%) × receiver n·l gate (0.01–0.18)
-<span class="c">// painted look, with Shadows s (0.7):</span>
-shadow    = mix(1, key, s)
-occlusion ×= mix(1, mix(1, ao, 0.7) · mix(1, tightAo, 0.85), s)</div>
-    <div class="col prose">
-      <p>Three figure types are traced against their exact shapes instead of boxes. The borromean tribar's three plates are traced as square-washer SDFs (the constant-width band around its round-cornered hole), sampled at 9 points along the ray, refined with 7 golden-section steps and a parabola; the plates of other loops are lifted over the receiver like any crossing, with a clip that keeps only the post or the overpass that really crosses it. The whole figure-8 and trefoil are traced against the curve itself: the closest curve parameter to the ray is seeded from 7 samples per piece, skipping the receiver's own neighbourhood (0.085 of the loop), then refined 6 times by alternating a Newton step on the curve with the closest point on the ray to the beam's sheared octagonal section.</p>
-      <p>Illusion-space shadows only match the picture near the sweet spot, so they fade with the camera's angle off it, <code>1 − smoothstep(3°, 15°, θ)</code>, and as a figure grows on its way out (<code>(1.5 − scale) / 0.4</code>). Further out the figure is lit without them, which reads as an unshadowed object rather than a wrong one.</p>
+      <p>Those shadows only match the picture near the sweet spot, so they fade out as the camera leaves it, between 3° and 15°. Further out the figure is lit without them, which reads as an unshadowed object rather than a wrong one.</p>
     </div>
   </section>
 
-  <!-- 11. The show -->
   <section>
     <div class="col prose">
-      <div class="eyebrow">The show · <b>main.js updateShow, startOrbit, orbitGuide, followSpring</b></div>
+      <div class="eyebrow">The show · <b>main.js</b></div>
       <h2>Orbit, click, split, leave</h2>
-      <p>Every figure plays the same four phases. <strong>Orbit</strong>: the camera cuts, unseen, to a point 2.2 turns (396°) around the figure, to a random side, pitched by <code>0.5·sin(wave)</code> with a random wave, and 1.35 times further out (in orthographic, zoomed out to 1/1.35). The figure grows in from nothing over <em>Grow in</em> (0.6 s, <code>OutCubic</code>) while a deep whoosh plays, and the camera swings around it for <em>Orbit</em> (7 s), seeing the impossible figure from every side as the nonsense it really is. <strong>Click</strong>: it lands on the sweet spot. <strong>Split</strong>: once it has settled, the gaps open and the blocks march. <strong>Merge and exit</strong>: when the next figure is asked for, the gaps close over the same 4 s, then the figure grows to 1.5× (<code>InQuad</code>) and fades into the backdrop over <em>Exit</em> (1.2 s), and the next orbit starts.</p>
-      <p>The camera doesn't follow an easing curve to the sweet spot; that stops dead and looks animated. A <em>guide path</em> sets where the camera ought to be: the yaw closes as <code>from · (1 − OutQuart(u))</code>, fast for most of the swing and then a long brake, the pitch settles by <code>OutCubic</code> with a little wave, <code>0.22·sin(wave + 3πu)</code>, and the distance and zoom ease in and out. An under-damped spring chases it, <code>ω = 7</code>, <code>ζ = 0.7</code>, integrated at 240 Hz whatever the frame rate, and starts moving at the guide's own speed. It lags the guide through the fast part of the swing, which rounds off the start and the turn into the brake, and catches up during the long brake. With the default 7 s orbit it overshoots by 0.002°, far under a pixel, and comes within 0.12° about 0.7 s before the guide ends; with a 1 s orbit the guide brakes so hard that the spring overshoots by almost 4° and swings back. Once, after the guide has arrived, the error is under 2·10⁻⁴ and the speed under 2·10⁻³, the camera is pinned exactly at the sweet spot.</p>
+      <p>Every figure plays the same phases. It grows in over 0.6 s while the camera swings 2.2 turns around it in 7 s, seeing the impossible figure from every side as the nonsense it really is. It lands on the sweet spot with a click, splits and marches, and when the next figure is asked for, it closes up, grows slightly and fades into exactly the backdrop behind it.</p>
+      <p>The camera doesn't follow an easing curve, which would stop dead. A guide path brakes into the sweet spot, and an under-damped spring (ω = 7, ζ = 0.7) chases it, rounding off the start and gliding in; once it has settled it is pinned exactly. While a figure is on screen the camera sways about the line of sight, ±14° over 14 s, passing upright as it lands: a roll about the sightline keeps the figure welded.</p>
     </div>
     <div class="fig">
       <div class="fig-head"><h3>Landing on the sweet spot</h3>
@@ -368,44 +328,18 @@ occlusion ×= mix(1, mix(1, ao, 0.7) · mix(1, tightAo, 0.85), s)</div>
       <p class="fig-cap">The yaw of one orbit, simulated with the day's code at 60 fps (4 spring substeps a frame). Top, the whole swing; bottom, the landing magnified, with the moment the camera comes within 0.12° (the click) and the moment it is pinned. ω and ζ are fixed in the day; the sliders show what they do. Shorten the orbit to see the spring overshoot.</p>
     </div>
     <div class="col prose">
-      <p>The landing plays a wooden click when the camera's direction comes within 0.12° of the sweet spot, which is when the pieces' depth offsets shift them by less than a pixel and they visibly lock. While the figure is on screen the camera also <em>sways</em>: it rolls about the line of sight by <em>Camera sway</em> (14°) times <code>sin(2π·t / 14 s)</code>. A roll about the sightline keeps the alignment exact and keeps the light fixed on the figure, so the figure seems to rock while staying welded. The sway clock starts at minus the orbit time, so it passes upright exactly as the camera lands, and it holds while you drag.</p>
-      <p><em>Auto change</em> asks for a new figure 14 s after the last change or interaction, counting across the phases but not during a merge or an exit. <code>R</code> picks a figure from the <em>Randomize from</em> pool (all, only those that split, only the whole ones), never the one on screen, with a random split style, a gap of 0.08 to 0.22, a radius of 0.92 to 1.14 and a thickness of 0.34 to 0.48. The panel's shape settings for the figure on screen are held while it merges and exits, so a change never reshapes the figure that is leaving.</p>
-      <p>The exit fades the figure into exactly what is behind it: in the shader, albedo and specular go to 0 and the emission goes to the backdrop gradient computed for that pixel, through <code>smoothstep</code> of the dissolve, while the outlines fade with it. A figure that has dissolved has no edge left to pop when it is removed.</p>
+      <p>Dragging breaks the illusion: a few degrees off, the cut ends step apart; further, the figure falls into its real, open shape. Letting go eases back to the sweet spot, keeping your zoom. Near the sweet spot a hand-placed camera is never quite on the axis, so the figure turns to meet it, fully within 2.5° and not at all past 7°.</p>
     </div>
   </section>
 
-  <!-- 12. Hand camera -->
-  <section>
-    <div class="col prose">
-      <div class="eyebrow">By hand · <b>main.js, modules/FreeOrbitControls.js</b></div>
-      <h2>Breaking the illusion yourself</h2>
-      <p>Dragging takes the camera away from the show at any time; the orbit uses the shared gimbal-free controls with damping 0.08 and no panning. The point of dragging is to break the figure: a few degrees off and the cut ends step apart, further and the figure falls into its real, open shape. Letting go eases back to the sweet spot by <code>1 − e<sup>−9·dt</sup></code> a frame (with <em>Auto-snap</em>, or at any time with <code>L</code>), and the show takes over again at the next figure.</p>
-      <p>A hand-placed camera is never exactly on the axis, and a figure built for the axis shows a sliver of the front piece's side a degree away from it. So near the sweet spot the figure turns to meet the camera: within 2.5° it is rotated fully so its sightline points at the camera, fading to no turn at 7° (a <code>smoothstep</code> on the angle). In perspective it also takes the camera's distance as its own. The light's direction is turned back by the same rotation for the shadows. The staged orbit does without this: it lands exactly, and a figure turning as the camera glides in would read as a second motion.</p>
-    </div>
-  </section>
-
-  <!-- 13. Sound -->
   <section>
     <div class="col prose">
       <div class="eyebrow">Sound · <b>sound.js</b></div>
       <h2>Air, a click and wooden blocks</h2>
-      <p>The orbit has two sounds. As it sets off, one of two deep whoosh recordings plays at half gain. Under it runs a synthesized swoosh that follows how fast the camera swings around the figure: three seconds of stereo pink-ish noise (three one-pole filters summed) loop through three layers, a low body, a band that sweeps up and flutters, and high air. Each frame the camera's angular speed sets a level <code>L = √min(1, speed / 4)</code>, a gentle curve so it carries through the slow end of the glide, and the layers follow it with short time constants (60 to 120 ms). The swoosh pans with the camera's side, up to ±0.8. A jump of more than 20 rad/s is a cut between orbits, not a swing, and is ignored.</p>
-    </div>
-    <div class="table-wrap"><table>
-      <thead><tr><th>layer</th><th>filter</th><th>tracks the level L</th></tr></thead>
-      <tbody>
-        <tr><td>body</td><td>low-pass, Q 2.5</td><td class="wrap">cutoff 110 + 220·L Hz, gain 0.4·L</td></tr>
-        <tr><td>band</td><td>band-pass, Q 1.4</td><td class="wrap">centre 260 + 1500·L² Hz, gain 0.32·L, tremolo at 2 + 10·L Hz with depth 0.25·L</td></tr>
-        <tr><td>air</td><td>high-pass 4.5 kHz</td><td class="wrap">gain 0.1·L³, only at speed</td></tr>
-      </tbody>
-    </table></div>
-    <div class="col prose">
-      <p>The landing plays a single wooden click. The split is made of knocks: the rig counts the gaps that are more than 12% open each frame, and for every gap that opens or closes the day plays one of three hits cut from a recording of toy wooden blocks, never the same one twice in a row, at 0.9 gain opening and 0.65 closing (and at 0.85 of the pitch, lower, when closing), divided by the square root of how many changed that frame, up to 8, spread by 12 ms each plus up to 20 ms at random, and panned up to ±0.6. <em>Together</em> makes one burst; <em>wave</em> makes a run of knocks around the loop. Every sample also varies by ±10% in pitch and −30% to +10% in gain.</p>
-      <p>Everything goes through a master gain of 0.8 and a compressor (−12 dB, 3:1), with a send to a short room: a 2.2 s impulse of noise decaying as <code>(1 − t)<sup>3.2</sup></code>, mixed in at 0.16. The audio context is created on load and resumes on the first gesture, nothing plays before the first frame, and the variations use the unseeded random so the seed's figures don't change with the sound. For recordings the whole sound can render into an <code>OfflineAudioContext</code>, with each event placed at its own time.</p>
+      <p>Each orbit sets off with a deep whoosh, under a synthesized swoosh that follows how fast the camera swings: looping pink noise through a low body, a band that sweeps up and flutters, and high air, panned with the camera. The landing is a single wooden click, played when the pieces come within a pixel of each other. Every gap that opens or closes knocks one of three hits cut from a recording of toy wooden blocks, lower when closing, so together makes a burst and wave a run around the loop. All of it goes through a short generated room reverb.</p>
     </div>
   </section>
 
-  <!-- Controls -->
   <section>
     <div class="col prose">
       <div class="eyebrow">Using it</div>
@@ -552,6 +486,48 @@ occlusion ×= mix(1, mix(1, ao, 0.7) · mix(1, tightAo, 0.85), s)</div>
   const TRI_QUADS = triQuads();
   const KEY = (() => { const k = [-0.55, 0.62, 0.56], l = Math.hypot(...k); return k.map((c) => c / l); })();
 
+  // The triangle is drawn with WebGL into an offscreen canvas, so overlapping beams are resolved per pixel by a depth
+  // buffer instead of a face sort that flips order as it turns.
+  const triGL = (() => {
+    const cv = document.createElement("canvas");
+    const gl = cv.getContext("webgl", { antialias: true, premultipliedAlpha: true, alpha: true });
+    if (!gl) return null;
+    const sh = (type, src) => { const o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); return o; };
+    const prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, `
+      attribute vec3 p; attribute float lit; uniform vec2 cs; uniform vec2 sc; varying float vLit;
+      void main() {
+        vec3 r = vec3(p.x * cs.x - p.z * cs.y, p.y, p.x * cs.y + p.z * cs.x);
+        vLit = lit;
+        gl_Position = vec4(r.x * sc.x, r.y * sc.y - 0.03, -r.z * 0.1, 1.0);
+      }`));
+    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, `
+      precision mediump float; uniform vec3 wood; varying float vLit;
+      void main() { gl_FragColor = vec4(wood * vLit, 1.0); }`));
+    gl.linkProgram(prog);
+    const pos = [], lit = [];
+    for (const q of TRI_QUADS) {
+      const l = 0.38 + 0.62 * Math.max(0, dot(q.n, KEY));
+      for (const i of [0, 1, 2, 0, 2, 3]) { pos.push(...q.p[i]); lit.push(l); }
+    }
+    const buf = (data, loc, n) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW); const a = gl.getAttribLocation(prog, loc); gl.enableVertexAttribArray(a); gl.vertexAttribPointer(a, n, gl.FLOAT, false, 0, 0); };
+    gl.useProgram(prog);
+    buf(pos, "p", 3); buf(lit, "lit", 1);
+    const count = pos.length / 3;
+    return (w, h, th, scale, wood) => {
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+      gl.viewport(0, 0, cv.width, cv.height);
+      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
+      gl.uniform2f(gl.getUniformLocation(prog, "cs"), Math.cos(th), Math.sin(th));
+      gl.uniform2f(gl.getUniformLocation(prog, "sc"), (2 * scale) / w, (2 * scale) / h);
+      gl.uniform3f(gl.getUniformLocation(prog, "wood"), wood[0] / 255, wood[1] / 255, wood[2] / 255);
+      gl.drawArrays(gl.TRIANGLES, 0, count);
+      return cv;
+    };
+  })();
+
   // ---- 1. The cut ----
   {
     const T = $("cuT");
@@ -564,23 +540,7 @@ occlusion ×= mix(1, mix(1, ao, 0.7) · mix(1, tightAo, 0.85), s)</div>
       const scale = Math.min(mainW, mainH) / 3.4;
       const ox = mainW / 2, oy = mainH / 2 + scale * 0.05;
       const wood = rgb(css("--wood"));
-      const rot = (v) => [v[0] * c - v[2] * s, v[1], v[0] * s + v[2] * c];
-      const list = [];
-      for (const q of TRI_QUADS) {
-        const n = rot(q.n);
-        if (n[2] <= 1e-4) continue;
-        const pr = q.p.map(rot);
-        const z = pr.reduce((a, v) => a + v[2], 0) / 4;
-        const lit = 0.38 + 0.62 * Math.max(0, dot(q.n, KEY));
-        list.push({ pr, z, lit });
-      }
-      list.sort((a, b) => a.z - b.z);
-      for (const q of list) {
-        const col = `rgb(${wood.map((v) => Math.round(v * q.lit)).join(",")})`;
-        ctx.beginPath();
-        q.pr.forEach((v, i) => { const x = ox + v[0] * scale, y = oy - v[1] * scale; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
-        ctx.closePath(); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 0.6; ctx.stroke();
-      }
+      if (triGL) ctx.drawImage(triGL(mainW, mainH, th, scale, wood), 0, 0, mainW, mainH);
       label(ctx, "seen from the camera", 14, 20);
       label(ctx, `orbit ${(+T.value).toFixed(1)}°`, 14, 36, css("--accent"));
       // top view
@@ -844,6 +804,16 @@ occlusion ×= mix(1, mix(1, ao, 0.7) · mix(1, tightAo, 0.85), s)</div>
     bind("uwS", "uwSo", (v) => v.toFixed(3), () => fig.redraw());
   }
 })();
+
+  // ---- Gallery ----
+  {
+    const g = document.getElementById("gallery");
+    g.addEventListener("click", (e) => { const t = e.target.closest(".tile"); if (t) t.classList.toggle("on"); });
+    document.getElementById("galAll").addEventListener("click", (e) => {
+      g.classList.toggle("all");
+      e.target.textContent = g.classList.contains("all") ? "show them whole" : "split them all";
+    });
+  }
 </script>
 </body>
 </html>

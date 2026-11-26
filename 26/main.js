@@ -305,6 +305,9 @@ function cameraAngles(cam) {
   return { yaw: Math.atan2(p.x, p.z), pitch: Math.asin(Maf.clamp(p.y / d, -1, 1)), dist: d, zoom: cam.zoom };
 }
 
+// The zoom the visitor chose (ortho): kept by the snap and the staged orbits.
+let userZoom = 1;
+
 function placeCamera(cam, ctrl, yaw, pitch, dist, zoom) {
   cam.position.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)).multiplyScalar(dist);
   cam.up.copy(SWEET_UP);
@@ -341,7 +344,7 @@ function startOrbit(sweetDist) {
     snapping = false;
     const cam = getActiveCamera();
     placeCamera(cam, getActiveControls(), -show.side * ORBIT_SWEEP, ORBIT_PITCH * Math.sin(show.wave),
-      sweetDist * (cam.isOrthographicCamera ? 1 : ORBIT_DOLLY), cam.isOrthographicCamera ? 1 / ORBIT_DOLLY : 1);
+      sweetDist * (cam.isOrthographicCamera ? 1 : ORBIT_DOLLY), cam.isOrthographicCamera ? userZoom / ORBIT_DOLLY : 1);
   }
   startPhase("orbit");
   show.settled = false;
@@ -392,13 +395,13 @@ function updateShow(dt, sweetDist) {
     if (u >= 1) startPhase("click");
   } else if (show.phase === "click" && show.drive && !show.settled) {
     // The spring lags the guide, so it lands here: settle, then pin the exact sweet spot.
-    const target = [0, 0, sweetDist, 1];
+    const target = [0, 0, sweetDist, userZoom];
     followSpring(cam, ctrl, target, dt);
     const err = show.spring.x.reduce((m, x, i) => Math.max(m, Math.abs(x - target[i]) / (i === 2 ? sweetDist : 1)), 0);
     const vel = show.spring.v.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
     if (err < 2e-4 && vel < 2e-3) {
       show.settled = true;
-      placeCamera(cam, ctrl, 0, 0, sweetDist, 1);
+      placeCamera(cam, ctrl, 0, 0, sweetDist, userZoom);
       ctrl.saveState();
     }
   }
@@ -413,7 +416,7 @@ function orbitGuide(u, sweetDist) {
     show.from.yaw * (1 - Easings.OutQuart(u)),
     show.from.pitch * settle + 0.22 * Math.sin(show.wave + u * Math.PI * 3) * settle,
     Maf.lerp(show.from.dist, sweetDist, Easings.InOutCubic(u)),
-    Maf.lerp(show.from.zoom, 1, Easings.InOutCubic(u)),
+    Maf.lerp(show.from.zoom, userZoom, Easings.InOutCubic(u)),
   ];
 }
 
@@ -2380,12 +2383,15 @@ render(({ time, dt }) => {
   if (!dragging) show.swayT += dt;
   show.roll = Maf.toRadians(params.cameraSway()) * Math.sin((show.swayT * Math.PI * 2) / 14);
 
+  if (!show.drive && cam.isOrthographicCamera) userZoom = orthoCamera.zoom;
   if (snapping && !dragging) {
     const alpha = 1 - Math.exp(-wallDt * 9);
     _sweetPos.set(0, 0, sweetDist);
     if (isPersp) {
-      const nextLen = Maf.lerp(cam.position.length(), sweetDist, alpha);
-      cam.position.lerp(_sweetPos, alpha).setLength(nextLen);
+      // Keep the visitor's distance: the figure turns and rescales its depth to meet the camera there.
+      const len = cam.position.length();
+      _sweetPos.setLength(len);
+      cam.position.lerp(_sweetPos, alpha).setLength(len);
       cam.up.lerp(SWEET_UP, alpha).normalize();
       ctrl.target.lerp(ORIGIN, alpha);
       if (cam.position.distanceToSquared(_sweetPos) < 1e-5) {
@@ -2400,17 +2406,10 @@ render(({ time, dt }) => {
       cam.position.lerp(_sweetPos, alpha).setLength(sweetDist);
       cam.up.lerp(SWEET_UP, alpha).normalize();
       ctrl.target.lerp(ORIGIN, alpha);
-      orthoCamera.zoom = Maf.lerp(orthoCamera.zoom, 1, alpha);
-      orthoCamera.updateProjectionMatrix();
-      if (
-        cam.position.distanceToSquared(_sweetPos) < 1e-5 &&
-        Math.abs(orthoCamera.zoom - 1) < 1e-3
-      ) {
+      if (cam.position.distanceToSquared(_sweetPos) < 1e-5) {
         cam.position.copy(_sweetPos);
         cam.up.copy(SWEET_UP);
         ctrl.target.copy(ORIGIN);
-        orthoCamera.zoom = 1;
-        orthoCamera.updateProjectionMatrix();
         ctrl.saveState();
         ctrl.reset();
         snapping = false;

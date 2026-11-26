@@ -104,7 +104,8 @@ footer > .meta { margin-bottom: 12px; }
     const margin = () => (innerWidth < 600 ? 12 : 40);
     const layout = (cx, cy) => {
       const w = img.naturalWidth || thumb.naturalWidth || 1, h = img.naturalHeight || thumb.naturalHeight || 1, pad = margin();
-      const fit = Math.min((innerWidth - pad * 2) / w, (innerHeight - pad * 2) / h);
+      // Fit the window, but never past the image's own size until the visitor zooms in.
+      const fit = Math.min(1, (innerWidth - pad * 2) / w, (innerHeight - pad * 2) / h);
       const scale = zoomed ? Math.max(1, fit * 2) : fit;
       const before = img.getBoundingClientRect();
       const fx = cx === undefined ? 0.5 : (cx - before.left) / before.width;
