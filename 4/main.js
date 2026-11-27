@@ -1,4 +1,4 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, keysHelp, setDay, addKey, showHint, loadingStep } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, keysHelp, setDay, addKey, showHint, loadingStep } from "common";
 import { GUI } from "guspira";
 import { createAutoChange } from "modules/autoChange.js";
 import { Scene, Mesh, Vector3 } from "three";
@@ -136,7 +136,8 @@ let hdrLoad = null;
 function loadHdr(onProgress) {
   return (hdrLoad ??= studio
     .then((env) => loadReflections(renderer, "../assets/studio_small_03_2k.hdr", { keyDirection: KEY_DIRECTION, match: env.envMap, onProgress }))
-    .then((env) => (envs.hdr = env)));
+    .then((env) => (envs.hdr = env))
+    .catch((e) => console.warn("Reflections unavailable", e)));
 }
 function updateReflections() {
   const choice = params.reflections();
@@ -224,7 +225,9 @@ onRandomize(() => {
   params.sectionAmount.set(0.4 + 0.6 * Math.random());
 });
 
-retie(false);
+// A url's seed ties its own knot here, so it opens on it rather than morphing from the default.
+applyUrlState();
+if (!tubesBuilt) retie(false);
 updateSection(true);
 knots.update(0, 0);
 tangle.update(renderer, 0, pipeline.depthTexture);
