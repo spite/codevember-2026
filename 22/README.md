@@ -23,7 +23,8 @@ A start screen offers three ways in, over the camcorder's blue standby screen:
 Choosing goes fullscreen with the UI hidden (it comes back when leaving fullscreen). WASD or the arrows walk; the first
 click grabs the mouse to look around, Esc lets go. On phones: drag to look, hold to walk. V changes the mode, R gives a
 new maze, K records your motion for a video. When the tape (10 minutes by default) runs out, it stops, rewinds, and
-starts again on a fresh one.
+starts again on a fresh one. Auto change (in the panel) is off by default: a walk left running already gets a new tape
+when this one runs out, and a new maze mid-walk would cut the take short.
 
 ## Notable
 

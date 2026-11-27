@@ -368,6 +368,13 @@ const COOLDOWN = 0.5;
 const HOARSE = 5;
 // With the microphone the voice is real: it never tires and needs no rest.
 const canCall = () => mode === "mic" || (sinceVoiced >= COOLDOWN && !hoarse);
+// Take playback state: declared before the load awaits, since a ping can come from the chooser during them.
+let replaying = false;
+let replayTime = 0;
+let lastTake = null;
+let replayTake = null;
+let replayDone = null;
+
 function ping(intensity = 1, silent = false) {
   if (!replaying && (!canCall() || mode === "standby" || mode === "ended")) return [];
   const asked = intensity;
@@ -458,11 +465,6 @@ await breathsLoaded;
 await load.compile.track(pipeline.compileAsync(scene, camera), 2);
 
 // Recording and playing back takes.
-let replaying = false;
-let replayTime = 0;
-let lastTake = null;
-let replayTake = null;
-let replayDone = null;
 const recLabel = document.createElement("div");
 Object.assign(recLabel.style, {
   position: "fixed",
