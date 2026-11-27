@@ -227,10 +227,15 @@ function syncPerspFov(fovDeg) {
   }
 }
 
+// Narrowest aspect that still shows the full frustum height; narrower ones keep this width (figures span up to ±0.83).
+const PORTRAIT_FIT = 0.9;
+
+// From the base fov: portrait's horizontal fov is the base one, so this frames FRUSTUM_HEIGHT × PORTRAIT_FIT at least.
 function getPerspSweetDistance() {
   syncPerspFov(params.fov());
-  const halfRad = Maf.toRadians(perspCamera.fov) * 0.5;
-  return FRUSTUM_HEIGHT / Math.max(1e-4, 2 * Math.tan(halfRad));
+  const halfRad = Maf.toRadians(params.fov()) * 0.5;
+  const fit = Math.min(1, Math.max(perspCamera.aspect || 1, PORTRAIT_FIT));
+  return (FRUSTUM_HEIGHT * fit) / Math.max(1e-4, 2 * Math.tan(halfRad));
 }
 
 const initPerspDist = getPerspSweetDistance();
@@ -353,6 +358,15 @@ function startOrbit(sweetDist) {
     const g0 = orbitGuide(0, sweetDist);
     const g1 = orbitGuide(1e-3, sweetDist);
     show.spring = { x: g0, v: g0.map((g, i) => ((g1[i] - g) / 1e-3) / show.duration) };
+  }
+}
+
+// An object picked from the panel or with [ ] leaves through the staged swap too.
+let shownObject = null;
+function watchObject() {
+  if (show.started && !show.held && shownObject !== null && params.object() !== shownObject) {
+    show.held = { ...Object.fromEntries(SHAPE_KEYS.map((k) => [k, params[k]()])), object: shownObject };
+    requestShapeChange();
   }
 }
 
@@ -1974,7 +1988,18 @@ const edgeMaterial = new LineBasicMaterial({
 const rig = new AnamorphicRig({ bodyMaterial, edgeMaterial, shadowState });
 scene.add(rig.group);
 
-onResize((w, h, dpr) => pipeline.setSize(w, h, dpr));
+onResize((w, h, dpr) => {
+  pipeline.setSize(w, h, dpr);
+  // Portrait keeps the figure's width in frame.
+  const aspect = w / h;
+  const fh = FRUSTUM_HEIGHT / Math.min(1, aspect / PORTRAIT_FIT);
+  orthoCamera.userData.frustumHeight = fh;
+  orthoCamera.top = fh / 2;
+  orthoCamera.bottom = -fh / 2;
+  orthoCamera.left = (-fh * aspect) / 2;
+  orthoCamera.right = (fh * aspect) / 2;
+  orthoCamera.updateProjectionMatrix();
+});
 
 
 const shapeBag = { key: null, left: [] };
@@ -2062,7 +2087,7 @@ function syncLook(lookName) {
   shadowState.uniforms.uShadowTint.value.set(cfg.shadowTint);
   keyDirection.copy(cfg.studio.keyDirection).normalize();
   applyEnvironment(resolvedStudios[name]);
-  pipeline.resetAccumulation?.();
+  pipeline.restartAccumulation();
 }
 
 syncLook(params.look());
@@ -2106,7 +2131,7 @@ function syncProjectionMode() {
     }
     nextCam.lookAt(ORIGIN);
     activeProjection = mode;
-    pipeline.resetAccumulation?.();
+    pipeline.restartAccumulation();
   }
 
   perspControls.enabled = mode === "perspective";
@@ -2385,7 +2410,9 @@ render(({ time, dt }) => {
   const cam = isPersp ? perspCamera : orthoCamera;
   const ctrl = isPersp ? perspControls : orthoControls;
 
+  watchObject();
   updateShow(dt, sweetDist);
+  shownObject = shapeParam("object");
   rig.group.scale.setScalar(Math.max(1e-3, show.scale));
   rig.group.visible = show.scale > 1e-3 && show.dissolve < 1;
   paintUniforms.uDissolve.value = show.dissolve;
