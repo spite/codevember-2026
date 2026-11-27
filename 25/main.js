@@ -764,6 +764,7 @@ const baseEnv = globalUniforms.envIntensity.value;
 // Every program, the veil's near side included, before the first frame.
 const compileScene = new Scene();
 compileScene.add(firstSkull.veil.front.clone());
+await load.sound.track(sound.decoded);
 await load.compile.track(Promise.all([pipeline.compileAsync(scene, camera), renderer.compileAsync(compileScene, camera)]), 4);
 firstSkull.root.visible = false;
 

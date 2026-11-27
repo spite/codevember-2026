@@ -32,14 +32,17 @@ function createSound({ base = "./sounds/", sets, onProgress } = {}) {
   far.Q.value = 0.5;
   far.connect(master);
 
-  for (const file of files) {
-    fetch(`${base}${file}.mp3`)
-      .then((res) => res.arrayBuffer())
-      .finally(() => onProgress?.(++fetched / files.length))
-      .then((data) => ctx.decodeAudioData(data))
-      .then((buffer) => ((buffers[file.split("-")[0]] ??= [])[Number(file.split("-")[1])] = buffer))
-      .catch((e) => console.warn("sound", file, e));
-  }
+  // Resolves once every sample is decoded (or has failed), so the first sound is never missing.
+  const decoded = Promise.all(
+    files.map((file) =>
+      fetch(`${base}${file}.mp3`)
+        .then((res) => res.arrayBuffer())
+        .finally(() => onProgress?.(++fetched / files.length))
+        .then((data) => ctx.decodeAudioData(data))
+        .then((buffer) => ((buffers[file.split("-")[0]] ??= [])[Number(file.split("-")[1])] = buffer))
+        .catch((e) => console.warn("sound", file, e)),
+    ),
+  );
 
   const gesture = () => {
     if (!paused) ctx.resume();
@@ -96,6 +99,7 @@ function createSound({ base = "./sounds/", sets, onProgress } = {}) {
   let chainIn = 8;
 
   return {
+    decoded,
     get enabled() {
       return on;
     },
