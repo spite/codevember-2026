@@ -490,7 +490,8 @@ function requestCard(values) {
   const sceneChanged = sceneKey(values) !== shown.scene;
   Promise.all([sceneChanged ? diorama.prepare(values.scene, values.machines) : null, sceneChanged ? smudges.prepare(values.machines) : true]).then(
     ([prepared]) => {
-      if (id !== flip.request) return;
+      if (id !== flip.request) return diorama.discard(prepared);
+      diorama.discard(flip.prepared);
       flip.prepared = prepared;
       // On the beat: the swap waits for the next bar to begin.
       flip.state = flip.onBar ? "ready" : "landing";
@@ -506,6 +507,7 @@ function swapCard() {
   params.$apply(values);
   if (flip.prepared) {
     diorama.show(flip.prepared);
+    flip.prepared = null;
     smudges.show();
     u.uSmudge.value = smudges.texture;
     shown.scene = sceneKey(values);

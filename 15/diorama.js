@@ -194,6 +194,8 @@ async function bakeLighting(renderer, geometry, { keyCount = 64, skyCount = 160,
   const pointsGeometry = new BufferGeometry();
   pointsGeometry.setAttribute("position", geometry.attributes.position);
   pointsGeometry.setAttribute("normal", geometry.attributes.normal);
+  // Shares the scene's buffers, so it goes when the scene does.
+  geometry.addEventListener("dispose", () => pointsGeometry.dispose());
   const texel = (2 * R) / depthSize;
   const pointsMaterial = new ShaderMaterial({
     glslVersion: GLSL3,
@@ -516,16 +518,25 @@ export function createDiorama(renderer, { shadowSize = 2048 } = {}) {
         return null;
       }
       await nextFrame();
+      if (v !== version) {
+        geometry.dispose();
+        bake.dispose();
+        return null;
+      }
       const shadow = keyShadowMap(renderer, geometry, shadowSize);
       // fill: how much of the window the scene takes (1 fills it; less sets it further back).
       return { kind, geometry, bake, shadow, fill: built.fill ?? 1 };
     },
+    // Frees a prepared scene that will never be shown.
+    discard(p) {
+      p?.geometry.dispose();
+      p?.bake.dispose();
+      p?.shadow.target.dispose();
+    },
     // Puts a prepared scene on show, freeing the one before.
     show(next) {
       if (!next) return;
-      content?.geometry.dispose();
-      content?.bake.dispose();
-      content?.shadow.target.dispose();
+      this.discard(content);
       content = next;
       mesh.geometry = next.geometry;
       uniforms.bakeTex.value = next.bake.texture;
