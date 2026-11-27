@@ -112,9 +112,15 @@ gui.addSelect("Encasing", params.shape, SHAPE_NAMES);
 gui.addSelect("Finish", params.finish, FINISH_NAMES);
 gui.addSlider("Level", params.encase, 0, 1, 0.01, { randomizable: false, title: "Raise or lower the frosted glass encasing volume (0 = fully excavated, 1 = fully encased)." });
 gui.addSlider("Chamfer", params.chamfer, 0.004, 0.16, 0.002, { randomizable: false, title: "Radius of the rounded edge fillets on the glass encasing." });
-gui.addSlider("Frost", params.frost, 0, 1, 0.01, { title: "The even sanded finish of the glass: the haze and blur of what is inside." });
-gui.addSlider("Streaks", params.marks, 0, 1, 0.01, { title: "How much the frost smears what is behind it down the faces, as glass sanded in one direction." });
-gui.addSlider("Streak length", params.markScale, 0.25, 4, 0.01, { title: "How far the streaks smear." });
+const frostCtl = gui.addSlider("Frost", params.frost, 0, 1, 0.01, { title: "The even sanded finish of the glass: the haze and blur of what is inside." });
+const marksCtl = gui.addSlider("Streaks", params.marks, 0, 1, 0.01, { title: "How much the frost smears what is behind it down the faces, as glass sanded in one direction." });
+const markScaleCtl = gui.addSlider("Streak length", params.markScale, 0.25, 4, 0.01, { title: "How far the streaks smear." });
+// Randomize stays where the frost and its streaks look good (a sweep of the three): heavy frost with long, strong
+// streaks smears the highlights into white bars, and short streaks or light frost show nothing.
+const pick = (lo, hi) => Math.round((lo + (hi - lo) * Math.random()) * 100) / 100;
+frostCtl.randomize = () => params.frost.set(pick(0.3, 0.65));
+marksCtl.randomize = () => params.marks.set(pick(0.15, params.frost() > 0.55 ? 0.4 : 0.6));
+markScaleCtl.randomize = () => params.markScale.set(pick(0.8, params.frost() > 0.55 && params.marks() > 0.3 ? 1.5 : 2));
 gui.addSlider("Refraction", params.ior, 1.1, 1.9, 0.01, { randomizable: false });
 gui.addSlider("Heat", params.heat, 0, 1.5, 0.01, { title: "Molten ember intensity at the lower burrow tips (0 = fully cooled metal)." });
 gui.addSlider("Grain", params.grain, 0, 1, 0.01, { title: "Sand-imprinted cast metal surface micro-texture (subtle cast grain always remains)." });
@@ -124,7 +130,7 @@ gui.addSlider("Spotlight", params.spotlight, 0, 1, 0.01, { randomizable: false, 
 gui.addSlider("Room light", params.room, 0, 1, 0.01, { randomizable: false, title: "Light on the plinth and backdrop outside the spot (0: only the spot and the embers)." });
 gui.addSlider("Base light", params.baseLight, 0, 2, 0.01, { randomizable: false, title: "The warm strip tucked under the plinth." });
 gui.addSlider("Complexity", params.complexity, 0.2, 1, 0.05);
-gui.addSelect("Glass Detail", params.detail, ["fast", "ultra"], { randomizable: false, title: "Fast: 8-tap gather, 3-level pyramid, fast TIR. Ultra: 16-tap smooth pyramid (L4), full TIR shading, 12-step volume, micro-bubbles, and extra micro-grain." });
+gui.addSelect("Glass Detail", params.detail, ["fast", "ultra"], { randomizable: false, title: "Fast: 3-level frost pyramid, 6-step glow. Ultra: a 4th pyramid level, 12-step glow, seed bubbles and finer grain." });
 gui.addSlider("Spin", params.spin, 0, 1, 0.01, { randomizable: false });
 gui.addCheckbox("Idle orbit", params.orbit, { randomizable: false, title: "Left alone, the camera slowly circles the piece, near and far, above and a little below." });
 const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTime, gui, ready: () => cycle.phase === "rest" });
@@ -317,6 +323,17 @@ function findCrown(vol) {
   return vol.spec.hy * 2;
 }
 
+// The plinth's width and depth, eased to each piece's.
+const plinthSize = { current: new Vector2(2.65, 2.65), target: new Vector2(2.65, 2.65) };
+let activeVolSet = false;
+function setPlinthSize() {
+  const { x: w, y: d } = plinthSize.current;
+  plinthTop.scale.set(w / 2.65, 1, d / 2.65);
+  baseUniforms.uPlinthHalf.value.set(w / 2, d / 2);
+  glass.uniforms.uPlinthHalf.value.set(w / 2, (-FLOOR_Y - BASE_GAP) / 2, d / 2);
+  glass.uniforms.uPlinthCenterY.value = (FLOOR_Y + BASE_GAP) / 2;
+}
+
 // The next piece bakes in a worker while the current one lifts away; its textures are uploaded as soon as it arrives.
 let bake = null;
 function startBake() {
@@ -365,12 +382,11 @@ function applyVolume(vol) {
   plinthMat.uniforms.uBlockHalf.value.set(spec.hx, spec.hy, spec.hz);
   plinthMat.uniforms.uBlockType.value = spec.type;
 
-  const plinthW = shape === "column" ? 1.85 : shape === "slab" ? 3.1 : 2.65;
-  const plinthD = shape === "column" ? 1.85 : shape === "slab" ? 1.65 : 2.65;
-  plinthTop.scale.set(plinthW / 2.65, 1, plinthD / 2.65);
-  baseUniforms.uPlinthHalf.value.set(plinthW / 2, plinthD / 2);
-  glass.uniforms.uPlinthHalf.value.set(plinthW / 2, (-FLOOR_Y - BASE_GAP) / 2, plinthD / 2);
-  glass.uniforms.uPlinthCenterY.value = (FLOOR_Y + BASE_GAP) / 2;
+  plinthSize.target.set(shape === "column" ? 1.85 : shape === "slab" ? 3.1 : 2.65, shape === "column" ? 1.85 : shape === "slab" ? 1.65 : 2.65);
+  // The first piece sets it; later ones ease to theirs on the empty plinth.
+  if (!activeVolSet) plinthSize.current.copy(plinthSize.target);
+  activeVolSet = true;
+  setPlinthSize();
 
 }
 
@@ -445,6 +461,21 @@ window.app = {
   rebuild: () => beginLift(true),
   pour: () => beginLift(false),
   cycle,
+  // For recordings: restart this piece's cycle from the empty plinth, or lift it away for the next one (the given
+  // params, else a randomize).
+  restart: () => {
+    startCycle();
+    curGlassMix = 0;
+  },
+  nextLook: (look) => {
+    if (look) for (const [k, v] of Object.entries(look)) params[k].set(v);
+    else gui.randomizeAll();
+    beginLift(true);
+  },
+  // Orbit from the start, even under ?capture.
+  forceOrbit: false,
+  // The whole orbit from high above, looking down.
+  orbitHigh: false,
 };
 
 // Idle orbit: left alone, the camera circles the piece, drifting near and far, above and a little below.
@@ -452,6 +483,8 @@ const IDLE_DELAY = 6;
 let idleFor = 0;
 let idleWeight = 0;
 let orbitTime = 0;
+// 0 wide (the pour, the lift), 1 close in (the cooling and the resin, the finished piece).
+let orbitClose = 0;
 const orbitOffset = new Vector3();
 const orbitSpherical = new Spherical();
 for (const type of ["pointerdown", "wheel"]) renderer.domElement.addEventListener(type, () => (idleFor = 0), { passive: true });
@@ -459,23 +492,29 @@ let pointerHeld = false;
 renderer.domElement.addEventListener("pointerdown", () => (pointerHeld = true));
 for (const type of ["pointerup", "pointercancel"]) window.addEventListener(type, () => (pointerHeld = false));
 const capturing = new URLSearchParams(location.search).has("capture");
+const mix = (a, b, t) => a + (b - a) * t;
 function idleOrbit(dt) {
   idleFor = pointerHeld ? 0 : idleFor + dt;
-  const want = params.orbit() && !capturing && idleFor > IDLE_DELAY ? 1 : 0;
-  idleWeight = want ? Math.min(1, idleWeight + dt / 3) : 0;
+  const want = window.app.forceOrbit || (params.orbit() && !capturing && idleFor > IDLE_DELAY);
+  idleWeight = window.app.forceOrbit ? 1 : want ? Math.min(1, idleWeight + dt / 3) : 0;
   if (idleWeight <= 0) return;
   orbitTime += dt;
   const w = idleWeight * idleWeight * (3 - 2 * idleWeight);
   const follow = 1 - Math.exp(-dt * 0.35 * w);
+  const closeTarget = cycle.phase === "rest" ? 1 : cycle.phase === "cool" ? Math.min(1, cycle.t / 2.5) : 0;
+  orbitClose += (closeTarget - orbitClose) * (1 - Math.exp(-dt * 0.9));
+  const near = 3.2 + 1.0 * activeVol.spec.hy;
   controls.target.x -= controls.target.x * follow;
   controls.target.z -= controls.target.z * follow;
   orbitOffset.subVectors(camera.position, controls.target);
   orbitSpherical.setFromVector3(orbitOffset);
-  const radius = 5.2 + 2.0 * Math.sin(orbitTime * 0.09);
-  const elevation = 0.2 + 0.32 * Math.sin(orbitTime * 0.061 + 1.3);
-  orbitSpherical.theta += dt * 0.12 * w;
-  orbitSpherical.radius += (radius - orbitSpherical.radius) * follow;
-  orbitSpherical.phi += (Math.PI / 2 - elevation - orbitSpherical.phi) * follow;
+  const c = orbitClose * orbitClose * (3 - 2 * orbitClose);
+  const radius = mix(5.2 + 2.0 * Math.sin(orbitTime * 0.09), near + 0.25 * Math.sin(orbitTime * 0.21), c);
+  const elevation = window.app.orbitHigh ? 0.85 : mix(0.2 + 0.32 * Math.sin(orbitTime * 0.061 + 1.3), 0.12 + 0.16 * Math.sin(orbitTime * 0.13 + 0.4), c);
+  // A little faster around while close, to show the cast through each face.
+  orbitSpherical.theta += dt * (0.12 + 0.08 * c) * w;
+  orbitSpherical.radius += (radius - orbitSpherical.radius) * (1 - Math.exp(-dt * 0.8 * w));
+  orbitSpherical.phi += (Math.PI / 2 - elevation - orbitSpherical.phi) * (1 - Math.exp(-dt * 0.7 * w));
   orbitSpherical.makeSafe();
   camera.position.copy(controls.target).add(orbitOffset.setFromSpherical(orbitSpherical));
 }
@@ -553,6 +592,10 @@ render(({ time, dt }) => {
   }
 
   const spec = activeVol.spec;
+  if (plinthSize.current.distanceTo(plinthSize.target) > 1e-4) {
+    plinthSize.current.lerp(plinthSize.target, 1 - Math.exp(-dt * 5));
+    setPlinthSize();
+  }
   curTargetY += (spec.hy - curTargetY) * (1 - Math.exp(-wallDt * 2));
   controls.target.y = curTargetY;
   // Panning keeps the target near the plinth, so the camera never leaves the backdrop.

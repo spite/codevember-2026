@@ -241,8 +241,7 @@ function usableExtentsAtY(y, spec, margin) {
   return [rx, rz];
 }
 
-// Two-pass space colonization inside the block (inspired by Day 21's grow.worker.js):
-// produces graceful, naturally spaced organic branching hierarchies that fill the selected case silhouette.
+// Space colonization inside the block: naturally spaced branching that fills the case's silhouette.
 function buildColonizedTree(spec, { attrCount, stepLen, baseRadius, minRadius, wander, broodChance, heatPower }) {
   const topY = spec.hy;
   const botY = -spec.hy;

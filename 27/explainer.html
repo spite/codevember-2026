@@ -1,0 +1,1259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="../modules/theme.js"></script><script src="../modules/page.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How Burrow Casts</title>
+<meta name="description" content="How Codevember 2026 day 27, Burrow, grows six kinds of burrow, bakes them into a narrow-band distance volume with a pour-arrival field, pours molten metal into them, and draws the cast inside a frosted resin block by raymarching through it: refraction, one internal bounce, frost blurred by depth, a gallery spot with dust, and the glass's own temporal antialiasing.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Dark gallery, molten orange, frosted resin grey, cast bronze and aluminium. */
+:root {
+  --bg: #e8e6e2;
+  --panel: #f2f1ee;
+  --ink: #17181b;
+  --muted: #65625c;
+  --line: #d5d2cc;
+  --accent: #b5501c;
+  --accent2: #8a6a3e;
+  --stage: #17181b;
+  --stage-ink: #bcb8b1;
+  --stage-line: #3a3b40;
+  --molten: #ff7b24;
+  --hot: #ffd9a0;
+  --resin: #9aa0a8;
+  --bronze: #c2925c;
+  --alu: #dfe4ea;
+  --cool: #7f9cc4;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --text: "Literata", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1012; --panel: #18191c; --ink: #ebe8e3; --muted: #9e9a93; --line: #2b2c30;
+    --accent: #f08a3e; --accent2: #d2a66c; --stage: #0b0b0d; --stage-ink: #b3afa8; --stage-line: #2e2f34;
+    --resin: #8d939b; --cool: #8eaad2;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1012; --panel: #18191c; --ink: #ebe8e3; --muted: #9e9a93; --line: #2b2c30;
+  --accent: #f08a3e; --accent2: #d2a66c; --stage: #0b0b0d; --stage-ink: #b3afa8; --stage-line: #2e2f34;
+  --resin: #8d939b; --cool: #8eaad2;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 17px/1.62 var(--text); margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+main { max-width: 1060px; margin: 0 auto; display: flex; flex-direction: column; gap: 72px; }
+.col { max-width: 680px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.05; }
+h1 { font-weight: 800; font-size: clamp(44px, 9vw, 104px); letter-spacing: -0.035em; }
+h2 { font-weight: 700; font-size: clamp(28px, 4.4vw, 42px); letter-spacing: -0.02em; }
+h3 { font-weight: 700; font-size: 19px; letter-spacing: -0.005em; }
+p { margin: 0; }
+.prose { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font: 600 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: 0.84em; }
+code { background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 0.08em 0.35em; border-radius: 3px; }
+a { color: var(--accent); }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+section { display: flex; flex-direction: column; gap: 24px; }
+.hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; align-items: end; padding-top: 48px; }
+.hero .lede { font-size: 20px; line-height: 1.5; max-width: 34ch; }
+.hero-text { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 .glow { color: var(--accent); }
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .hero h1 .glow { background: linear-gradient(100deg, var(--accent) 10%, var(--accent2) 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+}
+.hero figure { margin: 0; position: relative; }
+.hero img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 2px; background: var(--stage); }
+.hero figcaption { font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 8px; }
+.live { font: 600 14px/1 var(--mono); display: inline-flex; gap: 8px; align-items: center; text-decoration: none; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 400 13px/1.3 var(--mono); color: var(--muted); }
+.meta span b { color: var(--ink); font-weight: 600; }
+.fig { background: var(--panel); border-radius: 4px; padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fig-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.fig-cap { font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 70ch; }
+.fig canvas { display: block; width: 100%; max-width: 100%; touch-action: pan-y; border-radius: 3px; background: var(--stage); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; font: 400 13px/1.2 var(--mono); color: var(--muted); }
+.controls label { display: flex; gap: 10px; align-items: center; }
+.controls output { color: var(--ink); min-width: 3ch; font-variant-numeric: tabular-nums; }
+.controls select { font: 400 13px/1 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 5px 6px; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+input[type="checkbox"] { accent-color: var(--accent); }
+button { font: 600 13px/1 var(--mono); color: var(--bg); background: var(--ink); border: 0; border-radius: 3px; padding: 9px 14px; cursor: pointer; }
+button.ghost { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.readout { display: flex; flex-wrap: wrap; gap: 6px 22px; font: 400 13px/1.3 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.readout b { color: var(--ink); font-weight: 600; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.fact { background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fact b { font: 700 15px/1.2 var(--display); }
+.fact span { font-size: 14px; line-height: 1.45; color: var(--muted); }
+.fact code { font-size: 12.5px; }
+.formula { font: 400 14px/1.6 var(--mono); background: var(--panel); border-radius: 4px; padding: 14px 16px; overflow-x: auto; white-space: pre; }
+.formula .c { color: var(--muted); }
+.table-wrap { overflow-x: auto; background: var(--panel); border-radius: 4px; }
+table { border-collapse: collapse; width: 100%; font: 400 14px/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+td.num, th.num { text-align: right; }
+td.wrap { white-space: normal; min-width: 260px; }
+tr:last-child td { border-bottom: 0; }
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 20%, transparent); }
+footer { font: 400 13px/1.6 var(--mono); color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; }
+footer ul { margin: 8px 0 12px; padding-left: 18px; }
+@media (max-width: 760px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: 28px; gap: 28px; }
+  .fig { padding: 16px; }
+  main { gap: 56px; }
+}
+.keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
+.keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.keys b { font: 600 13px/1 var(--mono); }
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="hero-text">
+      <div class="eyebrow"><a href="../">Codevember 2026</a> · <b>Day 27</b> · Burrow</div>
+      <h1>How Burrow <span class="glow">casts</span></h1>
+      <p class="lede">An ant nest, a termite mound or a root system, cast in metal and set in a block of frosted resin on a plinth, under one gallery spot in a dark room. Each piece plays out as a cycle: the plinth stands empty, molten metal pours in and finds the tunnels, it cools as the resin rises around it, and the finished piece rests until a new one lifts it away. Here is how the burrows are grown, baked into a distance volume that also knows when the metal reaches each point, poured, and drawn through the block by a raymarch of their own: refraction, one bounce inside, frost that blurs by depth, a beam of lit dust, and the sound of it.</p>
+      <a class="live" href="./">See it live <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M3 1.8v8.4c0 .5.5.8.9.5l6.6-4.2a.6.6 0 0 0 0-1L3.9 1.3c-.4-.3-.9 0-.9.5z" fill="currentColor"/></svg></a>
+    </div>
+    <figure>
+      <img src="../screenshots/27.jpg" width="1080" height="1080" alt="A cast-metal burrow of branching tunnels inside a frosted resin block on a black plinth, lit by a single spotlight in a dark room." fetchpriority="high" decoding="async">
+      <figcaption>A bronze brood cast at rest in its frosted paperweight, under the spot.</figcaption>
+    </figure>
+  </header>
+
+  <!-- 1. The idea -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The idea</div>
+      <h2>A cast of a hole</h2>
+      <p>Entomologists map ant nests by pouring molten aluminium into the entrance: the metal runs down every gallery and fills every chamber, and once it has cooled the soil is dug away to leave a metal cast of the hole. The casts are strange, beautiful objects, part root, part coral, and they end up on plinths. The day makes one, from the pour to the display case: a burrow is grown procedurally, the metal runs into it from a hole at the top, white-hot at the front and cooling to bare metal behind it, and a block of frosted resin rises around it to make the finished piece.</p>
+      <p>The look is a museum photograph: a near-black room, a black slate plinth, one hard spot from above, and the cast seen through sandblasted resin, sharp where a branch touches the face and dissolving into milky grey deeper in. None of that is meshes. The cast is a 3D distance texture, and a full-screen pass refracts every pixel's ray through the block and raymarches it.</p>
+    </div>
+    <div class="facts">
+      <div class="fact"><b>6 × 8 × 7</b><span>Six burrow kinds, eight resin encasings and seven metal finishes, any combination.</span></div>
+      <div class="fact"><b>One 144³ volume</b><span>Distance, resting heat, pour arrival and pool level per voxel, in half floats (96³ to 160³ by quality tier).</span></div>
+      <div class="fact"><b>About 27 s a piece</b><span>0.8 s empty, 4.2 s pour, 6.3 s cooling and resin, 14 s at rest, 1.8 s lifting out.</span></div>
+    </div>
+  </section>
+
+  <!-- 2. Burrows -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The burrows · <b>volume.js</b></div>
+      <h2>Six ways to dig</h2>
+      <p>A burrow is a list of primitives: tapered capsules (a segment with a radius at each end), ellipsoids and, for ant chambers, wobbly flat discs. Each carries a <em>heat</em> at its ends, how warm that part of the cast stays once it has cooled, which concentrates toward the bottom and the tips. Every archetype grows inside the block it will be cast in, held a margin of about 0.1 (<code>min(0.11, 0.24 × the narrower half-width)</code>) inside its walls, so a column gets a tall narrow nest and a slab a wide flat one.</p>
+      <p>Three archetypes grow by <b>space colonization</b>. Attractor points are scattered through the block, 45% of them held near the walls and the lower corners so the growth reaches the whole case. A hub sits 0.20 below the top with five splayed stubs (four in a column, six in a slab). Each iteration, every attractor pulls the node nearest to it within 1.6 × the block's largest half-size; each pulled node grows one step toward the mean of its pulls, plus a random wander and a downward bias of 0.14; an attractor within 2.05 steps of a node is used up. Growth stops after 76 iterations, 340 nodes, or when no attractor pulls. Steps that would leave the block or creep along its floor are dropped. Radii then follow the pipe model: a branch's radius goes from the minimum to the base radius with <code>(tips downstream / all tips)<sup>0.42</sup></code>, so a branch's radius<sup>2.4</sup> scales with the tips it feeds, as in Murray's law.</p>
+      <p>In all three, 24% of the larger branches sprout a dead-end spur of three bent, tapering segments 0.08–0.19 long, and 55% of the hot tips end in a teardrop. The other three archetypes are drawn as paths: wandering helical shafts studded with lobed chambers, one meandering trunk that forks recursively, and fluted chimneys bridged by arched galleries.</p>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>archetype</th><th>built as</th><th class="num">blend k</th></tr></thead>
+      <tbody>
+        <tr><td>dendritic</td><td class="wrap">Space colonization, 90–170 attractors by complexity, step 0.09, radius 0.018–0.088, wander 0.40; 8% of nodes from depth 3 swell into chambers.</td><td class="num">0.024</td></tr>
+        <tr><td>brood</td><td class="wrap">The same growth with 80–155 attractors, step 0.095 and wander 0.36; 30% of nodes from depth 3 swell into brood chambers 1.65–2.25× the tunnel radius.</td><td class="num">0.026</td></tr>
+        <tr><td>filigree</td><td class="wrap">Fine and dense: 130–220 attractors, step 0.078, radius 0.014–0.056, wander 0.44, no chambers.</td><td class="num">0.018</td></tr>
+        <tr><td>antcast</td><td class="wrap">A harvester-ant nest: 4–6 lobed shelves just under the entrance, then 3–4 shafts (2 in a column, 3–5 in a slab) of 28 segments spiralling 1–2 turns down, each with 5–8 chambers of 2–4 overlapping wafers 0.014–0.022 thick; 35% of chambers loop back, and each shaft ends in 1–2 dripping tips.</td><td class="num">0.022</td></tr>
+        <tr><td>shaft</td><td class="wrap">One trunk of 28 segments, radius 0.070 to 0.036 with a pinching rhythm, meandering on three frequencies; 7–12 forks peel off from 22% of the way down and fork again (46% a step) up to two levels deep, hot ends swelling into drops.</td><td class="num">0.024</td></tr>
+        <tr><td>termite</td><td class="wrap">A cathedral mound: 4–6 fluted chimneys (3 in a column) of 26 segments flaring from the crown, radius 0.050 to 0.028, bridged by 8–15 arched galleries, 16% of segments swelling into chambers.</td><td class="num">0.028</td></tr>
+      </tbody>
+    </table></div>
+    <div class="col prose">
+      <p>Every archetype uses <code>Math.random</code>, which the day seeds: the same seed always grows the same burrow.</p>
+    </div>
+  </section>
+
+  <!-- 3. The volume -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The volume · <b>volume.js, textures.js</b></div>
+      <h2>A narrow band of distance</h2>
+      <p>The primitives are rasterized into a cube of <code>T³</code> voxels spanning ±1.65 around the block's centre: <code>T</code> is 96 on the low tier, 128 on medium, 144 on high and 160 for captures, so a voxel is 0.023 units on high. Each voxel stores the signed distance to the nearest metal, but only within a <b>narrow band</b> of 8 voxels: the distance is packed as <code>0.5 − d / (2 · 8 voxels)</code>, so 0.5 is the surface, 1 is deep inside and anything farther than 8 voxels saturates at 0. That is all a sphere tracer needs, since it never steps farther than the distance it reads, and it keeps the precision where the surface is.</p>
+      <p>Each primitive writes only the box of voxels within its radius plus the band and the blend. Primitives merge with a polynomial smooth minimum of width <code>k</code> (the table above), which welds a branch onto its parent with a fillet. Consecutive segments of one branch are tagged with the same chain and merge with a plain minimum instead, so a tunnel stays a smooth tube rather than a string of sausages. The heat blends with the same weight as the distance. Close to the surface, two octaves of value noise (at 7.5 and 17 per unit, clamped to −0.014…+0.0055) roughen the distance into a sand-cast skin.</p>
+      <p>Each voxel's four channels are written as <b>half floats</b>: R the distance, G the resting heat, B when the stream reaches it, A when the pool fills it. At 8 bits the distance would round to 1/255 of the band, which shows up in the normals as terracing that shimmers as the cast turns. On the high tier the texture is 144³ × 8 bytes, 23.9 MB.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A slice through the bake</h3>
+        <div class="controls">
+          <label>field <select id="slM"><option value="dist" selected>stored distance</option><option value="stream">stream arrival</option><option value="pool">pool level</option></select></label>
+          <label>time <input id="slT" type="range" min="0" max="10" step="0.02" value="3"><output id="slTo"></output></label>
+          <button id="slP" class="ghost">play</button>
+          <button id="slN" class="ghost">new burrow</button>
+        </div>
+      </div>
+      <canvas id="sliceFig" aria-label="Left: a vertical slice through a burrow in a cube block, coloured by the chosen baked field: the stored narrow-band distance, when the stream reaches each point, or when the pool fills it. Right: the same slice at the chosen time of the pour, metal where the pour's distance is negative, coloured by its heat."></canvas>
+      <div class="readout" id="slR"></div>
+      <p class="fig-cap">The bake in two dimensions: the dendritic growth in a cube block (with 60% of the attractors, since a plane fills faster than a volume), rasterized at the medium tier's 128 voxels across the ±1.65 volume, then flooded from the hole as the day does. Left, the baked field, read with bilinear filtering as the GPU reads it; in the stream view, the dashed box is where the flood starts. Right, the pour at that moment, run through the same formula as the shader.</p>
+    </div>
+  </section>
+
+  <!-- 4. The pour -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The pour · <b>volume.js, glass.js</b></div>
+      <h2>Finding the way down</h2>
+      <p>For the metal to run through the burrow, every voxel needs to know when the stream reaches it. The bake floods the inside of the cast with <b>Dijkstra's algorithm</b> on the voxel grid, through the six face neighbours of every voxel within 0.010 of the surface or inside it. Seeds are the voxels within <code>hole radius + 0.18</code> of the axis and 0.34 of the top, each starting at <code>(top − y) × 0.5</code>. Moving down costs 0.65, sideways 1.0 and up 1.5, so the front races down shafts and crawls up into side pockets, as gravity would make it. The arrival costs, divided by the largest, become the stream channel, 0 at the hole and 1 at the farthest tip; they are copied 4 voxels out into the band, so that filtering at the surface never mixes in the "unreached" value. The pool channel is simpler: height above the lowest metal, 0 at the bottom and 1 at the top.</p>
+      <p>The shader turns those two fields into a pour driven by one number, <code>pour</code>, rising at 0.24 a second, 4.2 s from empty to full:</p>
+    </div>
+    <div class="formula"><span class="c">// the stream: the metal the front has reached, thinned into falling blobs</span>
+front   = mix(−0.04, 1.08, clamp(pour / 0.48))          <span class="c">// at the deepest tip by pour 0.45, 1.9 s</span>
+dTip    = (stream − front) × 0.55
+blobs   = smax(d + shrink(waves), dTip, 0.018)           <span class="c">// thinner by 0.032→0.012 between two travelling wave trains</span>
+<span class="c">// the pool: full thickness where it has risen and the front has been</span>
+level   = mix(−0.04, 1.08, smoothstep(0.32, 0.96, pour))
+pool    = smax(d, max((poolT − level) × 0.60, dTip), 0.024)
+d       = mix(d, smin(blobs, pool, 0.020) × 0.65, 1 − smoothstep(0.95, 0.998, pour))</div>
+    <div class="col prose">
+      <p>The blobs are two cosine-squared trains running down the stream coordinate (4.8 and 7.6 waves along it, moving with the pour), plus a lead blob at the front; their pinch fades out between pour 0.72 and 0.95. The scales below 1 keep the combined field a safe lower bound for the tracer, since stretching distance by the field's gradient would otherwise overstep. Past pour 0.998 the shader reads the baked distance alone.</p>
+      <p>Heat comes from the same clock. A point's arrival time is the pour's own: <code>0.48 · (stream + 0.04) / 1.12 / 0.24</code> seconds. From then on it is white-hot, <code>1.3 · e<sup>−age/0.5</sup></code>, settling to molten 1.1 while the metal keeps coming. When the pour ends, each point starts to cool a little later the later it was reached (by <code>0.36 × its arrival time</code>), with a time constant of 1.6 s; the resting heat baked into G, × 0.85, is the floor it cools to, so deep tips keep an ember glow.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The pour, by the clock</h3>
+        <div class="controls">
+          <label>point along the stream <input id="htS" type="range" min="0" max="1" step="0.01" value="0.6"><output id="htSo"></output></label>
+        </div>
+      </div>
+      <canvas id="heatFig" aria-label="Top: the pour, the stream front and the pool level over ten seconds from the start of the pour, with the stream's thinning. Bottom: the heat of three points along the stream and of the chosen point, coloured by the molten colour ramp, with the crackle level and the threshold below which the metal stops glowing."></canvas>
+      <div class="readout" id="htR"></div>
+      <p class="fig-cap">Top, the shader's inputs over the first 10 s of a pour. Bottom, the heat of points 0.1, 0.5 and 0.95 along the stream (thin) and of the chosen point (thick, in its colour), with the glow ramp's stops: deep red from 0.16, orange from 0.38, yellow from 0.62, white above 0.88; below 0.14 the metal no longer glows. Dashed: the cooling level that drives the crackle.</p>
+    </div>
+  </section>
+
+  <!-- 5. The bake split -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Baking · <b>textures.js, bake-worker.js, volume.js</b></div>
+      <h2>Drawn on the page, rasterized in a worker</h2>
+      <p>The bake has two parts. Growing the primitives draws from the seeded <code>Math.random</code>, so it runs on the page, where the seed is. Rasterizing, flooding, packing and the glow volume are deterministic and heavy (about a second on high), so the primitives are posted to a module worker and the packed arrays come back as transferred buffers, with no copy. The next piece is baked while the old one lifts away; its textures are uploaded the moment they arrive, and a bake that a newer request has overtaken is thrown away. If a worker can't be made, the same function runs on the page.</p>
+      <p>Alongside the distance volume, the bake makes a 48³ RGBA8 texture. R is the <b>ember glow</b>: the heat of every voxel within 1.5 voxels of the metal and hotter than 0.18, raised to the power 1.45, blurred by four separable passes of a 5-tap kernel (0.08, 0.22, 0.4, 0.22, 0.08) along x, y and z, normalized and stored with a 0.72 gamma. G holds <b>frost wisps</b>, three octaves of value noise at 1.45 per unit, and B <b>frost blotches</b>, domain-warped noise, both read by the resin's volume. A third, shared 48³ texture holds tileable noise, 12 cells to its period, with its gradient precomputed into GBA, for every surface relief in the shaders. The highest metal on the axis, found by scanning the 3 × 3 central columns of the volume downward, is where the falling stream lands.</p>
+    </div>
+  </section>
+
+  <!-- 6. The block -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The encasing · <b>glass.js, volume.js, main.js</b></div>
+      <h2>Eight blocks of resin, rising</h2>
+      <p>The block is an analytic distance function in the shader, one of eight shapes, each with filleted edges. Its height is a level from 0 to 1 anchored at the plinth: the shape is cut to <code>2 · halfHeight · level</code> with the fillet shrunk to fit, so the resin rises around the cast as a block whose top is always a clean bevelled face. The chamfer is the panel's (0.052 by default), capped at 0.42 of the narrower half-width.</p>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>encasing</th><th class="num">half-size x · y · z</th><th class="num">fillet</th><th class="num">plinth</th><th>notes</th></tr></thead>
+      <tbody>
+        <tr><td>cube</td><td class="num">0.96 · 0.96 · 0.96</td><td class="num">0.052</td><td class="num">2.65 × 2.65</td><td class="wrap">rounded box</td></tr>
+        <tr><td>cylinder</td><td class="num">0.86 · 1.04 · 0.86</td><td class="num">0.064</td><td class="num">2.65 × 2.65</td><td class="wrap">rounded cylinder</td></tr>
+        <tr><td>column</td><td class="num">0.50 · 1.48 · 0.50</td><td class="num">0.042</td><td class="num">1.85 × 1.85</td><td class="wrap">tall box with strata bands (0.65) in the resin</td></tr>
+        <tr><td>hex</td><td class="num">0.94 · 1.02 · 0.94</td><td class="num">0.048</td><td class="num">2.65 × 2.65</td><td class="wrap">hexagonal prism turned 30° so three facets face the camera</td></tr>
+        <tr><td>slab</td><td class="num">1.24 · 0.96 · 0.42</td><td class="num">0.042</td><td class="num">3.10 × 1.65</td><td class="wrap">wide and thin</td></tr>
+        <tr><td>dome</td><td class="num">0.88 · 1.12 · 0.88</td><td class="num">0.048</td><td class="num">2.65 × 2.65</td><td class="wrap">a bell jar: a cylinder crowned by a hemisphere</td></tr>
+        <tr><td>monolith</td><td class="num">1.04 · 1.06 · 1.04</td><td class="num">0.048</td><td class="num">2.65 × 2.65</td><td class="wrap">a square frustum narrowing to 60% at the top, strata 0.25</td></tr>
+        <tr><td>paperweight</td><td class="num">1.12 · 0.86 · 1.12</td><td class="num">0.055</td><td class="num">2.65 × 2.65</td><td class="wrap">a sphere of radius 1.12 with its bottom cut flat</td></tr>
+      </tbody>
+    </table></div>
+    <div class="col prose">
+      <p>The plinth's top eases to each shape's size (by <code>1 − e<sup>−5 dt</sup></code> a frame) while it stands empty, and the camera's target height follows the block's half-height. The block spins about its vertical axis at the Spin rate, 0.1 rad/s by default; everything that reads the block, the glass pass, the plinth and the cast's shadow, takes the same angle.</p>
+    </div>
+  </section>
+
+  <!-- 7. Through the block -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Through the block · <b>glass.js</b></div>
+      <h2>One ray, refracted, then bounced once</h2>
+      <p>The block and cast are drawn by a full-screen pass that runs as the photographic pipeline's composite, over its lit frame of the plinth and room and before its bloom. Each pixel builds its camera ray, nudged by this frame's sub-pixel jitter, and moves it into the block's spinning, lifting frame. Rays that miss the block's bounding box keep the frame as it is.</p>
+      <p>A ray first sphere-traces the block's distance function, up to 64 steps to within 0.0008, stopping at the scene's depth. Where the resin is lower than the cast, it also traces the metal in the open air above it, up to 48 steps and three bisections. Where it meets the resin, it refracts into it with the panel's index (1.5 by default; 1 while the resin is still a film), and runs the <b>crossing</b>:</p>
+      <p><b>Phase A</b> sphere-traces the cast's distance volume, at most 48 steps of 0.9 × the distance (never under 0.007), each also kept within the room left to the resin's surface. A hit is bisected four times so the surface carries no step rings; a ray that leaves the block finds its exit by interpolating the last two glass distances. In the box-shaped blocks the glass is only tested over the last stretch before the box exit, less the fillet. <b>Phase B</b> then integrates the resin's own volume along the stretch it crossed, in 6 jittered steps: a frost density of <code>0.10 + (0.22 + 0.34 · wisp) · frost</code> (plus strata bands), a faint grey veil of 0.045 that in a dark room is barely lit, and the ember glow scattered by it, orange and brighter where the glow volume is hot.</p>
+      <p>If the crossing reaches metal, that is what the pixel sees. If it leaves the block instead, the far face splits it with Schlick's Fresnel: what leaves samples what lies beyond, the lit frame reprojected 1.4 units on (or the plinth top, where the ray heads down onto it), and what the face mirrors runs a <b>second crossing</b> back across the block. That bounce has 36 steps and 3 volume steps and ignores the metal: it carries only the glow and what is beyond its own exit, so its copies of the inside stay soft instead of repeating every edge of the cast. A frosted face scatters most of what it would mirror, so the bounce is kept at <code>mix(0.2, 0.04, frost)</code>. Light along the first crossing is absorbed by <code>e<sup>−(0.26, 0.24, 0.22)·path</sup></code>, a slight warm tint.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>A ray through the cube</h3>
+        <div class="controls">
+          <label>height <input id="rfY" type="range" min="-0.85" max="0.85" step="0.01" value="0.42"><output id="rfYo"></output></label>
+          <label>angle <input id="rfA" type="range" min="-70" max="70" step="0.5" value="22"><output id="rfAo"></output></label>
+          <label>index <input id="rfI" type="range" min="1.1" max="1.9" step="0.01" value="1.5"><output id="rfIo"></output></label>
+          <label><input id="rfM" type="checkbox"> metal in the way</label>
+        </div>
+      </div>
+      <canvas id="refractFig" aria-label="A cross-section of the cube block with its fillets. A ray enters the left face, refracts, crosses the block, and at the far face splits into a part that leaves and a part reflected back across the block, which then leaves through another face. An optional metal blob stops the first crossing; the reflected crossing passes through it."></canvas>
+      <div class="readout" id="rfR"></div>
+      <p class="fig-cap">The cube block in section (half-size 0.96, fillet 0.052). Line widths follow the weights the shader gives each part: the front face's own reflection, the light leaving the far face, and the mirrored part, which crosses again at <code>mix(0.2, 0.04, frost)</code> (frost 0.45 here). With metal in the way the first crossing stops on it and no bounce runs; the bounce never stops on metal.</p>
+    </div>
+    <div class="col prose">
+      <p>The pass writes the interior colour and, in alpha, a <b>blur amount</b> for the frost pass. It grows with how deep the ray went: the distance to the metal, or for a ray that crosses, <code>first crossing + 0.52 × the bounce + 0.14</code>, divided by the block's width, through <code>smoothstep(0.05, 0.78, ·)</code>, scaled by the frost and by the face's local frost (0.45 ± 0.15 of slow noise, up to 0.22 more toward the edges), with a floor of 0.012. A metal hit in the open air writes its negative distance instead, so the passes after it know where the beam must stop.</p>
+    </div>
+  </section>
+
+  <!-- 8. The metal -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The metal · <b>glass.js, materials.js</b></div>
+      <h2>Sand-cast, poured hot</h2>
+      <p>Wherever a ray lands on metal it is shaded once, at the end of the pass, from a normal taken by four tetrahedral taps of the pour's distance 0.75 voxels apart. Three octaves of the shared noise, at 1.8, 6.5 and 19.5 times its period per unit, bend that normal into sand-cast relief and pit the albedo and roughness. The two finer octaves fade out once their features shrink under 3 to 1.5 pixels, measured from the pixel's angular size, and roughness rises to stand in for what they would have scattered, so the relief never sparkles. With Bubbles above 0, three layers of hashed cells at 18, 34 and 58 per unit carve round gas pores, each a bowl-shaped normal with its own darkening, and each layer only where its pores are larger than a few pixels. Undersides (normals pointing down) are smoother and brighter, as the smoothest skin of a casting is the one that cooled against the mould's floor.</p>
+      <p>Light is a GGX highlight from the key, the studio environment's prefiltered reflection, a little diffuse for the less metallic finishes, two ambient-occlusion taps along the normal at 0.045 and 0.12, and a warm bounce from the glow volume just outside the surface. Heat changes the material: as the temperature rises from 0.14 to 0.55 the albedo falls to 18%, and in the molten zone (0.22 to 0.85) the roughness goes to 0.22 and the metalness to 0.25, a liquid rather than a metal. It then emits <code>ramp(temp) · temp<sup>1.7</sup> · 3.4</code>, through a ramp from deep red to orange, yellow and a pale white, kept moderate so the tone mapper keeps it orange. Every glow breathes between 80% and 100% at 1.45 rad/s.</p>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>finish</th><th>colour</th><th class="num">rough</th><th class="num">metal</th><th class="num">under</th><th>extra</th></tr></thead>
+      <tbody>
+        <tr><td>aluminum</td><td><span class="swatch" style="background:#e4e8ee"></span>#e4e8ee</td><td class="num">0.16</td><td class="num">0.98</td><td class="num">0.08</td><td class="wrap">the field biologists' metal</td></tr>
+        <tr><td>bronze</td><td><span class="swatch" style="background:#c2925c"></span>#c2925c</td><td class="num">0.28</td><td class="num">0.94</td><td class="num">0.12</td><td class="wrap"></td></tr>
+        <tr><td>gold</td><td><span class="swatch" style="background:#e0ba60"></span>#e0ba60</td><td class="num">0.24</td><td class="num">0.97</td><td class="num">0.10</td><td class="wrap"></td></tr>
+        <tr><td>copper</td><td><span class="swatch" style="background:#d47850"></span>#d47850</td><td class="num">0.26</td><td class="num">0.95</td><td class="num">0.11</td><td class="wrap">verdigris in the occluded, unpitted recesses: turquoise, rough, barely metallic</td></tr>
+        <tr><td>iron</td><td><span class="swatch" style="background:#3d424b"></span>#3d424b</td><td class="num">0.44</td><td class="num">0.88</td><td class="num">0.22</td><td class="wrap"></td></tr>
+        <tr><td>bismuth</td><td><span class="swatch" style="background:#c9d0dc"></span>#c9d0dc</td><td class="num">0.20</td><td class="num">0.96</td><td class="num">0.09</td><td class="wrap">thin-film oxide: a cosine palette of the viewing angle, the noise and the height</td></tr>
+        <tr><td>blued</td><td><span class="swatch" style="background:#7c8796"></span>#7c8796</td><td class="num">0.26</td><td class="num">0.94</td><td class="num">0.12</td><td class="wrap">temper bands from the heat and the height: straw, violet, indigo, teal</td></tr>
+      </tbody>
+    </table></div>
+    <div class="col prose">
+      <p>A change of finish, frost, index or any other look eases toward its new value by <code>1 − e<sup>−7.5 dt</sup></code> on the wall clock, so it glides even while the scene is paused; nothing eases while a piece is lifting away, and a new piece starts on its values.</p>
+    </div>
+  </section>
+
+  <!-- 9. Frost -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Frost · <b>glass.js</b></div>
+      <h2>Sharp at the face, milky behind it</h2>
+      <p>Sandblasted resin blurs what is behind it by how far behind it is: a branch touching the face reads crisp, one at the back is a smear. The frost is a screen-space gather over a <b>pyramid</b> of the interior pass. The pyramid halves the image three times (1/2, 1/4, 1/8, and 1/16 on Ultra), each level with a separable 9-tap Gaussian taken in 5 bilinear reads, first across in the source's own texels, then down in the half-width image's, so every texel is filtered before it is dropped. Each tap is masked to the glass (alpha above 0.008): the room around the block and the cast in open air never bleed into it, while what lies behind the block, near or far, spreads.</p>
+      <p>The final pass picks a blur per pixel. Near the face it uses the pixel's own amount; as the amount rises from 15% to 55% of the frost it moves to the amount averaged over the 1/4 level, so the blur changes smoothly across a face instead of jumping at every silhouette behind it. The width is <code>0.050 · amount² · 0.4 · height</code> pixels (0.054 on Ultra), a level is chosen by its log<sub>2</sub>, and the levels are read with a cubic B-spline from four bilinear taps and blended between neighbours, so the low levels upsample without blocks. The deepest level is washed in, up to 32%, where the amount is high; and where the amount is under 12% of the frost the sharp image shows through the blur, fading out by 50%.</p>
+      <p>Resin sanded in one direction smears along it. The <b>streaks</b> lay the vertical onto the face and project it to the screen; along that direction the gather becomes 9 taps over <code>±3 · streak · length</code> times the blur, weighted by <code>e<sup>−2s²</sup></code>, and across it the blur narrows to half. Each tap is blurred at least as wide as the gap between taps, so the streak is continuous; level faces, where the vertical lies flat, get none.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>Blur by depth</h3>
+        <div class="controls">
+          <label>frost <input id="frF" type="range" min="0" max="1" step="0.01" value="0.45"><output id="frFo"></output></label>
+          <label>local frost <input id="frL" type="range" min="0.3" max="0.82" step="0.01" value="0.45"><output id="frLo"></output></label>
+          <label>streaks <input id="frS" type="range" min="0" max="1" step="0.01" value="0.35"><output id="frSo"></output></label>
+          <label>streak length <input id="frK" type="range" min="0.25" max="4" step="0.05" value="1"><output id="frKo"></output></label>
+        </div>
+      </div>
+      <canvas id="frostFig" aria-label="Top: the blur amount, the blur width in pixels at 1080p and the weight that keeps the image sharp, against how deep the ray went into the cube block. Bottom: a strip of thin bright strokes, blurred by those amounts from shallow on the left to deep on the right, with the streaks stretching the blur vertically."></canvas>
+      <div class="readout" id="frR"></div>
+      <p class="fig-cap">Against the depth the ray reached in the cube (0 to its full width, 1.92). Top: the blur amount the interior pass writes, the gather's width in pixels for a 1080-pixel-tall frame (right axis), and how much of the sharp image is kept. Bottom: the same strokes at every depth, a 300 × 100 crop of a 1080p frame, blurred by those widths, stretched down the face by the streaks and mixed back toward sharp near the face.</p>
+    </div>
+  </section>
+
+  <!-- 10. The surface -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The surface · <b>glass.js</b></div>
+      <h2>Satin, Fresnel and bevels</h2>
+      <p>Over the frosted interior, the final pass traces the block once more for its front face and shades the surface itself. Its normal carries a fine sanded grain, hashed per cell at 320 cells a unit and gone where a cell gets smaller than a pixel. Reflection follows a Schlick curve from the index (F0 = 0.04 at 1.5) with an exponent of 3.8, of the studio environment at a roughness from 0.03 to 0.46 with the frost, mixed with a crisp reflection where the face turns into a bevel. The bevels are where the normal is most diagonal: they reflect more, take a tighter key highlight (power <code>mix(220, 22, frost) × 3.2</code>) and a cool catchlight, and keep less grain, as the polished edges of a cast block do.</p>
+      <p>The plinth shows in the faces' reflection: the reflected ray is intersected with the plinth's box, and the hit takes its colour from the lit frame where that point is on screen and unhidden (blended by how closely the frame's surface there matches it, so the switch never flickers), else dark slate warmed by the embers. When the resin is below its full level, its top face also reflects the exposed cast above it, traced in up to 24 steps.</p>
+      <p>The face itself is a light satin film: grey lit by the key and the environment, heavier toward the edges, at grazing angles and on the top, up to half opaque, warmed where the glow volume sits right behind the face; the bottom rim glows faintly where the embers sit close to the plinth.</p>
+    </div>
+  </section>
+
+  <!-- 11. The gallery -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The gallery · <b>main.js, materials.js</b></div>
+      <h2>A plinth in a dark room</h2>
+      <p>The room is the shared photographic pipeline: a background of <code>#131417</code>, exposure 1.05, bloom 0.14, vignette 0.28, grain 0.024, and a studio key from <code>(−0.62, 0.85, 0.42)</code> at 8.5 with a cool fill of 0.12. The backdrop is a seamless cyclorama, a lathe of 64 segments: a flat floor 1.85 below the plinth top out to 6.5 from the centre, a cove of radius 4.5 and a wall at 11. The plinth is a chamfered slate box, 2.65 wide and 1.78 tall, floating 0.07 above the floor on a black toe set in by 0.09, whose top edge holds a warm strip (emissive at 30×) that pools on the floor in three falloffs and glows back up the plinth's lowest edges.</p>
+      <p>The plinth and backdrop are lit only inside the spot's cone, plus as much of the room as Room light lets in (0.12). The resin's shadow on the plinth is worked out in the plinth's own shader: a ray toward the spot is clipped to the block's box and sampled 16 times, each step adding how much of it lies inside the block, softened by the lamp's size. The shadow deepens with that length of resin, <code>0.25 · smoothstep(0, 0.06, L) + 0.6 · (1 − e<sup>−0.8 L</sup>)</code>, so it is smooth and steady rather than speckled. A contact shadow hugs the block's footprint, fading as the block lifts, and the embers spill onto the plinth top from two reads of the glow volume, low and mid-height, as sharp pools under a bare cast and a soft wash through resin.</p>
+      <p>The metal casts its shadow through the pipeline's shadow map. An invisible box around the block exists only in the shadow pass, where its shader marches the cast's distance volume away from the key (64 steps up to 4.5 units) and is opaque wherever it meets metal, only what the front has reached during a pour. The pipeline's PCSS then softens it, with a light size of 0.018 and a filter disc of at least 7 texels.</p>
+    </div>
+  </section>
+
+  <!-- 12. The spot -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The spot · <b>glass.js, materials.js</b></div>
+      <h2>A beam of lit dust</h2>
+      <p>The spot hangs 6.8 units up the key direction from a point at 65% of the block's half-height, and points back down it. Its beam is lit haze along the view ray. The ray is clipped to a sphere of radius 6.2 around the cone, and to the first thing it meets (the glass's front, the metal in the open air, or the frame's depth), then sampled 20 times with a per-pixel jitter. Each sample takes the cone's soft edge (<code>smoothstep(0.966, 0.99, cos)</code>, full inside 8.1°, gone at 15°), a falloff that rises out of the dark near the lamp and then thins slowly, slow-drifting noise for haze, and the spot's visibility: zero behind the plinth, dimmed to 70–30% by the resin with the level, and shadowed by the cast through 8 steps of its distance. The sum is weighted by a Henyey-Greenstein phase with <code>g = 0.45</code>, relative to isotropic, so looking into the lamp the beam is 4.8× what an even scatter would give, 0.6× across it and 0.26× looking away. Inside the glass's silhouette it counts at 65%.</p>
+      <p><b>Dust motes</b> live on a grid of 0.16-unit cells, one in 22 cells holding one. The ray walks the cells within ±2.6 of where it passes closest to the beam's axis, at most 64, with a 3D DDA. A mote sits jittered in its cell, wanders on its own and drifts with the air; its size is 0.5 to 2.6 pixels with a cubed hash, so most are faint specks and a few are flakes. It blurs into a disc of <code>|distance − focus| × 0.018</code>, holding the same light, with the focus at the piece; and 60% of the flakes tumble, glinting with a sixth power of two beating sines.</p>
+      <p>Where the beam lands on the plinth, floor or backdrop, the surface brightens inside a slightly wider cone, as much as the room light lets in, shadowed by the glass and the cast along the key so it lines up with the key's own shadow.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>The beam in section</h3>
+        <div class="controls">
+          <label>view ray <input id="spA" type="range" min="-28" max="22" step="0.5" value="-4"><output id="spAo"></output></label>
+          <button id="spJ" class="ghost">new jitter</button>
+        </div>
+      </div>
+      <canvas id="spotFig" aria-label="A vertical section through the spot's axis: the lamp at upper left, its cone landing on the block and plinth, the plinth's shadow below its top edge, the bounding sphere, and a view ray from the camera at right with its 20 jittered samples and the dust cells it walks. An inset shows the Henyey-Greenstein phase lobe."></canvas>
+      <div class="readout" id="spR"></div>
+      <p class="fig-cap">A 2D section through the beam's axis with the cube block at full resin: the cone's light per point (edge, falloff and visibility, without the haze), the bounding sphere (dashed), and one view ray: its 20 samples sized by what each adds, and the cells it walks around its closest approach to the axis, with the motes they hold drawn at their blur. In 3D, a mote counts when the ray passes within its disc. Inset: the phase lobe, the circle being isotropic, and the ray's angle to the lamp.</p>
+    </div>
+  </section>
+
+  <!-- 13. Temporal -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Antialiasing · <b>glass.js</b></div>
+      <h2>Its own temporal resolve</h2>
+      <p>The glass pass runs once per pixel, so its edges, highlights and thin branches would alias. Each frame its rays are offset by a Halton (2, 3) point, an 8-frame cycle within ±½ pixel, and a resolve blends this frame with the last one at the same point of the glass. The final pass writes how far along the ray the glass's front face is; the resolve rebuilds that point, undoes this frame's lift and spin about the vertical axis, projects it with last frame's camera, and reads the history there.</p>
+    </div>
+    <div class="formula">hist  = clamp(history(reprojected), mean − 1.25σ, mean + 1.25σ)   <span class="c">// 3×3 neighbourhood of this frame</span>
+out   = mix(current, hist, 0.92)</div>
+    <div class="col prose">
+      <p>The variance clip keeps the history within this frame's neighbourhood, so a highlight that comes and goes with the jitter holds steady without ghosting. While the resin level or the pour changes, last frame shows a different shape, so the history is not used at all. Off the glass the frame passes through unblended.</p>
+    </div>
+  </section>
+
+  <!-- 14. Windows -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Compiling · <b>glass.js, materials.js</b></div>
+      <h2>One call site per heavy function</h2>
+      <p>On Windows, Chrome runs WebGL through ANGLE, which translates each shader to HLSL for Direct3D's FXC compiler. FXC inlines every function at every place it is called and unrolls loops whose bounds it can see, so a function called from three places is compiled three times, and a big shader can take many seconds. The day's shaders are written so each heavy function appears once. The way into the block and the bounce back across it are two iterations of one loop around <code>crossing()</code>; the metal hits from the open air and the crossings are stored in two slots and shaded by one loop at the end; the four tetrahedral taps of every normal are a loop over one call of the distance; the AO taps and the bisections are loops too. Every loop bound adds <code>uLoop</code>, a uniform that is always 0, which the compiler can't see through, so the loops stay loops. All four passes compile in parallel behind the loading pill.</p>
+    </div>
+  </section>
+
+  <!-- 15. The cycle -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">The cycle · <b>main.js</b></div>
+      <h2>Empty, pour, cool, rest, lift</h2>
+      <p>Each piece is a small state machine. <b>Empty</b>: the plinth stands bare for 0.8 s while it eases to the new piece's size. <b>Pour</b>: the pour rises at 0.24 a second, and a molten stream, an open cylinder 0.022 to 0.03 wide and emissive at (26, 10, 2.4), falls into the crown of the cast, wobbling and thinning to nothing between pour 0.85 and 0.97. <b>Cool</b>: after 0.8 s the resin rises over 5.5 s on a smoothstep, its level chased at <code>1 − e<sup>−2 dt</sup></code>. <b>Rest</b>: the finished piece waits, and auto change counts its 14 s only now. <b>Lift</b>: the piece rises 9 units in 1.8 s on a cubic and is held out of view until the next bake has arrived; then the new volume goes in and the cycle starts over. P replays the current cast through the same lift; scrubbing the Pour slider jumps straight to rest with the resin up.</p>
+      <p>Left alone for 6 s, the camera starts to orbit, fading in over 3 s. During the pour and the lift it circles wide, 5.2 ± 2.0 units out, rising and dipping; once the metal starts cooling it draws in over 2.5 s to <code>3.2 + the block's half-height</code> (± 0.25), lower and a little faster round (0.20 instead of 0.12 rad/s), to show the cast through each face. Its target drifts back to the plinth's axis, pans are kept within 1.5 of it, and the distance within 2 to 8.5, inside the cyclorama.</p>
+    </div>
+    <div class="fig">
+      <div class="fig-head"><h3>One piece, start to finish</h3>
+        <div class="controls">
+          <label>time <input id="cyT" type="range" min="0" max="40" step="0.05" value="9"><output id="cyTo"></output></label>
+          <button id="cyP" class="ghost">play</button>
+          <label>change every <input id="cyA" type="range" min="5" max="30" step="1" value="14"><output id="cyAo"></output></label>
+          <label>bake <input id="cyB" type="range" min="0.2" max="4" step="0.1" value="1"><output id="cyBo"></output></label>
+        </div>
+      </div>
+      <canvas id="cycleFig" aria-label="A forty-second timeline of the cycle, simulated with the day's constants at 60 frames a second: the phases; the pour, the stream and the resin level; the cooling heat and the two sound beds; the idle orbit's closeness and distance; and the lift height, with a cursor at the chosen time."></canvas>
+      <div class="readout" id="cyR"></div>
+      <p class="fig-cap">The cycle simulated with the day's code and constants at 60 fps, the camera left alone. The lift waits at the top for the bake if it takes longer than 1.8 s; the sizzle marks the moment the stream starts.</p>
+    </div>
+  </section>
+
+  <!-- 16. Sound -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Sound · <b>sound.js</b></div>
+      <h2>Gloop, sizzle, crackle</h2>
+      <p>The sound is two looping beds that follow the cast. While the stream runs, a thick gloopy bubbling plays at <code>0.75 × flow</code>, one of three takes picked per pour and started from a random point, through a lowpass that opens from 700 to 2200 Hz with the flow; a soft sizzle, pitched 0.9 to 1.05, marks the moment it starts. As the cast cools, a crackle plays at <code>0.7 × cooling<sup>1.5</sup></code>, where cooling falls from 1 to 0 over the 2.9 s after the pour ends; it is one of two takes of bread crackling as it leaves the oven. Beds rise with a 0.08 s time constant, fall with 0.4 s, and stop 2 s after going silent. Everything goes through a compressor (−16 dB, 3:1) and an 18% send to a 1.6 s generated room tail. Nothing plays before the first frame; variations draw from the unseeded random so they never shift the seeded burrow.</p>
+    </div>
+  </section>
+
+  <!-- 17. Detail -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Detail and quality · <b>main.js, glass.js</b></div>
+      <h2>Fast and Ultra</h2>
+      <p>The panel's Glass Detail trades the glass pass's cost for smoothness; the pipeline's quality tier sets the volume's resolution.</p>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>setting</th><th>Fast (default)</th><th>Ultra</th></tr></thead>
+      <tbody>
+        <tr><td>resin volume steps</td><td>6, bounce 3</td><td>12, bounce 6</td></tr>
+        <tr><td>frost pyramid</td><td>3 levels (to 1/8)</td><td>4 levels (to 1/16)</td></tr>
+        <tr><td>frost width</td><td>0.050</td><td>0.054</td></tr>
+        <tr><td>seed bubbles in the resin</td><td>none</td><td>0.8% of 1/18-unit cells, radius 0.0055</td></tr>
+      </tbody>
+    </table></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>pipeline tier</th><th class="num">volume</th><th class="num">voxel</th><th class="num">band</th><th class="num">memory</th></tr></thead>
+      <tbody>
+        <tr><td>low</td><td class="num">96³</td><td class="num">0.034</td><td class="num">0.275</td><td class="num">7.1 MB</td></tr>
+        <tr><td>medium (phones)</td><td class="num">128³</td><td class="num">0.026</td><td class="num">0.206</td><td class="num">16.8 MB</td></tr>
+        <tr><td>high (desktops)</td><td class="num">144³</td><td class="num">0.023</td><td class="num">0.183</td><td class="num">23.9 MB</td></tr>
+        <tr><td>capture</td><td class="num">160³</td><td class="num">0.021</td><td class="num">0.165</td><td class="num">32.8 MB</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- Controls -->
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Using it</div>
+      <h2>Controls</h2>
+    </div>
+    <ul class="keys col">
+      <li>Drag to orbit, scroll or pinch to zoom. Left alone 6 s, the camera circles the piece by itself (<b>Idle orbit</b>).</li>
+      <li><b>R</b> (or the dice) casts a new piece: the old one lifts away first. <b>P</b> replays this piece's cast.</li>
+      <li><b>E</b> toggles excavate: the resin sinks away, or rises back.</li>
+      <li><b>Archetype</b>, <b>Encasing</b>, <b>Finish</b>, <b>Complexity</b> (0.2–1): what is cast. Changing the first two or the complexity starts a new piece.</li>
+      <li><b>Level</b>, <b>Chamfer</b>, <b>Frost</b>, <b>Streaks</b>, <b>Streak length</b>, <b>Refraction</b> (1.1–1.9): the resin.</li>
+      <li><b>Heat</b> (0–1.5), <b>Grain</b>, <b>Bubbles</b>, <b>Pour</b>: the metal. <b>Spotlight</b>, <b>Room light</b>, <b>Base light</b>: the gallery. <b>Glass Detail</b>, <b>Spin</b>.</li>
+      <li><b>M</b> or the speaker button toggles sound, <b>Space</b> pauses, <b>F</b> goes fullscreen, <b>Tab</b> hides the panel.</li>
+      <li>Each piece rests 14 s before a new one is cast (<b>Auto change</b>).</li>
+    </ul>
+  </section>
+
+  <footer class="col">
+    <div class="meta">
+      <span><b>three.js</b> r187</span><span>WebGL2</span><span>photographic pipeline</span><span>narrow-band distance volume</span><span>space colonization</span><span>Dijkstra pour field</span><span>raymarched resin</span><span>Web Audio</span>
+    </div>
+    Day 27 of <a href="../">Codevember 2026</a> by Jaume Sanchez Elias. See it live at <a href="https://spite.github.io/codevember-2026/27/">spite.github.io/codevember-2026/27</a>; the source is in <a href="https://github.com/spite/codevember-2026/tree/main/27">27/ of the codevember-2026 repository</a>.
+    <br><br>Sounds: CC0 recordings on freesound.org, looped, softened and levelled:
+    <ul>
+      <li>"Hot Bubbling Mud" by Breviceps (456806), "Lava Loop 1" and "Lava Loop 2" by Fission9 (474850, 474852), the pour</li>
+      <li>"ShovelSizzle8_mod.MP3" by rabban625 (436470), the sizzle</li>
+      <li>"Bread Crackling Cooling Fresh from Oven" by Erbsland-Music (623368) and "Bread is singing out of the bread oven" by Sacha.Julien (727285), the cooling</li>
+    </ul>
+  </footer>
+</main>
+<script>
+(() => {
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const $ = (id) => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const clamp01 = (x) => clamp(x, 0, 1);
+  const smoothstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+  const mix = (a, b, t) => a + (b - a) * t;
+  const font = (px, w = 400) => `${w} ${px}px ${css("--mono") || "monospace"}`;
+  const rgb = (hex) => { const c = document.createElement("canvas").getContext("2d"); c.fillStyle = hex; const s = c.fillStyle; if (s[0] === "#") return [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16)); return s.match(/\d+/g).slice(0, 3).map(Number); };
+  const rgba = (hex, a) => `rgba(${rgb(hex).join(",")},${a})`;
+  const DEG = Math.PI / 180;
+
+  function setup(canvas, aspect, draw) {
+    const ctx = canvas.getContext("2d");
+    let lastW = -1, W = 0, H = 0;
+    const fit = (force) => {
+      if (force !== true && canvas.clientWidth === lastW) return;
+      lastW = canvas.clientWidth;
+      W = canvas.clientWidth || 600; H = Math.round(W * (typeof aspect === "function" ? aspect(W) : aspect));
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); canvas.style.height = H + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(ctx, W, H);
+    };
+    new ResizeObserver(() => requestAnimationFrame(fit)).observe(canvas);
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => fit(true));
+    new MutationObserver(() => fit(true)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return { redraw: () => fit(true) };
+  }
+  const bind = (id, out, fmt, fn) => { const el = $(id); const o = $(out); const show = () => { if (o) o.textContent = fmt(+el.value); }; el.addEventListener("input", () => { show(); fn(); }); show(); return el; };
+  const stage = (ctx, W, H) => { ctx.fillStyle = css("--stage"); ctx.fillRect(0, 0, W, H); };
+  const label = (ctx, text, x, y, color = css("--stage-ink"), size = 11, align = "left") => { ctx.fillStyle = color; ctx.font = font(size); ctx.textAlign = align; ctx.fillText(text, x, y); ctx.textAlign = "left"; };
+  const mulberry32 = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const smin = (a, b, k) => { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * 0.25; };
+  const smax = (a, b, k) => -smin(-a, -b, k);
+
+  // As glass.js moltenRamp.
+  function moltenRamp(t) {
+    t = clamp(t, 0, 1.4);
+    const m3 = (a, b, k) => [mix(a[0], b[0], k), mix(a[1], b[1], k), mix(a[2], b[2], k)];
+    let c = m3([0, 0, 0], [0.75, 0.08, 0.005], smoothstep(0.16, 0.42, t));
+    c = m3(c, [1, 0.24, 0.01], smoothstep(0.38, 0.66, t));
+    c = m3(c, [1, 0.46, 0.05], smoothstep(0.62, 0.92, t));
+    return m3(c, [1, 0.94, 0.72], smoothstep(0.88, 1.28, t));
+  }
+  const POUR_RATE = 0.24, COOL_TIME = 1.6;
+  // The poured heat of a point at stream coordinate s, `clock` seconds after the pour began (burrowSdf).
+  function pourHeat(clock, s) {
+    const arrived = (0.48 * (s + 0.04)) / 1.12 / POUR_RATE;
+    const age = clock - arrived;
+    if (age <= -0.05) return 0;
+    const since = clock - 1 / POUR_RATE - arrived * POUR_RATE * 1.5;
+    return Math.max(1.1 * Math.exp(-Math.max(since, 0) / COOL_TIME), 1.3 * Math.exp(-Math.max(age, 0) / 0.5));
+  }
+  const toneByte = (x) => Math.round(255 * Math.pow(clamp01(x / (1 + x)), 1 / 2.2));
+  const heatCss = (temp) => { const c = moltenRamp(temp), m = Math.max(c[0], 0.05); return `rgb(${c.map((v) => Math.round(255 * Math.min(1, (v / m) * 0.35 + v * 0.65))).join(",")})`; };
+
+  // ---- 1. Slice through the bake ----
+  {
+    const EXT = 1.65, N = 128, VOX = (2 * EXT) / N, BANDW = 8 * VOX, HX = 0.96, HY = 0.96, BEV = 0.052, HOLE = 0.088, BLEND = 0.024;
+    const sdBox = (x, y) => { const qx = Math.abs(x) - (HX - BEV), qy = Math.abs(y) - (HY - BEV); return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - BEV; };
+    let seed = 27, F = null;
+
+    function grow(rand) {
+      const rnd = (a, b) => a + rand() * (b - a);
+      const margin = Math.min(0.11, HX * 0.24);
+      const count = Math.round(mix(90, 170, 0.65) * 0.6), shellTarget = Math.round(count * 0.45);
+      const att = [];
+      let shell = 0, tries = 0;
+      while (att.length < count && tries < count * 22) {
+        tries++;
+        const x = rnd(-HX + margin, HX - margin), y = rnd(-HY + margin, HY - 0.16), d = sdBox(x, y);
+        if (d > -margin) continue;
+        if (shell < shellTarget) { if (d < -0.32 && y > -HY + 2 * HY * 0.28) continue; shell++; }
+        if (y > HY - 0.3 && Math.abs(x) < 0.18 && rand() < 0.7) continue;
+        att.push({ x, y, spent: false });
+      }
+      const base = 0.088, minR = 0.018, step = 0.09, wander = 0.4;
+      const nodes = [{ x: 0, y: HY - 0.2, parent: -1, children: 0 }];
+      for (let i = 0; i < 5; i++) {
+        const ny = HY - rnd(0.22, 0.34), a = (i / 5) * Math.PI * 2 + rnd(-0.26, 0.26);
+        nodes.push({ x: Math.cos(a) * (HX - margin) * rnd(0.28, 0.46), y: ny, parent: 0, children: 0 });
+        nodes[0].children++;
+      }
+      const influence = HX * 1.6, kill = step * 2.05;
+      for (let it = 0; it < 76; it++) {
+        const px = new Float32Array(nodes.length), py = new Float32Array(nodes.length), pn = new Uint16Array(nodes.length);
+        let active = 0;
+        for (const a of att) {
+          if (a.spent) continue;
+          let best = influence, bi = -1;
+          for (let i = 1; i < nodes.length; i++) {
+            const d = Math.hypot(a.x - nodes[i].x, a.y - nodes[i].y);
+            if (d < kill) { a.spent = true; bi = -1; break; }
+            if (d < best) { best = d; bi = i; }
+          }
+          if (bi >= 0) { const inv = 1 / Math.max(best, 1e-4); px[bi] += (a.x - nodes[bi].x) * inv; py[bi] += (a.y - nodes[bi].y) * inv; pn[bi]++; active++; }
+        }
+        if (!active || nodes.length > 340) break;
+        const n0 = nodes.length;
+        for (let i = 1; i < n0; i++) {
+          if (!pn[i]) continue;
+          const nd = nodes[i];
+          let dx = px[i] / pn[i] + rnd(-wander, wander), dy = py[i] / pn[i] + rnd(-wander * 0.45, wander * 0.35) - 0.14;
+          const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+          const nx = nd.x + dx * step, ny = nd.y + dy * step;
+          if (sdBox(nx, ny) > -margin * 0.85) continue;
+          if (ny < -HY + margin + 0.08 && dy > -0.6) continue;
+          nodes.push({ x: nx, y: ny, parent: i, children: 0 });
+          nd.children++;
+        }
+      }
+      const weight = new Float32Array(nodes.length);
+      for (let i = nodes.length - 1; i >= 0; i--) { if (!nodes[i].children) weight[i] = 1; if (nodes[i].parent >= 0) weight[nodes[i].parent] += weight[i]; }
+      const maxW = Math.max(weight[0], 1);
+      for (let i = 0; i < nodes.length; i++) {
+        const nd = nodes[i];
+        nd.r = mix(minR, base, Math.pow(weight[i] / maxW, 0.42));
+        const low = smoothstep(HY * 0.25, -HY * 0.82, nd.y);
+        nd.h = clamp(Math.pow(low, 1.55) + (nd.children ? 0 : 0.32) * smoothstep(HY * 0.35, -HY * 0.35, nd.y), 0, 1);
+      }
+      const caps = [], ells = [];
+      for (let i = 1; i < nodes.length; i++) {
+        const b = nodes[i], a = nodes[b.parent];
+        caps.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, ra: a.r, rb: b.r, ha: a.h, hb: b.h, chain: a.children === 1 ? a.parent : i });
+        if (!b.children && b.h > 0.6 && rand() < 0.55) { const tr = b.r * rnd(1.15, 1.65); ells.push({ cx: b.x, cy: b.y - tr * 0.38, rx: tr * rnd(0.75, 1), ry: tr * rnd(1.2, 1.65), h: clamp(b.h * 1.15, 0, 1) }); }
+      }
+      return { caps, ells };
+    }
+
+    function bake() {
+      const { caps, ells } = grow(mulberry32(seed));
+      const NN = N * N, dist = new Float32Array(NN).fill(BANDW), heat = new Float32Array(NN), chain = new Int32Array(NN).fill(-1);
+      const toIdx = (v) => clamp(Math.floor((v + EXT) / VOX), 0, N - 1), pad = BANDW + BLEND;
+      const write = (idx, d, h, cid) => {
+        const prev = dist[idx];
+        const merged = cid >= 0 && chain[idx] === cid ? Math.min(prev, d) : smin(prev, d, BLEND);
+        if (merged < prev) {
+          heat[idx] = prev >= BANDW * 0.99 ? h : mix(heat[idx], h, smoothstep(BLEND, -BLEND * 0.5, d - prev));
+          dist[idx] = merged;
+          if (d < prev) chain[idx] = cid;
+        }
+      };
+      for (const c of caps) {
+        const rM = Math.max(c.ra, c.rb) + pad, dx = c.bx - c.ax, dy = c.by - c.ay, l2 = Math.max(dx * dx + dy * dy, 1e-8);
+        for (let j = toIdx(Math.min(c.ay, c.by) - rM); j <= toIdx(Math.max(c.ay, c.by) + rM); j++) {
+          const y = -EXT + (j + 0.5) * VOX;
+          for (let i = toIdx(Math.min(c.ax, c.bx) - rM); i <= toIdx(Math.max(c.ax, c.bx) + rM); i++) {
+            const x = -EXT + (i + 0.5) * VOX, px = x - c.ax, py = y - c.ay;
+            const t = clamp01((px * dx + py * dy) / l2);
+            const d = Math.hypot(px - dx * t, py - dy * t) - (c.ra + (c.rb - c.ra) * t);
+            if (d < BANDW) write(j * N + i, d, c.ha + (c.hb - c.ha) * t, c.chain);
+          }
+        }
+      }
+      for (const e of ells) {
+        const rM = Math.max(e.rx, e.ry) + pad;
+        for (let j = toIdx(e.cy - rM); j <= toIdx(e.cy + rM); j++) {
+          const qy = -EXT + (j + 0.5) * VOX - e.cy;
+          for (let i = toIdx(e.cx - rM); i <= toIdx(e.cx + rM); i++) {
+            const qx = -EXT + (i + 0.5) * VOX - e.cx;
+            const k0 = Math.hypot(qx / e.rx, qy / e.ry), k1 = Math.hypot(qx / (e.rx * e.rx), qy / (e.ry * e.ry)) || 1e-6;
+            const d = (k0 * (k0 - 1)) / k1;
+            if (d < BANDW) write(j * N + i, d, e.h, -2);
+          }
+        }
+      }
+      // Dijkstra from the hole: down 0.65, sideways 1.0, up 1.5.
+      const cost = new Float32Array(NN).fill(1e9), done = new Uint8Array(NN), stream = new Float32Array(NN).fill(1);
+      const hk = [], hv = [];
+      const push = (v, k) => { let c = hk.length; hk.push(k); hv.push(v); while (c > 0) { const p = (c - 1) >> 1; if (hk[p] <= k) break; hk[c] = hk[p]; hv[c] = hv[p]; c = p; } hk[c] = k; hv[c] = v; };
+      const pop = () => { const top = hv[0], lk = hk.pop(), lv = hv.pop(); if (hk.length) { let p = 0; for (;;) { const l = 2 * p + 1; if (l >= hk.length) break; const r = l + 1, s = r < hk.length && hk[r] < hk[l] ? r : l; if (lk <= hk[s]) break; hk[p] = hk[s]; hv[p] = hv[s]; p = s; } hk[p] = lk; hv[p] = lv; } return top; };
+      let seeds = 0;
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        const idx = j * N + i, x = -EXT + (i + 0.5) * VOX, y = -EXT + (j + 0.5) * VOX;
+        if (dist[idx] <= 0.01 && y >= HY - 0.34 && Math.abs(x) <= HOLE + 0.18) { cost[idx] = Math.max(0, (HY - y) * 0.5); push(idx, cost[idx]); seeds++; }
+      }
+      const order = [];
+      while (hk.length) {
+        const u = pop();
+        if (done[u]) continue;
+        done[u] = 1; order.push(u);
+        const i = u % N, j = (u - i) / N;
+        const nb = [[i > 0, u - 1, 1], [i < N - 1, u + 1, 1], [j > 0, u - N, 0.65], [j < N - 1, u + N, 1.5]];
+        for (const [ok, v, w] of nb) {
+          if (!ok || done[v] || dist[v] > 0.01) continue;
+          const nd = cost[u] + w;
+          if (nd < cost[v]) { cost[v] = nd; push(v, nd); }
+        }
+      }
+      let maxC = 1e-4;
+      for (const v of order) maxC = Math.max(maxC, cost[v]);
+      for (const v of order) stream[v] = clamp(cost[v] / maxC, 0.01, 0.99);
+      const filled = new Uint8Array(done);
+      for (let pass = 0; pass < 4; pass++) {
+        const next = new Uint8Array(filled);
+        for (let j = 1; j < N - 1; j++) for (let i = 1; i < N - 1; i++) {
+          const idx = j * N + i;
+          if (filled[idx] || dist[idx] >= BANDW) continue;
+          let best = 2;
+          for (const v of [idx - 1, idx + 1, idx - N, idx + N]) if (filled[v] && stream[v] < best) best = stream[v];
+          if (best < 1.5) { stream[idx] = best; next[idx] = 1; }
+        }
+        filled.set(next);
+      }
+      let minY = HY;
+      outer: for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) if (dist[j * N + i] <= 0) { minY = -EXT + (j + 0.5) * VOX; break outer; }
+      const S = new Float32Array(NN), P = new Float32Array(NN);
+      let metal = 0;
+      for (let j = 0; j < N; j++) {
+        const y = -EXT + (j + 0.5) * VOX, pl = clamp((y - minY) / Math.max(HY - minY, 0.2), 0.01, 0.99);
+        for (let i = 0; i < N; i++) { const idx = j * N + i; S[idx] = clamp01(0.5 - dist[idx] / (2 * BANDW)); P[idx] = pl; if (dist[idx] <= 0) metal++; }
+      }
+      F = { S, stream, P, heat, metal, reached: order.length, maxC, seeds, caps: caps.length };
+    }
+
+    // Bilinear reads at a world point: decoded distance, stream, pool, resting heat.
+    function sample(x, y, out) {
+      const fx = (x + EXT) / VOX - 0.5, fy = (y + EXT) / VOX - 0.5;
+      const i0 = clamp(Math.floor(fx), 0, N - 2), j0 = clamp(Math.floor(fy), 0, N - 2);
+      const tx = clamp01(fx - i0), ty = clamp01(fy - j0);
+      const a = j0 * N + i0, b = a + 1, c = a + N, d = c + 1;
+      const w0 = (1 - tx) * (1 - ty), w1 = tx * (1 - ty), w2 = (1 - tx) * ty, w3 = tx * ty;
+      const r = (A) => A[a] * w0 + A[b] * w1 + A[c] * w2 + A[d] * w3;
+      out.s = r(F.S); out.d = (0.5 - out.s) * 16 * VOX; out.st = r(F.stream); out.pl = r(F.P); out.h = r(F.heat);
+    }
+    // burrowSdf's pour, with z = 0.
+    function pourD(d, sT, pT, x, pour) {
+      if (pour >= 0.999) return d;
+      const front = mix(-0.04, 1.08, clamp01(pour / 0.48)), dTip = (sT - front) * 0.55;
+      const amp = 1 - smoothstep(0.72, 0.95, pour);
+      const ph1 = (sT * 4.8 - pour * 6.4) * 2 * Math.PI + 0.65 * Math.sin(x * 2.4);
+      const ph2 = (sT * 7.6 - pour * 9.0) * 2 * Math.PI + 0.75 * Math.cos(-x * 2.0);
+      let w1 = 0.5 + 0.5 * Math.cos(ph1); w1 *= w1;
+      let w2 = 0.5 + 0.5 * Math.cos(ph2); w2 *= w2;
+      const lead = smoothstep(0.14, 0, Math.abs(front - 0.04 - sT));
+      const maskB = clamp01(Math.max(Math.max(w1, w2 * 0.72), lead));
+      const shrink = mix(mix(0.032, 0.012, smoothstep(0, 0.85, sT)) * amp, 0, maskB);
+      const dB = smax(d + shrink, dTip, 0.018);
+      const level = mix(-0.04, 1.08, smoothstep(0.32, 0.96, pour));
+      const dP = smax(d, Math.max((pT - level) * 0.6, dTip), 0.024);
+      return mix(d, smin(dB, dP, 0.02) * 0.65, 1 - smoothstep(0.95, 0.998, pour));
+    }
+
+    const M = $("slM"), T = $("slT");
+    let img = null;
+    const fig = setup($("sliceFig"), (W) => (W < 600 ? 2.05 : 0.53), (ctx, W, H) => {
+      stage(ctx, W, H);
+      if (!F) bake();
+      const narrow = W < 600;
+      const side = narrow ? Math.min(W - 24, (H - 60) / 2) : Math.min((W - 48) / 2, H - 46);
+      const R = 200, half = 1.06, px = (2 * half) / R;
+      if (!img || img.width !== R) img = new ImageData(R, R);
+      const views = narrow ? [[12, 26], [12, 26 + side + 30]] : [[16, 28], [W - 16 - side, 28]];
+      const t = +T.value, pour = Math.min(1, t * POUR_RATE), mode = M.value;
+      const stageC = rgb(css("--stage")), resin = [32, 34, 38], outside = stageC, br = rgb(css("--bronze")).map((v) => v / 255);
+      const rampA = rgb(css("--molten")), rampB = rgb(css("--bronze")), rampC = rgb(css("--cool"));
+      const smp = {};
+      for (let v = 0; v < 2; v++) {
+        const D = img.data;
+        for (let py = 0; py < R; py++) for (let qx = 0; qx < R; qx++) {
+          const x = -half + (qx + 0.5) * px, y = half - (py + 0.5) * px, o = (py * R + qx) * 4;
+          sample(x, y, smp);
+          const inBlock = sdBox(x, y) < 0;
+          let c = inBlock ? resin : outside;
+          if (v === 0) {
+            if (mode === "dist") {
+              const s = smp.s, g = Math.round(20 + 210 * s);
+              c = s <= 0.002 ? [16, 17, 19] : [g, Math.round(g * 0.97), Math.round(g * 0.92)];
+              if (Math.abs(smp.d) < px * 0.8) c = rampA;
+            } else {
+              const val = mode === "stream" ? smp.st : smp.pl;
+              const cov = smoothstep(px * 0.7, -px * 0.7, smp.d);
+              if (cov > 0) {
+                const k = clamp01(val), col = k < 0.5 ? rampA.map((a, i) => mix(a, rampB[i], k * 2)) : rampB.map((a, i) => mix(a, rampC[i], k * 2 - 1));
+                const dim = mode === "stream" && smp.st > 0.995 ? 0.25 : 1;
+                c = c.map((a, i) => mix(a, col[i] * dim, cov));
+              }
+            }
+          } else {
+            const dp = pourD(smp.d, smp.st, smp.pl, x, pour);
+            const cov = smoothstep(px * 0.7, -px * 0.7, dp);
+            if (cov > 0) {
+              const temp = clamp(Math.max(smp.h * 0.85, pourHeat(t, smp.st)) * 1, 0, 1.35);
+              const rim = 0.55 + 0.45 * smoothstep(-0.035, 0, dp);
+              const alb = br.map((a) => a * 0.32 * rim * mix(1, 0.18, smoothstep(0.14, 0.55, temp)));
+              const glow = temp > 0.14 ? moltenRamp(temp).map((a) => a * Math.pow(temp, 1.7) * 3.4) : [0, 0, 0];
+              const m = alb.map((a, i) => toneByte(a + glow[i]));
+              c = c.map((a, i) => mix(a, m[i], cov));
+            }
+          }
+          D[o] = c[0]; D[o + 1] = c[1]; D[o + 2] = c[2]; D[o + 3] = 255;
+        }
+        const tmp = document.createElement("canvas"); tmp.width = R; tmp.height = R;
+        tmp.getContext("2d").putImageData(img, 0, 0);
+        const [vx, vy] = views[v];
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(tmp, vx, vy, side, side);
+        const toS = (wx, wy) => [vx + ((wx + half) / (2 * half)) * side, vy + ((half - wy) / (2 * half)) * side];
+        ctx.strokeStyle = rgba(css("--alu"), 0.35); ctx.lineWidth = 1;
+        const [bx0, by0] = toS(-HX, HY), [bx1, by1] = toS(HX, -HY);
+        ctx.strokeRect(bx0, by0, bx1 - bx0, by1 - by0);
+        if (v === 0 && mode === "stream") {
+          const [sx0, sy0] = toS(-(HOLE + 0.18), HY), [sx1, sy1] = toS(HOLE + 0.18, HY - 0.34);
+          ctx.setLineDash([3, 3]); ctx.strokeStyle = css("--hot"); ctx.strokeRect(sx0, sy0, sx1 - sx0, sy1 - sy0); ctx.setLineDash([]);
+        }
+        const title = v === 0 ? (mode === "dist" ? "stored R: 0.5 − d / (2 · 8 voxels)" : mode === "stream" ? "B: stream arrival (0 hot → 1 cool)" : "A: pool level (0 bottom → 1 top)") : `the pour at ${t.toFixed(1)} s · pour ${pour.toFixed(2)}`;
+        label(ctx, title, vx, vy - 9);
+      }
+      const front = mix(-0.04, 1.08, clamp01(pour / 0.48)), level = mix(-0.04, 1.08, smoothstep(0.32, 0.96, pour));
+      $("slR").innerHTML = `<span>voxel <b>${VOX.toFixed(4)}</b>, band <b>${BANDW.toFixed(3)}</b></span><span>${F.caps} capsules, <b>${F.metal}</b> metal voxels, <b>${F.reached}</b> flooded from ${F.seeds} seeds</span><span>front <b>${front.toFixed(2)}</b> · pool level <b>${level.toFixed(2)}</b></span>`;
+    });
+    const redraw = () => fig.redraw();
+    bind("slT", "slTo", (v) => `${v.toFixed(1)} s`, redraw);
+    M.addEventListener("change", redraw);
+    $("slN").addEventListener("click", () => { seed = (seed * 7 + 13) % 100003; F = null; redraw(); });
+    let on = false, last = 0;
+    const btn = $("slP");
+    const step = (now) => {
+      if (!on) return;
+      const dt = last ? Math.min(0.05, (now - last) / 1000) : 0; last = now;
+      T.value = Math.min(10, +T.value + dt); $("slTo").textContent = `${(+T.value).toFixed(1)} s`;
+      redraw();
+      if (+T.value >= 10) { on = false; btn.textContent = "play"; return; }
+      requestAnimationFrame(step);
+    };
+    btn.addEventListener("click", () => { on = !on; btn.textContent = on ? "pause" : "play"; last = 0; if (on) { if (+T.value >= 10) T.value = 0; requestAnimationFrame(step); } });
+  }
+
+  // ---- 2. Heat timing ----
+  {
+    const S = $("htS");
+    const fig = setup($("heatFig"), (W) => (W < 600 ? 1.1 : 0.56), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const pad = 44, r = 14, tMax = 10;
+      const X = (t) => pad + (t / tMax) * (W - pad - r);
+      const topY = 26, topH = H * 0.34, botY = topY + topH + 40, botH = H - botY - 26;
+      const Yt = (v) => topY + topH - (v / 1.1) * topH;
+      const Yb = (v) => botY + botH - (v / 1.4) * botH;
+      ctx.strokeStyle = css("--stage-line"); ctx.lineWidth = 1;
+      for (const [y0, h] of [[topY, topH], [botY, botH]]) { ctx.beginPath(); ctx.moveTo(pad, y0 + h); ctx.lineTo(W - r, y0 + h); ctx.stroke(); }
+      for (let s = 0; s <= tMax; s += 2) { const x = X(s); ctx.beginPath(); ctx.moveTo(x, topY); ctx.lineTo(x, topY + topH); ctx.moveTo(x, botY); ctx.lineTo(x, botY + botH); ctx.strokeStyle = rgba(css("--stage-ink"), 0.08); ctx.stroke(); label(ctx, `${s} s`, x, botY + botH + 15, css("--stage-ink"), 10, "center"); }
+      const curve = (f, Y, col, w, dash) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.beginPath(); for (let i = 0; i <= 400; i++) { const t = (i / 400) * tMax, y = Y(f(t)); if (i) ctx.lineTo(X(t), y); else ctx.moveTo(X(t), y); } ctx.stroke(); ctx.setLineDash([]); };
+      const pourAt = (t) => Math.min(1, t * POUR_RATE);
+      curve(pourAt, Yt, css("--alu"), 1.6);
+      curve((t) => clamp(mix(-0.04, 1.08, clamp01(pourAt(t) / 0.48)), 0, 1.08), Yt, css("--molten"), 2);
+      curve((t) => clamp(mix(-0.04, 1.08, smoothstep(0.32, 0.96, pourAt(t))), 0, 1.08), Yt, css("--bronze"), 2);
+      curve((t) => (t < 1 / POUR_RATE ? 1 - clamp01((pourAt(t) - 0.85) / 0.12) : 0), Yt, css("--resin"), 1.2, [4, 3]);
+      label(ctx, "pour", X(4.3) + 4, Yt(1) + 4, css("--alu"));
+      label(ctx, "front", X(1.95) + 4, Yt(1.05) - 2, css("--molten"));
+      label(ctx, "pool level", X(3.6) + 4, Yt(0.86) + 12, css("--bronze"));
+      label(ctx, "stream", X(4.1) + 4, Yt(0.12), css("--resin"));
+      label(ctx, "the shader's inputs", pad, topY - 10);
+      // ramp stops
+      for (const [v, txt] of [[0.14, "glow ends 0.14"], [0.38, "orange"], [0.62, "yellow"], [0.88, "white"]]) {
+        ctx.strokeStyle = rgba(css("--stage-ink"), 0.16); ctx.setLineDash([2, 4]); ctx.beginPath(); ctx.moveTo(pad, Yb(v)); ctx.lineTo(W - r, Yb(v)); ctx.stroke(); ctx.setLineDash([]);
+        label(ctx, txt, W - r - 2, Yb(v) - 3, css("--stage-ink"), 10, "right");
+      }
+      label(ctx, "heat of a point along the stream", pad, botY - 10);
+      label(ctx, "1.3", pad - 6, Yb(1.3) + 4, css("--stage-ink"), 10, "right");
+      label(ctx, "0", pad - 6, Yb(0) + 4, css("--stage-ink"), 10, "right");
+      for (const s of [0.1, 0.5, 0.95]) curve((t) => pourHeat(t, s), Yb, rgba(css("--stage-ink"), 0.35), 1);
+      curve((t) => { const tEnd = 1 / POUR_RATE; return t < tEnd ? (t > 0 ? 1 : 0) : Math.max(0, 1 - (t - tEnd) * 0.34); }, Yb, css("--cool"), 1.4, [5, 3]);
+      label(ctx, "cooling (crackle)", X(5.6), Yb(0.68) - 4, css("--cool"));
+      const s = +S.value;
+      ctx.lineWidth = 3.2; ctx.lineCap = "round";
+      let prev = null;
+      for (let i = 0; i <= 300; i++) {
+        const t = (i / 300) * tMax, h = pourHeat(t, s), p = [X(t), Yb(h)];
+        if (prev && h > 0) { ctx.strokeStyle = h > 0.14 ? heatCss(h) : css("--bronze"); ctx.beginPath(); ctx.moveTo(prev[0], prev[1]); ctx.lineTo(p[0], p[1]); ctx.stroke(); }
+        prev = p;
+      }
+      ctx.lineCap = "butt";
+      const arrived = (0.48 * (s + 0.04)) / 1.12 / POUR_RATE, coolStart = 1 / POUR_RATE + arrived * POUR_RATE * 1.5, out = coolStart + COOL_TIME * Math.log(1.1 / 0.14);
+      ctx.fillStyle = css("--hot"); ctx.beginPath(); ctx.arc(X(arrived), Yb(1.3), 3.5, 0, 7); ctx.fill();
+      $("htR").innerHTML = `<span>reached at <b>${arrived.toFixed(2)} s</b></span><span>cools from <b>${coolStart.toFixed(2)} s</b></span><span>stops glowing at <b>${out.toFixed(2)} s</b></span><span>pour ends at <b>${(1 / POUR_RATE).toFixed(2)} s</b></span>`;
+    });
+    bind("htS", "htSo", (v) => v.toFixed(2), () => fig.redraw());
+  }
+
+  // ---- 3. Refraction and the bounce ----
+  {
+    const HX = 0.96, BEV = 0.052, BLOB = [0.2, -0.12, 0.3];
+    const sd = (x, y) => { const qx = Math.abs(x) - (HX - BEV), qy = Math.abs(y) - (HX - BEV); return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - BEV; };
+    const sdM = (x, y) => Math.hypot(x - BLOB[0], y - BLOB[1]) - BLOB[2];
+    const nrm = (x, y) => { const e = 1e-4, gx = sd(x + e, y) - sd(x - e, y), gy = sd(x, y + e) - sd(x, y - e), l = Math.hypot(gx, gy) || 1; return [gx / l, gy / l]; };
+    const dot = (a, b) => a[0] * b[0] + a[1] * b[1];
+    // GLSL refract(I, N, eta).
+    const refract = (I, Nn, eta) => { const c = dot(Nn, I), k = 1 - eta * eta * (1 - c * c); if (k < 0) return [0, 0]; const s = eta * c + Math.sqrt(k); return [eta * I[0] - s * Nn[0], eta * I[1] - s * Nn[1]]; };
+    const reflect = (I, Nn) => { const c = 2 * dot(Nn, I); return [I[0] - c * Nn[0], I[1] - c * Nn[1]]; };
+    function cross(p, d, metal) {
+      let t = 0.008;
+      for (let i = 0; i < 600; i++) {
+        const q = [p[0] + d[0] * t, p[1] + d[1] * t], dg = sd(q[0], q[1]);
+        if (metal && sdM(q[0], q[1]) < 0.002) return { t, q, metal: true };
+        if (dg > 0) { let lo = t - 0.004, hi = t; for (let k = 0; k < 20; k++) { const m = 0.5 * (lo + hi); if (sd(p[0] + d[0] * m, p[1] + d[1] * m) > 0) hi = m; else lo = m; } return { t: hi, q: [p[0] + d[0] * hi, p[1] + d[1] * hi], metal: false }; }
+        t += Math.max(Math.min(-dg, metal ? sdM(q[0], q[1]) : 9) * 0.9, 0.004);
+      }
+      return { t, q: [p[0] + d[0] * t, p[1] + d[1] * t], metal: false };
+    }
+    const Yi = $("rfY"), Ai = $("rfA"), Ii = $("rfI"), Mi = $("rfM");
+    const fig = setup($("refractFig"), (W) => (W < 600 ? 0.95 : 0.52), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const span = W < 600 ? 2.6 : 3.4, sc = Math.min(W / (2 * span), H / 2.5), cx = W / 2 + sc * 0.35, cy = H / 2;
+      const S = (p) => [cx + p[0] * sc, cy - p[1] * sc];
+      const ior = +Ii.value, frost = 0.45, tirKeep = mix(0.2, 0.04, frost), f0 = ((ior - 1) / (ior + 1)) ** 2;
+      // block
+      ctx.beginPath();
+      const r = BEV * sc, [x0, y0] = S([-HX, HX]), w = 2 * HX * sc;
+      ctx.roundRect ? ctx.roundRect(x0, y0, w, w, r) : ctx.rect(x0, y0, w, w);
+      ctx.fillStyle = rgba(css("--resin"), 0.16); ctx.fill(); ctx.strokeStyle = rgba(css("--alu"), 0.55); ctx.lineWidth = 1.2; ctx.stroke();
+      if (Mi.checked) { const [bx, by] = S(BLOB); ctx.fillStyle = css("--bronze"); ctx.beginPath(); ctx.arc(bx, by, BLOB[2] * sc, 0, 7); ctx.fill(); label(ctx, "metal", bx, by + 4, css("--stage"), 11, "center"); }
+      const a = +Ai.value * DEG, rd = [Math.cos(a), -Math.sin(a)], P = [-HX, +Yi.value];
+      const seg = (p, q, col, wd, dash) => { const [ax, ay] = S(p), [bx, by] = S(q); ctx.strokeStyle = col; ctx.lineWidth = wd; ctx.setLineDash(dash || []); ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke(); ctx.setLineDash([]); };
+      const ray = (p, d, len) => [p[0] + d[0] * len, p[1] + d[1] * len];
+      seg(ray(P, rd, -3), P, css("--alu"), 2);
+      label(ctx, "from the camera", ...S(ray(P, rd, -2.2)).map((v, i) => v + (i ? -8 : 0)), css("--stage-ink"));
+      const nF = nrm(P[0], P[1]), ndv = clamp(-dot(rd, nF), 0, 1);
+      const fres = f0 + (1 - f0) * Math.pow(Math.max(1 - ndv, 1e-4), 3.8);
+      seg(P, ray(P, reflect(rd, nF), 1.1), rgba(css("--alu"), 0.25 + fres), 1 + 6 * fres);
+      const d1 = refract(rd, nF, 1 / ior);
+      const c1 = cross([P[0] - nF[0] * 0.004, P[1] - nF[1] * 0.004], d1, Mi.checked);
+      seg(P, c1.q, css("--molten"), 2.4);
+      let leave = 1, effBlur = c1.t, txt = "";
+      if (c1.metal) {
+        const [hx, hy] = S(c1.q); ctx.fillStyle = css("--hot"); ctx.beginPath(); ctx.arc(hx, hy, 4, 0, 7); ctx.fill();
+        txt = `<span>first crossing <b>${c1.t.toFixed(2)}</b>, stops on the metal</span>`;
+      } else {
+        const m = nrm(c1.q[0], c1.q[1]), out1 = refract(d1, [-m[0], -m[1]], ior), tir = dot(out1, out1) === 0;
+        leave = tir ? 0 : 1 - (f0 + (1 - f0) * Math.pow(1 - clamp01(dot(out1, m)), 5));
+        if (!tir) { seg(c1.q, ray(c1.q, out1, 1.6), rgba(css("--alu"), 0.3 + 0.7 * leave), 0.5 + 3 * leave); label(ctx, "leaves", ...S(ray(c1.q, out1, 1.7)), css("--stage-ink")); }
+        if (leave < 0.96) {
+          const d2 = reflect(d1, [-m[0], -m[1]]);
+          const c2 = cross([c1.q[0] - m[0] * 0.005, c1.q[1] - m[1] * 0.005], d2, false);
+          const wgt = (1 - leave) * tirKeep;
+          seg(c1.q, c2.q, rgba(css("--hot"), 0.45 + wgt * 2), 1.4 + 10 * wgt, [5, 4]);
+          const m2 = nrm(c2.q[0], c2.q[1]);
+          let out2 = refract(d2, [-m2[0], -m2[1]], ior);
+          if (dot(out2, out2) === 0) out2 = reflect(d2, [-m2[0], -m2[1]]);
+          seg(c2.q, ray(c2.q, out2, 1.0), rgba(css("--hot"), 0.35), 1, [5, 4]);
+          const [lx, ly] = S([(c1.q[0] + c2.q[0]) / 2, (c1.q[1] + c2.q[1]) / 2]);
+          label(ctx, Mi.checked ? "bounce (passes the metal)" : "bounce", lx + 6, ly - 6, css("--hot"));
+          effBlur = Math.max(c1.t, c1.t + c2.t * 0.52 + 0.14);
+          txt = `<span>leaves the far face <b>${tir ? "0 (total internal reflection)" : (leave * 100).toFixed(1) + "%"}</b></span><span>bounce weight <b>${(wgt * 100).toFixed(1)}%</b></span><span>crossings <b>${c1.t.toFixed(2)}</b> + <b>${c2.t.toFixed(2)}</b></span>`;
+        } else {
+          effBlur = Math.max(c1.t, 0.55);
+          txt = `<span>leaves <b>${(leave * 100).toFixed(1)}%</b>, no bounce</span>`;
+        }
+      }
+      const depthFrac = clamp01(effBlur / (2 * HX)), lf = 0.45;
+      const coc = clamp(frost * (smoothstep(0.05, 0.78, depthFrac) * (0.65 + 0.55 * lf) + lf * lf * 0.22 * smoothstep(0.03, 0.28, depthFrac)), 0.012, 1);
+      const refrDeg = Math.asin(clamp(Math.sin(Math.acos(ndv)) / ior, -1, 1)) / DEG;
+      $("rfR").innerHTML = `<span>front reflects <b>${(fres * 100).toFixed(1)}%</b></span><span>refracted to <b>${refrDeg.toFixed(1)}°</b></span>${txt}<span>blur depth <b>${effBlur.toFixed(2)}</b> → amount <b>${coc.toFixed(3)}</b></span>`;
+    });
+    const redraw = () => fig.redraw();
+    bind("rfY", "rfYo", (v) => v.toFixed(2), redraw);
+    bind("rfA", "rfAo", (v) => `${v}°`, redraw);
+    bind("rfI", "rfIo", (v) => v.toFixed(2), redraw);
+    Mi.addEventListener("change", redraw);
+  }
+
+  // ---- 4. Frost blur by depth ----
+  {
+    const SPAN = 1.92, IW = 300, IH = 100;
+    const sharp = (() => {
+      const c = document.createElement("canvas"); c.width = IW; c.height = IH;
+      const g = c.getContext("2d"), rand = mulberry32(5);
+      g.fillStyle = "#000"; g.fillRect(0, 0, IW, IH); g.strokeStyle = "#fff"; g.lineCap = "round";
+      for (let i = 0; i < 70; i++) {
+        let x = rand() * IW, y = rand() * IH, a = rand() * Math.PI * 2;
+        g.lineWidth = 0.8 + rand() * 2.4; g.beginPath(); g.moveTo(x, y);
+        for (let k = 0; k < 5; k++) { a += (rand() - 0.5) * 1.2; x += Math.cos(a) * 6; y += Math.sin(a) * 6; g.lineTo(x, y); }
+        g.stroke();
+      }
+      g.fillStyle = "#fff";
+      for (let i = 0; i < 40; i++) { g.beginPath(); g.arc(rand() * IW, rand() * IH, 0.6 + rand() * 1.4, 0, 7); g.fill(); }
+      const d = g.getImageData(0, 0, IW, IH).data, v = new Float32Array(IW * IH);
+      for (let i = 0; i < IW * IH; i++) v[i] = d[i * 4] / 255;
+      return v;
+    })();
+    const Fi = $("frF"), Li = $("frL"), Si = $("frS"), Ki = $("frK");
+    const model = (depth) => {
+      const frost = +Fi.value, lf = +Li.value, streak = +Si.value, len = +Ki.value;
+      const df = clamp01(depth / SPAN);
+      const coc = frost <= 0.02 ? 0 : clamp(frost * (smoothstep(0.05, 0.78, df) * (0.65 + 0.55 * lf) + lf * lf * 0.22 * smoothstep(0.03, 0.28, df)), 0.012, 1);
+      const blurPx = 0.05 * coc * coc * 1080 * 0.4, across = blurPx * mix(1, 0.5, streak), along = blurPx * streak * 3 * len;
+      const near = frost <= 0.02 ? 1 : 1 - smoothstep(0.12, 0.5, coc / Math.max(frost, 0.05));
+      return { coc, blurPx, across, along, near };
+    };
+    const fig = setup($("frostFig"), (W) => (W < 600 ? 1.05 : 0.6), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const pad = 44, r = 44, plotY = 24, plotH = H * 0.42, stripY = plotY + plotH + 38, stripH = H - stripY - 24;
+      const X = (d) => pad + (d / SPAN) * (W - pad - r);
+      const Y = (v) => plotY + plotH - v * plotH;
+      const pxMax = 0.05 * 1080 * 0.4;
+      ctx.strokeStyle = css("--stage-line"); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad, Y(0)); ctx.lineTo(W - r, Y(0)); ctx.stroke();
+      const curve = (f, col, w, dash) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.beginPath(); for (let i = 0; i <= 200; i++) { const d = (i / 200) * SPAN, y = Y(f(model(d))); if (i) ctx.lineTo(X(d), y); else ctx.moveTo(X(d), y); } ctx.stroke(); ctx.setLineDash([]); };
+      curve((m) => m.coc, css("--alu"), 2);
+      curve((m) => m.blurPx / pxMax, css("--molten"), 2);
+      curve((m) => m.near, css("--cool"), 1.5, [5, 3]);
+      label(ctx, "amount", pad + 4, plotY - 8, css("--alu"));
+      label(ctx, "width (px at 1080p)", pad + 70, plotY - 8, css("--molten"));
+      label(ctx, "kept sharp", pad + 222, plotY - 8, css("--cool"));
+      label(ctx, "1", pad - 6, Y(1) + 4, css("--stage-ink"), 10, "right");
+      label(ctx, "0", pad - 6, Y(0) + 4, css("--stage-ink"), 10, "right");
+      label(ctx, `${pxMax.toFixed(1)} px`, W - r + 6, Y(1) + 4, css("--molten"), 10);
+      for (const d of [0, 0.48, 0.96, 1.44, 1.92]) label(ctx, d.toFixed(2), X(d), Y(0) + 14, css("--stage-ink"), 10, "center");
+      label(ctx, "depth reached in the block →", W - r, Y(0) + 28, css("--stage-ink"), 10, "right");
+      // strip
+      const ms = []; for (let i = 0; i < IW; i++) ms.push(model((i / (IW - 1)) * SPAN));
+      const tmp = new Float32Array(IW * IH), out = new Float32Array(IW * IH);
+      for (let i = 0; i < IW; i++) {
+        const s = Math.min(25, ms[i].across * 0.6), rad = Math.ceil(s * 3);
+        for (let j = 0; j < IH; j++) {
+          if (s < 0.3) { tmp[j * IW + i] = sharp[j * IW + i]; continue; }
+          let a = 0, ws = 0;
+          for (let k = -rad; k <= rad; k++) { const ii = clamp(i + k, 0, IW - 1), w = Math.exp((-k * k) / (2 * s * s)); a += sharp[j * IW + ii] * w; ws += w; }
+          tmp[j * IW + i] = a / ws;
+        }
+      }
+      for (let i = 0; i < IW; i++) {
+        const sa = ms[i].across * 0.6, s = Math.min(30, Math.hypot(sa, ms[i].along * 0.5)), rad = Math.ceil(s * 3);
+        for (let j = 0; j < IH; j++) {
+          let v = tmp[j * IW + i];
+          if (s >= 0.3) { let a = 0, ws = 0; for (let k = -rad; k <= rad; k++) { const jj = clamp(j + k, 0, IH - 1), w = Math.exp((-k * k) / (2 * s * s)); a += tmp[jj * IW + i] * w; ws += w; } v = a / ws; }
+          out[j * IW + i] = mix(v, sharp[j * IW + i], ms[i].near);
+        }
+      }
+      const im = new ImageData(IW, IH), lo = [30, 32, 36], hi = rgb(css("--alu"));
+      for (let p = 0; p < IW * IH; p++) { const v = Math.min(1, out[p] * 1.3); im.data[p * 4] = mix(lo[0], hi[0], v); im.data[p * 4 + 1] = mix(lo[1], hi[1], v); im.data[p * 4 + 2] = mix(lo[2], hi[2], v); im.data[p * 4 + 3] = 255; }
+      const c = document.createElement("canvas"); c.width = IW; c.height = IH; c.getContext("2d").putImageData(im, 0, 0);
+      const sw = W - pad - r, sh = Math.min(stripH, (sw * IH) / IW);
+      ctx.imageSmoothingEnabled = true; ctx.drawImage(c, pad, stripY, sw, sh);
+      label(ctx, "near the face", pad, stripY - 8);
+      label(ctx, "at the back", pad + sw, stripY - 8, css("--stage-ink"), 11, "right");
+      const mid = model(SPAN * 0.5), deep = model(SPAN);
+      $("frR").innerHTML = `<span>half way: amount <b>${mid.coc.toFixed(3)}</b>, <b>${mid.blurPx.toFixed(1)} px</b>, sharp <b>${(mid.near * 100).toFixed(0)}%</b></span><span>at the back: <b>${deep.blurPx.toFixed(1)} px</b> across <b>${deep.across.toFixed(1)}</b>, along <b>±${deep.along.toFixed(1)} px</b></span>`;
+    });
+    const redraw = () => fig.redraw();
+    bind("frF", "frFo", (v) => v.toFixed(2), redraw);
+    bind("frL", "frLo", (v) => v.toFixed(2), redraw);
+    bind("frS", "frSo", (v) => v.toFixed(2), redraw);
+    bind("frK", "frKo", (v) => v.toFixed(2), redraw);
+  }
+
+  // ---- 5. The spot ----
+  {
+    const Lraw = [-0.62, 0.85, 0.42], Ll = Math.hypot(...Lraw), L = [-Math.hypot(Lraw[0], Lraw[2]) / Ll, Lraw[1] / Ll];
+    const HY = 0.96, target = [0, 0.65 * HY], lamp = [target[0] + L[0] * 6.8, target[1] + L[1] * 6.8], sDir = [-L[0], -L[1]];
+    const sph = [target[0] + L[0] * 1.7, target[1] + L[1] * 1.7], SR = 6.2, CAM = [5.6, 2.3];
+    const plinth = [-1.325, -1.78, 1.325, 0], block = [-0.96, 0, 0.96, 1.92], FLOOR = -1.85;
+    const g = 0.45, hg = (c) => (1 - g * g) / Math.pow(1 + g * g - 2 * g * c, 1.5);
+    const dot = (a, b) => a[0] * b[0] + a[1] * b[1];
+    // Ray against an axis-aligned box: [tNear, tFar] or null.
+    const boxHit = (o, d, b) => { let t0 = -1e9, t1 = 1e9; for (let k = 0; k < 2; k++) { if (Math.abs(d[k]) < 1e-9) { if (o[k] < b[k] || o[k] > b[k + 2]) return null; continue; } let a = (b[k] - o[k]) / d[k], c = (b[k + 2] - o[k]) / d[k]; if (a > c) [a, c] = [c, a]; t0 = Math.max(t0, a); t1 = Math.min(t1, c); } return t0 <= t1 ? [t0, t1] : null; };
+    const vis = (p) => { const v = [lamp[0] - p[0], lamp[1] - p[1]], l = Math.hypot(...v), d = [v[0] / l, v[1] / l]; const ph = boxHit(p, d, plinth); if (ph && ph[1] > 0.02) return 0; const bh = boxHit(p, d, block); return bh && bh[1] > 0.02 ? 0.3 : 1; };
+    const beamAt = (p) => { const v = [p[0] - lamp[0], p[1] - lamp[1]], dist = Math.hypot(...v); const radial = smoothstep(0.966, 0.99, dot(v, sDir) / Math.max(dist, 1e-4)); if (radial <= 0.001) return 0; return Math.pow(radial, 1.3) * (smoothstep(0.6, 3, dist) / (1 + dist * dist * 0.02)) * vis(p); };
+    const hash = (x, y, k) => { const s = Math.sin(x * 127.1 + y * 311.7 + k * 74.7) * 43758.5453; return s - Math.floor(s); };
+    let jit = 0.37;
+    const A = $("spA");
+    let beamImg = null, beamKey = "";
+    const fig = setup($("spotFig"), (W) => (W < 600 ? 0.95 : 0.66), (ctx, W, H) => {
+      stage(ctx, W, H);
+      const xr = [-5.3, 6.2], yr = [-2.3, 6.4];
+      const sc = Math.min(W / (xr[1] - xr[0]), H / (yr[1] - yr[0])), ox = (W - (xr[1] - xr[0]) * sc) / 2, oy = (H - (yr[1] - yr[0]) * sc) / 2;
+      const S = (p) => [ox + (p[0] - xr[0]) * sc, oy + (yr[1] - p[1]) * sc];
+      const Wi = (p) => [xr[0] + (p[0] - ox) / sc, yr[1] - (p[1] - oy) / sc];
+      // beam raster, cached per size
+      const key = `${W}x${H}`;
+      if (beamKey !== key) {
+        const R = 3, bw = Math.ceil(W / R), bh = Math.ceil(H / R), im = new ImageData(bw, bh), hot = rgb("#fff1dc");
+        for (let j = 0; j < bh; j++) for (let i = 0; i < bw; i++) {
+          const p = Wi([(i + 0.5) * R, (j + 0.5) * R]);
+          const inside = (p[0] > plinth[0] && p[0] < plinth[2] && p[1] > plinth[1] && p[1] < plinth[3]) || p[1] < FLOOR;
+          const v = inside ? 0 : Math.min(1, beamAt(p) * 1.6), o = (j * bw + i) * 4;
+          im.data[o] = hot[0]; im.data[o + 1] = hot[1]; im.data[o + 2] = hot[2]; im.data[o + 3] = Math.round(v * 110);
+        }
+        const c = document.createElement("canvas"); c.width = bw; c.height = bh; c.getContext("2d").putImageData(im, 0, 0);
+        beamImg = c; beamKey = key;
+      }
+      ctx.imageSmoothingEnabled = true; ctx.drawImage(beamImg, 0, 0, W, H);
+      // scene
+      const rect = (b, fill, stroke) => { const [x0, y0] = S([b[0], b[3]]), [x1, y1] = S([b[2], b[1]]); ctx.fillStyle = fill; ctx.fillRect(x0, y0, x1 - x0, y1 - y0); if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0); } };
+      ctx.strokeStyle = css("--stage-line"); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(...S([xr[0], FLOOR])); ctx.lineTo(...S([xr[1], FLOOR])); ctx.stroke();
+      rect(plinth, "#0a0a0c", css("--stage-line"));
+      rect([-1.235, FLOOR, 1.235, -1.78], "#050506");
+      ctx.fillStyle = "#ffb070"; const [sx0, sy0] = S([-1.235, -1.792]), [sx1] = S([1.235, 0]); ctx.fillRect(sx0, sy0, sx1 - sx0, 2);
+      rect(block, rgba(css("--resin"), 0.22), rgba(css("--alu"), 0.5));
+      ctx.strokeStyle = css("--bronze"); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(...S([0, 1.7])); ctx.lineTo(...S([-0.2, 1.0])); ctx.lineTo(...S([-0.5, 0.3])); ctx.moveTo(...S([-0.2, 1.0])); ctx.lineTo(...S([0.35, 0.5])); ctx.lineTo(...S([0.5, 0.15])); ctx.stroke();
+      // cone edges and sphere
+      const edge = (ang, a) => { const c = Math.cos(ang), s = Math.sin(ang), d = [sDir[0] * c - sDir[1] * s, sDir[0] * s + sDir[1] * c]; ctx.strokeStyle = rgba("#fff1dc", a); ctx.beginPath(); ctx.moveTo(...S(lamp)); ctx.lineTo(...S([lamp[0] + d[0] * 11, lamp[1] + d[1] * 11])); ctx.stroke(); };
+      ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
+      for (const s of [-1, 1]) { edge(s * Math.acos(0.99), 0.3); edge(s * Math.acos(0.966), 0.15); }
+      ctx.beginPath(); const [scx, scy] = S(sph); ctx.arc(scx, scy, SR * sc, 0, 7); ctx.strokeStyle = rgba(css("--stage-ink"), 0.25); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = css("--hot"); ctx.beginPath(); ctx.arc(...S(lamp), 5, 0, 7); ctx.fill();
+      label(ctx, "spot", S(lamp)[0] + 9, S(lamp)[1] + 4, css("--hot"));
+      // view ray
+      const toT = [target[0] - CAM[0], target[1] + 0.6 - CAM[1]], base = Math.atan2(toT[1], toT[0]), ang = base + +A.value * DEG;
+      const rd = [Math.cos(ang), Math.sin(ang)];
+      const sc0 = [CAM[0] - sph[0], CAM[1] - sph[1]], b = dot(sc0, rd), c = dot(sc0, sc0) - SR * SR, disc = b * b - c;
+      let tMax = 24, gain = 1;
+      for (const bx of [plinth, block]) { const h = boxHit(CAM, rd, bx); if (h && h[0] > 0 && h[0] < tMax) { tMax = h[0]; gain = bx === block ? 0.65 : 1; } }
+      if (rd[1] < 0) { const tf = (FLOOR - CAM[1]) / rd[1]; if (tf < tMax) { tMax = tf; gain = 1; } }
+      ctx.strokeStyle = css("--cool"); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(...S(CAM)); ctx.lineTo(...S([CAM[0] + rd[0] * tMax, CAM[1] + rd[1] * tMax])); ctx.stroke();
+      ctx.fillStyle = css("--cool"); ctx.beginPath(); ctx.arc(...S(CAM), 4, 0, 7); ctx.fill();
+      label(ctx, "camera", S(CAM)[0] - 6, S(CAM)[1] - 10, css("--cool"), 11, "right");
+      let acc = 0, t0 = 0, t1 = 0, walked = 0, motes = 0;
+      if (disc > 0) {
+        t0 = Math.max(0.15, -b - Math.sqrt(disc)); t1 = Math.min(Math.min(tMax, 24), -b + Math.sqrt(disc));
+        if (t1 > t0) {
+          const dt = (t1 - t0) / 20;
+          for (let i = 0; i < 20; i++) {
+            const p = [CAM[0] + rd[0] * (t0 + (i + jit) * dt), CAM[1] + rd[1] * (t0 + (i + jit) * dt)], v = beamAt(p) * dt;
+            acc += v;
+            ctx.fillStyle = v > 0.002 ? css("--hot") : rgba(css("--stage-ink"), 0.5);
+            ctx.beginPath(); ctx.arc(...S(p), 1.6 + Math.min(6, v * 40), 0, 7); ctx.fill();
+          }
+          // DDA over 0.16 cells around the closest approach to the axis
+          const CELL = 0.16, w0 = [CAM[0] - lamp[0], CAM[1] - lamp[1]], bd = dot(rd, sDir), dd = dot(rd, w0), ed = dot(sDir, w0);
+          const tAx = clamp((bd * ed - dd) / Math.max(1 - bd * bd, 1e-4), t0, t1), ts = Math.max(t0, tAx - 2.6), te = Math.min(t1, tAx + 2.6);
+          const ro = [(CAM[0] + rd[0] * ts) / CELL, (CAM[1] + rd[1] * ts) / CELL], cell = [Math.floor(ro[0]), Math.floor(ro[1])];
+          const st = [Math.sign(rd[0]), Math.sign(rd[1])], tD = [Math.abs(1 / rd[0]), Math.abs(1 / rd[1])];
+          const tN = [(st[0] * (cell[0] - ro[0]) + st[0] * 0.5 + 0.5) * tD[0], (st[1] * (cell[1] - ro[1]) + st[1] * 0.5 + 0.5) * tD[1]];
+          const tC = (te - ts) / CELL, focus = Math.hypot(CAM[0], CAM[1] - HY);
+          for (let i = 0; i < 64; i++) {
+            walked++;
+            const [cx0, cy0] = S([cell[0] * CELL, (cell[1] + 1) * CELL]);
+            ctx.strokeStyle = rgba(css("--cool"), 0.35); ctx.lineWidth = 0.8; ctx.strokeRect(cx0, cy0, CELL * sc, CELL * sc);
+            if (hash(cell[0], cell[1], 1) > 0.955) {
+              const m = [(cell[0] + 0.5 + (hash(cell[0], cell[1], 2) - 0.5) * 0.5) * CELL, (cell[1] + 0.5 + (hash(cell[0], cell[1], 3) - 0.5) * 0.5) * CELL];
+              const along = dot([m[0] - CAM[0], m[1] - CAM[1]], rd), blur = Math.abs(along - focus) * 0.018;
+              if (beamAt(m) > 0) { motes++; ctx.fillStyle = rgba("#fff1dc", 0.85); ctx.beginPath(); ctx.arc(...S(m), Math.max(1.5, blur * sc), 0, 7); ctx.fill(); }
+            }
+            const tmin = Math.min(tN[0], tN[1]);
+            if (tmin > tC) break;
+            if (tN[0] <= tN[1]) { cell[0] += st[0]; tN[0] += tD[0]; } else { cell[1] += st[1]; tN[1] += tD[1]; }
+          }
+        }
+      }
+      // phase inset
+      const ix = W - 70, iy = 62, ir = 9;
+      ctx.strokeStyle = rgba(css("--stage-ink"), 0.35); ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.arc(ix, iy, ir, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = css("--hot"); ctx.lineWidth = 1.5; ctx.beginPath();
+      const la = Math.atan2(-L[1], L[0]);
+      for (let i = 0; i <= 90; i++) { const th = (i / 90) * Math.PI * 2, rr = hg(Math.cos(th)) * ir, x = ix + Math.cos(la + th) * rr, y = iy + Math.sin(la + th) * rr; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+      ctx.stroke();
+      const cosT = dot(rd, L), ph = hg(cosT);
+      label(ctx, "phase, g = 0.45", ix, iy + 54, css("--stage-ink"), 10, "center");
+      $("spR").innerHTML = `<span>ray to lamp <b>${(Math.acos(clamp(cosT, -1, 1)) / DEG).toFixed(0)}°</b>, phase <b>${ph.toFixed(2)}×</b></span><span>beam sum <b>${(acc * ph * 0.25 * 0.3 * gain).toFixed(4)}</b>${gain < 1 ? " (×0.65 in the glass)" : ""}</span><span>cells walked <b>${walked}</b>, motes in the beam <b>${motes}</b></span>`;
+    });
+    bind("spA", "spAo", (v) => `${v}°`, () => fig.redraw());
+    $("spJ").addEventListener("click", () => { jit = Math.random(); fig.redraw(); });
+  }
+
+  // ---- 6. The cycle ----
+  {
+    function simulate(autoT, bakeT) {
+      const dt = 1 / 60, out = [], events = [];
+      let phase = "empty", t = 0, lift = 0, resin = 0, pour = 0, anim = false, heat = 0, glass = 0, close = 0, radius = 5.2, ot = 0, auto = 0, bakeAge = 0, lastFlow = 0;
+      for (let f = 0; f <= 40 * 60; f++) {
+        const time = f * dt;
+        if (phase === "rest") { auto += dt; if (auto >= autoT) { auto = 0; phase = "lift"; t = 0; bakeAge = 0; events.push([time, "auto change"]); } }
+        t += dt;
+        if (phase === "lift") {
+          const k = Math.min(t / 1.8, 1); lift = 9 * k * k * k; bakeAge += dt;
+          if (k >= 1 && bakeAge >= bakeT) { phase = "empty"; t = 0; lift = 0; resin = 0; anim = false; pour = 0; heat = 0; glass = 0; }
+        } else if (phase === "empty") {
+          if (t >= 0.8) { phase = "pour"; t = 0; anim = true; pour = 0; heat = 1; }
+        } else if (phase === "pour") {
+          if (!anim) { phase = "cool"; t = 0; }
+        } else if (phase === "cool") {
+          const k = clamp01((t - 0.8) / 5.5); resin = k * k * (3 - 2 * k);
+          if (k >= 1) { phase = "rest"; auto = 0; }
+        }
+        if (phase !== "lift") glass += (resin - glass) * (1 - Math.exp(-dt * 2));
+        if (anim) { pour = Math.min(1, pour + dt * POUR_RATE); heat = 1; if (pour >= 1) anim = false; }
+        else { const target = pour < 0.985 && pour > 0.005 ? 1 : 0; heat = target > heat ? heat + (target - heat) * (1 - Math.exp(-dt * 8)) : Math.max(0, heat - dt * 0.34); }
+        const flow = anim ? 1 - clamp01((pour - 0.85) / 0.12) : 0;
+        if (flow > 0.5 && lastFlow <= 0.5) events.push([time, "sizzle"]);
+        lastFlow = flow;
+        const cooling = heat * (1 - flow);
+        const closeT = phase === "rest" ? 1 : phase === "cool" ? Math.min(1, t / 2.5) : 0;
+        close += (closeT - close) * (1 - Math.exp(-dt * 0.9));
+        ot += dt;
+        const c = close * close * (3 - 2 * close);
+        radius += (mix(5.2 + 2 * Math.sin(ot * 0.09), 3.2 + 0.96 + 0.25 * Math.sin(ot * 0.21), c) - radius) * (1 - Math.exp(-dt * 0.8));
+        out.push({ time, phase, pour, flow, glass, heat, bedPour: 0.75 * flow, bedCool: 0.7 * Math.pow(Math.min(cooling, 1), 1.5), close: c, radius, lift });
+      }
+      return { out, events };
+    }
+    const Ti = $("cyT"), Ai = $("cyA"), Bi = $("cyB");
+    let sim = null;
+    const PH = { empty: "--stage-line", pour: "--molten", cool: "--bronze", rest: "--resin", lift: "--cool" };
+    const fig = setup($("cycleFig"), (W) => (W < 600 ? 1.35 : 0.62), (ctx, W, H) => {
+      stage(ctx, W, H);
+      if (!sim) sim = simulate(+Ai.value, +Bi.value);
+      const pad = 92, r = 14, T = 40, X = (t) => pad + (t / T) * (W - pad - r);
+      const lanes = [["phase", 18], ["pour · stream · resin", 0], ["heat · sound", 0], ["orbit", 0], ["lift", 0]];
+      const fixed = 18 + 4 * 10, each = (H - 30 - fixed - 22) / 4;
+      let y = 14;
+      const lane = [];
+      for (let i = 0; i < lanes.length; i++) { const h = i === 0 ? 18 : each; lane.push([y, h]); y += h + 10; }
+      lanes.forEach(([name], i) => label(ctx, name, 8, lane[i][0] + (i === 0 ? 13 : 12), css("--stage-ink"), 10));
+      // phase band
+      let start = 0;
+      for (let i = 1; i <= sim.out.length; i++) {
+        const p = sim.out[i - 1].phase;
+        if (i === sim.out.length || sim.out[i].phase !== p) {
+          const x0 = X(sim.out[start].time), x1 = X(sim.out[i - 1].time);
+          ctx.fillStyle = rgba(css(PH[p]), p === "empty" ? 0.9 : 0.75); ctx.fillRect(x0, lane[0][0], Math.max(1, x1 - x0), 18);
+          if (x1 - x0 > 30) label(ctx, p, (x0 + x1) / 2, lane[0][0] + 13, "#111", 10, "center");
+          start = i;
+        }
+      }
+      const curve = (li, key, col, w, max = 1, dash) => {
+        const [y0, h] = lane[li];
+        ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash(dash || []); ctx.beginPath();
+        sim.out.forEach((s, i) => { const yy = y0 + h - (s[key] / max) * h; if (i) ctx.lineTo(X(s.time), yy); else ctx.moveTo(X(s.time), yy); });
+        ctx.stroke(); ctx.setLineDash([]);
+      };
+      for (let li = 1; li < lanes.length; li++) { const [y0, h] = lane[li]; ctx.strokeStyle = css("--stage-line"); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad, y0 + h); ctx.lineTo(W - r, y0 + h); ctx.stroke(); }
+      curve(1, "pour", css("--alu"), 1.6); curve(1, "flow", css("--molten"), 1.6, 1, [4, 3]); curve(1, "glass", css("--resin"), 2.2);
+      curve(2, "heat", css("--hot"), 1.4); curve(2, "bedPour", css("--molten"), 1.8); curve(2, "bedCool", css("--cool"), 1.8);
+      curve(3, "radius", css("--alu"), 1.8, 7.5); curve(3, "close", css("--bronze"), 1.4, 1, [4, 3]);
+      curve(4, "lift", css("--cool"), 1.8, 9);
+      const leg = (li, items) => { let x = pad + 4; for (const [txt, col] of items) { label(ctx, txt, x, lane[li][0] + 10, css(col), 10); x += txt.length * 6.4 + 14; } };
+      leg(1, [["pour", "--alu"], ["stream", "--molten"], ["resin level", "--resin"]]);
+      leg(2, [["cooling", "--hot"], ["gloop bed", "--molten"], ["crackle bed", "--cool"]]);
+      leg(3, [["distance (0–7.5)", "--alu"], ["closeness", "--bronze"]]);
+      leg(4, [["height (0–9)", "--cool"]]);
+      for (const [t, txt] of sim.events) { const x = X(t); ctx.strokeStyle = rgba(css("--stage-ink"), 0.4); ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(x, lane[1][0]); ctx.lineTo(x, lane[4][0] + lane[4][1]); ctx.stroke(); ctx.setLineDash([]); label(ctx, txt, x + 3, lane[4][0] + lane[4][1] - 4, css("--stage-ink"), 9); }
+      for (let s = 0; s <= T; s += 5) label(ctx, `${s} s`, X(s), H - 8, css("--stage-ink"), 10, "center");
+      const t = +Ti.value, s = sim.out[Math.min(sim.out.length - 1, Math.round(t * 60))];
+      ctx.strokeStyle = css("--hot"); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(t), lane[0][0]); ctx.lineTo(X(t), lane[4][0] + lane[4][1]); ctx.stroke();
+      $("cyR").innerHTML = `<span>phase <b>${s.phase}</b></span><span>pour <b>${s.pour.toFixed(2)}</b></span><span>resin <b>${s.glass.toFixed(2)}</b></span><span>camera <b>${s.radius.toFixed(2)}</b> out</span><span>lift <b>${s.lift.toFixed(2)}</b></span>`;
+    });
+    const redraw = () => fig.redraw();
+    bind("cyT", "cyTo", (v) => `${v.toFixed(1)} s`, redraw);
+    bind("cyA", "cyAo", (v) => `${v} s`, () => { sim = null; redraw(); });
+    bind("cyB", "cyBo", (v) => `${v.toFixed(1)} s`, () => { sim = null; redraw(); });
+    let on = false, last = 0;
+    const btn = $("cyP");
+    const step = (now) => {
+      if (!on) return;
+      const dt = last ? Math.min(0.05, (now - last) / 1000) : 0; last = now;
+      Ti.value = (+Ti.value + dt) % 40; $("cyTo").textContent = `${(+Ti.value).toFixed(1)} s`;
+      redraw(); requestAnimationFrame(step);
+    };
+    btn.addEventListener("click", () => { on = !on; btn.textContent = on ? "pause" : "play"; last = 0; if (on) requestAnimationFrame(step); });
+  }
+})();
+</script>
+</body>
+</html>

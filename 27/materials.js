@@ -252,7 +252,7 @@ export function createToeMaterial() {
 
 // An invisible box around the block that only exists in the shadow pass, where it raymarches the cast's distance
 // volume toward the key: the cast then shadows the plinth and floor like any mesh, blocked by whatever is in the way.
-// The frosted glass blocks the key stochastically, by how much glass the light crosses, so its shadow is partial.
+// The resin's own shadow is worked out in the plinth's shader.
 export function createCastShadowMaterial() {
   const uniforms = {
     tBurrow: { value: null },

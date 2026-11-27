@@ -25,7 +25,7 @@ auto change casts a new piece once each one has rested for its interval.
 - True 3D raytraced glass refraction and Total Internal Reflection over a `Data3DTexture` burrow SDF and 3D-blurred volumetric glow field.
 - Depth-weighted bilateral frosted blur so branches close to the front glass wall stay sharp while deeper tunnels and internal wall reflections soften into milky frosted silica.
 - Multi-scale craggy sand-cast micro-relief with smooth specular lower undersides and heat-oxidized molten ember transitions.
-- The pour: a molten stream falls into the hole and each point of the cast takes its heat from when the front reached it, white-hot at the front, cooling through orange and red to bare metal about 2 s behind; the deepest tips keep an ember glow.
+- The pour: a molten stream falls into the hole and each point of the cast takes its heat from when the front reached it, white-hot at the front and molten until the pour ends; then it cools through orange and red to bare metal over about 3 s, the first metal in first; the deepest tips keep an ember glow.
 - Internal reflections off the frosted faces arrive blurred by the frost, as light scattered by a sandblasted surface would.
 - The gallery spot is a beam of lit haze along the key with forward scattering, shadowed by the plinth, the glass and the cast, with drifting dust motes and a lit pool where it lands.
 - The bake is split: the seeded layout of the burrow is drawn on the page (so a seed always gives the same piece), and
@@ -36,7 +36,7 @@ auto change casts a new piece once each one has rested for its interval.
   resin, so it is smooth and steady; the metal casts through the shadow map.
 - Dust in the beam wanders on its own, mostly faint specks with a few larger flakes that glint as they tumble, and blurs
   into soft discs away from the focus distance.
-- On Windows, Chrome compiles shaders through Direct3D's FXC, which inlines every call: each heavy function (the crossing, the metal shading, the spot's shadow test, the distance functions in the normals) has a single call site, which took the first frame from about 37 s to 12 s there.
+- On Windows, Chrome compiles shaders through Direct3D's FXC, which inlines every call: each heavy function (the crossing, the metal shading, the distance functions in the normals) has a single call site, which took the first frame from about 37 s to 12 s there.
 
 ## Sound
 
