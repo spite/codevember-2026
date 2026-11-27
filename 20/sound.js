@@ -31,9 +31,14 @@ export function createSound({ onProgress } = {}) {
   const buffers = {};
   let done = 0;
   const loaded = Promise.all(
+    // A sample that fails is left out (its sound stays silent) rather than holding up the load.
     names.map(async (name) => {
-      const data = await (await fetch(url(name))).arrayBuffer();
-      buffers[name] = await ctx.decodeAudioData(data);
+      try {
+        const data = await (await fetch(url(name))).arrayBuffer();
+        buffers[name] = await ctx.decodeAudioData(data);
+      } catch (e) {
+        console.warn("sound", name, e);
+      }
       onProgress?.(++done / names.length);
     }),
   );
