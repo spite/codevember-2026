@@ -664,7 +664,13 @@ const shownLook = {
   bgColor: new Color(),
   initialized: false,
 };
-const scratchColor = new Color();
+// Finish colours, parsed once: the look eases toward them every frame.
+const finishColors = new Map();
+function finishColor(value) {
+  let c = finishColors.get(value);
+  if (!c) finishColors.set(value, (c = new Color(value)));
+  return c;
+}
 
 let lookSettling = false;
 
@@ -678,14 +684,14 @@ function updateFinishLook(wallDt, snap = false, snapBackground = snap) {
   const fb = transitionPhase !== "idle" ? FINISHES[params.finish()] ?? f : f;
   shownLook.initialized = true;
 
-  shownLook.floorColor.lerp(scratchColor.set(f.floorColor), k);
-  shownLook.floorSecondary.lerp(scratchColor.set(f.floorSecondary), k);
-  shownLook.wallColor.lerp(scratchColor.set(f.wallColor), k);
-  shownLook.crownColor.lerp(scratchColor.set(f.wallCrown), k);
-  shownLook.rimColor.lerp(scratchColor.set(f.rimColor), k);
-  shownLook.marbleColor.lerp(scratchColor.set(f.marbleColor), k);
-  shownLook.marbleAccent.lerp(scratchColor.set(f.marbleAccent), k);
-  shownLook.bgColor.lerp(scratchColor.set(fb.backdrop), kBackground);
+  shownLook.floorColor.lerp(finishColor(f.floorColor), k);
+  shownLook.floorSecondary.lerp(finishColor(f.floorSecondary), k);
+  shownLook.wallColor.lerp(finishColor(f.wallColor), k);
+  shownLook.crownColor.lerp(finishColor(f.wallCrown), k);
+  shownLook.rimColor.lerp(finishColor(f.rimColor), k);
+  shownLook.marbleColor.lerp(finishColor(f.marbleColor), k);
+  shownLook.marbleAccent.lerp(finishColor(f.marbleAccent), k);
+  shownLook.bgColor.lerp(finishColor(fb.backdrop), kBackground);
 
   floorMaterial.color.copy(shownLook.floorColor);
   floorMaterial.roughness += (f.floorRough - floorMaterial.roughness) * k;
@@ -719,8 +725,8 @@ function updateFinishLook(wallDt, snap = false, snapBackground = snap) {
   else backdrop.update(wallDt);
 
   // Uniform-only blends are invisible to the pipeline, so restart the still until they settle.
-  scratchColor.set(f.wallColor);
-  const colorGap = Math.abs(scratchColor.r - shownLook.wallColor.r) + Math.abs(scratchColor.g - shownLook.wallColor.g) + Math.abs(scratchColor.b - shownLook.wallColor.b);
+  const wall = finishColor(f.wallColor);
+  const colorGap = Math.abs(wall.r - shownLook.wallColor.r) + Math.abs(wall.g - shownLook.wallColor.g) + Math.abs(wall.b - shownLook.wallColor.b);
   lookSettling = !snap && colorGap + Math.abs(f.floorRough - floorMaterial.roughness) + Math.abs(fb.exposure - pipeline.exposure) + Math.abs(targetHint - shared.uShowHint.value) > 1e-3;
 }
 
