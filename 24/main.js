@@ -177,7 +177,8 @@ for (let i = 0; i < SLOT_COUNT; i++) {
     material,
     materials: new Map([[0, material]]),
     assignedGen: null,
-    specKey: "",
+    specMode: "",
+    specSeed: null,
     yaw: 0,
   });
 }
@@ -279,13 +280,14 @@ function updateNest(u, sceneTime, glossBias) {
     const slotIdx = ((gen % SLOT_COUNT) + SLOT_COUNT) % SLOT_COUNT;
     const slot = slots[slotIdx];
 
-    const specKey = `${modeKey}|${seedForGen(gen)}`;
-    if (slot.assignedGen !== gen || slot.specKey !== specKey) {
+    const seed = seedForGen(gen);
+    if (slot.assignedGen !== gen || slot.specMode !== modeKey || slot.specSeed !== seed) {
       const spec = getDollSpec(gen, seedForGen(gen), opts);
       applySlotSpec(slot, spec, -glossBias);
       slot.yaw = dollYaw(gen);
       slot.assignedGen = gen;
-      slot.specKey = specKey;
+      slot.specMode = modeKey;
+      slot.specSeed = seed;
     } else {
       slot.material.uniforms.uRoughnessBias.value = -glossBias;
     }
