@@ -491,6 +491,8 @@ function getTargetBackdrop(u) {
 
 // Snap initial backdrop immediately before first render
 const startBackdrop = getTargetBackdrop(nestU);
+// The loading cover takes the seeded first backdrop, so it fades into the page's own colour.
+document.querySelector("#loading")?.style.setProperty("--loading-background", startBackdrop.bg);
 const bgColor = new Color(startBackdrop.bg);
 const cycColor = new Color(startBackdrop.cyc);
 const targetBgColor = new Color();
@@ -504,6 +506,7 @@ let smoothGloss = params.gloss();
 
 await studio;
 updateNest(nestU, 0, smoothGloss);
+await load.sound.track(sound.decoded);
 await load.compile.track(pipeline.compileAsync(scene, camera), 3);
 compileReady = true;
 

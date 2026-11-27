@@ -48,12 +48,15 @@ function createSound({ base = "./sounds/", music: musicUrl = "./music.mp3", musi
   };
   ctx.addEventListener("statechange", syncMusic);
 
-  for (const { name, i, data } of files) {
-    data
-      .then((buf) => ctx.decodeAudioData(buf))
-      .then((b) => ((buffers[name] ??= [])[i] = b))
-      .catch((e) => console.warn("sound", name, i, e));
-  }
+  // Resolves once every sample is decoded (or has failed), so the first cue is never silent.
+  const decoded = Promise.all(
+    files.map(({ name, i, data }) =>
+      data
+        .then((buf) => ctx.decodeAudioData(buf))
+        .then((b) => ((buffers[name] ??= [])[i] = b))
+        .catch((e) => console.warn("sound", name, i, e)),
+    ),
+  );
 
   const gesture = () => {
     if (!paused) ctx.resume();
@@ -83,6 +86,7 @@ function createSound({ base = "./sounds/", music: musicUrl = "./music.mp3", musi
 
   return {
     downloaded,
+    decoded,
     play,
     start() {
       started = true;
