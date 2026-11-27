@@ -449,7 +449,8 @@ function randomDir(rand) {
   return new Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).normalize();
 }
 
-function buildScene(m) {
+// keepFrame: the same layout rebuilt in place, so the view, the turn and the floor stay as they are.
+function buildScene(m, keepFrame = false) {
   for (const o of [...meshes, ...axleMeshes]) {
     rig.remove(o);
     o.traverse((c) => c.geometry?.dispose());
@@ -490,6 +491,7 @@ function buildScene(m) {
     rig.add(mesh);
     axleMeshes.push(mesh);
   }
+  if (keepFrame) return;
   frame.radius = m.bounds.radius;
   // The side that shows most of the machine, which the camera turns to while it arrives.
   frame.dir = bestView(m, escapement(0).wheel, 0);
@@ -794,7 +796,7 @@ function update(dt) {
   else if (finishKey() !== finished && phase.name === "run") {
     finished = finishKey();
     const keep = { ...motionState };
-    buildScene(createMachine({ ...machineOptions(), ...finishOptions() }));
+    buildScene(createMachine({ ...machineOptions(), ...finishOptions() }), true);
     Object.assign(motionState, keep);
     pipeline.restartAccumulation();
   }
