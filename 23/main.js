@@ -315,7 +315,9 @@ onPause((running) => {
   if (!running) dragSpin.active = false;
 });
 canvasEl.addEventListener("pointerdown", (ev) => {
-  if (!ev.isPrimary || controls.enableRotate) return;
+  // A second finger (a pinch, which zooms) stops the turn, with no fling.
+  if (!ev.isPrimary) return void Object.assign(dragSpin, { active: false, id: -1, x: 0, y: 0 });
+  if (controls.enableRotate) return;
   Object.assign(dragSpin, { active: true, lastX: ev.clientX, lastY: ev.clientY, lastT: performance.now(), id: ev.pointerId, x: 0, y: 0 });
   canvasEl.setPointerCapture(ev.pointerId);
 });
@@ -462,13 +464,19 @@ const meshOptions = (seed) => ({
   ...meshSettings(params.detail()),
 });
 
+let meshInFlight = Promise.resolve();
 async function buildMesh(seed = getSeed(), { target = "a" } = {}) {
   const serial = ++buildSerial;
   const detail = params.detail();
   const opts = meshOptions(seed);
   // The baked mesh info arrives asynchronously
   if (!(await baker.ready) || serial !== buildSerial) return false;
-  const built = await meshBuilder.build(opts);
+  // One build in the worker at a time: a newer request made meanwhile replaces this one, so a drag never queues a backlog.
+  await meshInFlight;
+  if (serial !== buildSerial) return false;
+  const job = meshBuilder.build(opts);
+  meshInFlight = job.catch(() => {});
+  const built = await job;
   if (serial !== buildSerial) {
     built.geometry.dispose();
     return false;
