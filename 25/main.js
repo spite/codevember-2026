@@ -108,6 +108,8 @@ const replayStart = Number(new URLSearchParams(location.search).get("replayStart
 // The start screen: camera, or mouse (touch). Choosing the camera asks for it, and falls back to the mouse if it
 // isn't allowed.
 const touch = matchMedia("(pointer: coarse)").matches;
+// The control the frame loop last synced the camera to.
+let lastControl;
 const chooser = createChooser({
   touch,
   status: () => tracker.state.status,
@@ -763,7 +765,7 @@ compileScene.add(firstSkull.veil.front.clone());
 await load.compile.track(Promise.all([pipeline.compileAsync(scene, camera), renderer.compileAsync(compileScene, camera)]), 4);
 firstSkull.root.visible = false;
 
-let lastControl = params.control();
+lastControl = params.control();
 window.app = {
   canvas: renderer.domElement,
   params,

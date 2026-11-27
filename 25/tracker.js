@@ -67,6 +67,9 @@ function createTracker() {
   let landmarker = null; // main-thread fallback
   let busy = false;
   let stream = null;
+  // Whether the camera is wanted now; stop() bumps gen, so a start still waiting on the prompt knows it was cancelled.
+  let wanted = false;
+  let gen = 0;
   let lastVideoTime = -1;
   let lastTime = 0;
   // The newest camera frame not yet handed to the landmarker, by its capture time (ms).
@@ -133,7 +136,15 @@ function createTracker() {
   // A start while one is under way waits for that one.
   let starting = null;
   function start() {
-    starting ??= begin().finally(() => (starting = null));
+    wanted = true;
+    if (!starting) {
+      const g = gen;
+      // Stopped and started again while it was under way: that run gave up, so start over.
+      starting = begin().finally(() => {
+        starting = null;
+        if (wanted && !stream && gen !== g) start();
+      });
+    }
     return starting;
   }
 
@@ -145,21 +156,30 @@ function createTracker() {
       return;
     }
     state.status = "asking";
+    const g = gen;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+      if (g !== gen) {
+        for (const track of s.getTracks()) track.stop();
+        return;
+      }
+      stream = s;
       // Then the fastest frame rate the camera says it has, if that's more than it chose.
       const track = stream.getVideoTracks()[0];
       const max = track?.getCapabilities?.().frameRate?.max;
       if (max && max > (track.getSettings().frameRate ?? 0)) await track.applyConstraints({ frameRate: { ideal: max } }).catch(() => {});
     } catch (e) {
-      state.status = "denied";
+      if (g !== gen) return;
+      state.status = e.name === "NotAllowedError" || e.name === "SecurityError" ? "denied" : "failed";
       state.error = e.message;
       return;
     }
+    if (!stream) return;
     const settings = stream.getVideoTracks()[0]?.getSettings?.() ?? {};
     state.mirrored = settings.facingMode !== "environment";
     video.srcObject = stream;
     await video.play().catch(() => {});
+    if (!stream) return;
     if (video.requestVideoFrameCallback) {
       const onFrame = (now, meta) => {
         counts.frames++;
@@ -189,6 +209,8 @@ function createTracker() {
   }
 
   function stop() {
+    wanted = false;
+    gen++;
     for (const track of stream?.getTracks() ?? []) track.stop();
     stream = null;
     video.srcObject = null;
