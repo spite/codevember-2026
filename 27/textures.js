@@ -39,8 +39,15 @@ function getWorker() {
   try {
     worker = new Worker(new URL("./bake-worker.js", import.meta.url), { type: "module" });
     worker.onmessage = ({ data: { id, r } }) => {
-      pending.get(id)?.(r);
+      pending.get(id)?.resolve(r);
       pending.delete(id);
+    };
+    // A worker that fails to load (async, so the catch below misses it): its bakes and every later one run here.
+    worker.onerror = (e) => {
+      console.warn("day 27: the bake worker failed, baking on the main thread", e.message);
+      worker = false;
+      for (const p of pending.values()) p.resolve(rasterizeBurrow(p.job));
+      pending.clear();
     };
   } catch {
     worker = false;
@@ -64,7 +71,7 @@ export function bakeBurrowVolumes({ archetype, shape, complexity, T, G, random =
   if (!w) return Promise.resolve(toVolume(shape, rasterizeBurrow(job)));
   const id = nextId++;
   return new Promise((resolve) => {
-    pending.set(id, (r) => resolve(toVolume(shape, r)));
+    pending.set(id, { job, resolve: (r) => resolve(toVolume(shape, r)) });
     w.postMessage({ id, job });
   });
 }

@@ -398,7 +398,9 @@ function applyVolume(vol) {
 }
 
 // 3/4 museum macro camera framing matching the hero cube references.
-camera.fov = 34;
+// baseFov is what common.js widens for portrait on every resize; this first one is widened the same way here.
+camera.userData.baseFov = 34;
+camera.fov = camera.aspect < 1 ? (2 * Math.atan(Math.tan((34 * Math.PI) / 360) / camera.aspect) * 180) / Math.PI : 34;
 camera.updateProjectionMatrix();
 camera.position.set(3.45, 3.05, 3.85);
 controls.target.set(0, 0.96, 0);
@@ -528,6 +530,8 @@ function idleOrbit(dt) {
 }
 
 let soundStarted = false;
+let pendingKey = null;
+let pendingSince = 0;
 render(({ time, dt }) => {
   if (!soundStarted) {
     soundStarted = true;
@@ -540,7 +544,13 @@ render(({ time, dt }) => {
   cycle.snap = false;
 
   autoChange.update(dt);
-  if (sculptureKey() !== currentKey) beginLift(true);
+  // A Complexity drag bakes once the slider rests (a bake per step would queue up); archetype and shape go at once.
+  const wantKey = sculptureKey();
+  if (wantKey !== currentKey) {
+    if (wantKey !== pendingKey) (pendingKey = wantKey), (pendingSince = now);
+    const sameForm = wantKey.split("|").slice(0, 2).join() === currentKey.split("|").slice(0, 2).join();
+    if (!sameForm || now - pendingSince > 250) beginLift(true);
+  }
   updateCycle(dt);
   const lift = cycle.lift;
   const present = cycle.phase === "lift" ? 1 - Math.min(cycle.t / LIFT_TIME, 1) : 1;
