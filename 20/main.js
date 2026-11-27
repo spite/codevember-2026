@@ -14,7 +14,6 @@ import { createSound } from "./sound.js";
 
 const WRAP_SECONDS = 10; // how long the silk takes to go on, or come off
 const CLOSED = 0.87; // how much of the silk is on when the bands have closed over the head, the last place they do
-const HOLD_SECONDS = 3.5; // how long a closed cocoon holds still before it hatches by itself
 const LAMP_COLOR = new Color("#ffd9a8");
 
 const defaults = {
@@ -26,7 +25,7 @@ const defaults = {
   orbit: 1,
   speed: 1,
   auto: true,
-  autoTime: 10,
+  autoTime: 4,
 };
 const params = fromDefaults(defaults);
 const styleOf = (name) => STYLES[name] ?? STYLES[defaults.style];
@@ -237,7 +236,8 @@ function startOver(fuzz) {
   closedWith = tint;
 }
 
-const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTime, gui, ready: () => !hatch && wrapped >= 1 });
+// A closed cocoon, all but still, hatches "Change every" seconds after it closes.
+const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTime, gui, min: 2, max: 30, ready: () => !hatch && wrapped >= CLOSED });
 pipeline.addGUI(gui);
 gui.addSeparator();
 gui.addText(keysHelp());
@@ -325,7 +325,6 @@ window.app = {
   // A new cocoon from bare, with the current fuzz: for a recording to start from the beginning.
   restart() {
     hatch = 0;
-    closedFor = 0;
     lastFrame = performance.now();
     startOver(seed);
   },
@@ -343,7 +342,6 @@ for (const name of STYLE_NAMES) getStudio(name);
 let lastWall = performance.now();
 let lastFrame = lastWall;
 let lampAngle = 0;
-let closedFor = 0;
 const lampPath = new Vector3(), lampAside = new Vector3(), lampDodge = new Vector3();
 let tearing = 0; // how fast the shell is breaking, eased, for the sound
 let strainWas = 0, strainRising = false; // for a push at the height of each shove
@@ -436,12 +434,6 @@ render(({ time, dt }) => {
       figure.setBodyColors(tint);
     }
     if (wrapped < 0.3) closedWith = tint;
-  }
-  // A closed cocoon, all but still, hatches by itself after a few seconds (kiosk mode only).
-  closedFor = !hatch && params.auto() && wrapped >= CLOSED ? closedFor + frameStep : 0;
-  if (closedFor > HOLD_SECONDS) {
-    closedFor = 0;
-    randomize();
   }
   figure.uniforms.uHatch.value = hatch;
   const share = (v) => `${Math.round(v * 100)}%`;
