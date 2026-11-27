@@ -1,4 +1,4 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, keysHelp, setDay, showHint, showSoundHint, loadingStep, getSeed, loadSeed, addActionButton, addKey, onPause } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, keysHelp, setDay, showHint, showSoundHint, loadingStep, getSeed, loadSeed, randomize, addActionButton, addKey, onPause } from "common";
 import { GUI } from "guspira";
 import { Scene, Vector3, Vector2, Raycaster, Quaternion } from "three";
 import { Pipeline } from "modules/pipeline/Pipeline.js";
@@ -112,6 +112,7 @@ const backdrop = createBackdrop({ floorY: FLOOR_Y, color: LOOKS.peach.backdrop }
 scene.add(backdrop.mesh);
 const cutter = new Cutter();
 
+let buildFailures = 0;
 const stage = new Stage({
   scene,
   shadowCamera: () => pipeline.shadow?.camera,
@@ -120,7 +121,9 @@ const stage = new Stage({
     if (t >= 1 || from === to) dress(to);
     blendStudio(from, to, t, { backdrop, pipeline });
   },
-  onSettled: () => autoChange.restart(),
+  onSettled: () => ((buildFailures = 0), autoChange.restart()),
+  // A build that fails would leave the stage empty for good: try another seed, a few times at most.
+  onFailed: () => ++buildFailures <= 3 && randomize(),
   onArrive: (c) => director.reframe(c.framing()),
   // Each piece as it lifts off its seat, and as it lands: a click and a clack, the base heavier.
   onCue: (name, gate) => {

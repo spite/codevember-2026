@@ -58,11 +58,12 @@ const STAGGER = 0.22;
 
 class Stage {
   // shadowCamera(): the camera the shadow map is drawn with.
-  constructor({ scene, onLook, onSettled, onArrive, onCue, shadowCamera = () => null }) {
+  constructor({ scene, onLook, onSettled, onArrive, onCue, onFailed, shadowCamera = () => null }) {
     this.scene = scene;
     this.shadowCamera = shadowCamera;
     this.onLook = onLook;
     this.onSettled = onSettled;
+    this.onFailed = onFailed;
     this.onArrive = onArrive;
     // onCue(name, gate or null): "off" as a piece lifts away, "land" as one comes down.
     this.onCue = onCue;
@@ -93,17 +94,25 @@ class Stage {
 
   // Swaps in whatever `next` (a promise of { contraption, look }) resolves to.
   change(next) {
-    // One built but not yet brought in is dropped for the newer one.
-    this.next?.contraption.dispose();
-    this.next = null;
-    this.pending = next;
-    next.then(
-      (entry) => {
-        if (this.pending === next) this.next = entry;
-        else entry.contraption.dispose();
-      },
-      (error) => console.error("day 18: building a contraption failed", error),
-    );
+    // Asked again for the one already coming (a change queued during an arrival): keep it.
+    if (next !== this.pending) {
+      // One built but not yet brought in is dropped for the newer one.
+      this.next?.contraption.dispose();
+      this.next = null;
+      this.pending = next;
+      next.then(
+        (entry) => {
+          if (this.pending === next) this.next = entry;
+          else entry.contraption.dispose();
+        },
+        (error) => {
+          console.error("day 18: building a contraption failed", error);
+          if (this.pending !== next) return;
+          this.pending = null;
+          this.onFailed?.();
+        },
+      );
+    }
     if (this.state === "idle") {
       if (!this.current) return this.enter("empty");
       const c = this.current.contraption;
