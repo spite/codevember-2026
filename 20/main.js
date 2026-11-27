@@ -499,6 +499,7 @@ render(({ time, dt }) => {
   keepInStudio(controls.target, 0.2, 2.5);
   keepInStudio(camera.position, 0.25, 6);
   camera.lookAt(controls.target);
-  drawLampDepth();
+  // The lamp's depth only matters while it gives light.
+  if (lamp.visible) drawLampDepth();
   pipeline.render(scene, camera, time);
 });
