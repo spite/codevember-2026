@@ -977,7 +977,7 @@ async function applyBuild(d) {
 
 // Kiosk mode: while a piece plays out, the next one (what the next auto change's seed gives) is grown in a worker of its
 // own and its program compiled, so the change rarely waits.
-const prefetch = { state: "", pending: "", since: 0, seed: null, key: null, look: null, result: null, done: false, taken: false, worker: null };
+const prefetch = { checked: -Infinity, state: "", pending: "", since: 0, seed: null, key: null, look: null, result: null, done: false, taken: false, worker: null };
 const stateKey = () => getSeed() + "|" + JSON.stringify(params.$snapshot(params.$keys));
 // What randomizing with this seed would set, without changing anything on show.
 function predict(seed) {
@@ -996,6 +996,9 @@ function predict(seed) {
 }
 function updatePrefetch(now) {
   if (!params.auto() || capturing || !built || blank || busy || built !== buildKey() || swap.phase !== "idle") return;
+  // A few checks a second are enough to see the panel settle.
+  if (now - prefetch.checked < 250) return;
+  prefetch.checked = now;
   const st = stateKey();
   if (st === prefetch.state) return;
   // Once the panel has been left alone a moment.
@@ -1281,6 +1284,7 @@ const framing = { f: 1, lift: 0, user: false };
 controls.addEventListener("start", () => (framing.user = true));
 controls.addEventListener("end", () => (framing.user = false));
 const _ft = new Vector3();
+const _ft2 = new Vector3();
 function updateFraming(dt) {
   const st = stages();
   const wide = swap.phase === "idle" ? smooth(st.etch[0] - 0.3, st.etch[0] + 2.2, clock) * (1 - smooth(st.etch[1] + 0.3, st.etch[1] + 3.3, clock)) : 0;
@@ -1292,7 +1296,7 @@ function updateFraming(dt) {
   // Back to the viewer's own framing, then out to this frame's.
   const base = _ft.copy(controls.target);
   base.y -= framing.lift;
-  const dir = camera.position.clone().sub(controls.target);
+  const dir = _ft2.subVectors(camera.position, controls.target);
   const dist = dir.length() / framing.f;
   dir.normalize();
   controls.target.copy(base).y += lift;
@@ -1434,6 +1438,11 @@ const _n = new Vector3();
 const _d = new Vector3();
 // The piece sways gently while it is scribed, and at each hammer blow jolts (a stiff spring) and swings (a soft one,
 // in rotation), settling between blows.
+// In real time, so a fast Speed doesn't push the jerks past the frame rate into jitter.
+function jerk(seconds, f, o) {
+  const v = Math.sin(seconds * 2 * Math.PI * f + o);
+  return Math.sign(v) * Math.abs(v) ** 0.3;
+}
 const shake = { x: new Vector3(), v: new Vector3(), r: new Vector3(), w: new Vector3(), s: new Vector3(), sw: new Vector3(), sway: 0 };
 const _sq = new Quaternion();
 function spring(x, v, k, zeta, h) {
@@ -1466,12 +1475,8 @@ function updateShake(dt, t) {
   const tl = (etch - ACID.drain[0]) * (stages().etch[1] - stages().etch[0]);
   const ph = tl * 1.15 - Math.floor(tl * 1.15);
   const burst = off * smooth(0, 0.06, ph) * (1 - smooth(0.42, 0.55, ph));
-  // In real time, so a fast Speed doesn't push the jerks past the frame rate into jitter.
-  const jerk = (f, o) => {
-    const v = Math.sin((performance.now() / 1000) * 2 * Math.PI * f + o);
-    return Math.sign(v) * Math.abs(v) ** 0.3;
-  };
-  const jx = burst * jerk(5.6, 0), jz = burst * jerk(5.6, 1.9);
+  const wall = performance.now() / 1000;
+  const jx = burst * jerk(wall, 5.6, 0), jz = burst * jerk(wall, 5.6, 1.9);
   mesh.position.copy(shake.x).y += 0.006 * shake.sway * Math.sin(t * 1.7 + 0.5);
   mesh.position.x += 0.065 * jx;
   mesh.position.z += 0.025 * jz;
