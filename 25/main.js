@@ -299,6 +299,8 @@ onRandomize(() => {
 
 function updateSwap(dt, skull) {
   const veil = skull?.veil;
+  // A change asked for during the last drop is played now, in the look it was shown with until then.
+  if (swap.state === "idle" && veil && swap.redrop) swap.state = "out";
   if (swap.state === "idle") {
     // Colour, opacity and diffusion follow the panel live; a new cut of cloth needs a new drop.
     shown.color = params.veilColor();
