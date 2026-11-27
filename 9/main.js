@@ -659,9 +659,15 @@ function rebuild(first = false) {
   }
 }
 
+// No sound before the first frame: the opening set's swell waits for it.
+let started = false;
+let swellPending = false;
+const playSwell = () => setTimeout(() => sound.play("swell", { gain: 1 }), 250);
+
 function spawn() {
   // The new set swells in, sucked into place, once the growth shows.
-  setTimeout(() => sound.play("swell", { gain: 1 }), 250);
+  if (started) playSwell();
+  else swellPending = true;
   for (const spec of place(newBodies())) {
     const body = world.addBody({ ...spec, scale: GROW_FROM, quaternion: randomQuat() });
     if (body) live.push({ body, t: 0, delay: Math.random() * 0.3 });
@@ -921,6 +927,10 @@ window.app = {
 };
 
 render(({ time, dt }) => {
+  if (!started) {
+    started = true;
+    if (swellPending) playSwell();
+  }
   adaptScale(performance.now());
   autoChange.update(dt);
   if (key() !== built) {
