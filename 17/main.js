@@ -31,7 +31,10 @@ const FADE_IN = 1.6;
 const SETTLE_STEPS = 15;
 
 const QUALITIES = ["high", "medium", "low"];
-const autoQuality = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || matchMedia("(pointer: coarse)").matches ? "medium" : "high";
+const mobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || matchMedia("(pointer: coarse)").matches;
+// Phones that report little memory or few cores start on the low tier (the kelp physics is CPU-bound there).
+const lowEnd = mobile && ((navigator.deviceMemory ?? 8) <= 4 || (navigator.hardwareConcurrency ?? 8) <= 4);
+const autoQuality = lowEnd ? "low" : mobile ? "medium" : "high";
 const query = new URLSearchParams(location.search);
 const askedQuality = query.get("quality");
 const capture = query.has("capture");
