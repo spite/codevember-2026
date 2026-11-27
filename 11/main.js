@@ -675,6 +675,8 @@ const finishOptions = () => ({ chamfer: params.chamfer(), erosion: { amount: par
 const machineKey = () => JSON.stringify(machineOptions());
 const finishKey = () => JSON.stringify(finishOptions());
 
+let started = false;
+
 function begin() {
   shown = machineKey();
   clearing = false;
@@ -727,7 +729,8 @@ function install() {
   s.threshold = newThreshold(params.rust());
   phase.name = "in";
   phase.t = 0;
-  transitionSounds("in");
+  // The opening machine's arrival sounds wait for the first frame, when its parts start flying in.
+  if (started) transitionSounds("in");
 }
 
 const _m = new Matrix4(), _r = new Matrix4(), _t = new Matrix4(), _p = new Vector3(), _c = new Vector3(), _d = new Vector3();
@@ -932,6 +935,10 @@ window.app = {
 
 
 render(({ time, dt }) => {
+  if (!started) {
+    started = true;
+    if (phase.name === "in") transitionSounds("in");
+  }
   const now = performance.now();
   fps.frames++;
   if (now - fps.since > 500) {
