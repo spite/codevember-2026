@@ -353,11 +353,15 @@ controls.maxPolarAngle = Math.PI * 0.55;
 const portrait = () => innerWidth < innerHeight;
 const layoutSpread = () => (portrait() ? new Vector3(1.7, 2.6, 1.2) : new Vector3(3.4, 2.0, 1.3));
 
-// Keeps the whole cluster in frame at any aspect ratio.
+// Keeps the whole cluster in frame at any aspect ratio; a user zoom is kept in proportion.
+let fitted = 0;
 onResize((w, h, dpr) => {
   const t = Math.tan((camera.fov * Math.PI) / 360);
   const s = layoutSpread();
-  camera.position.setLength(Math.min(CAMERA_MAX, Math.max((s.y + 1.6) / t, (s.x + 1.6) / (t * (w / h)))));
+  const fit = Math.min(CAMERA_MAX, Math.max((s.y + 1.6) / t, (s.x + 1.6) / (t * (w / h))));
+  const distance = fitted ? (camera.position.length() * fit) / fitted : fit;
+  camera.position.setLength(fitted ? Math.min(CAMERA_MAX, Math.max(controls.minDistance, distance)) : distance);
+  fitted = fit;
   pipeline.setSize(w, h, dpr);
 });
 

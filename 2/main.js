@@ -390,12 +390,16 @@ controls.minDistance = 3;
 controls.maxDistance = 14;
 controls.autoRotate = true;
 
-// Frames the burst for the narrower of the two fields of view.
+// Frames the burst for the narrower of the two fields of view; a user zoom is kept in proportion.
 const FRAME_RADIUS = 2.6;
+let fitted = 0;
 onResize((w, h, dpr) => {
   const half = Math.atan(Math.tan((camera.fov * Math.PI) / 360) * Math.min(1, w / h));
   const offset = camera.position.clone().sub(controls.target);
-  offset.setLength(Math.min(controls.maxDistance, FRAME_RADIUS / Math.sin(half)));
+  const fit = Math.min(controls.maxDistance, FRAME_RADIUS / Math.sin(half));
+  const distance = fitted ? (offset.length() * fit) / fitted : fit;
+  fitted = fit;
+  offset.setLength(Math.min(controls.maxDistance, Math.max(controls.minDistance, distance)));
   camera.position.copy(controls.target).add(offset);
   pipeline.setSize(w, h, dpr);
 });
