@@ -726,9 +726,10 @@ function createSpine() {
     for (let i = 0; i < count; i++) {
       sample(i / (count - 1), P, T, N);
       B.crossVectors(T, N);
-      d.set([P.x, P.y, P.z, T.x], i * 4);
-      d.set([N.x, N.y, N.z, T.y], row + i * 4);
-      d.set([B.x, B.y, B.z, T.z], 2 * row + i * 4);
+      const o = i * 4, o1 = o + row, o2 = o1 + row;
+      d[o] = P.x, d[o + 1] = P.y, d[o + 2] = P.z, d[o + 3] = T.x;
+      d[o1] = N.x, d[o1 + 1] = N.y, d[o1 + 2] = N.z, d[o1 + 3] = T.y;
+      d[o2] = B.x, d[o2 + 1] = B.y, d[o2 + 2] = B.z, d[o2 + 3] = T.z;
       extent = Math.max(extent, P.length());
     }
     if (!keepPrev) d.copyWithin(3 * row, 0, 3 * row);
