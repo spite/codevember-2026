@@ -91,19 +91,37 @@ function createSound({ onProgress } = {}) {
     leaderNodes = null;
   }
 
+  // The strike's sounds, some scheduled seconds ahead, so a new object can cut them off.
+  let strikeNodes = [];
+  function stopStrike() {
+    const t = now();
+    for (const n of strikeNodes) {
+      n.level.gain.cancelScheduledValues(t);
+      n.level.gain.setTargetAtTime(0, t, 0.02);
+      n.src.stop(t + 0.1);
+    }
+    strikeNodes = [];
+  }
+
   // strokes: the bolt's return strokes, [{ at, level }], seconds after the first. reveal: how long the discharge
   // takes to run through the glass.
   function strike(strokes = [{ at: 0, level: 1 }], reveal = 1) {
     stopLeader();
+    stopStrike();
     const t = now();
+    const keep = (name, opts) => {
+      const n = play(name, opts);
+      if (n) strikeNodes.push(n);
+      return n;
+    };
     // The crack, close: one of two recordings, a little different each time.
-    play(nativeRandom() < 0.6 ? "crack-0" : "crack-1", { at: t, gain: 1.1, rate: 0.94 + nativeRandom() * 0.12 });
+    keep(nativeRandom() < 0.6 ? "crack-0" : "crack-1", { at: t, gain: 1.1, rate: 0.94 + nativeRandom() * 0.12 });
     // Further off, the roll it starts.
-    play("rumble", { at: t + 0.35, gain: 0.45, rate: 0.9 + nativeRandom() * 0.15, lowpass: 900 });
+    keep("rumble", { at: t + 0.35, gain: 0.45, rate: 0.9 + nativeRandom() * 0.15, lowpass: 900 });
     // A snap for each restrike, down the same channel.
-    for (const { at, level } of strokes.slice(1)) play("zap", { at: t + at, gain: level * 0.7, rate: 0.8 + nativeRandom() * 0.4, highpass: 400 });
+    for (const { at, level } of strokes.slice(1)) keep("zap", { at: t + at, gain: level * 0.7, rate: 0.8 + nativeRandom() * 0.4, highpass: 400 });
     // The glass taking the discharge: crackling while the front runs, fading as it slows.
-    const crackle = play("crackle", { at: t + 0.03, gain: 0.9, rate: 1.1 + nativeRandom() * 0.2, offset: nativeRandom() * 3, highpass: 1500 });
+    const crackle = keep("crackle", { at: t + 0.03, gain: 0.9, rate: 1.1 + nativeRandom() * 0.2, offset: nativeRandom() * 3, highpass: 1500 });
     if (crackle) {
       crackle.level.gain.setValueAtTime(0.9, t + 0.03);
       crackle.level.gain.setTargetAtTime(0, t + reveal * 0.6, reveal * 0.5);
@@ -111,7 +129,7 @@ function createSound({ onProgress } = {}) {
     }
     // And a few ticks as it cools.
     for (let k = 0, at = reveal + 0.3; k < 4; k++, at += 0.4 + nativeRandom() * 1.4) {
-      play("tick", { at: t + at, gain: 0.25 + nativeRandom() * 0.3, rate: 1.2 + nativeRandom() * 0.9, highpass: 1200 });
+      keep("tick", { at: t + at, gain: 0.25 + nativeRandom() * 0.3, rate: 1.2 + nativeRandom() * 0.9, highpass: 1200 });
     }
   }
 
@@ -163,6 +181,7 @@ function createSound({ onProgress } = {}) {
     renderOffline,
     leader,
     stopLeader,
+    stopStrike,
     strike,
     get running() {
       return live.state === "running";

@@ -326,6 +326,7 @@ function clearFigure() {
   glass.uniforms.glow.value = 0;
   glass.uniforms.flash.value = 0;
   bolt.clear();
+  sound.stopStrike();
   for (const c of lamps.lampColor.value) c.setRGB(0, 0, 0);
 }
 function newObject() {
@@ -366,8 +367,10 @@ const _so = new Vector3(), _sn = new Vector3();
 const toWorld = (p, out) => out.set(p[0], p[1], p[2]).multiplyScalar(SCALE).applyAxisAngle(UP, state.angle).add(center);
 
 let now = 0;
+// Strikes wait for the first frame: before it there may be no object, and no sound may play.
+let started = false;
 function strike(hit) {
-  if (state.phase !== "clear" || !hit || !isRunning()) return false;
+  if (!started || state.phase !== "clear" || !hit || !isRunning()) return false;
   const seed = Math.floor(Math.random() * 2 ** 31);
   Object.assign(state, { phase: "leader", start: now, wall: performance.now(), dash: -1, entry: hit.point, normal: hit.normal, result: null, job: state.job + 1 });
   state.strokes = bolt.strike(toWorld(hit.point, _hit), seededRandom(seed));
@@ -381,7 +384,7 @@ function strike(hit) {
 }
 // Somewhere on the side the camera sees, toward the top, where a bolt from above would land.
 function strikeAnywhere() {
-  if (state.phase !== "clear") return;
+  if (!started || state.phase !== "clear") return;
   const c = center.clone().project(camera);
   let best = null;
   for (let i = 0; i < 40; i++) {
@@ -402,7 +405,10 @@ canvas.addEventListener("pointerup", (e) => {
   strike(pick(((e.clientX - rect.left) / rect.width) * 2 - 1, 1 - ((e.clientY - rect.top) / rect.height) * 2));
 });
 
+// Ignored until the shapes have loaded; the object is built from the params then.
+let booted = false;
 onRandomize(() => {
+  if (!booted) return;
   const was = params.shape();
   gui.randomizeAll();
   // Always another shape.
@@ -414,6 +420,7 @@ onRandomize(() => {
 });
 // Every shape is needed before the url's seed and params are applied: the seed's handler builds the object.
 await suzanne;
+booted = true;
 applyUrlState();
 newObject();
 await studio;
@@ -441,6 +448,7 @@ const HOT = new Color(0.3, 0.55, 1.0), COOL = new Color(0.12, 0.25, 1.0);
 
 let bloom = BLOOM, flashBloom = 0;
 function frame({ time, dt }) {
+  started = true;
   now = time;
   autoChange.update(dt);
   if (state.phase === "clear" && autoChange.remaining < Math.min(AUTO_STRIKE, params.autoTime() * 0.6)) strikeAnywhere();
