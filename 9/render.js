@@ -517,6 +517,8 @@ const copyScene = fullscreen(new RawShaderMaterial({
 const copyCamera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
 // Built level by level (each from the one above), then copied into one atlas for sampling.
+const _clear = new Color();
+
 class Pyramid {
   constructor(levels = 6) {
     this.levels = Array.from({ length: levels }, () => rt());
@@ -804,7 +806,7 @@ class VolumePass {
       this.absorbPyr.setSize(width, height);
     }
     const prev = renderer.getRenderTarget();
-    const clear = renderer.getClearColor(new Color()), clearAlpha = renderer.getClearAlpha();
+    const clear = renderer.getClearColor(_clear), clearAlpha = renderer.getClearAlpha();
     const autoClear = renderer.autoClear;
     renderer.autoClear = false;
 

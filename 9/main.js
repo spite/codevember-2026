@@ -809,6 +809,7 @@ function updateIdleSounds(dt) {
   sound.play("squish", { gain: 0.18 + 0.12 * nativeRandom(), pan: panOf(...b.c), rate: 0.6 - size * 0.12 });
 }
 
+const changing = new Set();
 function updateSounds() {
   if (world.version === heard) return;
   heard = world.version;
@@ -816,7 +817,9 @@ function updateSounds() {
   if (dt <= 0) return;
   const { x } = world;
   // Bodies shrinking away or swelling in move fast on purpose: no impact sounds from them.
-  const changing = new Set([...dying.map((it) => it.body), ...live.filter((it) => it.t < 1).map((it) => it.body)]);
+  changing.clear();
+  for (const it of dying) changing.add(it.body);
+  for (const it of live) if (it.t < 1) changing.add(it.body);
   for (const b of world.bodies) {
     if (b.start < 0 || changing.has(b)) continue;
     let m = motion.get(b);
@@ -828,8 +831,8 @@ function updateSounds() {
     }
     const vx = (b.c[0] - m.c[0]) / dt, vy = (b.c[1] - m.c[1]) / dt, vz = (b.c[2] - m.c[2]) / dt;
     const dv = Math.hypot(vx - m.v[0], vy - m.v[1], vz - m.v[2]);
-    m.v = [vx, vy, vz];
-    m.c = [...b.c];
+    m.v[0] = vx, m.v[1] = vy, m.v[2] = vz;
+    m.c[0] = b.c[0], m.c[1] = b.c[1], m.c[2] = b.c[2];
     m.cool -= dt;
     const size = Math.min(1, b.radius * b.scale * 2.2);
     if (m.cool <= 0 && dv > 0.45 && b.scale > 0.6) {
@@ -847,7 +850,7 @@ function updateSounds() {
       const k = (b.fstart + j) * 3, o = j * 6;
       const fx = (x[k] - m.f[o]) / dt, fy = (x[k + 1] - m.f[o + 1]) / dt, fz = (x[k + 2] - m.f[o + 2]) / dt;
       const fdv = Math.hypot(fx - m.f[o + 3], fy - m.f[o + 4], fz - m.f[o + 5]);
-      m.f.set([x[k], x[k + 1], x[k + 2], fx, fy, fz], o);
+      m.f[o] = x[k], m.f[o + 1] = x[k + 1], m.f[o + 2] = x[k + 2], m.f[o + 3] = fx, m.f[o + 4] = fy, m.f[o + 5] = fz;
       m.fcool[j] -= dt;
       if (m.fcool[j] <= 0 && fdv > 2.2 && b.floaters[j].radius < 0.3) {
         sound.play("marble", { gain: Math.min(0.6, (fdv - 2.2) / 4) + 0.3, pan: panOf(x[k], x[k + 1], x[k + 2]) });
