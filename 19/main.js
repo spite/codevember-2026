@@ -88,6 +88,8 @@ const defaults = {
 const params = fromDefaults(defaults);
 const load = {
   studio: loadingStep(1, "Lighting the studio…"),
+  // The opening environment, when it is a beach (the default): its own HDR download.
+  beach: loadingStep(2, "Walking to the beach…"),
   glass: loadingStep(2, "Tumbling glass…"),
   compile: loadingStep(3, "Compiling shaders…"),
   sound: loadingStep(1, "Gathering clinks…"),
@@ -506,7 +508,7 @@ load.glass.track(
 const [hdrEnv, softboxEnv] = await Promise.all([hdrEnvPromise, softboxEnvPromise]);
 envs["HDR Studio"] = hdrEnv;
 envs["Softbox Studio"] = softboxEnv;
-if (BEACHES[params.environment()]) await load.studio.track(loadBeach(params.environment()));
+await load.beach.track(BEACHES[params.environment()] ? loadBeach(params.environment()) : Promise.resolve());
 await selectEnvironment(params.environment());
 // Start facing the sun: the camera on the far side of the glass from it, a little above, so the sun sits behind the
 // cluster and lights it from the back
