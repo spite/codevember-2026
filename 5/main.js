@@ -357,6 +357,11 @@ function install(data, isPreview = false, keepGrowth = false) {
     hero.remove(body, shells);
     body.geometry.dispose();
     shells.geometry.dispose();
+    // Frees the instance matrix buffer, shared with the depth copy, which goes with it.
+    shells.dispose();
+    shellDepth?.removeFromParent();
+    shellDepth?.dispose();
+    shellDepth = null;
   }
   const g = new BufferGeometry();
   g.setAttribute("position", new BufferAttribute(data.position, 3));
@@ -490,7 +495,7 @@ syncShellDepth();
 await load.compile.track(pipeline.compileAsync(scene, camera), 4);
 started = true;
 
-window.app = { canvas: renderer.domElement, pipeline, controls, params, shared, rd, regrow };
+window.app = { canvas: renderer.domElement, pipeline, camera, controls, params, shared, rd, regrow };
 
 const focusPoint = new Vector3();
 const lookKey = () => [params.moss(), params.stone(), params.weathering(), params.depth(), params.shoots(), params.overgrowth()].join();
