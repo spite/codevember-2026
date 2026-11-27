@@ -150,9 +150,8 @@ for (const def of SHAPES)
 // The holes and the hollowing; these rebuild too.
 gui.addSection("Hollowing");
 // Randomize keeps the lattice open: more cells get thinner struts.
-let randomCells = defaults.cells;
 gui.addSlider("Cells", params.cells, 40, 1000, 1,
-  tip("About how many holes the sculpture gets. More cells means smaller holes and a finer lattice. Rebuilds.")).randomize = () => params.cells.set((randomCells = Math.round(150 + Math.random() * 150)));
+  tip("About how many holes the sculpture gets. More cells means smaller holes and a finer lattice. Rebuilds.")).randomize = () => params.cells.set(Math.round(150 + Math.random() * 150));
 gui.addSlider("Variation", params.variation, 0, 1, 0.01,
   tip("How much hole sizes vary across the surface: 0 makes them all alike, 1 mixes big and small holes in patches. Rebuilds."));
 gui.addSlider("Roundness", params.roundness, 0.1, 1, 0.01,
@@ -164,7 +163,7 @@ gui.addButton("Hollow again", () => rehollow()).el.title = "Replays the hollowin
 gui.addSection("Look");
 gui.addSlider("Strut", params.strut, 0.06, 0.45, 0.01,
   tip("Width of the struts between holes, relative to the cell size: higher values make wider struts and smaller holes. Re-cuts the lattice without hollowing again.")).randomize = () => {
-  const top = 0.26 - ((randomCells - 150) / 150) * 0.05;
+  const top = 0.26 - ((Math.min(300, Math.max(150, params.cells())) - 150) / 150) * 0.05;
   params.strut.set(Math.round((0.15 + Math.random() * (top - 0.15)) * 100) / 100);
 };
 gui.addSlider("Fillet", params.fillet, 0.1, 1, 0.01,
@@ -760,6 +759,11 @@ sketcher.w.onmessage = (e) => {
   if (!e.data.error && previewing && e.data.shape === resolveShape()) showSketch(e.data);
   askSketch();
 };
+// A sketch worker that fails leaves previews off: the full builds still come from the meshers.
+sketcher.w.onerror = (e) => {
+  console.error("day 7: the sketch worker failed", e.message);
+  Object.assign(sketcher, { busy: false, want: null, dead: true });
+};
 let previewing = false;
 // A change of shape shrinks the sculpture away and grows the new one in, both eased.
 const morph = { s: 1, from: 1, to: 1, t: 1, dur: 1, ease: Easings.Linear, queued: null, shown: null, last: performance.now() };
@@ -821,6 +825,7 @@ let bgSet = false;
 const eased = { day: null, warmth: null, bright: null };
 
 function askSketch() {
+  if (sketcher.dead) sketcher.want = null;
   if (sketcher.busy || !sketcher.want) return;
   const d = sketcher.want;
   // The same shape as the sculpture on show: the outlines go onto it, so they take its exact frame.
