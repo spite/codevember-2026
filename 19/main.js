@@ -562,7 +562,12 @@ setTimeout(() => Object.values(BEACHES).forEach(({ url }) => fetch(url).catch(()
 
 let lastWall = performance.now();
 
+let soundArmed = false;
 render(({ time, dt }) => {
+  if (!soundArmed) {
+    soundArmed = true;
+    sound.arm();
+  }
   const now = performance.now();
   const wallDt = Math.min(0.1, (now - lastWall) * 0.001);
   lastWall = now;

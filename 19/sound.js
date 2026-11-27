@@ -68,6 +68,16 @@ export function createSound({ base = "./sounds/", enabled = true, onProgress, am
         }
       }),
     );
+    decodedAll = true;
+    maybeStartShore();
+  }
+  // The shore waits for both the decode and arm(), called on the page's first frame.
+  let armed = false;
+  let decodedAll = false;
+  let shoreStarted = false;
+  function maybeStartShore() {
+    if (!armed || !decodedAll || shoreStarted) return;
+    shoreStarted = true;
     startShore();
   }
   // Resolves once every sample is decoded
@@ -233,6 +243,10 @@ export function createSound({ base = "./sounds/", enabled = true, onProgress, am
   }
 
   return {
+    arm() {
+      armed = true;
+      maybeStartShore();
+    },
     downloaded,
     decoded,
     beginOffline,
