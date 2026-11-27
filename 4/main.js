@@ -16,7 +16,6 @@ const FLOOR_Y = -1.7;
 // The Merge slider in blend radius; the bands are thin, so its range is scaled down to keep them distinct.
 const MERGE_SCALE = 0.4;
 const KEY_DIRECTION = new Vector3(-0.5, 0.85, 0.5);
-const lite = /Mobi|Android|iPhone|iPad/.test(navigator.userAgent) || matchMedia("(pointer: coarse)").matches;
 
 // Thin-film colour ranges: film thickness in nm, picked where the interference colour runs through
 // the palette's hues; glass absorbs the complementary colours.
@@ -96,9 +95,6 @@ const defaults = {
 const params = fromDefaults(defaults);
 
 const knots = new Knots();
-// The volume only finds which bands a ray passes near (they are solved exactly), and the glossy reflections hold up at
-// half resolution: both look the same as 64³ at full resolution.
-const tangle = new Tangle(knots, { volume: 32, halfReflections: true, ...(lite && { rings: 192, sides: 28, reflectionSteps: 12 }) });
 
 const pipeline = new Pipeline(renderer, {
   background: BACKDROP,
@@ -109,6 +105,11 @@ const pipeline = new Pipeline(renderer, {
   shadow: { autoFit: true, denoise: true },
   depthOfField: { aperture: 0, maxBlur: 0.03, lensSamples: 24 },
 });
+// Lighter bands and reflections on the lower tiers (phones by default, or ?quality=).
+const lite = pipeline.quality === "medium" || pipeline.quality === "low";
+// The volume only finds which bands a ray passes near (they are solved exactly), and the glossy reflections hold up at
+// half resolution: both look the same as 64³ at full resolution.
+const tangle = new Tangle(knots, { volume: 32, halfReflections: true, ...(lite && { rings: 192, sides: 28, reflectionSteps: 12 }) });
 globalUniforms.aoIntensity.value = 1;
 globalUniforms.aoMin.value = 0.06;
 globalUniforms.lightSpecular.value = 0;

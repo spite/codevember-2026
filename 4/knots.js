@@ -316,6 +316,11 @@ export class Knots {
         this._tie(next, n, true, matchTwist);
       }
     } else if (this.blend < 1) this.blend = Math.min(1, this.blend + dt / 2);
+    // Nothing has moved since the last update (paused, or Motion at 0, with no re-tie under way): keep the texture.
+    if (this.blend === 1 && this._shownBlend === 1 && this.to === this._shownTo && time === this._shownTime) return;
+    this._shownTo = this.to;
+    this._shownTime = time;
+    this._shownBlend = this.blend;
     const e = this.blend * this.blend * (3 - 2 * this.blend);
     const d = this.data;
     const a = (this._a ??= new Float32Array(d.length));
