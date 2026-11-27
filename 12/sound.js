@@ -95,7 +95,7 @@ export function createSound() {
       const d = tail.getChannelData(c);
       let y = 0;
       for (let i = 0; i < d.length; i++) {
-        y = 0.6 * y + 0.4 * (Math.random() * 2 - 1);
+        y = 0.6 * y + 0.4 * (nativeRandom() * 2 - 1);
         d[i] = y * Math.exp((-4 * i) / d.length) * (i < 400 ? i / 400 : 1);
       }
     }
@@ -109,7 +109,7 @@ export function createSound() {
     const buf = ctx.createBuffer(1, n, ctx.sampleRate);
     const d = buf.getChannelData(0);
     let b = 0;
-    for (let i = 0; i < n; i++) d[i] = b = 0.97 * b + 0.03 * (Math.random() * 2 - 1) * 4;
+    for (let i = 0; i < n; i++) d[i] = b = 0.97 * b + 0.03 * (nativeRandom() * 2 - 1) * 4;
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.loop = true;

@@ -659,15 +659,20 @@ controls.target.set(0, 0, 0);
 // momentum.
 controls.enableRotate = false;
 controls.enablePan = false;
-const turn = { active: false, x: 0, y: 0, vx: 0, vy: 0 };
+// One pointer turns the form; a second (a pinch, which zooms) stops it until every pointer is up.
+const turn = { active: false, id: null, x: 0, y: 0, vx: 0, vy: 0 };
+const pointers = new Set();
 renderer.domElement.addEventListener("pointerdown", (e) => {
-  turn.active = true;
+  if (e.isPrimary) pointers.clear();
+  pointers.add(e.pointerId);
+  turn.vx = turn.vy = 0;
+  turn.active = pointers.size === 1;
+  turn.id = e.pointerId;
   turn.x = e.clientX;
   turn.y = e.clientY;
-  turn.vx = turn.vy = 0;
 });
 addEventListener("pointermove", (e) => {
-  if (!turn.active) return;
+  if (!turn.active || e.pointerId !== turn.id) return;
   const k = 4 / Math.max(innerHeight, 1);
   turn.vx = (e.clientX - turn.x) * k;
   turn.vy = (e.clientY - turn.y) * k;
@@ -675,7 +680,12 @@ addEventListener("pointermove", (e) => {
   turn.y = e.clientY;
   rotateForm(turn.vx, turn.vy);
 });
-for (const e of ["pointerup", "pointercancel"]) addEventListener(e, () => (turn.active = false));
+for (const type of ["pointerup", "pointercancel"]) {
+  addEventListener(type, (e) => {
+    pointers.delete(e.pointerId);
+    turn.active = false;
+  });
+}
 const _qa = new Quaternion(), _qb = new Quaternion(), _up = new Vector3(), _right = new Vector3();
 // Turns the form about the camera's up (dx) and right (dy) axes.
 function rotateForm(dx, dy) {
