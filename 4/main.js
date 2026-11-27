@@ -98,7 +98,7 @@ const params = fromDefaults(defaults);
 const knots = new Knots();
 // The volume only finds which bands a ray passes near (they are solved exactly), and the glossy reflections hold up at
 // half resolution: both look the same as 64³ at full resolution.
-const tangle = new Tangle(knots, lite ? { rings: 192, sides: 28, volume: 32, reflectionSteps: 12 } : { volume: 32, halfReflections: true });
+const tangle = new Tangle(knots, { volume: 32, halfReflections: true, ...(lite && { rings: 192, sides: 28, reflectionSteps: 12 }) });
 
 const pipeline = new Pipeline(renderer, {
   background: BACKDROP,
