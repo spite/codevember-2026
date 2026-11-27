@@ -217,7 +217,7 @@ gui.addText(
     ? "<p>Drag to turn the sculpture, two fingers to move around it and zoom, tap a window to switch its light.</p>"
     : `<p>Drag to turn the sculpture, right-drag to move around it, scroll to zoom, click a window to switch its light.</p>${keysHelp()}`,
 );
-showHint("Drag to turn · right-drag to orbit · click a window · R for another", "Drag to turn · two fingers to orbit · tap {randomize} for another");
+showHint("Drag to turn · right-drag to orbit · click a window · R for another", "Drag to turn · two fingers to orbit · tap a window · tap {randomize} for another");
 gui.show();
 // Floating free: each new one turns up at its own angle.
 // It eases from the old angle to the new one over the morph.
