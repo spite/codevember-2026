@@ -18,7 +18,18 @@ function shiftChromatic(hex, dh, ds = 0, dl = 0) {
 }
 
 // Compute a remixed studio backdrop for Cycle >= 1 so recurring families feel fresh and cohesive
+// Cached: it is asked for every frame, and the same object back lets the caller skip re-parsing its colours.
+const backdropCache = new Map();
 function getBackdropForFamily(familyIndex, seed) {
+  const key = `${familyIndex}|${seed}`;
+  let b = backdropCache.get(key);
+  if (!b) {
+    if (backdropCache.size > 64) backdropCache.clear();
+    backdropCache.set(key, (b = computeBackdrop(familyIndex, seed)));
+  }
+  return b;
+}
+function computeBackdrop(familyIndex, seed) {
   const family = getFamilyForIndex(familyIndex, seed);
   const base = family.backdrop;
   const cycle = Math.abs(Math.floor(familyIndex / FAMILIES.length));

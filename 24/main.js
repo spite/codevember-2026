@@ -493,6 +493,7 @@ const bgColor = new Color(startBackdrop.bg);
 const cycColor = new Color(startBackdrop.cyc);
 const targetBgColor = new Color();
 const targetCycColor = new Color();
+let lastBackdrop = null;
 pipeline.background.copy(bgColor);
 backdrop.material.color.copy(cycColor);
 backdrop.material.uniforms.backdropLevel.value = startBackdrop.level;
@@ -596,8 +597,11 @@ render(({ time, dt, frame }) => {
 
   const kBg = 1 - Math.exp(-2.2 * dt);
   const bSpec = getTargetBackdrop(nestU);
-  targetBgColor.set(bSpec.bg);
-  targetCycColor.set(bSpec.cyc);
+  if (bSpec !== lastBackdrop) {
+    lastBackdrop = bSpec;
+    targetBgColor.set(bSpec.bg);
+    targetCycColor.set(bSpec.cyc);
+  }
   bgColor.lerp(targetBgColor, kBg);
   cycColor.lerp(targetCycColor, kBg);
   pipeline.background.copy(bgColor);
