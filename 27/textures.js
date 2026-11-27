@@ -49,8 +49,17 @@ function getWorker() {
 }
 
 // Draws the seeded primitives now (so seeds replay the same piece), rasterizes in the worker. Resolves to the volume.
-export function bakeBurrowVolumes({ archetype, shape, complexity, T, G }) {
-  const job = { ...buildBurrowPrimitives({ archetype, shape, complexity }), T, G };
+export function bakeBurrowVolumes({ archetype, shape, complexity, T, G, random = Math.random }) {
+  // The primitives draw from their own stream, so a piece doesn't depend on what drew from Math.random before it.
+  const pageRandom = Math.random;
+  Math.random = random;
+  let prims;
+  try {
+    prims = buildBurrowPrimitives({ archetype, shape, complexity });
+  } finally {
+    Math.random = pageRandom;
+  }
+  const job = { ...prims, T, G };
   const w = getWorker();
   if (!w) return Promise.resolve(toVolume(shape, rasterizeBurrow(job)));
   const id = nextId++;

@@ -178,7 +178,7 @@ footer ul { margin: 8px 0 12px; padding-left: 18px; }
       </tbody>
     </table></div>
     <div class="col prose">
-      <p>Every archetype uses <code>Math.random</code>, which the day seeds: the same seed always grows the same burrow.</p>
+      <p>Every archetype draws from its own random stream, seeded from the page's seed plus the archetype, case and complexity, so the same seed always grows the same burrow, whatever was cast before it.</p>
     </div>
   </section>
 
@@ -457,7 +457,7 @@ out   = mix(current, hist, 0.92)</div>
     <div class="col prose">
       <div class="eyebrow">The cycle · <b>main.js</b></div>
       <h2>Empty, pour, cool, rest, lift</h2>
-      <p>Each piece is a small state machine. <b>Empty</b>: the plinth stands bare for 0.8 s while it eases to the new piece's size. <b>Pour</b>: the pour rises at 0.24 a second, and a molten stream, an open cylinder 0.022 to 0.03 wide and emissive at (26, 10, 2.4), falls into the crown of the cast, wobbling and thinning to nothing between pour 0.85 and 0.97. <b>Cool</b>: after 0.8 s the resin rises over 5.5 s on a smoothstep, its level chased at <code>1 − e<sup>−2 dt</sup></code>. <b>Rest</b>: the finished piece waits, and auto change counts its 14 s only now. <b>Lift</b>: the piece rises 9 units in 1.8 s on a cubic and is held out of view until the next bake has arrived; then the new volume goes in and the cycle starts over. P replays the current cast through the same lift; scrubbing the Pour slider jumps straight to rest with the resin up.</p>
+      <p>Each piece is a small state machine. <b>Empty</b>: the plinth stands bare for 0.8 s while it eases to the new piece's size. <b>Pour</b>: the pour rises at 0.24 a second, and a molten stream, an open cylinder 0.022 to 0.03 wide and emissive at (26, 10, 2.4), falls into the crown of the cast, wobbling and thinning to nothing between pour 0.85 and 0.97. <b>Cool</b>: after 0.8 s the resin rises over 5.5 s on a smoothstep, its level chased at <code>1 − e<sup>−2 dt</sup></code>. <b>Rest</b>: the finished piece waits, and auto change counts its 14 s only now. <b>Lift</b>: the piece rises 9 units in 1.8 s on a cubic and is held out of view until the next bake has arrived; then the new volume goes in and the cycle starts over. C replays the current cast through the same lift; scrubbing the Pour slider jumps straight to rest with the resin up.</p>
       <p>Left alone for 6 s, the camera starts to orbit, fading in over 3 s. During the pour and the lift it circles wide, 5.2 ± 2.0 units out, rising and dipping; once the metal starts cooling it draws in over 2.5 s to <code>3.2 + the block's half-height</code> (± 0.25), lower and a little faster round (0.20 instead of 0.12 rad/s), to show the cast through each face. Its target drifts back to the plinth's axis, pans are kept within 1.5 of it, and the distance within 2 to 8.5, inside the cyclorama.</p>
     </div>
     <div class="fig">
@@ -519,7 +519,7 @@ out   = mix(current, hist, 0.92)</div>
     </div>
     <ul class="keys col">
       <li>Drag to orbit, scroll or pinch to zoom. Left alone 6 s, the camera circles the piece by itself (<b>Idle orbit</b>).</li>
-      <li><b>R</b> (or the dice) casts a new piece: the old one lifts away first. <b>P</b> replays this piece's cast.</li>
+      <li><b>R</b> (or the dice) casts a new piece: the old one lifts away first. <b>C</b> replays this piece's cast.</li>
       <li><b>E</b> toggles excavate: the resin sinks away, or rises back.</li>
       <li><b>Archetype</b>, <b>Encasing</b>, <b>Finish</b>, <b>Complexity</b> (0.2–1): what is cast. Changing the first two or the complexity starts a new piece.</li>
       <li><b>Level</b>, <b>Chamfer</b>, <b>Frost</b>, <b>Streaks</b>, <b>Streak length</b>, <b>Refraction</b> (1.1–1.9): the resin.</li>

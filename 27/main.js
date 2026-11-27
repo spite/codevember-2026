@@ -18,6 +18,7 @@ import {
   showSoundHint,
   onPause,
 } from "common";
+import { getSeed, seededRandom } from "modules/random.js";
 import { GUI } from "guspira";
 import { Scene, Mesh, Group, Vector2, Vector3, Spherical, Color, Shape, ExtrudeGeometry, LatheGeometry, CylinderGeometry, BoxGeometry, DataUtils } from "three";
 import { PipelineMaterial } from "modules/pipeline/PipelineMaterial.js";
@@ -103,7 +104,7 @@ function toggleSound() {
 onPause((running) => sound.pause(!running));
 
 addKey("KeyE", "toggle excavate", () => params.encase.set(params.encase() > 0.5 ? 0 : 1));
-addKey("KeyP", "replay the cast", () => beginLift(false));
+addKey("KeyC", "replay the cast", () => beginLift(false));
 addKey("KeyM", "toggle sound", () => toggleSound());
 
 const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
@@ -125,7 +126,7 @@ gui.addSlider("Refraction", params.ior, 1.1, 1.9, 0.01, { randomizable: false })
 gui.addSlider("Heat", params.heat, 0, 1.5, 0.01, { title: "Molten ember intensity at the lower burrow tips (0 = fully cooled metal)." });
 gui.addSlider("Grain", params.grain, 0, 1, 0.01, { title: "Sand-imprinted cast metal surface micro-texture (subtle cast grain always remains)." });
 gui.addSlider("Bubbles", params.bubbles, 0, 1, 0.01, { title: "Trapped gas blowholes and spherical air pockets carved into the cast metal." });
-gui.addSlider("Pour", params.pour, 0, 1, 0.01, { randomizable: false, title: "Molten metal pour fill progress from the top entrance (press P to replay)." });
+gui.addSlider("Pour", params.pour, 0, 1, 0.01, { randomizable: false, title: "Molten metal pour fill progress from the top entrance (press C to replay)." });
 gui.addSlider("Spotlight", params.spotlight, 0, 1, 0.01, { randomizable: false, title: "Volumetric overhead gallery spotlight shaft and drifting dust haze." });
 gui.addSlider("Room light", params.room, 0, 1, 0.01, { randomizable: false, title: "Light on the plinth and backdrop outside the spot (0: only the spot and the embers)." });
 gui.addSlider("Base light", params.baseLight, 0, 2, 0.01, { randomizable: false, title: "The warm strip tucked under the plinth." });
@@ -137,7 +138,7 @@ const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTi
 pipeline.addGUI(gui);
 gui.addSeparator();
 gui.addText(keysHelp());
-showHint("Drag to orbit · P pour · E excavate · R new cast", "Drag to orbit · tap {randomize} for a new cast");
+showHint("Drag to orbit · C pour · E excavate · R new cast", "Drag to orbit · tap {randomize} for a new cast");
 showSoundHint(() => !sound.running);
 gui.show();
 
@@ -233,9 +234,9 @@ function triggerPour() {
   pourAnimActive = true;
   curPour = 0.0;
   curPourHeat = 1.0;
-  lastSliderPour = 0.0;
   pourClock = 0;
-  params.pour.set(0.0);
+  params.pour.set(1);
+  lastSliderPour = 1;
 }
 
 // The cycle: an empty plinth, the pour defines the burrow, the resin rises around it as it cools, then it rests. A change
@@ -254,9 +255,9 @@ function startCycle() {
   pourAnimActive = false;
   curPour = 0;
   curPourHeat = 0;
-  lastSliderPour = 0;
   pourClock = 0;
-  params.pour.set(0);
+  params.pour.set(1);
+  lastSliderPour = 1;
 }
 function beginLift(rebuild = true) {
   if (rebuild) startBake();
@@ -337,6 +338,11 @@ function setPlinthSize() {
 // The next piece bakes in a worker while the current one lifts away; its textures are uploaded as soon as it arrives.
 let bake = null;
 function startBake() {
+  // A baked piece that never went on show.
+  if (bake?.vol) {
+    bake.vol.burrowTex.dispose();
+    bake.vol.glowTex.dispose();
+  }
   currentKey = sculptureKey();
   const job = { vol: null };
   bake = job;
@@ -346,6 +352,7 @@ function startBake() {
     complexity: params.complexity(),
     T: VOL_RES,
     G: 48,
+    random: seededRandom(`${getSeed()}|${currentKey}`),
   }).then((vol) => {
     renderer.initTexture(vol.burrowTex);
     renderer.initTexture(vol.glowTex);
@@ -409,7 +416,8 @@ onRandomize(() => {
 
 applyUrlState();
 load.burrow.set(0.3);
-startBake();
+// A seed in the url has already started this piece's bake.
+if (!bake || currentKey !== sculptureKey()) startBake();
 applyVolume(await load.burrow.track(bake.promise));
 bake = null;
 if (hasUrlPour) {
@@ -578,12 +586,11 @@ render(({ time, dt }) => {
   pourClock += dt;
   if (pourAnimActive) {
     curPour = Math.min(1.0, curPour + dt * POUR_RATE);
-    lastSliderPour = curPour;
-    params.pour.set(curPour);
     curPourHeat = 1.0;
     if (curPour >= 1.0) pourAnimActive = false;
   } else {
-    curPour += (sliderPour - curPour) * ease;
+    // The plinth stays empty until the pour starts.
+    curPour += ((cycle.phase === "empty" ? 0 : sliderPour) - curPour) * ease;
     const targetPourHeat = curPour < 0.985 && curPour > 0.005 ? 1.0 : 0.0;
     const coolRate = targetPourHeat > curPourHeat ? 1 - Math.exp(-dt * 8.0) : dt * 0.34;
     curPourHeat = targetPourHeat > curPourHeat

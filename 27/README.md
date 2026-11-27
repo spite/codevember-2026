@@ -12,7 +12,7 @@ Six procedural burrow morphologies (`dendritic`, `antcast`, `brood`, `shaft`, `f
 
 - **Drag** to orbit, **scroll** to zoom
 - **R** — cast a new burrow (the old piece lifts away first)
-- **P** — replay the cast of this piece
+- **C** — replay the cast of this piece
 - **E** — toggle excavate (hide/show the frosted glass encasing)
 - **M** — toggle sound
 - **Space** — pause / resume
