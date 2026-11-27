@@ -129,8 +129,10 @@ export function createLabyrinthSound({ base = "./sounds/", enabled = true, onPro
     }
   }
 
+  // The music waits for arm(), called on the page's first frame.
+  let armed = false;
   function ensureMusicPlaying() {
-    if (!isEnabled || isPaused || document.hidden) return;
+    if (!armed || !isEnabled || isPaused || document.hidden) return;
     if (!musicStarted) {
       musicGain.gain.cancelScheduledValues(ctx.currentTime);
       musicGain.gain.setValueAtTime(0, ctx.currentTime);
@@ -352,6 +354,10 @@ export function createLabyrinthSound({ base = "./sounds/", enabled = true, onPro
 
   return {
     loaded,
+    arm() {
+      armed = true;
+      if (ctx.state === "running") ensureMusicPlaying();
+    },
     updateRolling,
     silenceLoops,
     hit,

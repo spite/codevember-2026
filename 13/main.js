@@ -1532,7 +1532,12 @@ function updateCameraMode(wallDt) {
 
 let lastWallNow = performance.now();
 
+let soundArmed = false;
 function onFrame({ time, dt, wallDtOverride }) {
+  if (!soundArmed) {
+    soundArmed = true;
+    sound.arm();
+  }
   const now = performance.now();
   const wallDt = wallDtOverride ?? Math.min(0.1, Math.max(0.001, (now - lastWallNow) / 1000));
   lastWallNow = now;
