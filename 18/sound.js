@@ -158,6 +158,13 @@ export function createSound({ base = "./sounds/", enabled = true, onProgress } =
     w.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), t, 0.08);
   }
 
+  // Fades out every whoosh from index `from` on: bobs no longer swinging.
+  function silenceAir(from = 0) {
+    if (whooshes.length <= from) return;
+    const t = clock();
+    for (let i = from; i < whooshes.length; i++) whooshes[i]?.gain.gain.setTargetAtTime(0, t, 0.08);
+  }
+
   // A short rush of air: noise swept up through a band-pass, for the bob slipping through a gate.
   function swish({ gain = 1, pan = 0, delay = 0, duration = 0.16, pitch = 1 } = {}) {
     if (logger && on && !paused) return logger({ name: "swish", gain, pan, delay, pitch });
@@ -272,6 +279,7 @@ export function createSound({ base = "./sounds/", enabled = true, onProgress } =
     play,
     ratchet,
     air,
+    silenceAir,
     swish,
     bell,
     setEnabled,

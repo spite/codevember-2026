@@ -78,7 +78,7 @@ class Foley {
     const { sound } = this;
     if (!c || speed <= 0) {
       this.until = null;
-      sound.air(0, 0, 0);
+      sound.silenceAir();
       return;
     }
     if (this.until === null || this.until < t - 0.25 || this.until > t + 1) this.until = t;
@@ -146,11 +146,13 @@ class Foley {
     if (c.gimbal) {
       const v = c.gimbal.velocity(t);
       sound.air(0, (slow(t) * Math.hypot(v[0], v[1], v[2])) / 3.4, this.pan(c.bobPosition(t)));
+      sound.silenceAir(1);
       return;
     }
     const fastest = 2 * pendulum.k * pendulum.w0 / slow(t);
     sound.air(0, Math.abs(pendulum.angularVelocity(t)) / fastest, this.pan(c.bobPosition(t)));
     c.crossers.forEach((x, i) => sound.air(i + 1, (slow(t) * Math.abs(x.pendulum.angularVelocity(t + x.phase))) / (2 * x.pendulum.k * x.pendulum.w0), this.pan(x.arm.position), 0.6));
+    sound.silenceAir(c.crossers.length + 1);
   }
 }
 
