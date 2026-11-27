@@ -120,6 +120,11 @@ footer ul { margin: 8px 0 12px; padding-left: 18px; }
 .keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 24px; font-size: 15px; line-height: 1.45; margin: 0; padding: 0; list-style: none; }
 .keys li { padding: 6px 0; border-bottom: 1px solid var(--line); }
 .keys b { font: 600 13px/1 var(--mono); }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.tile { position: relative; display: block; border-radius: 3px; overflow: hidden; background: #0d0d0e; }
+.tile img { display: block; width: 100%; height: auto; aspect-ratio: 1; transition: transform 0.4s; }
+.tile:hover img { transform: scale(1.04); }
+.tile span { position: absolute; left: 0; right: 0; bottom: 0; padding: 20px 8px 7px; font: 400 11px/1.2 var(--mono); color: #e8e2d8; background: linear-gradient(transparent, rgba(0, 0, 0, 0.72)); }
 </style>
 </head>
 <body>
@@ -176,6 +181,41 @@ footer ul { margin: 8px 0 12px; padding-left: 18px; }
       <p>Every archetype uses <code>Math.random</code>, which the day seeds: the same seed always grows the same burrow.</p>
     </div>
   </section>
+
+  <section>
+    <div class="col prose">
+      <div class="eyebrow">Gallery</div>
+      <h2>Twenty-four random pieces</h2>
+      <p>Twenty-four seeds taken at random, each at rest once its resin has set: whatever archetype, case, finish, frost and heat the seed drew. Each opens the live page on that seed.</p>
+    </div>
+    <div class="gallery">
+      <a class="tile" href="./?seed=gkgath"><img src="gallery/gkgath.jpg" alt="copper termite burrow in a paperweight of frosted resin" loading="lazy" width="360" height="360"><span>termite · paperweight · copper</span></a>
+      <a class="tile" href="./?seed=ydanup"><img src="gallery/ydanup.jpg" alt="aluminum dendritic burrow in a slab of frosted resin" loading="lazy" width="360" height="360"><span>dendritic · slab · aluminum</span></a>
+      <a class="tile" href="./?seed=kf5ui4"><img src="gallery/kf5ui4.jpg" alt="copper dendritic burrow in a cylinder of frosted resin" loading="lazy" width="360" height="360"><span>dendritic · cylinder · copper</span></a>
+      <a class="tile" href="./?seed=yg9h5p"><img src="gallery/yg9h5p.jpg" alt="bismuth shaft burrow in a column of frosted resin" loading="lazy" width="360" height="360"><span>shaft · column · bismuth</span></a>
+      <a class="tile" href="./?seed=q0yqzy"><img src="gallery/q0yqzy.jpg" alt="bronze antcast burrow in a cube of frosted resin" loading="lazy" width="360" height="360"><span>antcast · cube · bronze</span></a>
+      <a class="tile" href="./?seed=wucxz3"><img src="gallery/wucxz3.jpg" alt="aluminum termite burrow in a hex of frosted resin" loading="lazy" width="360" height="360"><span>termite · hex · aluminum</span></a>
+      <a class="tile" href="./?seed=02eccv"><img src="gallery/02eccv.jpg" alt="iron brood burrow in a monolith of frosted resin" loading="lazy" width="360" height="360"><span>brood · monolith · iron</span></a>
+      <a class="tile" href="./?seed=eq8maz"><img src="gallery/eq8maz.jpg" alt="iron shaft burrow in a cylinder of frosted resin" loading="lazy" width="360" height="360"><span>shaft · cylinder · iron</span></a>
+      <a class="tile" href="./?seed=lo2fsy"><img src="gallery/lo2fsy.jpg" alt="blued termite burrow in a cube of frosted resin" loading="lazy" width="360" height="360"><span>termite · cube · blued</span></a>
+      <a class="tile" href="./?seed=sbgyuq"><img src="gallery/sbgyuq.jpg" alt="aluminum termite burrow in a monolith of frosted resin" loading="lazy" width="360" height="360"><span>termite · monolith · aluminum</span></a>
+      <a class="tile" href="./?seed=1rnt8n"><img src="gallery/1rnt8n.jpg" alt="gold dendritic burrow in a cube of frosted resin" loading="lazy" width="360" height="360"><span>dendritic · cube · gold</span></a>
+      <a class="tile" href="./?seed=b2ykxs"><img src="gallery/b2ykxs.jpg" alt="iron filigree burrow in a dome of frosted resin" loading="lazy" width="360" height="360"><span>filigree · dome · iron</span></a>
+      <a class="tile" href="./?seed=oyi1ao"><img src="gallery/oyi1ao.jpg" alt="iron dendritic burrow in a monolith of frosted resin" loading="lazy" width="360" height="360"><span>dendritic · monolith · iron</span></a>
+      <a class="tile" href="./?seed=c43u5x"><img src="gallery/c43u5x.jpg" alt="blued dendritic burrow in a hex of frosted resin" loading="lazy" width="360" height="360"><span>dendritic · hex · blued</span></a>
+      <a class="tile" href="./?seed=dzurvs"><img src="gallery/dzurvs.jpg" alt="blued termite burrow in a cylinder of frosted resin" loading="lazy" width="360" height="360"><span>termite · cylinder · blued</span></a>
+      <a class="tile" href="./?seed=tvc0s8"><img src="gallery/tvc0s8.jpg" alt="gold shaft burrow in a column of frosted resin" loading="lazy" width="360" height="360"><span>shaft · column · gold</span></a>
+      <a class="tile" href="./?seed=12l3yw"><img src="gallery/12l3yw.jpg" alt="iron dendritic burrow in a cylinder of frosted resin" loading="lazy" width="360" height="360"><span>dendritic · cylinder · iron</span></a>
+      <a class="tile" href="./?seed=d4yzbi"><img src="gallery/d4yzbi.jpg" alt="blued antcast burrow in a column of frosted resin" loading="lazy" width="360" height="360"><span>antcast · column · blued</span></a>
+      <a class="tile" href="./?seed=z8r0mh"><img src="gallery/z8r0mh.jpg" alt="iron dendritic burrow in a slab of frosted resin" loading="lazy" width="360" height="360"><span>dendritic · slab · iron</span></a>
+      <a class="tile" href="./?seed=5fsfxs"><img src="gallery/5fsfxs.jpg" alt="blued brood burrow in a paperweight of frosted resin" loading="lazy" width="360" height="360"><span>brood · paperweight · blued</span></a>
+      <a class="tile" href="./?seed=k6rrd1"><img src="gallery/k6rrd1.jpg" alt="iron brood burrow in a dome of frosted resin" loading="lazy" width="360" height="360"><span>brood · dome · iron</span></a>
+      <a class="tile" href="./?seed=redel4"><img src="gallery/redel4.jpg" alt="iron filigree burrow in a paperweight of frosted resin" loading="lazy" width="360" height="360"><span>filigree · paperweight · iron</span></a>
+      <a class="tile" href="./?seed=m1z093"><img src="gallery/m1z093.jpg" alt="iron termite burrow in a cube of frosted resin" loading="lazy" width="360" height="360"><span>termite · cube · iron</span></a>
+      <a class="tile" href="./?seed=fhc7e9"><img src="gallery/fhc7e9.jpg" alt="copper termite burrow in a column of frosted resin" loading="lazy" width="360" height="360"><span>termite · column · copper</span></a>
+    </div>
+  </section>
+
 
   <!-- 3. The volume -->
   <section>
