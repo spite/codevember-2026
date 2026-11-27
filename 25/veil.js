@@ -469,17 +469,28 @@ class Veil {
   }
 
   // Triangles for the cells of the cloth that are there: all of them, without `cells`.
+  // One index buffer, sized for the whole cloth and rewritten in place (a replaced one would stay on the GPU).
   setIndex(cells) {
     const M = SURFACE_SIDE;
-    const index = [];
+    let attr = this.geometry.index;
+    if (!attr) {
+      attr = new BufferAttribute(new Uint32Array((M - 1) * (M - 1) * 6), 1);
+      this.geometry.setIndex(attr);
+    }
+    const index = attr.array;
+    let n = 0;
     for (let j = 0; j + 1 < M; j++) {
       for (let i = 0; i + 1 < M; i++) {
         if (cells && !cells[(j >> 1) * CELLS_SIDE + (i >> 1)]) continue;
         const a = j * M + i;
-        index.push(a, a + M, a + 1, a + 1, a + M, a + M + 1);
+        index[n++] = a, index[n++] = a + M, index[n++] = a + 1;
+        index[n++] = a + 1, index[n++] = a + M, index[n++] = a + M + 1;
       }
     }
-    this.geometry.setIndex(index);
+    attr.clearUpdateRanges();
+    attr.addUpdateRange(0, n);
+    attr.needsUpdate = true;
+    this.geometry.setDrawRange(0, n);
   }
 
   // Tears the veil to tatters (each seed differently), or makes it whole, and drops it (live: from above, as it's seen).
