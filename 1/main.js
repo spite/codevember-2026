@@ -827,6 +827,8 @@ await load.compile.track(pipeline.compileAsync(scene, camera), 4);
 // Handle for scripted capture and the console: nextLook() transitions to a seed or a set of settings.
 window.app = {
   canvas: renderer.domElement,
+  params,
+  camera,
   pipeline,
   controls,
   sound,
