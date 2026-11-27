@@ -333,7 +333,17 @@ function update() {
     const name = params.shape();
     if (loading !== name) {
       loading = name;
-      loadShape(name).then((s) => shapes.set(name, s));
+      loadShape(name).then(
+        (s) => shapes.set(name, s),
+        (e) => {
+          // Back to the shape on show, so a later pick can try this one again.
+          console.error(`Shape ${name} failed to load`, e);
+          if (loading !== name) return;
+          loading = null;
+          const shown = built?.split("|")[1];
+          if (shown && params.shape() === name) params.shape.set(shown);
+        },
+      );
     }
   } else if (key !== built) {
     built = key;
@@ -516,6 +526,7 @@ render(({ dt }) => {
 rendered.then(async () => {
   for (const name of Object.keys(SHAPES)) {
     await new Promise((resolve) => setTimeout(resolve, 300));
-    if (!shapes.has(name)) shapes.set(name, await loadShape(name));
+    // One that fails is skipped (it is tried again when picked), so the rest still load.
+    if (!shapes.has(name)) await loadShape(name).then((s) => shapes.set(name, s), (e) => console.error(`Shape ${name} failed to load`, e));
   }
 });
