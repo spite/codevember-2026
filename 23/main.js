@@ -487,7 +487,7 @@ function applyBuilt(built, target, detail) {
   magmaMesh.geometry = built.geometry;
   uniforms.uShapeRelief.value = shapeRelief(built.shape);
   uniforms.uUseDispUv.value = built.geometry.hasAttribute("aDispUv") ? 1 : 0;
-  if (!magmaMesh.visible) uploader.start(built.geometry);
+  if (!magmaMesh.visible || !initialized) uploader.start(built.geometry);
   else uploader.queue = [];
   appliedDetail = detail;
   writeVolume(sdf[target], built.sdf);
@@ -787,8 +787,18 @@ look.march = 1;
 look.ready = false;
 uniforms.uMelt.value = 1;
 uniforms.uNeutral.value = 1;
-buildMesh(getSeed(), { target: "b" }).then((ok) => {
-  if (ok) look.ready = true;
+// The rock's shading programs compile only once it has a mesh: do it off to the side, in parallel, before the hand-off
+// shows it, or its first frame stalls
+const compileRock = () => {
+  const side = new Scene();
+  side.add(new Mesh(magmaMesh.geometry, magmaMesh.material));
+  return pipeline.compileAsync(side, camera).catch(() => {});
+};
+buildMesh(getSeed(), { target: "b" }).then(async (ok) => {
+  if (!ok) return;
+  const serial = buildSerial;
+  await compileRock();
+  if (serial === buildSerial) look.ready = true;
 });
 await studio;
 await sound.loaded;
@@ -938,7 +948,7 @@ pipeline.composite = (hdr, ctx) => {
   });
 };
 
-render(({ time, dt, frame }) => {
+const frameFn = ({ time, dt, frame }) => {
   // The music waits for the first frame, when the loading screen goes
   if (frame === 0) sound.arm();
   if (held.frozen) {
@@ -1072,4 +1082,8 @@ render(({ time, dt, frame }) => {
     lavaPulse.probe();
   }
   pipeline.render(scene, camera, time);
-});
+};
+// A few frames rendered behind the loading screen, so the passes that only run from the second frame on (temporal
+// resolves, the smoke sim, ...) compile before it fades instead of freezing the first visible frames
+for (let k = -3; k < 0; k++) frameFn({ time: 0, dt: 1 / 60, frame: k });
+render(frameFn);
