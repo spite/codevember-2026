@@ -508,8 +508,11 @@ class Veil {
     this.tatterTextures = null;
     this.cloth.outlineMap.value = this.cloth.dirtMap.value = null;
     this.cloth.tattered.value = 0;
+    this.mapsFailed = false;
     if (tattered) this.prepareMaps(seed).then((maps) => {
-      if (this.tattered && this.tatterSeed === seed) this.setTatterMaps(maps);
+      if (!(this.tattered && this.tatterSeed === seed)) return;
+      if (maps) this.setTatterMaps(maps);
+      else this.mapsFailed = true;
     });
     this.worker.postMessage({ type: "tatter", tattered, seed, live, generation: ++this.generation });
   }
@@ -524,9 +527,11 @@ class Veil {
     this.worker.postMessage({ type: "release" });
   }
 
-  // True once the surface of the last drop has come back (and, tattered, its maps).
+  // True once the surface of the last drop has come back (and, tattered, its maps). A failed worker counts as settled,
+  // so the page doesn't wait on it for good.
   get settled() {
-    return this.shownGeneration === this.generation && (!this.tattered || !!this.tatterTextures);
+    if (this.error) return true;
+    return this.shownGeneration === this.generation && (!this.tattered || !!this.tatterTextures || this.mapsFailed);
   }
 
   // Starts making the maps of a tattered cut, so they're ready by the time it's dropped. Each seed's are kept.
@@ -537,6 +542,13 @@ class Veil {
         worker.onmessage = ({ data }) => {
           worker.terminate();
           resolve(data);
+        };
+        // Without its maps a tattered cut is drawn without the outline and dirt; the seed can be tried again later.
+        worker.onerror = (e) => {
+          console.error("day 25: tatter maps failed", e.message);
+          worker.terminate();
+          this.maps.delete(seed);
+          resolve(null);
         };
         worker.postMessage({ seed });
       }));
