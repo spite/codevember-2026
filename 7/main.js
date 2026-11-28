@@ -243,8 +243,11 @@ const heightOf = (m) => reachUp(m) + LIFT;
 // Frames the sculpture and the floor under it at any aspect. The fitted lens is kept across resizes (common resets
 // the fov on every one), and a big change of aspect refits it, keeping the viewer's zoom.
 let fit = null;
+// The canvas's size (not the window's: ?size and ?w/h give it its own), for the band kept clear of the GUI bar.
+const view = new Vector2();
 function frame(force = false) {
   if (!sculpture) return;
+  renderer.getSize(view);
   const a = camera.aspect;
   if (force || !fit || Math.abs(a - fit.aspect) / a > 0.15) {
     const zoom = fit && !force ? camera.position.distanceTo(controls.target) / fit.d : 1;
@@ -254,7 +257,7 @@ function frame(force = false) {
     const want = 4.1;
     // Narrow screens keep the bottom band clear for the collapsed GUI bar: the sculpture fits the rest, and the
     // lens is shifted to centre it there.
-    const band = innerWidth <= 950 ? Math.min(0.25, 80 / Math.max(innerHeight, 1)) : 0;
+    const band = view.x <= 950 ? Math.min(0.25, 80 / Math.max(view.y, 1)) : 0;
     const k = 1 - band;
     const top = band > 0.1 ? 0.08 : 0.14;
     const tv = Math.min(Math.tan(MathUtils.degToRad(22.5)), Math.max(Math.tan(MathUtils.degToRad(13)), (H * 0.5 + top) / (want * k), (R + side) / (want * a)));
@@ -267,7 +270,7 @@ function frame(force = false) {
     camera.lookAt(controls.target);
   }
   camera.fov = fit.fov;
-  if (fit.band > 0) camera.setViewOffset(innerWidth, innerHeight, 0, fit.band * innerHeight * 0.5, innerWidth, innerHeight);
+  if (fit.band > 0) camera.setViewOffset(view.x, view.y, 0, fit.band * view.y * 0.5, view.x, view.y);
   else camera.clearViewOffset();
   camera.updateProjectionMatrix();
 }
@@ -297,9 +300,11 @@ const workers = Array.from({ length: (navigator.hardwareConcurrency ?? 4) >= (li
     pump(worker);
   };
   w.onerror = (e) => {
+    // A worker that failed to load never answers again: its jobs, and any later ones, get the error.
+    worker.dead = e.message || "mesher failed to load";
     const job = worker.inflight;
     worker.inflight = null;
-    job?.done({ error: e.message || "mesher failed to load" });
+    job?.done({ error: worker.dead });
     pump(worker);
   };
   return worker;
@@ -309,6 +314,7 @@ function pump(worker) {
   if (worker.inflight || !worker.next) return;
   const job = worker.next;
   worker.next = null;
+  if (worker.dead) return job.done({ error: worker.dead });
   worker.inflight = job;
   worker.w.postMessage({ ...job.msg, id: ++jobId });
 }
