@@ -2002,8 +2002,6 @@ onResize((w, h, dpr) => {
 });
 
 
-const shapeBag = { key: null, left: [] };
-
 onRandomize(() => {
   requestShapeChange();
   const r = Math.random;
@@ -2012,19 +2010,14 @@ onRandomize(() => {
   const pool = OBJECT_NAMES.filter((n) =>
     params.pool() === "segmented" ? segmentable(n) : params.pool() === "solid" ? !segmentable(n) : true,
   );
-  // A shuffled bag: every figure in the pool comes up once before any repeats, and never twice in a row.
-  if (shapeBag.key !== params.pool() || !shapeBag.left.length) {
-    const fresh = pool.slice();
-    for (let i = fresh.length - 1; i > 0; i--) {
-      const j = Math.floor(r() * (i + 1));
-      [fresh[i], fresh[j]] = [fresh[j], fresh[i]];
-    }
-    if (fresh.length > 1 && fresh[fresh.length - 1] === params.object()) fresh.unshift(fresh.pop());
-    shapeBag.key = params.pool();
-    shapeBag.left = fresh;
-  }
-  const nextObj = shapeBag.left.pop();
+  // The figure comes from the seed alone, so a link reproduces it. Live, the same figure twice in a row is skipped for
+  // the next one, just after the seed's values are recorded: the url then carries the object, and still reproduces it.
+  const was = params.object();
+  const nextObj = pick(pool);
   params.object.set(nextObj);
+  if (show.started && nextObj === was && pool.length > 1) {
+    queueMicrotask(() => params.object.set(pool[(pool.indexOf(nextObj) + 1) % pool.length]));
+  }
   params.gap.set(snapStep(0.08 + r() * 0.14, 0.01));
   params.radius.set(snapStep(0.92 + r() * 0.22, 0.01));
   params.thickness.set(snapStep(0.34 + r() * 0.14, 0.01));
