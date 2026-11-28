@@ -1140,14 +1140,19 @@ onRandomize((seedVal) => {
 });
 
 applyUrlState();
-await load.build.track(
+// Waits for the build the panel wants now: R or a panel change during the load asks for another, and the stale one
+// that arrives first is passed over.
+const firstBuild = await load.build.track(
   new Promise((resolve) => {
-    builder.onReady = resolve;
-    requestBuild();
+    builder.onReady = () => {
+      const next = takeBuild();
+      if (next) resolve(next);
+    };
+    builder.onReady();
   }),
 );
 builder.onReady = null;
-installLabyrinth(takeBuild(), true);
+installLabyrinth(firstBuild, true);
 await noiseBaked;
 shownFinishName = params.finish();
 updateFinishLook(1, true);
