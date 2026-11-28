@@ -147,15 +147,18 @@ gui.addSection("Form");
 const SHAPES = [["torus", "torus"], ["knot", "torus knot"], ...Object.keys(KNOT_CURVES).map((k) => [k, k])];
 // The centre line of a closed shape, size: its ring radius or knot size.
 const lineFor = (shape, size, p, q, n) => (shape === "torus" ? centreLine(1, 0, size, n) : shape === "knot" ? centreLine(p, q, size, n) : knotLine(shape, size, n));
-// The shape comes from the seed alone, so a link reproduces it. Live, a repeat of the shape on show is replaced by a
-// fresh seed (randomized again once these values are in, so the url holds that seed).
+// In a page randomize the shape comes from the seed alone, so a link reproduces it; live, a repeat of the shape on show
+// is replaced by a fresh seed (randomized again once these values are in, so the url holds that seed). The Shape
+// control's own randomize just picks another shape (the url then names it).
 let live = false;
+let seeding = false;
 gui.addSelect("Shape", params.shape, SHAPES).randomize = () => {
   const weights = { torus: 0.1, knot: 0.25, trefoil: 0.2, "figure-eight": 0.15, saddle: 0.1, crown: 0.1, star: 0.1 };
   const was = params.shape();
+  if (!seeding) delete weights[was];
   let r = Math.random() * Object.values(weights).reduce((a, b) => a + b);
   for (const [k, w] of Object.entries(weights)) if ((r -= w) < 0) { params.shape.set(k); break; }
-  if (live && params.shape() === was) queueMicrotask(randomize);
+  if (seeding && live && params.shape() === was) queueMicrotask(randomize);
 };
 // Windings round the axis and through the hole; equal or sharing a factor gives a link, not a knot.
 // Randomized toward full, chunky forms: knots with few crossings, sized up so the tube can be thick, and as thick as
@@ -581,7 +584,16 @@ function vary(set) {
     });
   } else change ??= { stage: "shrink", t: 0, held };
 }
-onRandomize(() => vary(() => gui.randomizeAll()));
+onRandomize(() =>
+  vary(() => {
+    seeding = true;
+    try {
+      gui.randomizeAll();
+    } finally {
+      seeding = false;
+    }
+  }),
+);
 const ease = (x) => {
   const t = Math.min(Math.max(x, 0), 1);
   return t * t * (3 - 2 * t);
