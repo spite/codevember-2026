@@ -972,16 +972,22 @@ function machineSound(type, start, info) {
   }
 }
 
-// Clicks (not drags) poke whatever is under the pointer.
+// Clicks (not drags) poke whatever is under the pointer. Only a primary-button press counts, and a second finger (a
+// pinch) cancels it.
 const raycaster = new Raycaster();
 const pointerDown = new Vector2();
 let downAt = 0;
+let tapId = null;
 renderer.domElement.addEventListener("pointerdown", (e) => {
+  tapId = e.isPrimary && e.button === 0 ? e.pointerId : null;
   pointerDown.set(e.clientX, e.clientY);
   downAt = performance.now();
 });
+renderer.domElement.addEventListener("pointercancel", () => (tapId = null));
 renderer.domElement.addEventListener("pointerup", (e) => {
-  if (performance.now() - downAt > 450 || pointerDown.distanceTo(new Vector2(e.clientX, e.clientY)) > 8) return;
+  const tap = e.pointerId === tapId;
+  tapId = null;
+  if (!tap || performance.now() - downAt > 450 || pointerDown.distanceTo(new Vector2(e.clientX, e.clientY)) > 8) return;
   if (!machine || rebuild.state !== "idle" || waiting) return;
   const rect = renderer.domElement.getBoundingClientRect();
   const ndc = new Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
@@ -1069,7 +1075,7 @@ updateLook(1);
 updateInstances();
 await load.studio.track(studio);
 // The samples are in before the first frame, so the first click already sounds.
-await sound.downloaded;
+await sound.decoded;
 await compiled;
 atlasReady = true;
 motifAtlas.draw(shared.motifSeed.value);

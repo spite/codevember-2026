@@ -184,7 +184,8 @@ export function createMachineSound({ base = "./sounds/", enabled = true, onProgr
     logger = fn;
   }
 
-  start();
+  // Resolves once every sample is decoded.
+  const decoded = start();
 
-  return { play, ratchet, escapement, setEnabled, setPaused, setLogger, downloaded, get enabled() { return on; }, get running() { return ctx?.state === "running"; }, sets: SETS };
+  return { play, ratchet, escapement, setEnabled, setPaused, setLogger, downloaded, decoded, get enabled() { return on; }, get running() { return ctx?.state === "running"; }, sets: SETS };
 }
