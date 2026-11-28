@@ -723,7 +723,9 @@ function frameCamera(w, h) {
   controls.update();
 }
 
-camera.fov = 30;
+// baseFov is what common.js widens for portrait on every resize; this first one is widened the same way here.
+camera.userData.baseFov = 30;
+camera.fov = camera.aspect < 1 ? (2 * Math.atan(Math.tan((30 * Math.PI) / 360) / camera.aspect) * 180) / Math.PI : 30;
 camera.near = 0.5;
 camera.far = 60;
 camera.updateProjectionMatrix();
@@ -764,8 +766,11 @@ const baseEnv = globalUniforms.envIntensity.value;
 // Every program, the veil's near side included, before the first frame.
 const compileScene = new Scene();
 compileScene.add(firstSkull.veil.front.clone());
-await load.sound.track(sound.decoded);
-await load.compile.track(Promise.all([pipeline.compileAsync(scene, camera), renderer.compileAsync(compileScene, camera)]), 4);
+// The samples decode while the shaders compile; the first frame waits for both.
+await Promise.all([
+  load.sound.track(sound.decoded),
+  load.compile.track(Promise.all([pipeline.compileAsync(scene, camera), renderer.compileAsync(compileScene, camera)]), 4),
+]);
 firstSkull.root.visible = false;
 
 lastControl = params.control();
