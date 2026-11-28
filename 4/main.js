@@ -263,11 +263,15 @@ render(({ time, dt, frame }) => {
   updateReflections();
   autoChange.update(dt);
   t += dt * params.motion();
-  knots.update(t, dt);
+  // Re-ties morph in wall-clock time too, so R, T or Bands also play while paused (the still restarts as it goes).
+  const now = performance.now();
+  const wallDt = Math.min((now - last) / 1000, 0.1);
+  const morphing = knots.blend < 1 || !!knots.pending;
+  knots.update(t, dt || wallDt);
+  if (!dt && morphing) pipeline.restartAccumulation(false);
   // The first frame takes a seed's section as it is.
   updateSection(frame === 0);
   // Finish and palette changes fade in wall-clock time, so they also play while paused.
-  const now = performance.now();
   const target = shadingTarget();
   shading ??= new Fade(target);
   if (shading.update(target, Math.min((now - last) / 1000, 0.1))) pipeline.restartAccumulation();
