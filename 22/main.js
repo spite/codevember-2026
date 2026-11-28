@@ -142,7 +142,11 @@ function toggleSound() {
   audio.setMuted(!audio.isMuted());
   soundBtn.querySelector("img").src = audio.isMuted() ? "../assets/sound-off.svg" : "../assets/sound.svg";
 }
-const micBtn = addActionButton("mic.svg", "How to play: voice, click or watch (V)", () => chooser.open());
+// Keys and buttons work during the load: the chooser once it exists, recordings and calls (and their sound) from the
+// first frame.
+let chooserReady = false;
+let framed = false;
+const micBtn = addActionButton("mic.svg", "How to play: voice, click or watch (V)", () => chooserReady && chooser.open());
 const micStatus = signal("off");
 let micStarting = false;
 async function toggleMic(on = !audio.isMicActive()) {
@@ -165,8 +169,8 @@ async function toggleMic(on = !audio.isMicActive()) {
   return audio.isMicActive();
 }
 addKey("KeyM", "toggle sound", toggleSound);
-addKey("KeyV", "choose how to play", () => chooser.open());
-addKey("KeyK", "record your motion for a video (again to stop)", () => toggleRecording());
+addKey("KeyV", "choose how to play", () => chooserReady && chooser.open());
+addKey("KeyK", "record your motion for a video (again to stop)", () => framed && toggleRecording());
 addKey("KeyE", "shout (click mode)", () => mode === "click" && ping(1));
 
 const gui = new GUI(setDay(), document.querySelector("#gui-container"), { expanded: false });
@@ -200,10 +204,10 @@ const autoChange = createAutoChange({ enabled: params.auto, every: params.autoTi
 gui.addSection("Recording");
 const recStatus = signal("idle");
 gui.addMonitor("Motion", recStatus);
-gui.addButton("Record / stop (K)", () => toggleRecording());
-gui.addButton("Save the last take", () => lastTake && saveTake(lastTake));
-gui.addButton("Play the last take", () => lastTake && playRecording(lastTake));
-gui.addButton("Play a take from a file…", () => takeInput.click());
+gui.addButton("Record / stop (K)", () => framed && toggleRecording());
+gui.addButton("Save the last take", () => framed && lastTake && saveTake(lastTake));
+gui.addButton("Play the last take", () => framed && lastTake && playRecording(lastTake));
+gui.addButton("Play a take from a file…", () => framed && takeInput.click());
 pipeline.addGUI(gui);
 gui.addSeparator();
 gui.addText(keysHelp());
@@ -323,6 +327,7 @@ const chooser = createChooser({
     return { mode: m, note };
   },
 });
+chooserReady = true;
 if (!skipStandby) chooser.open();
 walker.reset();
 const minimap = createMinimap(room, walker);
@@ -375,8 +380,6 @@ let lastTake = null;
 let replayTake = null;
 let replayDone = null;
 
-// No call before the first frame: the chooser works during the load, but the echoes and their sound wait for it.
-let framed = false;
 function ping(intensity = 1, silent = false) {
   if (!framed) return [];
   if (!replaying && (!canCall() || mode === "standby" || mode === "ended")) return [];

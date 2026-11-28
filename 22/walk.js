@@ -41,7 +41,8 @@ export function createWalker(camera, dom, room) {
   };
   addEventListener("blur", release);
   document.addEventListener("visibilitychange", release);
-  addEventListener("pointercancel", release);
+  // A cancelled second finger leaves the first one's drag alone.
+  addEventListener("pointercancel", (e) => (!drag || e.pointerId === drag.id) && release());
   // Pointer lock (mouse only): the first click captures the mouse without calling; then moving it looks
   // around and every click calls. Esc lets go.
   let locked = false;
