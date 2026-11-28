@@ -1075,7 +1075,8 @@ updateLook(1);
 updateInstances();
 await load.studio.track(studio);
 // The samples are in before the first frame, so the first click already sounds.
-await sound.decoded;
+// Without audio (no AudioContext) the page goes on silent.
+await sound.decoded.catch((e) => console.warn("Sound unavailable", e));
 await compiled;
 atlasReady = true;
 motifAtlas.draw(shared.motifSeed.value);
