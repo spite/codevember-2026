@@ -1023,6 +1023,7 @@ function relook() {
   if (key !== lookSeen) {
     lookSeen = key;
     lookAt = now;
+    lookFailures = 0;
   }
   if (key === shownLook || now - lookAt < 0.2) return;
   const w = workers.find((w) => !w.busy && !w.dead);
