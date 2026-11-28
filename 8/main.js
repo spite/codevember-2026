@@ -1129,7 +1129,6 @@ render(({ dt }) => {
   const now = performance.now();
   const clock = Math.min((now - (lastNow ?? now)) / 1000, 0.1);
   lastNow = now;
-  autoChange.update(dt);
   updateTween(clock);
   const k = keys();
   if (k.solid !== last.solid) setSculpture(true);
@@ -1168,4 +1167,6 @@ render(({ dt }) => {
   updateProxy();
   infinity.bake(renderer);
   pipeline.render(scene, camera, heldTime);
+  // Last, so a re-randomize queued by its change lands before the next frame looks at the params.
+  autoChange.update(dt);
 });
