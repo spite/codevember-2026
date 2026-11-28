@@ -897,7 +897,11 @@ onRandomize(() => {
   params.look.set(pick(Object.keys(LOOKS)));
   gui.randomizeAll();
   params.look.set(params.look());
-  params.shape.set(forced.shape ?? pick(Object.keys(SHAPES).filter((s) => s !== container.name)));
+  // The shape comes from the seed alone, so a link reproduces it; live, a repeat of the one on show is replaced by a
+  // fresh seed (randomized again once these values are in, so the url holds that seed).
+  const was = container.name;
+  params.shape.set(forced.shape ?? pick(Object.keys(SHAPES)));
+  if (started && !forced.shape && params.shape() === was) queueMicrotask(randomize);
   // A new look always shows the container; hiding it is only by hand.
   params.container.set(true);
   // Strong refraction through barely scattering jelly looks glassy and busy: soften it a little.
