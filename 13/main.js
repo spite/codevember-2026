@@ -426,6 +426,7 @@ window.addEventListener("blur", () => {
 const marble = createMarbleState();
 let currentLabyrinth = null;
 let puzzleSerial = 0;
+let buildErrors = 0;
 let builtKey = "";
 let shownShape = "";
 let shownFinishName = "";
@@ -585,11 +586,16 @@ buildWorker.onmessage = ({ data }) => {
   if (data.key !== builder.requestedKey) return;
   if (data.error) {
     console.error(data.error);
+    // Another puzzle for the same options, a few times at most (a failure the options cause would repeat forever).
+    const errors = buildErrors + 1;
+    if (errors > 3) return;
     builder.requestedKey = "";
     puzzleSerial++;
     requestBuild();
+    buildErrors = errors;
     return;
   }
+  buildErrors = 0;
   const next = data.labyrinth;
   next.key = data.key;
   next.shape = SHAPES[next.shapeName];
@@ -605,6 +611,7 @@ function requestBuild() {
   if (key === builder.requestedKey) return;
   builder.requestedKey = key;
   builder.ready = null;
+  buildErrors = 0;
   postBuild({
     key,
     seedKey: desiredMazeSeedKey(),
