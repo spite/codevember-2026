@@ -150,7 +150,8 @@ export function createWorld(material, suzanneGeo) {
   const suzHull = suzanneGeo.userData.hull ?? suzanneGeo;
   suzanneGeo.computeBoundingSphere();
 
-  const key = (ci, cj) => `${ci},${cj}`;
+  // Numeric keys for chunks and cells: rays look them up on every step, and strings there feed the GC.
+  const key = (ci, cj) => (ci + 32768) * 65536 + (cj + 32768);
   const chunkOf = (i) => Math.floor(i / CHUNK);
 
   // Data of chunk (ci, cj): per cell, walls on its +x (east) and +z (south) edges, floor and ceiling heights.
@@ -223,7 +224,10 @@ export function createWorld(material, suzanneGeo) {
     return k === a || k === b || hash(ci, cj, axis === "x" ? 5 : 6, k) < 0.12;
   }
 
+  // Rays mostly stay in one chunk from step to step: the last one looked up is kept.
+  let lastChunk = null;
   function data(ci, cj) {
+    if (lastChunk && lastChunk.ci === ci && lastChunk.cj === cj) return lastChunk;
     const k = key(ci, cj);
     let c = chunks.get(k);
     if (!c) {
@@ -231,15 +235,18 @@ export function createWorld(material, suzanneGeo) {
       chunks.set(k, c);
       placeObjects(c);
     }
-    return c;
+    return (lastChunk = c);
   }
 
   function cell(i, j) {
     const c = data(chunkOf(i), chunkOf(j));
     const x = i - c.ci * CHUNK;
     const z = j - c.cj * CHUNK;
-    return { c, idx: z * CHUNK + x };
+    _cell.c = c;
+    _cell.idx = z * CHUNK + x;
+    return _cell;
   }
+  const _cell = { c: null, idx: 0 };
   const floorOf = (i, j) => {
     const { c, idx } = cell(i, j);
     return c.floor[idx];
@@ -274,7 +281,7 @@ export function createWorld(material, suzanneGeo) {
     obj.cells = [];
     for (let i = Math.floor((obj.center.x - r) / CELL); i <= Math.floor((obj.center.x + r) / CELL); i++) {
       for (let j = Math.floor((obj.center.z - r) / CELL); j <= Math.floor((obj.center.z + r) / CELL); j++) {
-        const k = `${i},${j}`;
+        const k = key(i, j);
         if (!cellObjects.has(k)) cellObjects.set(k, []);
         cellObjects.get(k).push(obj);
         obj.cells.push(k);
@@ -296,7 +303,7 @@ export function createWorld(material, suzanneGeo) {
   function objectsAt(i, j) {
     // Make sure the chunks that could own objects reaching into this cell exist.
     data(chunkOf(i), chunkOf(j));
-    return cellObjects.get(`${i},${j}`) ?? NONE;
+    return cellObjects.get(key(i, j)) ?? NONE;
   }
 
   function placeObjects(c) {
@@ -507,7 +514,7 @@ export function createWorld(material, suzanneGeo) {
     for (let steps = 0; steps < 64 && tEnter < maxT; steps++) {
       const tExit = Math.min(tMaxX, tMaxZ, maxT);
       const { c, idx } = cell(i, j);
-      if (mark) heard.add(`${i},${j}`);
+      if (mark) heard.add(key(i, j));
       let best = null;
       // Objects in this cell.
       for (const o of objectsAt(i, j)) {
@@ -660,7 +667,7 @@ export function createWorld(material, suzanneGeo) {
         const ni = i + di, nj = j + dj, k = `${ni},${nj}`;
         if (prev.has(k) || k === avoid || !canStep(i, j, di, dj)) continue;
         prev.set(k, [i, j]);
-        if (heard.has(k)) {
+        if (heard.has(key(ni, nj))) {
           queue.push([ni, nj, d + 1]);
           if (d + 1 >= 3) cands.push([ni, nj, score(ni, nj, d + 1, false)]);
         } else cands.push([ni, nj, score(ni, nj, d + 1, true)]);
@@ -705,7 +712,7 @@ export function createWorld(material, suzanneGeo) {
   // cells (an unheard one counts and isn't entered). Bounded, so it costs little.
   function frontier(si, sj, fi, fj) {
     const seen = new Set([`${fi},${fj}`, `${si},${sj}`]);
-    if (!heard.has(`${si},${sj}`)) return 1;
+    if (!heard.has(key(si, sj))) return 1;
     const queue = [[si, sj]];
     let unknown = 0;
     for (let n = 0; queue.length && n < 60; n++) {
@@ -715,7 +722,7 @@ export function createWorld(material, suzanneGeo) {
         const k = `${i + di},${j + dj}`;
         if (seen.has(k)) continue;
         seen.add(k);
-        if (heard.has(k)) queue.push([i + di, j + dj]);
+        if (heard.has(key(i + di, j + dj))) queue.push([i + di, j + dj]);
         else unknown++;
       }
     }
@@ -794,6 +801,7 @@ export function createWorld(material, suzanneGeo) {
     for (const c of chunks.values()) if (c.mesh) c.mesh.geometry.dispose();
     group.clear();
     chunks.clear();
+    lastChunk = null;
     cellObjects.clear();
     heard.clear();
     watchers.length = 0;
@@ -827,7 +835,7 @@ export function createWorld(material, suzanneGeo) {
       wallS: (i, j) => wallS(i, j),
       floor: (i, j) => floorOf(i, j),
       ceil: (i, j) => ceilOf(i, j),
-      heard: (i, j) => heard.has(`${i},${j}`),
+      heard: (i, j) => heard.has(key(i, j)),
       objects: (i, j) => objectsAt(i, j),
       void: VOID,
     },

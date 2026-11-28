@@ -118,6 +118,9 @@ export function createScanner(scene, room, { maxDots = 120000 } = {}) {
   // hits set the echo sound); the rest are traced over the next frames, keeping the call's start time.
   const queued = [];
   let queuedHead = 0;
+  // Bounces wait here for the frame's budget too, so a call's landing rays don't trace thousands at once.
+  const bounceQueue = [];
+  let bounceHead = 0;
   // focus: how strongly rays lean toward where the listener faces (0 = all round).
   function ping(origin, forward, count, intensity, time, bounces, now = 200, focus = 0.4) {
     const echoes = [];
@@ -146,7 +149,14 @@ export function createScanner(scene, room, { maxDots = 120000 } = {}) {
   // Rays travel unseen at the speed of sound; each leaves its dot when it lands.
   function update(time, speed, { budget = 600 } = {}) {
     dotUniforms.uTime.value = time;
-    for (let k = 0; k < budget && queuedHead < queued.length; k++) trace(queued[queuedHead++]);
+    // Bounces first (they land soonest), then the call's remaining rays, all within the frame's budget.
+    let k = 0;
+    for (; k < budget && bounceHead < bounceQueue.length; k++) {
+      const b = bounceQueue[bounceHead++];
+      launch(b.origin, b.dir, b.energy, b.bounces, b.t0, b.order);
+    }
+    if (bounceHead >= bounceQueue.length) bounceQueue.length = bounceHead = 0;
+    for (; k < budget && queuedHead < queued.length; k++) trace(queued[queuedHead++]);
     if (queuedHead >= queued.length) queued.length = queuedHead = 0;
     for (let i = dashes.length - 1; i >= 0; i--) {
       const s = dashes[i];
@@ -163,7 +173,7 @@ export function createScanner(scene, room, { maxDots = 120000 } = {}) {
           nd.z += (nativeRandom() - 0.5) * 0.35;
           nd.normalize();
           if (nd.dot(h.normal) < 0.05) nd.addScaledVector(h.normal, 0.1).normalize();
-          launch(h.point.clone().addScaledVector(h.normal, 0.003), nd, s.energy * 0.55, s.bounces - 1, s.t0 + s.length / speed, s.order + 1);
+          bounceQueue.push({ origin: h.point.clone().addScaledVector(h.normal, 0.003), dir: nd, energy: s.energy * 0.55, bounces: s.bounces - 1, t0: s.t0 + s.length / speed, order: s.order + 1 });
         }
         continue;
       }
@@ -182,6 +192,7 @@ export function createScanner(scene, room, { maxDots = 120000 } = {}) {
   function clear() {
     dashes.length = 0;
     queued.length = queuedHead = 0;
+    bounceQueue.length = bounceHead = 0;
     for (let i = 0; i < maxDots; i++) dotData[i * 4 + 3] = -1e4;
     dataAttr.clearUpdateRanges();
     dataAttr.needsUpdate = true;
