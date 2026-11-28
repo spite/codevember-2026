@@ -881,13 +881,19 @@ function pointerAngle(e) {
 canvas.addEventListener(
   "pointerdown",
   (e) => {
-    if (phase.name !== "run") return;
+    // One pointer turns a gear: a second finger, or another button, leaves the drag as it is.
+    if (phase.name !== "run" || drag.mesh || !e.isPrimary || e.button !== 0) return;
     setRay(e);
     for (const m of meshes) m.updateMatrixWorld();
     const hits = raycaster.intersectObjects(meshes, false);
     const part = hits[0]?.object.userData.part;
     if (!part || !part.draggable || !part.ratio || !part.axle) return;
     drag.mesh = hits[0].object;
+    drag.id = e.pointerId;
+    // Captured, so the release is seen wherever it happens (over the panel, outside the window).
+    try {
+      canvas.setPointerCapture(e.pointerId);
+    } catch {}
     drag.ratio = part.ratio;
     drag.teeth = part.build?.args?.teeth ?? 20;
     sound.play("latch", { gain: 0.4, lowpass: dull() });
@@ -904,7 +910,7 @@ canvas.addEventListener(
   { capture: true },
 );
 canvas.addEventListener("pointermove", (e) => {
-  if (!drag.mesh) return;
+  if (!drag.mesh || e.pointerId !== drag.id) return;
   const a = pointerAngle(e);
   if (a === null) return;
   let d = a - drag.last;
@@ -919,14 +925,15 @@ canvas.addEventListener("pointermove", (e) => {
     sound.play("ratchet", { gain: 0.5, rate: 0.9 + 0.2 * nativeRandom(), lowpass: dull() });
   }
 });
-const release = () => {
-  if (!drag.mesh) return;
+const release = (e) => {
+  if (!drag.mesh || e.pointerId !== drag.id) return;
   drag.mesh = null;
   motionState.dragging = false;
   controls.enabled = true;
 };
 canvas.addEventListener("pointerup", release);
 canvas.addEventListener("pointercancel", release);
+canvas.addEventListener("lostpointercapture", release);
 
 onRandomize(() => {
   gui.randomizeAll();
