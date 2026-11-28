@@ -687,7 +687,7 @@ function restart() {
   const lk = lookKey();
   let tries = 0;
   const ask = () =>
-    request(workers[0], { desc, E: 0, look: look() }, (d) => {
+    request(leadWorker(), { desc, E: 0, look: look() }, (d) => {
       if (d.stale || t !== token) return;
       if (d.error) {
         console.warn("Hollow mesher:", d.error);
@@ -970,13 +970,16 @@ const stepE = () => {
 };
 const leadE = () => Math.max(0.01, 1.2 * stepE());
 
+// The worker that prepares first: the first one still alive.
+const leadWorker = () => workers.find((w) => !w.dead) ?? workers[0];
 function schedule() {
   if (!desc || done || !ready) return;
   const t = token;
+  const lead = leadWorker();
   for (const w of workers) {
-    if (w.busy) continue;
+    if (w.busy || w.dead) continue;
     // A second worker starts preparing once the first has a field, so they don't both prepare at once.
-    if (w !== workers[0] && w.key !== desc.key && workers[0].key !== desc.key) continue;
+    if (w !== lead && w.key !== desc.key && lead.key !== desc.key) continue;
     // Meshes go out a full step apart, until the newest is ahead of where the clock will be when this one lands.
     const base = Math.max(lastAsked, shownE, ...pending.map((p) => p.E));
     if (base >= 1 || base > erosionAt(hollowT + (w.ms / 1000) * 1.5 + 0.2)) continue;
@@ -1022,7 +1025,7 @@ function relook() {
     lookAt = now;
   }
   if (key === shownLook || now - lookAt < 0.2) return;
-  const w = workers.find((w) => !w.busy);
+  const w = workers.find((w) => !w.busy && !w.dead);
   if (!w) return;
   shownLook = key;
   // Meshes on their way with the old look are dropped, so none of them lands after this one.
@@ -1035,10 +1038,13 @@ function relook() {
   relooking = true;
   request(w, { desc, E, look: look() }, (d) => {
     relooking = false;
-    if (!d.stale && !d.error && t === token && d.E >= shownE) install(d);
+    if (!d.stale && !d.error && t === token && d.E >= shownE) (install(d), (lookFailures = 0));
+    // Failed: forgotten, so the look is asked for again (a few times at most).
+    else if (d.error && t === token && ++lookFailures <= 3) shownLook = null;
   });
 }
 let relooking = false;
+let lookFailures = 0;
 
 // The status pill: what is changing right now, filled with its progress where there is one.
 const statusEl = document.querySelector("#status");
