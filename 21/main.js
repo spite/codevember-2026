@@ -1,4 +1,4 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, keysHelp, setDay, showHint, showSoundHint, loadingStep, addKey, addActionButton, onPause, isRunning } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, loadSeed, getSeed, keysHelp, setDay, showHint, showSoundHint, loadingStep, addKey, addActionButton, onPause, isRunning } from "common";
 import { GUI } from "guspira";
 import { Scene, Mesh, Vector2, Vector3, Color, BoxGeometry, LatheGeometry, Raycaster, DoubleSide, Spherical } from "three";
 import { Pipeline } from "modules/pipeline/Pipeline.js";
@@ -412,9 +412,11 @@ canvas.addEventListener("pointerup", (e) => {
 });
 
 // Ignored until the shapes have loaded; the object is built from the params then.
+// R during that wait still picks the seed (and puts it in the url): it is replayed once the shapes are in.
 let booted = false;
+let randomizedEarly = false;
 onRandomize(() => {
-  if (!booted) return;
+  if (!booted) return void (randomizedEarly = true);
   const was = params.shape();
   gui.randomizeAll();
   // Always another shape.
@@ -428,6 +430,7 @@ onRandomize(() => {
 await suzanne;
 booted = true;
 applyUrlState();
+if (randomizedEarly) loadSeed(getSeed());
 newObject();
 await studio;
 // A cool key; the fill (and so the room on the other side) is warm.
