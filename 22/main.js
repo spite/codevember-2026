@@ -375,7 +375,10 @@ let lastTake = null;
 let replayTake = null;
 let replayDone = null;
 
+// No call before the first frame: the chooser works during the load, but the echoes and their sound wait for it.
+let framed = false;
 function ping(intensity = 1, silent = false) {
+  if (!framed) return [];
   if (!replaying && (!canCall() || mode === "standby" || mode === "ended")) return [];
   const asked = intensity;
   motion.event(sceneTime, "call", asked);
@@ -569,6 +572,7 @@ window.app = {
 
 let lastWall = performance.now();
 render(({ dt }) => {
+  framed = true;
   const now = performance.now();
   const wallDt = Math.min(0.1, (now - lastWall) / 1000);
   lastWall = now;
