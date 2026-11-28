@@ -1,4 +1,4 @@
-import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, loadSeed, getSeed, keysHelp, setDay, showHint, showSoundHint, loadingStep, addKey, addActionButton, onPause, isRunning } from "common";
+import { fromDefaults, renderer, camera, controls, render, onResize, onRandomize, applyUrlState, loadSeed, getSeed, randomize, keysHelp, setDay, showHint, showSoundHint, loadingStep, addKey, addActionButton, onPause, isRunning } from "common";
 import { GUI } from "guspira";
 import { Scene, Mesh, Vector2, Vector3, Color, BoxGeometry, LatheGeometry, Raycaster, DoubleSide, Spherical } from "three";
 import { Pipeline } from "modules/pipeline/Pipeline.js";
@@ -414,23 +414,22 @@ canvas.addEventListener("pointerup", (e) => {
 // Ignored until the shapes have loaded; the object is built from the params then.
 // R during that wait still picks the seed (and puts it in the url): it is replayed once the shapes are in.
 let booted = false;
-let randomizedEarly = false;
-onRandomize(() => {
-  if (!booted) return void (randomizedEarly = true);
+let live = false;
+let earlySeed = null;
+onRandomize((value) => {
+  if (!booted) return void (earlySeed = value);
   const was = params.shape();
   gui.randomizeAll();
-  // Always another shape.
-  if (params.shape() === was) {
-    const others = shapeNames.filter((name) => name !== was);
-    params.shape.set(others[Math.floor(Math.random() * others.length)]);
-  }
+  // Live, always another shape: a repeat is replaced by a fresh seed, so the url holds the one on show.
+  if (live && params.shape() === was) return void queueMicrotask(randomize);
   newObject();
 });
 // Every shape is needed before the url's seed and params are applied: the seed's handler builds the object.
 await suzanne;
 booted = true;
 applyUrlState();
-if (randomizedEarly) loadSeed(getSeed());
+live = true;
+if (earlySeed !== null) loadSeed(earlySeed);
 newObject();
 await studio;
 // A cool key; the fill (and so the room on the other side) is warm.
