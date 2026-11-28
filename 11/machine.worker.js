@@ -13,10 +13,18 @@ function strip(o, seen) {
   else for (const [k, v] of Object.entries(o)) typeof v === "function" ? delete o[k] : strip(v, seen);
 }
 
+// The last machine's plain geometry, kept here (its buffers are copied to the page, not transferred): a change of finish
+// alone (Chamfer, Wear) reuses it and only rebuilds the worn parts.
+let last = { key: null, prebuilt: null, dir: null };
+
 onmessage = ({ data: { id, options, period } }) => {
   try {
+    const { chamfer, erosion, ...layout } = options;
+    const key = JSON.stringify(layout);
+    const reuse = last.key === key ? last.prebuilt : null;
     const prebuilt = new Map();
-    const m = createMachine({ ...options, record: prebuilt });
+    const m = createMachine({ ...options, ...(reuse ? { prebuilt: reuse } : {}), record: prebuilt });
+    if (reuse) for (const [k, v] of reuse) if (!prebuilt.has(k)) prebuilt.set(k, v);
     const results = m.parts.map((p) => {
       if (p.kind === "chain") return null;
       const r = p.build.result;
@@ -24,20 +32,23 @@ onmessage = ({ data: { id, options, period } }) => {
       r.weld = weldAttributes(r.position, r.normal, r.index);
       return r;
     });
-    const dir = bestView(m, motion(0, { period, layout: m.escapement.layout }).wheel, 0).toArray();
+    // The same layout keeps its view (the page keeps its framing on a change of finish).
+    const dir = reuse && last.dir ? last.dir : bestView(m, motion(0, { period, layout: m.escapement.layout }).wheel, 0).toArray();
+    last = { key, prebuilt, dir };
     const seen = new Set();
     strip(prebuilt, seen);
     for (const r of results) strip(r, seen);
-    // Each buffer once in the transfer list (a result can be the same geometry as its prebuilt entry).
-    const buffers = new Set();
-    const collect = (o, visited = new Set()) => {
+    // The worn results' buffers are transferred, each once; the prebuilt ones (also a result where nothing wears) stay.
+    const kept = new Set(), buffers = new Set();
+    const collect = (o, into, visited = new Set()) => {
       if (!o || typeof o !== "object" || visited.has(o)) return;
       visited.add(o);
-      if (ArrayBuffer.isView(o)) return void buffers.add(o.buffer);
-      for (const v of o instanceof Map ? o.values() : Object.values(o)) collect(v, visited);
+      if (ArrayBuffer.isView(o)) return void into.add(o.buffer);
+      for (const v of o instanceof Map ? o.values() : Object.values(o)) collect(v, into, visited);
     };
-    collect(prebuilt);
-    collect(results);
+    collect(prebuilt, kept);
+    collect(results, buffers);
+    for (const b of kept) buffers.delete(b);
     postMessage({ id, prebuilt, results, dir }, [...buffers]);
   } catch (e) {
     postMessage({ id, error: String(e?.stack ?? e) });
