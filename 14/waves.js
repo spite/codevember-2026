@@ -86,14 +86,24 @@ void main() {
   return pass;
 }
 
-let worker = null, nextId = 0;
+let worker = null, nextId = 0, workerDead = false;
 const pending = new Map();
+const emptyMap = () => ({ voxel: new Int32Array(0), index: new Int32Array(0), weight: new Float32Array(0) });
 function requestSplat(pos, sdf, box, edge) {
+  if (workerDead) return Promise.resolve(emptyMap());
   if (!worker) {
     worker = new Worker(new URL("./splat.worker.js", import.meta.url));
     worker.onmessage = (e) => {
+      if (e.data.error) console.error("Splat worker:", e.data.error);
       pending.get(e.data.id)?.(e.data);
       pending.delete(e.data.id);
+    };
+    // Failed to load: every map comes back empty (no waves on the surface), so nothing waits on it.
+    worker.onerror = (e) => {
+      console.error("Splat worker failed", e.message);
+      workerDead = true;
+      for (const done of pending.values()) done(emptyMap());
+      pending.clear();
     };
   }
   const id = nextId++;

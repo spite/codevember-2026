@@ -77,8 +77,10 @@ function createSound({ base = new URL("./sounds/", import.meta.url).href, onProg
 
   const live = () => on && !paused && ctx.state === "running";
 
+  // Nothing plays before arm(), called on the page's first frame (a gesture during the load is silent).
+  let armed = false;
   function play(buffer, { gain = 1, pan = 0, rate = 1, at = ctx.currentTime, out = master } = {}) {
-    if (!live() || !buffer || gain < 0.005) return false;
+    if (!armed || !live() || !buffer || gain < 0.005) return false;
     voices = voices.filter((t) => t > ctx.currentTime);
     if (voices.length >= MAX_VOICES) return false;
     const src = ctx.createBufferSource();
@@ -161,6 +163,7 @@ function createSound({ base = new URL("./sounds/", import.meta.url).href, onProg
 
   return {
     loaded,
+    arm: () => (armed = true),
     drop,
     ripple,
     squish,

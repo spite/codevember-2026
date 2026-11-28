@@ -310,11 +310,19 @@ function setFinish(f, second) {
 // with its lighting. A change made during one waits for it to finish.
 
 function request(slot, name, prepare) {
-  if (slot.target === name) return;
+  // A load that failed isn't asked for again until something else has been picked (then picking it retries).
+  if (slot.target === name || slot.failed === name) return;
+  slot.failed = null;
   slot.target = name;
-  prepare(name).then((p) => {
-    if (slot.target === name) slot.ready = p;
-  });
+  prepare(name).then(
+    (p) => {
+      if (slot.target === name) slot.ready = p;
+    },
+    (e) => {
+      console.error(`Couldn't load ${name}`, e);
+      if (slot.target === name) (slot.target = null), (slot.failed = name);
+    },
+  );
 }
 
 // The background tumbles slowly, like a camera drifting in zero gravity: its spin axis wanders through all three
@@ -1015,6 +1023,7 @@ let lastSignature = "";
 
 let lastTime = 0;
 render(({ time, dt }) => {
+  sound.arm();
   lastTime = time;
   autoChange.update(dt);
   updateLook(realDt());

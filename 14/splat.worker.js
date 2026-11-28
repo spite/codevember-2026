@@ -111,6 +111,11 @@ function build({ pos, field, box, grid, edge }) {
 }
 
 self.onmessage = (e) => {
-  const { voxel, index, weight } = build(e.data);
-  self.postMessage({ id: e.data.id, voxel, index, weight }, [voxel.buffer, index.buffer, weight.buffer]);
+  try {
+    const { voxel, index, weight } = build(e.data);
+    self.postMessage({ id: e.data.id, voxel, index, weight }, [voxel.buffer, index.buffer, weight.buffer]);
+  } catch (error) {
+    // Answered either way: an empty map leaves the surface without waves rather than the page waiting.
+    self.postMessage({ id: e.data.id, error: String(error?.stack ?? error), voxel: new Int32Array(0), index: new Int32Array(0), weight: new Float32Array(0) });
+  }
 };
