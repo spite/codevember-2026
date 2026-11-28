@@ -945,10 +945,13 @@ applyUrlState();
 textures = await rustTextures;
 lastStudio = params.studio();
 await load.studio.track(useStudio(lastStudio));
-requestBuild();
+// Asked again on every check: R during the load changes the machine, and the newest request is the one waited for.
 await load.machine.track(
   new Promise((resolve) => {
-    const wait = () => (buildReady() ? resolve(begin()) : setTimeout(wait, 20));
+    const wait = () => {
+      requestBuild();
+      buildReady() ? resolve(begin()) : setTimeout(wait, 20);
+    };
     wait();
   }),
 );
