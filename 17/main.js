@@ -146,11 +146,21 @@ const fluid = new FluidSim3D(24, 18, 24);
 const worker = new Worker(new URL("./forest.worker.js", import.meta.url), { type: "module" });
 const builds = new Map();
 let buildId = 0;
+// A forest that fails to build resolves to null (and every later one, once the worker itself has failed).
+let workerDead = false;
 worker.onmessage = ({ data }) => {
-  builds.get(data.id)?.(data);
+  if (data.error) console.error("Forest worker:", data.error);
+  builds.get(data.id)?.(data.error ? null : data);
   builds.delete(data.id);
 };
+worker.onerror = (e) => {
+  console.error("Forest worker failed", e.message);
+  workerDead = true;
+  for (const done of builds.values()) done(null);
+  builds.clear();
+};
 function buildForest() {
+  if (workerDead) return Promise.resolve(null);
   const id = ++buildId;
   return new Promise((resolve) => {
     builds.set(id, resolve);
@@ -180,7 +190,12 @@ function changeForest() {
   change.build = build;
   change.ready = null;
   build.then((data) => {
-    if (change.build === build) change.ready = data;
+    if (change.build !== build) return;
+    if (data) return void (change.ready = data);
+    // It failed: the water clears on the forest still there.
+    change.build = null;
+    change.state = "in";
+    change.t = FADE_IN * (1 - change.murk);
   });
   if (change.state !== "out") {
     change.t = FADE_OUT * change.murk;
@@ -220,6 +235,10 @@ function updateChange(dt) {
   kelpDepth.visible = kelpMesh.visible;
 }
 
+// The panel's Surge button works during the load, so these exist before it.
+let simTime = 0;
+let nextSurge = 8 + nativeRandom() * 10;
+
 let started = false;
 onRandomize(() => {
   forest.seed = Math.floor(Math.random() * 2 ** 32);
@@ -230,7 +249,16 @@ onRandomize(() => gui.randomizeAll());
 applyUrlState();
 started = true;
 
-const firstForest = load.forest.track(buildForest());
+// The first forest, from another seed if one fails (a few times at most).
+const firstForest = load.forest.track(
+  (async () => {
+    for (let attempt = 0; ; attempt++) {
+      const data = await buildForest();
+      if (data || attempt >= 2) return data;
+      forest.seed = Math.floor(nativeRandom() * 2 ** 32);
+    }
+  })(),
+);
 for (let i = 0; i < 50; i++) fluid.step(STEP, params.surge());
 load.water.done();
 showForest(await firstForest);
@@ -254,7 +282,6 @@ controls.update();
 await load.compile.track(underwater.compileAsync(scene, shadowScene, camera, depthScene), 3);
 
 // Now and then a bigger surge passes through the forest.
-let nextSurge = 8 + nativeRandom() * 10;
 function surge() {
   fluid.surge(0.45 + 0.25 * nativeRandom(), (nativeRandom() - 0.5) * 0.8);
   nextSurge = simTime + 10 + nativeRandom() * 15;
@@ -324,7 +351,6 @@ function advectSnow(dt) {
   }
 }
 
-let simTime = 0;
 let steps = 0;
 let pending = 0;
 function stepSim(dt) {
