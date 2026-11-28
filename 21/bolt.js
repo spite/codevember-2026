@@ -275,7 +275,8 @@ class Bolt {
       const below = (1 - u) * total;
       branch(main[i], lean(way, 0.4 + random() * 0.6), Math.min(2.8, below * (0.35 + random() * 0.75) + 0.25), i / last, 0.7, 0.55, 0);
     }
-    for (const attribute of Object.values(this.geometry.attributes)) attribute.needsUpdate = true;
+    for (const attribute of Object.values(this.geometry.attributes)) attribute.clearUpdateRanges(), (attribute.needsUpdate = true);
+    this._fullUpload = true;
     this.geometry.instanceCount = n;
     // The filaments go after the channel, rewritten while the charge gathers.
     this.fixed = n;
@@ -319,25 +320,27 @@ class Bolt {
           reach: 0.6 + r() * 0.6,
           start: new Vector3((r() - 0.5) * 0.03, 0, (r() - 0.5) * 0.03),
         });
-    const t1 = new Vector3(1, 0, 0).addScaledVector(normal, -normal.x);
+    const { t1, t2, start, end, endNormal, chord, up, centre, from, to, axis, p, prev, tip } = (this._v ??= Object.fromEntries(
+      ["t1", "t2", "start", "end", "endNormal", "chord", "up", "centre", "from", "to", "axis", "p", "prev", "tip"].map((k) => [k, new Vector3()]),
+    ));
+    t1.set(1, 0, 0).addScaledVector(normal, -normal.x);
     if (t1.lengthSq() < 0.01) t1.set(0, 0, 1).addScaledVector(normal, -normal.z);
     t1.normalize();
-    const t2 = new Vector3().crossVectors(normal, t1);
+    t2.crossVectors(normal, t1);
     const { pieceA, pieceB, pieceInfo, pieceMore, pieceStart } = this.arrays;
     let n = this.fixed;
     const put = (a, b, width, level, levelA = level) => {
       if (n >= MAX_PIECES) return;
-      pieceA.set([a.x, a.y, a.z], n * 3);
-      pieceB.set([b.x, b.y, b.z], n * 3);
+      const o3 = n * 3, o4 = n * 4;
+      pieceA[o3] = a.x, pieceA[o3 + 1] = a.y, pieceA[o3 + 2] = a.z;
+      pieceB[o3] = b.x, pieceB[o3 + 1] = b.y, pieceB[o3 + 2] = b.z;
       // Anchored to nothing: they are made where the glass is now.
-      pieceInfo.set([1, 0, width, level], n * 4);
-      pieceMore.set([1, r(), 2, 0], n * 4);
-      pieceStart.set([width, levelA, 1], n * 3);
+      pieceInfo[o4] = 1, pieceInfo[o4 + 1] = 0, pieceInfo[o4 + 2] = width, pieceInfo[o4 + 3] = level;
+      pieceMore[o4] = 1, pieceMore[o4 + 1] = r(), pieceMore[o4 + 2] = 2, pieceMore[o4 + 3] = 0;
+      pieceStart[o3] = width, pieceStart[o3 + 1] = levelA, pieceStart[o3 + 2] = 1;
       n++;
     };
     const count = Math.round(3 + charge * (FILAMENTS - 3));
-    const start = new Vector3(), end = new Vector3(), endNormal = new Vector3(), chord = new Vector3(), up = new Vector3();
-    const centre = new Vector3(), from = new Vector3(), to = new Vector3(), axis = new Vector3(), p = new Vector3(), prev = new Vector3();
     for (let k = 0; k < count; k++) {
       const f = this.filaments[k];
       // Where it lands: round the impact, wandering in angle and in reach.
@@ -374,15 +377,25 @@ class Bolt {
         p.addScaledVector(up, (a + (r() - 0.5) * 0.004) * ends).addScaledVector(axis, (b + (r() - 0.5) * 0.004) * ends);
         // Brighter where it leaves and where it lands.
         const s0 = (i - 1) / STEPS;
-        put(prev.clone(), p.clone(), 0.6, 0.55 + 0.45 * Math.max(1 - s * 4, s * s), 0.55 + 0.45 * Math.max(1 - s0 * 4, s0 * s0));
+        put(prev, p, 0.6, 0.55 + 0.45 * Math.max(1 - s * 4, s * s), 0.55 + 0.45 * Math.max(1 - s0 * 4, s0 * s0));
         prev.copy(p);
       }
       // Where it touches the glass, a spot of light.
-      put(end, end.clone().addScaledVector(endNormal, 0.004), 0.7, 0.6 + 0.4 * r());
+      put(end, tip.copy(end).addScaledVector(endNormal, 0.004), 0.7, 0.6 + 0.4 * r());
     }
     // And where they all leave from.
-    put(hit, hit.clone().addScaledVector(normal, 0.01), 1.2, 0.5 + 0.5 * charge);
-    for (const attribute of Object.values(this.geometry.attributes)) attribute.needsUpdate = true;
+    put(hit, tip.copy(hit).addScaledVector(normal, 0.01), 1.2, 0.5 + 0.5 * charge);
+    // Only the filaments' range goes up, unless the channel was just rewritten too.
+    const full = this._fullUpload;
+    this._fullUpload = false;
+    for (const name of Object.keys(this.arrays)) {
+      const attribute = this.geometry.attributes[name];
+      if (!full) {
+        if (n <= this.fixed) continue;
+        attribute.addUpdateRange(this.fixed * attribute.itemSize, (n - this.fixed) * attribute.itemSize);
+      }
+      attribute.needsUpdate = true;
+    }
     this.geometry.instanceCount = n;
   }
 

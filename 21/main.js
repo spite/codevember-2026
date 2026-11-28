@@ -447,12 +447,18 @@ const BASE = new Color(1.0, 0.62, 0.3), ARC = new Color(0.45, 0.6, 1.0), _c = ne
 const HOT = new Color(0.3, 0.55, 1.0), COOL = new Color(0.12, 0.25, 1.0);
 
 let bloom = BLOOM, flashBloom = 0;
+let pendingShape = null, pendingSince = 0;
 function frame({ time, dt }) {
   started = true;
   now = time;
   autoChange.update(dt);
   if (state.phase === "clear" && autoChange.remaining < Math.min(AUTO_STRIKE, params.autoTime() * 0.6)) strikeAnywhere();
-  if (shapeKey() !== state.shape) newObject();
+  // Edges and Inflate rebake the whole grid: a drag rebuilds once it rests. A new shape goes at once.
+  const wantShape = shapeKey();
+  if (wantShape !== state.shape) {
+    if (wantShape !== pendingShape) (pendingShape = wantShape), (pendingSince = performance.now());
+    if (wantShape.split(" ")[0] !== state.shape?.split(" ")[0] || performance.now() - pendingSince > 150) newObject();
+  }
   state.angle += dt * params.spin();
   glass.setPose(center, state.angle, SCALE);
   glass.uniforms.ior.value = params.ior();
