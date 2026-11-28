@@ -680,6 +680,8 @@ function createFeathers({ color = new Color(1.0, 0.985, 0.955), alphaToCoverage 
     for (let i = 0; i < n; i++) shapes[i * 4] *= ASPECT * width * PLANE_WIDTH;
     // three caches the instance limit of the first attributes it binds; a larger rebuild would be clipped to it.
     delete geometry._maxInstanceCount;
+    // Frees the GPU buffers of the instance attributes being replaced (three only frees those on dispose).
+    geometry.dispose();
     geometry.setAttribute("aRoot", new InstancedBufferAttribute(roots, 4));
     geometry.setAttribute("aNorm", new InstancedBufferAttribute(norms, 4));
     geometry.setAttribute("aDir", new InstancedBufferAttribute(dirs, 4));

@@ -147,12 +147,15 @@ gui.addSection("Form");
 const SHAPES = [["torus", "torus"], ["knot", "torus knot"], ...Object.keys(KNOT_CURVES).map((k) => [k, k])];
 // The centre line of a closed shape, size: its ring radius or knot size.
 const lineFor = (shape, size, p, q, n) => (shape === "torus" ? centreLine(1, 0, size, n) : shape === "knot" ? centreLine(p, q, size, n) : knotLine(shape, size, n));
-// Never the shape already on show.
+// The shape comes from the seed alone, so a link reproduces it. Live, a repeat of the shape on show is replaced by a
+// fresh seed (randomized again once these values are in, so the url holds that seed).
+let live = false;
 gui.addSelect("Shape", params.shape, SHAPES).randomize = () => {
   const weights = { torus: 0.1, knot: 0.25, trefoil: 0.2, "figure-eight": 0.15, saddle: 0.1, crown: 0.1, star: 0.1 };
-  delete weights[params.shape()];
+  const was = params.shape();
   let r = Math.random() * Object.values(weights).reduce((a, b) => a + b);
-  for (const [k, w] of Object.entries(weights)) if ((r -= w) < 0) return params.shape.set(k);
+  for (const [k, w] of Object.entries(weights)) if ((r -= w) < 0) { params.shape.set(k); break; }
+  if (live && params.shape() === was) queueMicrotask(randomize);
 };
 // Windings round the axis and through the hole; equal or sharing a factor gives a link, not a knot.
 // Randomized toward full, chunky forms: knots with few crossings, sized up so the tube can be thick, and as thick as
@@ -270,6 +273,10 @@ function toggleSound() {
 }
 addKey("KeyM", "toggle sound", toggleSound);
 // The life effects on demand: each starts on the next frame.
+// When the next gust, swipe and rouse come (seconds); declared before the load, since their keys work during it.
+let gustAt = 6 + 10 * nativeRandom();
+let swipeAt = 3 + 6 * nativeRandom();
+let rouseAt = 4 + 6 * nativeRandom();
 addKey("KeyO", "rouse", () => (rouseAt = 0));
 addKey("KeyS", "swipe", () => (swipeAt = 0));
 addKey("KeyW", "gust of wind", () => (gustAt = 0));
@@ -619,9 +626,12 @@ function runChange(dt) {
 }
 const _bg = new Color();
 applyUrlState();
+// What the first layout is built from, taken before it awaits: R during the load then shows as a change afterwards.
+const firstShape = shapeSignature();
+const firstBuilt = signature();
 await load.layout.track(rebuild());
-builtShape = shapeSignature();
-let built = signature();
+builtShape = firstShape;
+let built = firstBuilt;
 
 // Each look's studio is baked once; a switch waits for its bake, then swaps everything at once.
 const bakes = {};
@@ -737,10 +747,8 @@ for (const colour of Object.keys(BACKDROPS)) bake(studioKey("light", colour));
 
 // Life: the form breathes, now and then rouses its plumage like a bird, and stirs where the pointer passes close.
 const gust = { t: 99, peak: 0, rise: 1, fall: 1, pan: 0, dir: new Vector3(1, 0, 0) };
-let gustAt = 6 + 10 * nativeRandom();
 const swipe = { t: 9, from: 0, span: 0, side: 0, time: 1, count: 0 };
-let swipeAt = 3 + 6 * nativeRandom();
-let rouseCount = 0, rouseT = 99, rouseLength = 1.4, shakeHz = 7, shakeAmp = 0, rouseFront = 2, rouseSpeed = 1, rouse = 0, rouseAt = 4 + 6 * nativeRandom(), breathPrev = 1;
+let rouseCount = 0, rouseT = 99, rouseLength = 1.4, shakeHz = 7, shakeAmp = 0, rouseFront = 2, rouseSpeed = 1, rouse = 0, breathPrev = 1;
 const pointer = { ndc: new Vector2(), moved: 0, inside: false, stir: 0 };
 addEventListener("pointermove", (e) => {
   const r = renderer.domElement.getBoundingClientRect();
@@ -924,6 +932,7 @@ for (const e of ["pointerup", "pointercancel"]) addEventListener(e, () => (point
 // Recordings can slow the whole piece down (timeScale < 1): the clock everything runs on.
 let sceneTime = 0, realDt = 0, lastNow = 0;
 render(({ time, dt }) => {
+  live = true;
   // While paused the base's dt is 0: the frame's own interval keeps everything but the spin going.
   const now = performance.now();
   const measured = lastNow ? Math.min(0.1, (now - lastNow) / 1000) : 0;
