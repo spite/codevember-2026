@@ -6,6 +6,7 @@ import {
   render,
   onResize,
   onRandomize,
+  applyUrlState,
   keysHelp,
   setDay,
   addKey,
@@ -178,6 +179,9 @@ gui.addText(
 showHint("Drag a shape to throw it · drag the backdrop to orbit · R for new shapes", "Drag a shape to throw it · tap {randomize} for new ones");
 showSoundHint(() => !sound.running);
 gui.show();
+// Before the load: a url's seed and params are in place for the first layout, and R during the load randomizes the panel.
+onRandomize(() => gui.randomizeAll());
+applyUrlState();
 
 const scene = new Scene();
 
@@ -799,8 +803,6 @@ function updateOccluders() {
 
 commitShapes(planShapes(), 1);
 builtKey = key();
-
-onRandomize(() => gui.randomizeAll());
 
 // Rebuilds the paper in place once the Crease slider settles: same shapes and layout, new fillets.
 let creaseChanged = 0;
