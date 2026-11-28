@@ -197,16 +197,21 @@ const workers = Array.from({ length: (navigator.hardwareConcurrency ?? 4) >= 4 ?
     jobs.delete(e.data.id);
     resolve?.(e.data);
   };
+  const worker = { w, jobs, dead: false };
   w.onerror = (e) => {
+    // A worker that failed to load never answers again: its jobs, and any later ones, get the error.
+    worker.dead = true;
     for (const r of jobs.values()) r({ error: e.message || "mesher failed to load" });
     jobs.clear();
   };
-  return { w, jobs };
+  return worker;
 });
 const meshField = (msg) =>
   new Promise((resolve) => {
     const id = ++jobId;
-    const { w, jobs } = workers.reduce((a, b) => (b.jobs.size < a.jobs.size ? b : a));
+    const alive = workers.filter((x) => !x.dead);
+    if (!alive.length) return resolve({ error: "mesher failed to load" });
+    const { w, jobs } = alive.reduce((a, b) => (b.jobs.size < a.jobs.size ? b : a));
     jobs.set(id, resolve);
     w.postMessage({ ...msg, id }, [msg.field.buffer]);
   });
