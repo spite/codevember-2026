@@ -181,7 +181,7 @@ const params = fromDefaults(defaults);
 const load = { studio: loadingStep(1), sound: loadingStep(1), compile: loadingStep(3) };
 
 const sound = createSound({ onProgress: load.sound.set });
-load.sound.track(sound.loaded);
+const soundLoaded = load.sound.track(sound.loaded);
 const soundButton = addActionButton("../assets/sound.svg", "Sound", () => toggleSound());
 function toggleSound() {
   sound.on = !sound.on;
@@ -2012,7 +2012,8 @@ onRandomize(() => {
   );
   // The figure comes from the seed alone, so a link reproduces it. Live, the same figure twice in a row is skipped for
   // the next one, just after the seed's values are recorded: the url then carries the object, and still reproduces it.
-  const was = params.object();
+  // The figure on show (held through an exit), not one already queued.
+  const was = shapeParam("object");
   const nextObj = pick(pool);
   params.object.set(nextObj);
   if (show.started && nextObj === was && pool.length > 1) {
@@ -2333,7 +2334,8 @@ function rebuildGeometry() {
 }
 
 rebuildGeometry();
-await load.compile.track(pipeline.compileAsync(scene, getActiveCamera()), 3);
+// The samples decode while the shaders compile; the first frame (and its whoosh) waits for both.
+await Promise.all([soundLoaded, load.compile.track(pipeline.compileAsync(scene, getActiveCamera()), 3)]);
 
 window.app = {
   canvas: renderer.domElement,
