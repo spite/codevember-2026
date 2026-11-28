@@ -154,18 +154,36 @@ worker.onmessage = ({ data }) => {
   builds.delete(data.id);
 };
 worker.onerror = (e) => {
-  console.error("Forest worker failed", e.message);
+  console.error("Forest worker failed; building on the page", e.message ?? "");
   workerDead = true;
   for (const done of builds.values()) done(null);
   builds.clear();
 };
 function buildForest() {
-  if (workerDead) return Promise.resolve(null);
+  const job = { seed: forest.seed, randomLayout: forest.random, detail, density, shadowDetail: detail * 0.4 };
+  if (workerDead) return buildForestHere(job);
   const id = ++buildId;
   return new Promise((resolve) => {
     builds.set(id, resolve);
-    worker.postMessage({ id, seed: forest.seed, randomLayout: forest.random, detail, density, shadowDetail: detail * 0.4 });
+    worker.postMessage({ id, ...job });
   });
+}
+// Without the worker (it failed to load), the same build on the page, a frame later; null if it throws.
+function buildForestHere(job) {
+  return import("./kelpBuilder.js").then(
+    ({ buildKelpForestGeometry }) =>
+      new Promise((resolve) =>
+        setTimeout(() => {
+          try {
+            const shadow = buildKelpForestGeometry({ ...job, detail: job.shadowDetail, shadow: true });
+            resolve({ ...buildKelpForestGeometry(job), shadow: { attributes: shadow.attributes, index: shadow.index } });
+          } catch (error) {
+            console.error("Forest build failed", error);
+            resolve(null);
+          }
+        }, 0),
+      ),
+  );
 }
 
 function showForest(data) {
@@ -261,7 +279,10 @@ const firstForest = load.forest.track(
 );
 for (let i = 0; i < 50; i++) fluid.step(STEP, params.surge());
 load.water.done();
-showForest(await firstForest);
+// Still none after the retries: the page runs on with an empty sea rather than stopping at the loader.
+const first = await firstForest;
+if (first) showForest(first);
+else console.error("No forest could be built");
 
 // A wide lens, as most underwater photographs are taken with.
 camera.userData.baseFov = 72;
@@ -363,7 +384,7 @@ function stepSim(dt) {
     if (probeOn) fluid.applyMovingSphere(probe.position, probeVel, PROBE_RADIUS, 2.8);
     fluid.step(dt * sim.fluidEvery, params.surge());
   }
-  forest.physics.step(dt, fluid, probe.position, PROBE_RADIUS, probeOn, sim.iterations);
+  forest.physics?.step(dt, fluid, probe.position, PROBE_RADIUS, probeOn, sim.iterations);
   advectSnow(dt);
 }
 
@@ -400,7 +421,7 @@ render(({ time, dt }) => {
     stepped = true;
   }
   if (stepped) {
-    forest.physics.uploadTextures();
+    forest.physics?.uploadTextures();
     snowGeo.attributes.position.needsUpdate = true;
   }
   kelpUniforms.uTime.value = time;
