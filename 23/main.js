@@ -548,8 +548,12 @@ let buildFailures = 0;
 function buildFailed() {
   if (++buildFailures > 3) return;
   randomize();
-  // Before the page has started, the randomize handler doesn't rebuild: the new rock is asked for here.
-  if (!initialized) buildMorphTarget();
+  // Before the page has started, the randomize handler doesn't rebuild: the new rock is asked for here, with its own
+  // fluid developed (as a link to that seed would).
+  if (!initialized) {
+    look.fluid = true;
+    buildMorphTarget();
+  }
 }
 
 // Runs while the liquid is on show and the rock is hidden
@@ -740,6 +744,8 @@ function applySmokePreset(i) {
 onRandomize((seed) => {
   const previousStyle = params.style();
   const previousShape = params.shape();
+  // The look on show, read before anything here bakes (not the last draw, which a re-randomize may have replaced).
+  const [shownStyle, shownShape] = appliedLookKey ? appliedLookKey.split("|") : [previousStyle, previousShape];
   // Everything here comes from the seed alone, so a link reproduces it. Live, a repeat of the style or shape on show is
   // replaced by a fresh seed (randomized again once these values are in, so the url holds that seed).
   gui.randomizeAll();
@@ -755,8 +761,8 @@ onRandomize((seed) => {
   remap(params.gloss, Math.max(0.10, profile.gloss - 0.12), Math.min(0.92, profile.gloss + 0.12));
   // Embers from mid to max, weighted toward many
   params.embers.set(Number((0.5 + 0.5 * Math.sqrt(params.embers())).toFixed(2)));
+  if (initialized && (params.style() === shownStyle || params.shape() === shownShape)) return void queueMicrotask(randomize);
   if (initialized) changeLook(true);
-  if (initialized && (params.style() === previousStyle || params.shape() === previousShape)) queueMicrotask(randomize);
 });
 
 applyUrlState();
@@ -977,7 +983,6 @@ const frameFn = ({ time, dt, frame }) => {
   const wallDt = Math.min(0.1, (now - lastWall) * 0.001);
   lastWall = now;
 
-  autoChange.update(dt);
 
   // Selecting a new Style preset automatically applies its reference-calibrated profile
   const styleNow = params.style();
@@ -1098,6 +1103,8 @@ const frameFn = ({ time, dt, frame }) => {
     lavaPulse.probe();
   }
   pipeline.render(scene, camera, time);
+  // Last, so a re-randomize queued by its change lands before the next frame looks at the params.
+  autoChange.update(dt);
 };
 // A few frames rendered behind the loading screen, so the passes that only run from the second frame on (temporal
 // resolves, the smoke sim, ...) compile before it fades instead of freezing the first visible frames
