@@ -181,6 +181,8 @@ const first = await load.build.track(
   (async () => {
     for (let attempt = 0; ; attempt++) {
       try {
+        // Keyed before the build: an R or panel change made while it builds swaps in on the first frame.
+        builtKey = key();
         return await makeEntry();
       } catch (error) {
         if (attempt >= 2) throw error;
@@ -192,8 +194,6 @@ const first = await load.build.track(
   })(),
 );
 stage.show(first, 0.37);
-// A retry above may have moved to another seed: that's the one on show.
-builtKey = key();
 director.reframe(first.contraption.framing(), true);
 await studio;
 await load.compile.track(pipeline.compileAsync(scene, camera), 4);

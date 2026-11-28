@@ -30,6 +30,8 @@ class Cutter {
     this.id = 0;
     this.worker.onmessage = ({ data }) => {
       const p = this.pending.get(data.id);
+      // A batch already cut down (a message that failed to arrive) has no one waiting.
+      if (!p) return;
       this.pending.delete(data.id);
       if (data.error) p.reject(new Error(data.error));
       else p.resolve(data.results);
