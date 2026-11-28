@@ -524,7 +524,8 @@ function swapLookInPlace() {
     magmaMesh.visible = false;
     revealOnBuild = true;
   }
-  buildMesh(getSeed());
+  // A build that fails would leave the rock hidden: another seed instead.
+  buildMesh(getSeed()).then((ok) => ok === null && buildFailed());
 }
 let revealOnBuild = false;
 
