@@ -163,7 +163,13 @@ controls.minDistance = 3;
 controls.maxDistance = 12;
 controls.maxPolarAngle = Math.PI * 0.49;
 const director = new Director({ camera, controls, random: nativeRandom });
-onResize((w, h, dpr) => pipeline.setSize(w, h, dpr));
+// common.js resets the fov to its default on every resize: the Director's lens (24° and up) is put back.
+let lensFov = camera.fov;
+onResize((w, h, dpr) => {
+  pipeline.setSize(w, h, dpr);
+  camera.fov = lensFov;
+  camera.updateProjectionMatrix();
+});
 
 let builtKey = key();
 const first = await load.build.track(makeEntry());
@@ -372,5 +378,6 @@ render(({ time, dt }) => {
   director.update(dt * slow);
   controls.update();
   turnView(dt);
+  lensFov = camera.fov;
   asSeen(() => pipeline.render(scene, camera, time));
 });
