@@ -146,17 +146,18 @@ const fluid = new FluidSim3D(24, 18, 24);
 const worker = new Worker(new URL("./forest.worker.js", import.meta.url), { type: "module" });
 const builds = new Map();
 let buildId = 0;
-// A forest that fails to build resolves to null (and every later one, once the worker itself has failed).
+// A forest that fails to build resolves to null; once the worker itself has failed, forests are built on the page.
 let workerDead = false;
 worker.onmessage = ({ data }) => {
   if (data.error) console.error("Forest worker:", data.error);
-  builds.get(data.id)?.(data.error ? null : data);
+  builds.get(data.id)?.resolve(data.error ? null : data);
   builds.delete(data.id);
 };
 worker.onerror = (e) => {
   console.error("Forest worker failed; building on the page", e.message ?? "");
   workerDead = true;
-  for (const done of builds.values()) done(null);
+  // What was waiting on it is built on the page instead (the same seed, so the url still names it).
+  for (const { resolve, job } of builds.values()) resolve(buildForestHere(job));
   builds.clear();
 };
 function buildForest() {
@@ -164,7 +165,7 @@ function buildForest() {
   if (workerDead) return buildForestHere(job);
   const id = ++buildId;
   return new Promise((resolve) => {
-    builds.set(id, resolve);
+    builds.set(id, { resolve, job });
     worker.postMessage({ id, ...job });
   });
 }
