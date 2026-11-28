@@ -515,7 +515,13 @@ function setPaperFold(mesh) {
   };
 }
 
-function commitShapes(plan, fold) {
+// The crease the papers on show were built with: a change from it rebuilds them (updateCrease).
+let builtCrease = params.creaseAmount();
+let seenCrease = builtCrease;
+
+// crease: what the plan's papers were built with (a transition's, from when it started).
+function commitShapes(plan, fold, crease = params.creaseAmount()) {
+  builtCrease = crease;
   clearShapes();
   for (const item of plan) {
     const geometry = planGeometry(item, fold);
@@ -663,7 +669,7 @@ function contactSounds() {
 function startTransition() {
   if (transition) disposeSheets(transition);
   const plan = planShapes();
-  transition = { phase: "unfold", time: 0, plan, sheets: [], built: false, total: Math.max(plan.length, shapes.length) };
+  transition = { phase: "unfold", time: 0, plan, sheets: [], built: false, total: Math.max(plan.length, shapes.length), crease: params.creaseAmount() };
   transition.build = buildSteps(transition);
   setKinematic(true);
   sound.play("open", { gain: 0.45 });
@@ -703,7 +709,7 @@ function updateTransition(dt) {
         sh.object.visible = true;
       });
       builtKey = key();
-      commitShapes(tr.plan, 0);
+      commitShapes(tr.plan, 0, tr.crease);
       for (const s of shapes) s.object.visible = false;
       tr.phase = "morph";
       tr.time = 0;
@@ -797,8 +803,6 @@ builtKey = key();
 onRandomize(() => gui.randomizeAll());
 
 // Rebuilds the paper in place once the Crease slider settles: same shapes and layout, new fillets.
-let builtCrease = params.creaseAmount();
-let seenCrease = builtCrease;
 let creaseChanged = 0;
 function updateCrease(time) {
   const value = params.creaseAmount();
