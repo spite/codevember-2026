@@ -212,7 +212,7 @@ beatMap.then((map) => {
     // starts when the music does.
     if (beat.swapBar < -1e8) beat.swapBar = bar;
     const due = autoChange.on() && intro.tunnel >= 1 && bar - beat.swapBar >= Number(params.changeBars()) - 1;
-    if (due && bar % 4 === 3 && flip.state === "idle") {
+    if (due && bar % 4 === 3 && flip.state === "idle" && !cardQueued) {
       flip.onBar = true;
       randomize();
     }
@@ -222,7 +222,7 @@ beatMap.then((map) => {
     tunnel.uniforms.tunnelHatN.value = (tunnel.uniforms.tunnelHatN.value + 1) % 997;
   });
   track.on("tag:drop", () => {
-    if (autoChange.on() && flip.state === "idle") randomize();
+    if (autoChange.on() && flip.state === "idle" && !cardQueued) randomize();
   });
   // How hectic the song is, spread over its own range (5th to 95th percentile, so the quiet ends don't squash it).
   const h = [...(track.map.curves?.hectic ?? [])].filter((v) => v > 0.05).sort((a, b) => a - b);
@@ -472,6 +472,8 @@ function easeLook(k) {
 // spins, and the new one goes on as it passes edge-on.
 const shown = { shape: "", scene: "" };
 const sceneKey = (v) => v.scene + "|" + v.machines;
+// cardQueued covers the gap until the card is requested (a bar and the drop can both fire in one music update).
+let cardQueued = false;
 const flip = { wind: 0, windFrom: 0, state: "idle", angle: 0, omega: 0, values: null, prepared: null, swapped: false, target: 0, start: 0, duration: 1, t: 0, request: 0 };
 // Spin rate while the next card is made (rad/s), and how it winds down after.
 const SPIN = 16;
@@ -597,7 +599,9 @@ function liveRules(scene) {
 function nextCard(over = {}, onBar = false) {
   const was = params.$snapshot();
   randomizeLook();
+  cardQueued = true;
   queueMicrotask(() => {
+    cardQueued = false;
     liveRules(was.scene);
     for (const [key, value] of Object.entries(over)) params[key]?.set(value);
     const next = params.$snapshot();
