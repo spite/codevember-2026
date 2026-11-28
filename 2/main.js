@@ -263,7 +263,6 @@ const _p = new Vector3();
 const _s = new Vector3();
 const _z = new Vector3(0, 0, 1);
 const _v = new Vector3();
-const HIDE = new Matrix4().makeScale(0, 0, 0);
 
 function place() {
   const t = params.explosion() * 0.6;
@@ -272,55 +271,52 @@ function place() {
     p.mesh.position.copy(p.centre).addScaledVector(p.velocity, t);
     p.mesh.quaternion.setFromAxisAngle(p.axis, p.spin * t);
   }
+  // Each mesh draws only the instances in use, packed at its start: hidden ones cost nothing in any pass.
+  const used = new Map();
+  const put = (mesh, matrix) => {
+    const n = used.get(mesh) ?? 0;
+    mesh.setMatrixAt(n, matrix);
+    used.set(mesh, n + 1);
+  };
   chunks.forEach((c, i) => {
-    const mesh = chunkMeshes[i % chunkMeshes.length];
-    const at = Math.floor(i / chunkMeshes.length);
-    if (!c.on) return mesh.setMatrixAt(at, HIDE);
+    if (!c.on) return;
     _p.copy(c.start).addScaledVector(c.velocity, t);
     _q.setFromAxisAngle(c.axis, c.spin * t).multiply(_q2.setFromUnitVectors(_z, c.turn));
-    mesh.setMatrixAt(at, _m.compose(_p, _q, c.scale));
+    put(chunkMeshes[i % chunkMeshes.length], _m.compose(_p, _q, c.scale));
   });
-  for (const m of chunkMeshes) m.instanceMatrix.needsUpdate = true;
   // Drops stretch along their flight like a fast shutter would catch them.
   const dropCount = Math.round(MAX_DROPS * amount * (subject.spray.drops ?? 0));
-  for (let i = 0; i < MAX_DROPS; i++) {
-    if (i >= dropCount) {
-      drops.setMatrixAt(i, HIDE);
-      continue;
-    }
+  for (let i = 0; i < dropCount; i++) {
     const d = spray[i];
     _p.copy(d.start).addScaledVector(d.velocity, t);
     const speed = d.velocity.length();
     _q.setFromUnitVectors(_z, _v.copy(d.velocity).normalize());
     const stretch = 1 + speed * speed * 0.35 * Math.min(1, t * 8);
     const thin = d.size / stretch ** 0.25;
-    drops.setMatrixAt(i, _m.compose(_p, _q, _s.set(thin, thin, d.size * stretch)));
+    put(drops, _m.compose(_p, _q, _s.set(thin, thin, d.size * stretch)));
   }
-  drops.instanceMatrix.needsUpdate = true;
   const fleckCount = subject.spray.flecks ? Math.round(MAX_FLECKS * amount) : 0;
-  for (let i = 0; i < MAX_FLECKS; i++) {
-    if (i >= fleckCount) {
-      flecks.setMatrixAt(i, HIDE);
-      continue;
-    }
+  for (let i = 0; i < fleckCount; i++) {
     const d = spray[MAX_DROPS + i];
     _p.copy(d.start).addScaledVector(d.velocity, t * 0.8);
     _q.setFromAxisAngle(d.axis, d.spin * t);
-    flecks.setMatrixAt(i, _m.compose(_p, _q, _s.set(d.size * 0.9, d.size * 0.9, d.size * 2.6)));
+    put(flecks, _m.compose(_p, _q, _s.set(d.size * 0.9, d.size * 0.9, d.size * 2.6)));
   }
-  flecks.instanceMatrix.needsUpdate = true;
-  const chipCount = Math.round(MAX_CHIPS * amount * (subject.spray.chips ?? 0));
-  chips.forEach((c, i) => {
-    const k = i % chipMeshes.length;
-    const mesh = (c.big ? bigChipMeshes : chipMeshes)[k];
-    const at = Math.floor(i / chipMeshes.length);
-    (c.big ? chipMeshes : bigChipMeshes)[k].setMatrixAt(at, HIDE);
-    if (i >= chipCount || t <= 0) return mesh.setMatrixAt(at, HIDE);
+  const chipCount = t > 0 ? Math.round(MAX_CHIPS * amount * (subject.spray.chips ?? 0)) : 0;
+  for (let i = 0; i < Math.min(chipCount, chips.length); i++) {
+    const c = chips[i];
     _p.copy(c.start).addScaledVector(c.velocity, t);
     _q.setFromAxisAngle(c.axis, c.spin * t).multiply(_q2.setFromUnitVectors(_z, c.turn));
-    mesh.setMatrixAt(at, _m.compose(_p, _q, _s.set(c.size * (subject.spray.chipStretch ?? 1), c.size, c.size * (subject.spray.chipThin ?? 1))));
-  });
-  for (const m of [...chipMeshes, ...bigChipMeshes]) m.instanceMatrix.needsUpdate = true;
+    const mesh = (c.big ? bigChipMeshes : chipMeshes)[i % chipMeshes.length];
+    put(mesh, _m.compose(_p, _q, _s.set(c.size * (subject.spray.chipStretch ?? 1), c.size, c.size * (subject.spray.chipThin ?? 1))));
+  }
+  for (const m of [...chunkMeshes, drops, flecks, ...chipMeshes, ...bigChipMeshes]) {
+    m.count = used.get(m) ?? 0;
+    if (!m.count) continue;
+    m.instanceMatrix.clearUpdateRanges();
+    m.instanceMatrix.addUpdateRange(0, m.count * 16);
+    m.instanceMatrix.needsUpdate = true;
+  }
 }
 
 let placedKey = null;

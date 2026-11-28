@@ -77,11 +77,18 @@ function createTransport({ value, duration = 4, onRandomize, onPlay }) {
       value.set(next);
       if (next >= until) setPlaying(false);
     }
+    // The DOM is only touched when the value moved (or the scrub was being dragged and let go).
     const v = value();
-    if (document.activeElement !== scrub || playing) scrub.value = v;
+    const syncScrub = document.activeElement !== scrub || playing;
+    if (v === shown && syncScrub === scrubSynced) return;
+    shown = v;
+    scrubSynced = syncScrub;
+    if (syncScrub) scrub.value = v;
     scrub.style.setProperty("--progress", `${v * 100}%`);
     readout.textContent = `${Math.round(v * 100)}%`;
   }
+  let shown = NaN;
+  let scrubSynced = false;
 
   return {
     update,
