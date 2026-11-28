@@ -545,7 +545,10 @@ function changeLook(reDevelopFluid) {
 // A rock that couldn't be built would leave the liquid up for good: another seed instead, a few times at most.
 let buildFailures = 0;
 function buildFailed() {
-  if (++buildFailures <= 3) randomize();
+  if (++buildFailures > 3) return;
+  randomize();
+  // Before the page has started, the randomize handler doesn't rebuild: the new rock is asked for here.
+  if (!initialized) buildMorphTarget();
 }
 
 // Runs while the liquid is on show and the rock is hidden
@@ -719,13 +722,7 @@ const eased = {
 const remap = (param, lo, hi) => param.set(Number((lo + param() * (hi - lo)).toFixed(2)));
 
 // A new look never repeats the shape or the style on show
-function pickOther(param, options, previous) {
-  if (param() !== previous) return;
-  const rest = options.filter((o) => o !== previous);
-  param.set(rest[Math.floor(Math.random() * rest.length)]);
-}
-
-// Smoke moods the randomizer cycles through (each new look picks a different one); unlisted sliders stay at 1
+// Smoke moods the randomizer picks from; unlisted sliders stay at 1
 const SMOKE_PRESETS = [
   { smokeDraught: 2.5, smokeHeading: 90, smokeTurbulence: 1.4, smokeLifetime: 1.6, smokeRise: 1.8, smokeLavaLight: 2.2, smokeEmberLight: 2.2, smokeDensity: 1.1 },
   { shaft: 1.6, smokeDensity: 0.9, smokeTurbulence: 1.8, smokeDraught: 2.5, smokeHeading: 90, smokeLifetime: 1.6, smokeLavaLight: 1.4, smokeRoom: 1.2 },
@@ -735,22 +732,17 @@ const SMOKE_PRESETS = [
   { shaft: 1.4, smokeRoom: 1.2, smokePlumes: 1.1, smokeLava: 1.2, smokeRise: 1.8, smokeDensity: 1, smokeTurbulence: 1.5, smokeLifetime: 1.8, smokeDraught: 2.5, smokeHeading: 90, smokeLavaLight: 2, smokeEmberLight: 2 },
 ];
 const SMOKE_KEYS = Object.keys(defaults).filter((k) => k === "shaft" || k.startsWith("smoke"));
-// The page starts on the last one (the defaults)
-let smokePreset = SMOKE_PRESETS.length - 1;
 function applySmokePreset(i) {
-  smokePreset = i;
   for (const key of SMOKE_KEYS) params[key].set(SMOKE_PRESETS[i][key] ?? (key === "smokeHeading" ? 53 : 1));
 }
 
 onRandomize((seed) => {
   const previousStyle = params.style();
   const previousShape = params.shape();
+  // Everything here comes from the seed alone, so a link reproduces it. Live, a repeat of the style or shape on show is
+  // replaced by a fresh seed (randomized again once these values are in, so the url holds that seed).
   gui.randomizeAll();
-  pickOther(params.style, STYLES, previousStyle);
-  pickOther(params.shape, SHAPES, previousShape);
-  let preset = Math.floor(Math.random() * (SMOKE_PRESETS.length - 1));
-  if (preset >= smokePreset && smokePreset >= 0) preset++;
-  applySmokePreset(preset);
+  applySmokePreset(Math.floor(Math.random() * SMOKE_PRESETS.length));
   const profile = STYLE_PROFILES[params.style()] ?? STYLE_PROFILES["Cracked Plates"];
   lastStyle = params.style();
   remap(params.crust, Math.max(0.32, profile.crust - 0.10), Math.min(0.90, profile.crust + 0.08));
@@ -763,6 +755,7 @@ onRandomize((seed) => {
   // Embers from mid to max, weighted toward many
   params.embers.set(Number((0.5 + 0.5 * Math.sqrt(params.embers())).toFixed(2)));
   if (initialized) changeLook(true);
+  if (initialized && (params.style() === previousStyle || params.shape() === previousShape)) queueMicrotask(randomize);
 });
 
 applyUrlState();
