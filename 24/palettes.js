@@ -268,6 +268,8 @@ function hashGen(seed, gen, salt = 0) {
 let familyOrder = null;
 function setFamilyOrder(order) {
   familyOrder = order?.length ? order : null;
+  // Backdrops follow the family order, so the cached ones are stale.
+  backdropCache.clear();
 }
 
 function getFamilyForIndex(familyIndex, seed) {
