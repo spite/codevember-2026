@@ -1482,7 +1482,7 @@ function updateShake(dt, t) {
   mesh.position.copy(shake.x).y += 0.006 * shake.sway * Math.sin(t * 1.7 + 0.5);
   mesh.position.x += 0.065 * jx;
   mesh.position.z += 0.025 * jz;
-  mesh.position.y += 0.012 * burst * jerk(11.2, 0.7);
+  mesh.position.y += 0.012 * burst * jerk(wall, 11.2, 0.7);
   _sq.setFromEuler(_euler.set(rx + 0.05 * jz, 0.08 * jx, rz - 0.16 * jx));
   mesh.quaternion.premultiply(_sq);
 }
