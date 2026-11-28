@@ -95,7 +95,7 @@ const studio = load.studio.track(
 const VOL_RES = { low: 96, medium: 128, high: 144, capture: 160 }[pipeline.quality] || 128;
 
 const sound = createSound({ onProgress: load.sound.set });
-load.sound.track(sound.loaded);
+const soundLoaded = load.sound.track(sound.loaded);
 const soundButton = addActionButton("../assets/sound.svg", "Sound", () => toggleSound());
 function toggleSound() {
   sound.on = !sound.on;
@@ -444,7 +444,8 @@ await studio;
 globalUniforms.shadowLightSize.value = 0.018;
 // Soft-edged cast shadows: lookups average over at least a 7-texel disc.
 globalUniforms.shadowMinTexels.value = 7;
-await load.compile.track(Promise.all([pipeline.compileAsync(scene, camera), glass.compile(renderer)]), 6);
+// The samples decode while the shaders compile; the first frame waits for both.
+await Promise.all([soundLoaded, load.compile.track(Promise.all([pipeline.compileAsync(scene, camera), glass.compile(renderer)]), 6)]);
 
 // Wall-clock eased visual state so GUI/key changes animate smoothly even when paused.
 const targetColor = new Color(METAL_FINISHES[params.finish()].color);
