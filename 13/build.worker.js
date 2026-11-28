@@ -28,8 +28,13 @@ function packGeometry(geometry, transfer) {
 
 self.onmessage = ({ data: { type, key, seedKey, options, size } }) => {
   if (type === "noise") {
-    const data = bakeNoiseVolume(size);
-    self.postMessage({ type, data }, [data.buffer]);
+    // Answered either way: without it the page keeps the flat volume it started with.
+    try {
+      const data = bakeNoiseVolume(size);
+      self.postMessage({ type, data }, [data.buffer]);
+    } catch (error) {
+      self.postMessage({ type, data: null, error: String(error?.stack ?? error) });
+    }
     return;
   }
   let built;

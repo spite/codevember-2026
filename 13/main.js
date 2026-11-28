@@ -430,6 +430,7 @@ let builtKey = "";
 let shownShape = "";
 let shownFinishName = "";
 let booted = false;
+const CAPTURE = new URLSearchParams(location.search).has("capture");
 let pendingRandomSeed = null;
 let applyingAtBottom = false;
 let pendingFullSwap = false;
@@ -556,11 +557,18 @@ const noiseBaked = new Promise((resolve) => {
   builder.onNoise = resolve;
 });
 buildWorker.postMessage({ type: "noise", size: shared.uNoiseVol.value.image.width });
+// A worker that fails to load can't build labyrinths: say so, rather than wait on it in silence.
+buildWorker.onerror = (e) => {
+  console.error("Labyrinth worker failed to load", e.message);
+  builder.onNoise();
+};
 
 buildWorker.onmessage = ({ data }) => {
   if (data.type === "noise") {
-    shared.uNoiseVol.value.image.data = data.data;
-    shared.uNoiseVol.value.needsUpdate = true;
+    if (data.data) {
+      shared.uNoiseVol.value.image.data = data.data;
+      shared.uNoiseVol.value.needsUpdate = true;
+    } else console.error("Noise bake failed:", data.error);
     builder.onNoise();
     return;
   }
@@ -1636,7 +1644,8 @@ function onFrame({ time, dt, wallDtOverride }) {
     goalPulse = Math.max(0, 1 - marble.captureTime * 0.9);
     if (marble.captureTime > 1.05) {
       goalPulse = 0;
-      if (params.auto() && dragState.idleTime > 2) randomize();
+      // Recordings (?capture) drive their own changes: there the solved maze just gets a new puzzle.
+      if (params.auto() && !CAPTURE && dragState.idleTime > 2) randomize();
       else puzzleSerial++;
     }
   } else {
