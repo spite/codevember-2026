@@ -18,18 +18,29 @@ class MeshBuilder {
     this.worker = new Worker(new URL("./meshWorker.js", import.meta.url), { type: "module" });
     this.pending = new Map();
     this.nextId = 0;
+    // A job that fails resolves to null (and every later one, once the worker itself has failed).
+    this.dead = false;
     this.worker.onmessage = (e) => {
-      const { id, m } = e.data;
-      this.pending.get(id)?.(m);
+      const { id, m, error } = e.data;
+      if (error) console.error("Mesh worker:", error);
+      this.pending.get(id)?.(error ? null : m);
       this.pending.delete(id);
+    };
+    this.worker.onerror = (e) => {
+      console.error("Mesh worker failed", e.message);
+      this.dead = true;
+      for (const done of this.pending.values()) done(null);
+      this.pending.clear();
     };
   }
 
   // Hands Suzanne's mesh (suzanne-mesh.bin) to the worker; resolves to the baker's atlas-space geometry for her
   setSuzanne(buffer) {
+    if (this.dead) return Promise.resolve(null);
     const id = this.nextId++;
     return new Promise((resolve) => {
       this.pending.set(id, (m) => {
+        if (!m) return resolve(null);
         const geometry = new BufferGeometry();
         geometry.setAttribute("position", new BufferAttribute(m.position, 3));
         geometry.setAttribute("normal", new BufferAttribute(m.normal, 3));
@@ -44,6 +55,7 @@ class MeshBuilder {
 
   // Resolves to { geometry, sdf, heat, emitters, volumeRadius }; the readback is copied, so the baker can rebake at once.
   build({ radius, baker, shape, seed, levels, tol, maxTriangles, dispAmp }) {
+    if (this.dead) return Promise.resolve(null);
     const id = this.nextId++;
     const opts = {
       radius,
@@ -58,7 +70,7 @@ class MeshBuilder {
       info: { data: baker.infoPixels.slice(), flow: baker.flowPixels.slice(), width: baker.infoWidth, height: baker.infoHeight },
     };
     return new Promise((resolve) => {
-      this.pending.set(id, (m) => resolve({ geometry: toGeometry(m), sdf: m.sdf, heat: m.heat, emitters: m.emitters, flow: m.flow, volumeRadius: m.volumeRadius }));
+      this.pending.set(id, (m) => resolve(m && { geometry: toGeometry(m), sdf: m.sdf, heat: m.heat, emitters: m.emitters, flow: m.flow, volumeRadius: m.volumeRadius }));
       this.worker.postMessage({ id, opts }, [opts.info.data.buffer, opts.info.flow.buffer]);
     });
   }

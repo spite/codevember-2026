@@ -16,6 +16,7 @@ import {
   onPause,
   addActionButton,
   showSoundHint,
+  randomize,
 } from "common";
 import { GUI } from "guspira";
 import { Scene, Mesh, Vector3, Color, Quaternion, BufferGeometry, RawShaderMaterial, GLSL3, WebGLRenderTarget, OrthographicCamera } from "three";
@@ -477,12 +478,15 @@ async function buildMesh(seed = getSeed(), { target = "a" } = {}) {
   const job = meshBuilder.build(opts);
   meshInFlight = job.catch(() => {});
   const built = await job;
+  // A build that failed: null, for the caller to try another seed (stale ones return false).
+  if (!built) return serial === buildSerial ? null : false;
   if (serial !== buildSerial) {
     built.geometry.dispose();
     return false;
   }
   built.shape = opts.shape;
   applyBuilt(built, target, detail);
+  buildFailures = 0;
   return true;
 }
 
@@ -538,6 +542,12 @@ function changeLook(reDevelopFluid) {
   else if (look.phase === "recompose" || look.phase === "handOut") look.queued = true;
 }
 
+// A rock that couldn't be built would leave the liquid up for good: another seed instead, a few times at most.
+let buildFailures = 0;
+function buildFailed() {
+  if (++buildFailures <= 3) randomize();
+}
+
 // Runs while the liquid is on show and the rock is hidden
 function buildMorphTarget() {
   look.ready = false;
@@ -549,6 +559,7 @@ function buildMorphTarget() {
   syncShownToParams();
   buildMesh(seed, { target: "b" }).then((ok) => {
     if (ok) look.ready = true;
+    else if (ok === null) buildFailed();
   });
 }
 
@@ -780,7 +791,9 @@ const precompile = new Scene();
 const firstStyle = Math.max(0, STYLES.indexOf(params.style()));
 for (const m of [...fluid.materials, ...baker.materialsFor(firstStyle), moltenMorph.material, fieldAtlas.material, ...Object.values(uploader.meshes).map((u) => u.material)]) precompile.add(new Mesh(fluid.quad.geometry, m));
 await load.fluid.track(Promise.all([renderer.compileAsync(precompile, camera), rockSmoke?.compile(renderer)]), 4);
-baker.setSuzanneMesh(await suzanneMesh);
+// Without her mesh (a failed worker) Suzanne isn't drawn; the other shapes are unaffected.
+const suzanneGeometry = await suzanneMesh;
+if (suzanneGeometry) baker.setSuzanneMesh(suzanneGeometry);
 bakeMaps(getSeed(), true);
 embers.reset();
 load.bake.done();
@@ -803,6 +816,7 @@ const compileRock = () => {
   return pipeline.compileAsync(side, camera).catch(() => {});
 };
 buildMesh(getSeed(), { target: "b" }).then(async (ok) => {
+  if (ok === null) buildFailed();
   if (!ok) return;
   const serial = buildSerial;
   await compileRock();
