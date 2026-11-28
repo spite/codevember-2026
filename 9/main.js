@@ -711,6 +711,8 @@ const omega = new Vector3();
 const wander = new Vector3();
 const canvas = renderer.domElement;
 canvas.addEventListener("pointerdown", (e) => {
+  // A second finger (a pinch, which zooms) stops the spin drag, with no fling.
+  if (drag.active && e.pointerId !== drag.id) return void Object.assign(drag, { active: false, vx: 0, vy: 0 });
   if (drag.active || !isRunning()) return;
   drag.active = true;
   drag.id = e.pointerId;
