@@ -901,7 +901,7 @@ onRandomize(() => {
   // fresh seed (randomized again once these values are in, so the url holds that seed).
   const was = container.name;
   params.shape.set(forced.shape ?? pick(Object.keys(SHAPES)));
-  if (started && !forced.shape && params.shape() === was) queueMicrotask(randomize);
+  if (started && !forced.shape && !forced.look && params.shape() === was) queueMicrotask(randomize);
   // A new look always shows the container; hiding it is only by hand.
   params.container.set(true);
   // Strong refraction through barely scattering jelly looks glassy and busy: soften it a little.
@@ -941,7 +941,6 @@ render(({ time, dt }) => {
     if (swellPending) playSwell();
   }
   adaptScale(performance.now());
-  autoChange.update(dt);
   if (key() !== built) {
     built = key();
     rebuild();
@@ -960,4 +959,6 @@ render(({ time, dt }) => {
   // The sweep turns with the camera, so the backdrop is always behind the volume.
   floor.rotation.y = Math.atan2(camera.position.x - controls.target.x, camera.position.z - controls.target.z);
   pipeline.render(scene, camera, time);
+  // Last, so a re-randomize queued by its change lands before the next frame looks at the params.
+  autoChange.update(dt);
 });
