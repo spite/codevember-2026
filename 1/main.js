@@ -488,12 +488,13 @@ function planLayout() {
 }
 
 // Crease sets the fold fillet width: 0 is a sharp fold, the default 0.6 gives 0.07 of the edge.
-const creaseRadius = () => 0.12 * params.creaseAmount();
+const creaseRadius = (amount = params.creaseAmount()) => 0.12 * amount;
 
-const paperOptions = (item, fold) => ({
+// crease: the Crease value to build with (a transition's, from when it started, so all its papers match).
+const paperOptions = (item, fold, crease = params.creaseAmount()) => ({
   size: item.radius,
-  creaseRadius: creaseRadius(),
-  foldingCreaseRadius: Math.max(0.1, 1.43 * creaseRadius()),
+  creaseRadius: creaseRadius(crease),
+  foldingCreaseRadius: Math.max(0.1, 1.43 * creaseRadius(crease)),
   // Lighter meshes on touch devices: folding updates every vertex on the CPU.
   creaseSegments: touch ? 4 : 6,
   faceSubdivisions: touch ? 1 : 2,
@@ -635,7 +636,7 @@ function disposeSheets(tr) {
 function* buildSteps(tr) {
   for (let i = 0; i < tr.total; i++) {
     const to = tr.plan[i];
-    if (to && !to.geometry) to.geometry = yield* FoldedPaper.create(solidFor(to.pick, to.variant), paperOptions(to, 0));
+    if (to && !to.geometry) to.geometry = yield* FoldedPaper.create(solidFor(to.pick, to.variant), paperOptions(to, 0, tr.crease));
     const from = shapes[i];
     const geometry = yield* NetMorph.create(from ? from.paper.flatOutline() : null, to ? to.geometry.flatOutline() : null, { via: "square", bulge: 0.05 });
     buildSheet(tr, i, geometry);
