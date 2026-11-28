@@ -52,12 +52,13 @@ export function createWalker(camera, dom, room) {
   });
   document.addEventListener("pointerlockerror", () => (lockClick = false));
   dom.addEventListener("pointerdown", (e) => {
-    if (passive) return;
+    // One pointer looks around: a second finger is ignored, so it can't fight the first.
+    if (passive || !e.isPrimary) return;
     if (e.pointerType === "mouse" && e.button === 0 && !locked && dom.requestPointerLock) {
       lockClick = true;
       Promise.resolve(dom.requestPointerLock()).catch(() => (lockClick = false));
     }
-    drag = { x: e.clientX, y: e.clientY, moved: 0, touch: e.pointerType === "touch" };
+    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, touch: e.pointerType === "touch" };
     try {
       dom.setPointerCapture?.(e.pointerId);
     } catch {}
@@ -71,7 +72,7 @@ export function createWalker(camera, dom, room) {
       touched();
       return;
     }
-    if (!drag) return;
+    if (!drag || e.pointerId !== drag.id) return;
     const dx = e.clientX - drag.x;
     const dy = e.clientY - drag.y;
     drag.moved += Math.abs(dx) + Math.abs(dy);
@@ -82,7 +83,8 @@ export function createWalker(camera, dom, room) {
     if (drag.moved > 8) clearTimeout(holdTimer);
     touched();
   });
-  addEventListener("pointerup", () => {
+  addEventListener("pointerup", (e) => {
+    if (drag && e.pointerId !== drag.id) return;
     clearTimeout(holdTimer);
     holdWalk = false;
     drag = null;

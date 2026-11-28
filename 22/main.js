@@ -442,8 +442,8 @@ function ping(intensity = 1, silent = false) {
 }
 
 // In click mode, a click (a press that didn't turn the view) calls.
-renderer.domElement.addEventListener("pointerup", () => {
-  if (walker.wasClick() && mode === "click") ping(1);
+renderer.domElement.addEventListener("pointerup", (e) => {
+  if (e.isPrimary && walker.wasClick() && mode === "click") ping(1);
 });
 
 onRandomize(() => {
