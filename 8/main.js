@@ -651,9 +651,7 @@ function build(planes) {
   infinity.setSculpture(sculpture);
   const u = infinity.material.uniforms;
   u.nodeRadius.value = params.nodes() ? 1.7 * sculpture.tube.radius : 0;
-  // Pixels whose path goes deep get one more ray, at full quality and on the sparser solids.
-  const faces = morph.t < 1 ? Math.max(morph.from.planes.length, morph.to.planes.length) : sculpture.faces.length;
-  u.deepStart.value = extraRays() && faces <= DENSE ? 3 : 99;
+  setDeepStart();
   writeWindows(sculpture);
   frame.position.set(0, CENTER_Y, 0);
   walls.position.copy(frame.position);
@@ -1060,9 +1058,15 @@ controls.enablePan = false;
 controls.minDistance = 2.2;
 camera.lookAt(controls.target);
 
+// Pixels whose path goes deep get one more ray, at full quality and on the sparser solids. The only part of a build
+// that depends on the canvas size (its pixel ratio), so a resize sets just this.
+function setDeepStart() {
+  const faces = morph.t < 1 ? Math.max(morph.from.planes.length, morph.to.planes.length) : sculpture.faces.length;
+  infinity.material.uniforms.deepStart.value = extraRays() && faces <= DENSE ? 3 : 99;
+}
 onResize((w, h, dpr) => {
   pipeline.setSize(w, h, dpr);
-  if (sculpture) build(morph.t < 1 ? morphPlanes(morph.from, morph.to, ease(morph.t)) : shown.planes);
+  if (sculpture) setDeepStart();
 });
 
 // ---------------------------------------------------------------- frame
