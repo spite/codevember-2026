@@ -450,11 +450,17 @@ function randomDir(rand) {
 }
 
 // keepFrame: the same layout rebuilt in place, so the view, the turn and the floor stay as they are.
+const retiredMaterials = [];
 function buildScene(m, keepFrame = false) {
   for (const o of [...meshes, ...axleMeshes]) {
     rig.remove(o);
-    o.traverse((c) => c.geometry?.dispose());
-    (o.material ?? o.userData.material).dispose();
+    o.traverse((c) => {
+      c.geometry?.dispose();
+      if (c.isInstancedMesh) c.dispose();
+    });
+    // Disposed once the new parts have drawn: they share these programs, which would be destroyed and recompiled
+    // if the last material using them went first.
+    retiredMaterials.push(o.material ?? o.userData.material);
   }
   meshes = [];
   axleMeshes = [];
@@ -998,4 +1004,5 @@ render(({ time, dt }) => {
   frame.rollT = (frame.rollT ?? 0) + (dt || 0);
   if (frame.dir) camera.rotateZ(frame.roll * ROLL.amount * Math.sin((frame.rollT / ROLL.period) * Math.PI * 2));
   pipeline.render(scene, camera, time);
+  if (retiredMaterials.length) for (const m of retiredMaterials.splice(0)) m.dispose();
 });
