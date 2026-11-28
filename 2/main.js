@@ -312,10 +312,7 @@ function place() {
   }
   for (const m of [...chunkMeshes, drops, flecks, ...chipMeshes, ...bigChipMeshes]) {
     m.count = used.get(m) ?? 0;
-    if (!m.count) continue;
-    m.instanceMatrix.clearUpdateRanges();
-    m.instanceMatrix.addUpdateRange(0, m.count * 16);
-    m.instanceMatrix.needsUpdate = true;
+    if (m.count) m.instanceMatrix.needsUpdate = true;
   }
 }
 
