@@ -113,6 +113,11 @@ scene.add(backdrop.mesh);
 const cutter = new Cutter();
 
 let buildFailures = 0;
+// A build that fails would leave the stage empty for good: another seed instead, a few times at most.
+function buildFailed(error) {
+  if (error) console.error("day 18: building a contraption failed", error);
+  if (++buildFailures <= 3) randomize();
+}
 const stage = new Stage({
   scene,
   shadowCamera: () => pipeline.shadow?.camera,
@@ -122,8 +127,7 @@ const stage = new Stage({
     blendStudio(from, to, t, { backdrop, pipeline });
   },
   onSettled: () => ((buildFailures = 0), autoChange.restart()),
-  // A build that fails would leave the stage empty for good: try another seed, a few times at most.
-  onFailed: () => ++buildFailures <= 3 && randomize(),
+  onFailed: () => buildFailed(),
   onArrive: (c) => director.reframe(c.framing()),
   // Each piece as it lifts off its seat, and as it lands: a click and a clack, the base heavier.
   onCue: (name, gate) => {
@@ -172,8 +176,24 @@ onResize((w, h, dpr) => {
 });
 
 let builtKey = key();
-const first = await load.build.track(makeEntry());
+// The first contraption, retried if it fails to build (a few times at most).
+const first = await load.build.track(
+  (async () => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await makeEntry();
+      } catch (error) {
+        if (attempt >= 2) throw error;
+        console.error("day 18: building a contraption failed", error);
+        // The same seed once more first (a cutter worker that failed to load hands over to the page), then another.
+        if (attempt > 0) randomize();
+      }
+    }
+  })(),
+);
 stage.show(first, 0.37);
+// A retry above may have moved to another seed: that's the one on show.
+builtKey = key();
 director.reframe(first.contraption.framing(), true);
 await studio;
 await load.compile.track(pipeline.compileAsync(scene, camera), 4);
@@ -334,12 +354,15 @@ let swaps = 0;
 function swapTo(next) {
   const id = ++swaps;
   if (!params.instant()) return stage.change(next);
-  next.then((entry) => {
-    if (id !== swaps) return entry.contraption.dispose();
-    stage.replace(entry, 0);
-    director.reframe(entry.contraption.framing(), true);
-    autoChange.restart();
-  });
+  next.then(
+    (entry) => {
+      if (id !== swaps) return entry.contraption.dispose();
+      stage.replace(entry, 0);
+      director.reframe(entry.contraption.framing(), true);
+      autoChange.restart();
+    },
+    (error) => id === swaps && buildFailed(error),
+  );
 }
 
 // Slow motion: how fast time runs at time t, eased right down around each pass through a gate and back up between.

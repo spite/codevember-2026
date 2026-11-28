@@ -34,15 +34,18 @@ class Cutter {
       if (data.error) p.reject(new Error(data.error));
       else p.resolve(data.results);
     };
-    // A worker that fails to load or dies takes every batch waiting on it down with it, rather than leaving them hanging.
+    // A worker that fails to load or dies takes every batch waiting on it down with it, rather than leaving them hanging;
+    // later batches are cut on the page.
     this.worker.onerror = this.worker.onmessageerror = (e) => {
       for (const p of this.pending.values()) p.reject(new Error(e.message ?? "cutter worker failed"));
       this.pending.clear();
+      this.fallback ??= import("./cutter.js").then((m) => m.cutBatch);
     };
   }
 
   run(batch) {
     if (this.inline) return Promise.resolve(this.inline(batch));
+    if (this.fallback) return this.fallback.then((cut) => cut(batch));
     const id = ++this.id;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
