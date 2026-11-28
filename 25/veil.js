@@ -487,8 +487,6 @@ class Veil {
         index[n++] = a + 1, index[n++] = a + M, index[n++] = a + M + 1;
       }
     }
-    attr.clearUpdateRanges();
-    attr.addUpdateRange(0, n);
     attr.needsUpdate = true;
     this.geometry.setDrawRange(0, n);
   }
