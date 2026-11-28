@@ -950,7 +950,6 @@ render(({ time, dt }) => {
   const measured = lastNow ? Math.min(0.1, (now - lastNow) / 1000) : 0;
   lastNow = now;
   const spinDt = dt * (window.app?.timeScale ?? 1);
-  autoChange.update(spinDt);
   realDt = paused ? measured : dt;
   dt = realDt * (window.app?.timeScale ?? 1);
   sceneTime += dt;
@@ -1054,4 +1053,6 @@ render(({ time, dt }) => {
   meter.begin();
   pipeline.render(scene, camera, time);
   meter.end(dt > 0);
+  // Last, so a re-randomize queued by its change lands before the next frame looks at the params.
+  autoChange.update(spinDt);
 });
