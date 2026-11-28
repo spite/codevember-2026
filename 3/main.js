@@ -242,7 +242,10 @@ let shapeRequest = null;
 
 // The melt simulation for one shape: blobs and trails (later pendants, drops, puddle) stepped at a fixed rate
 // and packed into the field.
+// Bumped by every new or reset melt: a paused frame after one must upload it.
+let meltVersion = 0;
 function createMelt(next, walk = createSurfaceWalk(next.walk, next.topology())) {
+  meltVersion++;
   const seed = getSeed();
   const trails = createTrails({ maxTrails: field.MAXT, points: field.P });
   const blobs = createBlobs(walk, { lite, maxBlobs: field.MAXB, seed, trails });
@@ -370,7 +373,11 @@ async function setShape(name, onProgress) {
     next = await loadShape(name, { lite, densify: pipeline.quality !== "low", onProgress });
   } catch (e) {
     console.error(`Shape ${name} failed to load`, e);
-    if (shapeRequest === name && shape) params.shape.set(shape.name);
+    // Back to the shape on show, as it is (its drips kept): no new melt for it.
+    if (shapeRequest === name && shape) {
+      shapeRequest = shape.name;
+      params.shape.set(shape.name);
+    }
     return;
   }
   if (shapeRequest !== name) return;
@@ -387,6 +394,7 @@ async function setShape(name, onProgress) {
 
 // Dry: the shape comes back clean and blobs seep in again; primes so the reset gives no velocity spike.
 function resetMelt() {
+  meltVersion++;
   melt?.reset();
 }
 
@@ -568,7 +576,8 @@ render(({ time, dt, frame }) => {
   }
   field.setPoses(body);
   // Paused, with nothing changed since the last paused frame: the packed field and the bake are as they were.
-  const frozenKey = dt === 0 && melt && !melt.cold ? `${melt.seed}|${body.geometry.uuid}|${body.quaternion.toArray()}|${pipeline.shutter}|${JSON.stringify(params.$snapshot(params.$keys))}` : null;
+  const bakeShutter = pipeline.motionBlur && pipeline.motionBlurAvailable;
+  const frozenKey = dt === 0 && melt && !melt.cold ? `${meltVersion}|${body.geometry.uuid}|${body.quaternion.toArray()}|${pipeline.shutter}|${bakeShutter}|${JSON.stringify(params.$snapshot(params.$keys))}` : null;
   const frozen = frozenKey !== null && frozenKey === lastFrozenKey;
   lastFrozenKey = frozenKey;
   if (!frozen) melt?.upload(dt, body);
@@ -576,6 +585,6 @@ render(({ time, dt, frame }) => {
   if (settled) fitShadow();
   controls.update();
   backdrop.keepInsideCyc(camera, controls.target);
-  if (!frozen) bake.render(renderer, body.geometry, pipeline.motionBlur && pipeline.motionBlurAvailable);
+  if (!frozen) bake.render(renderer, body.geometry, bakeShutter);
   pipeline.render(scene, camera, time);
 });
