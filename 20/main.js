@@ -273,9 +273,10 @@ onResize((w, h, dpr) => pipeline.setSize(w, h, dpr));
 onRandomize(() => {
   const was = params.clip();
   gui.randomizeAll();
-  // A walk, run or sneak is always followed by a dance.
+  // A walk, run or sneak is always followed by a dance. That depends on what's on show, so it's applied just after the
+  // seed's values are recorded: the url then names the dance, and a link still reproduces it.
   const dance = DANCES[Math.floor(Math.random() * DANCES.length)];
-  if (!DANCES.includes(was) && !DANCES.includes(params.clip())) params.clip.set(dance);
+  if (!DANCES.includes(was) && !DANCES.includes(params.clip())) queueMicrotask(() => params.clip.set(dance));
   const pick = Math.random();
   const fuzz = Math.random();
   if (!built) {
