@@ -87,6 +87,10 @@
           bottom: 96px;
         }
       }
+      /* One pill at a time: while this one shows what is being built, the auto change countdown steps aside. */
+      body:has(#status.shown) #auto-change {
+        opacity: 0;
+      }
     </style>
   </head>
   <body>
