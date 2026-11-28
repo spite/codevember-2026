@@ -100,10 +100,10 @@ const initialStudio = load.studio.track(getStudio(defaults.style));
 // A stand-in: three.js's Xbot example model (a Mixamo character with walk and run clips and two poses), and the
 // samba from its Michelle example model, retargeted to Xbot's skeleton.
 const asset = (name) => new URL(`./assets/${name}`, import.meta.url).href;
-const figure = await load.figure.track(loadFigure(asset("Xbot.glb"), Object.fromEntries(EXTRA_CLIPS.map((name) => [name, asset(name)]))));
-
+// The samples download and decode alongside the figure; the first frame waits for both.
 const sound = createSound({ onProgress: load.sound.set });
-load.sound.track(sound.loaded);
+const soundLoaded = load.sound.track(sound.loaded);
+const figure = await load.figure.track(loadFigure(asset("Xbot.glb"), Object.fromEntries(EXTRA_CLIPS.map((name) => [name, asset(name)]))));
 const soundButton = addActionButton("../assets/sound.svg", "Sound", () => toggleSound());
 function toggleSound() {
   sound.setMuted(!sound.muted);
@@ -303,6 +303,7 @@ applyEnvironment(await getStudio(styleName));
 globalUniforms.shadowLightSize.value = 0.032;
 // White silk fills its own hollows with light bounced inside them.
 globalUniforms.aoMultiBounce.value = 1;
+await soundLoaded;
 await load.compile.track(pipeline.compileAsync(scene, camera), 4);
 
 // A handle for recording tools and the console.
