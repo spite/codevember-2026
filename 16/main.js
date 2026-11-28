@@ -354,6 +354,8 @@ const toNdc = (e, out) => {
   return out.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
 };
 // Where the ray passes nearest a colony (world space), and whether it passes through one.
+// The colony count on show and the spread of a change to it; read by clicks, which work during the load.
+const colonyMix = { shown: 1, spread: 0, velocity: 0 };
 function colonyUnder(ndc) {
   raycaster.setFromCamera(ndc, camera);
   const ray = raycaster.ray;
@@ -684,7 +686,6 @@ function endBud() {
 // colony's centre, so a merged mass splits back along its colonies, streaked with each other's colours).
 // A change in the number of colonies never jumps: the colonies draw together into one place, the count changes
 // there (each spore's colony colour then changes on its own schedule, see staggerChange), and they spread out again.
-const colonyMix = { shown: 1, spread: 0, velocity: 0 };
 function updateColonies(simTime) {
   const want = params.colonies();
   if (colonyMix.shown === 1) colonyMix.spread = colonyMix.velocity = 0;
