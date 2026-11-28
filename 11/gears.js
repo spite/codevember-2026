@@ -1,5 +1,5 @@
 // Involute gear geometry (spur, helical, ring, bevel, worm, worm wheel, rack) and the pairing maths that places them.
-import { Matrix4, ShapeUtils, Vector2, Vector3 } from "three";
+import { Matrix4, ShapeUtils, Vector2, Vector3 } from "../third_party/three.core.js";
 import { MeshBuilder, sweep, creases, wearOptions, wearLoops, capRows, wallRows, sweepWall, chamferPath, pitFaces, profiledExtrusion, delaunayFlip } from "./wear.js";
 
 export { DEFAULT_CHAMFER } from "./wear.js";

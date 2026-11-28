@@ -14,6 +14,7 @@ import { createMachine } from "./train.js";
 import { bestView, machinePoints, fitDistance } from "./view.js";
 import { createSound } from "./sound.js";
 import { nativeRandom } from "modules/random.js";
+import { weldAttributes } from "./weld.js";
 import { createRustMaterial, loadRustTextures, RUST_PALETTES, setRustPalette } from "./rust.js";
 
 function mulberry32(a) {
@@ -244,50 +245,14 @@ function toGeometry(data) {
   g.setAttribute("position", new BufferAttribute(data.position, 3));
   g.setAttribute("normal", new BufferAttribute(data.normal, 3));
   g.setIndex(new BufferAttribute(data.index, 1));
-  return weathering(g);
+  return weathering(g, data.weld);
 }
 
-// Per vertex, for the rust: a normal smoothed across creases (vertices welded by position; displacing along it keeps
-// the mesh closed, and blending to it rounds edges), and how concave the surface is there (grime gathers in it).
-function weathering(g) {
-  const P = g.attributes.position.array, N = g.attributes.normal.array, I = g.index.array;
-  const nv = P.length / 3;
-  const weld = new Int32Array(nv), keys = new Map();
-  let nw = 0;
-  for (let v = 0; v < nv; v++) {
-    const k = `${Math.round(P[3 * v] * 1e5)},${Math.round(P[3 * v + 1] * 1e5)},${Math.round(P[3 * v + 2] * 1e5)}`;
-    let w = keys.get(k);
-    if (w === undefined) keys.set(k, (w = nw++));
-    weld[v] = w;
-  }
-  const S = new Float32Array(nw * 3);
-  for (let v = 0; v < nv; v++) for (let c = 0; c < 3; c++) S[3 * weld[v] + c] += N[3 * v + c];
-  for (let w = 0; w < nw; w++) {
-    const l = Math.hypot(S[3 * w], S[3 * w + 1], S[3 * w + 2]) || 1;
-    S[3 * w] /= l, S[3 * w + 1] /= l, S[3 * w + 2] /= l;
-  }
-  // Concavity: neighbours rising above the vertex's tangent plane, as the sine of the angle, averaged over its edges.
-  const sum = new Float32Array(nw), cnt = new Float32Array(nw);
-  for (let t = 0; t < I.length; t += 3)
-    for (let e = 0; e < 3; e++) {
-      const a = I[t + e], b = I[t + ((e + 1) % 3)];
-      const dx = P[3 * b] - P[3 * a], dy = P[3 * b + 1] - P[3 * a + 1], dz = P[3 * b + 2] - P[3 * a + 2];
-      const l = Math.hypot(dx, dy, dz);
-      if (l < 1e-9) continue;
-      const wa = weld[a], wb = weld[b];
-      sum[wa] += (S[3 * wa] * dx + S[3 * wa + 1] * dy + S[3 * wa + 2] * dz) / l, cnt[wa]++;
-      sum[wb] -= (S[3 * wb] * dx + S[3 * wb + 1] * dy + S[3 * wb + 2] * dz) / l, cnt[wb]++;
-    }
-  const smooth = new Float32Array(nv * 3), cav = new Float32Array(nv), vex = new Float32Array(nv);
-  for (let v = 0; v < nv; v++) {
-    const w = weld[v], k = sum[w] / Math.max(cnt[w], 1);
-    smooth.set(S.subarray(3 * w, 3 * w + 3), 3 * v);
-    cav[v] = Math.max(0, Math.min(1, k * 8));
-    vex[v] = Math.max(0, Math.min(1, -k * 4));
-  }
-  g.setAttribute("aSmooth", new BufferAttribute(smooth, 3));
-  g.setAttribute("aCavity", new BufferAttribute(cav, 1));
-  g.setAttribute("aConvex", new BufferAttribute(vex, 1));
+// The rust's per-vertex attributes (weld.js), worked out here unless the worker already did.
+function weathering(g, w = weldAttributes(g.attributes.position.array, g.attributes.normal.array, g.index.array)) {
+  g.setAttribute("aSmooth", new BufferAttribute(w.smooth, 3));
+  g.setAttribute("aCavity", new BufferAttribute(w.cav, 1));
+  g.setAttribute("aConvex", new BufferAttribute(w.vex, 1));
   return g;
 }
 
@@ -451,7 +416,7 @@ function randomDir(rand) {
 
 // keepFrame: the same layout rebuilt in place, so the view, the turn and the floor stay as they are.
 const retiredMaterials = [];
-function buildScene(m, keepFrame = false) {
+function buildScene(m, keepFrame = false, viewDir = null) {
   for (const o of [...meshes, ...axleMeshes]) {
     rig.remove(o);
     o.traverse((c) => {
@@ -500,7 +465,7 @@ function buildScene(m, keepFrame = false) {
   if (keepFrame) return;
   frame.radius = m.bounds.radius;
   // The side that shows most of the machine, which the camera turns to while it arrives.
-  frame.dir = bestView(m, escapement(0).wheel, 0);
+  frame.dir = viewDir ?? bestView(m, escapement(0).wheel, 0);
   // How far the machine turns about the vertical for its best side to face the camera.
   {
     const c = cameraDirection(frame.dir);
@@ -685,14 +650,72 @@ const finishKey = () => JSON.stringify(finishOptions());
 
 let started = false;
 
+// Machines are built in a worker (plain and worn geometry, rust attributes, best view): the page lays out the parts from
+// its prebuilt geometry, which takes a few ms instead of most of a second. One job at a time; a newer request replaces
+// the one waiting. Without the worker the page builds them itself.
+const machineWorker = new Worker(new URL("./machine.worker.js", import.meta.url), { type: "module" });
+const jobs = { busy: null, waiting: null, next: 0, dead: false };
+function postJob(job) {
+  jobs.busy = job;
+  machineWorker.postMessage({ id: job.id, options: job.options, period: params.period() });
+}
+machineWorker.onmessage = ({ data }) => {
+  const job = jobs.busy;
+  jobs.busy = null;
+  if (data.error) console.error("Machine worker:", data.error);
+  job?.resolve(data.error ? null : data);
+  if (jobs.waiting) postJob(jobs.waiting), (jobs.waiting = null);
+};
+machineWorker.onerror = (e) => {
+  console.error("Machine worker failed; building on the page", e.message);
+  jobs.dead = true;
+  for (const job of [jobs.busy, jobs.waiting]) job?.resolve(null);
+  jobs.busy = jobs.waiting = null;
+};
+function requestMachine(options) {
+  if (jobs.dead) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const job = { id: ++jobs.next, options, resolve };
+    if (!jobs.busy) return postJob(job);
+    jobs.waiting?.resolve(null);
+    jobs.waiting = job;
+  });
+}
+// The build for the panel's current machine and finish: { key, data } once the worker answers (data null: build here).
+const pending = { key: null, ready: false, data: null };
+const buildKey = () => machineKey() + finishKey();
+function requestBuild() {
+  const key = buildKey();
+  if (pending.key === key) return;
+  Object.assign(pending, { key, ready: false, data: null });
+  requestMachine({ ...machineOptions(), ...finishOptions() }).then((data) => {
+    if (pending.key === key) Object.assign(pending, { ready: true, data });
+  });
+}
+// The machine for the current options, from the worker's build when there is one.
+function makeMachine() {
+  const options = { ...machineOptions(), ...finishOptions() };
+  const data = pending.key === buildKey() && pending.ready ? pending.data : null;
+  if (!data) return { m: createMachine(options), dir: null };
+  const m = createMachine({ ...options, prebuilt: data.prebuilt });
+  m.parts.forEach((p, i) => {
+    if (data.results[i]) Object.defineProperty(p.build, "result", { value: data.results[i], configurable: true, enumerable: false });
+  });
+  return { m, dir: new Vector3().fromArray(data.dir) };
+}
+const buildReady = () => pending.key === buildKey() && pending.ready;
+
 function begin() {
   shown = machineKey();
   clearing = false;
+  requestBuild();
   if (machine && phase.name !== "empty") {
     phase.name = "out";
     phase.t = 0;
     transitionSounds("out");
-  } else install();
+  } else if (buildReady()) install();
+  // Nothing on show and the build not back yet: wait, as at the end of a leaving.
+  else Object.assign(phase, { name: "out", t: 1 });
 }
 
 // Parts leaving are knocked off their axles with a heavy clank (lower for bigger parts), some dragging a chain rattle,
@@ -720,6 +743,7 @@ function transitionSounds(name) {
 }
 
 function install() {
+  shown = machineKey();
   finished = finishKey();
   L = lookFromParams();
   lastLook = JSON.stringify(L);
@@ -727,7 +751,8 @@ function install() {
     lastStudio = params.studio();
     useStudio(lastStudio);
   }
-  buildScene(createMachine({ ...machineOptions(), ...finishOptions() }));
+  const { m, dir } = makeMachine();
+  buildScene(m, false, dir);
   const s = motionState;
   s.time = 0;
   s.offset = 0;
@@ -799,18 +824,20 @@ const ramp = { t: 0 };
 function update(dt) {
   if (machineKey() !== shown && (phase.name === "run" || phase.name === "empty")) begin();
   // Chamfer and wear change the parts' shapes, not the layout: rebuilt in place, the motion carrying on.
-  else if (finishKey() !== finished && phase.name === "run") {
+  else if (finishKey() !== finished && phase.name === "run" && (requestBuild(), buildReady())) {
     finished = finishKey();
     const keep = { ...motionState };
-    buildScene(createMachine({ ...machineOptions(), ...finishOptions() }), true);
+    buildScene(makeMachine().m, true);
     Object.assign(motionState, keep);
     pipeline.restartAccumulation();
   }
   if (phase.name === "out") {
+    // A change asked for while this one leaves (or waits for its build) is the one that goes on.
+    if (!clearing) requestBuild();
     phase.t = Math.min(1, phase.t + dt / DURATION.out);
     if (phase.t >= 1) {
       if (clearing) phase.name = "empty";
-      else install();
+      else if (buildReady()) install();
     }
   } else if (phase.name === "in") {
     phase.t = Math.min(1, phase.t + dt / DURATION.in);
@@ -911,7 +938,13 @@ applyUrlState();
 textures = await rustTextures;
 lastStudio = params.studio();
 await load.studio.track(useStudio(lastStudio));
-await load.machine.track(Promise.resolve().then(begin));
+requestBuild();
+await load.machine.track(
+  new Promise((resolve) => {
+    const wait = () => (buildReady() ? resolve(begin()) : setTimeout(wait, 20));
+    wait();
+  }),
+);
 poseAll();
 await load.compile.track(pipeline.compileAsync(scene, camera), 3);
 

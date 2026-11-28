@@ -1,5 +1,5 @@
 // Roller chain: sprocket geometry, a closed chain loop over 2-3 sprockets, and link geometry for instancing.
-import { Matrix4, ShapeUtils, Vector2 } from "three";
+import { Matrix4, ShapeUtils, Vector2 } from "../third_party/three.core.js";
 import { delaunayFlip } from "./wear.js";
 
 const TAU = Math.PI * 2;

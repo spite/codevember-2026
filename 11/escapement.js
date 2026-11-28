@@ -16,7 +16,7 @@
 // - Anchor angles: entry unlocks at a = -(lift - lock) / 2 (rising), exit at a = +(lift - lock) / 2 (falling); the
 //   pendulum swings to +-amplitude, the rest of the swing is supplementary arc on the locking faces.
 // - Every contact keeps a gap of `clearance` * R, so the solids touch visually but never numerically.
-import { Matrix4, ShapeUtils, Vector2 } from "three";
+import { Matrix4, ShapeUtils, Vector2 } from "../third_party/three.core.js";
 import { wearOptions, profiledExtrusion } from "./wear.js";
 
 const TAU = Math.PI * 2;

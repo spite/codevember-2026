@@ -3,7 +3,7 @@
 // parts' vertices into a small depth buffer (orthographic, along each direction) and counting how much of every part
 // stays visible: each part counts by the square root of what shows, so a view that shows every part a little beats one
 // that shows a few parts fully, and gear faces seen face-on (large silhouettes) win over edge-on ones.
-import { Vector3 } from "three";
+import { Vector3 } from "../third_party/three.core.js";
 
 const N = 64;
 const depth = new Float32Array(N * N);

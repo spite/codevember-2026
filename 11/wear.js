@@ -4,7 +4,7 @@
 // solid (along each vertex's miter) at increasing depth from the cap, a flat 45 degree bevel for a chamfer, a rounded
 // band of irregular width when eroded, plus the occasional chip at a sharp corner. Eroded loops also have their convex
 // corners worn round, and flat faces get shallow pits (stitched in locally, so the rest of the mesh keeps its triangles).
-import { ShapeUtils, Vector2 } from "three";
+import { ShapeUtils, Vector2 } from "../third_party/three.core.js";
 
 const TAU = Math.PI * 2;
 export const DEFAULT_CHAMFER = 0.12; // in modules (the builder's length scale)

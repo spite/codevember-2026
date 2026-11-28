@@ -1,5 +1,5 @@
 // Seeded floating gear trains driven by an anchor escapement. One degree of freedom: q, the escape wheel's angle.
-import { Matrix4, Vector3 } from "three";
+import { Matrix4, Vector3 } from "../third_party/three.core.js";
 import * as G from "./gears.js";
 import * as E from "./escapement.js";
 import * as C from "./chain.js";
@@ -576,7 +576,7 @@ export const STAGE_TYPES = [
       const FPin = FW.clone().multiply(rotZ(psi));
       const pin = x.addPart(c, {
         id: x.nextId("cg"), kind: "cage", shaft: shC, group: shC.id, meshesWith: [], draggable: true,
-        build: { fn: "crossPin", module: "train", args: { radius: pinR, length: pinLen }, result: pinMesh(pinR, pinLen) },
+        build: { fn: "crossPin", module: "train", args: { radius: pinR, length: pinLen }, result: memo(`pin${pinR},${pinLen}`, () => pinMesh(pinR, pinLen)) },
         motion: x.rotating(FPin, thC.theta, thC.lin, thC.peak),
       });
       shC.members = [{ part: W, z0: -ww / 2, z1: ww / 2, axle: false, m0: 0, m1: 0 }, { part: pin, z0: -pinR, z1: pinR, axle: false, m0: 0, m1: 0 }];
@@ -699,7 +699,7 @@ const STAGE = Object.fromEntries(STAGE_TYPES.map((s) => [s.type, s]));
  *   builders' default). erosion: amount 0..1 (true = 1) or { amount, seed }. Both reshape the parts only: the layout is the
  *   same for any finish, and the worn geometry is built when build.result is first read.
  */
-export function createMachine({ seed = 1, size, gears, weights, balance = 0, chamfer = 0, erosion = 0 } = {}) {
+export function createMachine({ seed = 1, size, gears, weights, balance = 0, chamfer = 0, erosion = 0, prebuilt = null, record = null } = {}) {
   const gN = gears === undefined ? NaN : Number(gears);
   const G0 = Number.isFinite(gN) ? Math.max(6, Math.min(30, Math.round(gN))) : null;
   const room = size ?? (G0 ? 0.65 * Math.cbrt(G0 / 12) : 0.65);
@@ -710,11 +710,27 @@ export function createMachine({ seed = 1, size, gears, weights, balance = 0, cha
   if (custom && !Object.values(w).some((v) => v > 0)) for (const k of ["spur", "compound", "idler"]) w[k] = STAGE_WEIGHTS[k];
   // Balance wheel or pendulum, from its own stream so the rest of the layout's draws stay as they were.
   const useBalance = mulberry32((Math.imul(seed | 0, 0x2c1b3c6d) ^ 0x5bd1e995) >>> 0)() < balance;
-  for (let attempt = 0; attempt < 60; attempt++) {
-    const mc = tryMachine(seed, attempt, room, scale, G0, w, custom, useBalance);
-    if (mc) return finish(mc, chamfer, erosion);
+  store.prebuilt = prebuilt;
+  store.record = record;
+  try {
+    for (let attempt = 0; attempt < 60; attempt++) {
+      const mc = tryMachine(seed, attempt, room, scale, G0, w, custom, useBalance);
+      if (mc) return finish(mc, chamfer, erosion);
+    }
+  } finally {
+    store.prebuilt = store.record = null;
   }
   throw new Error(`createMachine: no machine for seed ${seed}`);
+}
+
+// The plain geometry the layout measures, by call site and arguments. prebuilt (a Map from a record of the same
+// options, e.g. made in a worker) skips building it; record collects what is built.
+const store = { prebuilt: null, record: null };
+function memo(key, make) {
+  if (store.prebuilt?.has(key)) return store.prebuilt.get(key);
+  const v = make();
+  store.record?.set(key, v);
+  return v;
 }
 
 function tryMachine(seed, attempt, size, k, G0, weights, custom = false, useBalance = false) {
@@ -760,6 +776,11 @@ function tryMachine(seed, attempt, size, k, G0, weights, custom = false, useBala
   function built(fn, args) {
     const key = fn + JSON.stringify(args);
     if (cache.has(key)) return cache.get(key);
+    const out = memo(key, () => measure(fn, args));
+    cache.set(key, out);
+    return out;
+  }
+  function measure(fn, args) {
     const g = BUILDERS[fn](args);
     const P = g.position, I = g.index;
     let zmin = Infinity, zmax = -Infinity, rmax = 0;
@@ -776,9 +797,7 @@ function tryMachine(seed, attempt, size, k, G0, weights, custom = false, useBala
       discs = [];
       bins.forEach((r, b) => { discs.push([zmin + ((zmax - zmin) * b) / n, r], [zmin + ((zmax - zmin) * (b + 1)) / n, r]); });
     }
-    const out = { g, fn, args, zmin, zmax, rmax, discs };
-    cache.set(key, out);
-    return out;
+    return { g, fn, args, zmin, zmax, rmax, discs };
   }
 
   const parts = [], shafts = [], colliders = [], stages = [];
@@ -929,13 +948,13 @@ function tryMachine(seed, attempt, size, k, G0, weights, custom = false, useBala
   const layout = E.escapementLayout({ teeth: Ne, radius: Re });
   // The anchor's hub is set by the layout; its arbor thins to keep a wall around the bore.
   const raA = Math.min(ra, layout.hubRadius - 0.5 * m);
-  const anchorGeo = E.buildAnchor({ teeth: Ne, radius: Re, bore: raA });
+  const anchorGeo = memo(`anchor${Ne},${Re},${raA}`, () => E.buildAnchor({ teeth: Ne, radius: Re, bore: raA }));
   const wA = anchorGeo.width;
   let anchorR = 0;
   for (let i = 0; i < anchorGeo.position.length; i += 3) anchorR = Math.max(anchorR, Math.hypot(anchorGeo.position[i], anchorGeo.position[i + 1]));
   const pLen = rand(0.36, 0.48) * k, bobR = rand(0.13, 0.17) * pLen;
   const pendArgs = { length: pLen, bobRadius: bobR, bore: raA, hubRadius: Math.max(0.048 * pLen, raA + 0.8 * m) };
-  const pendGeo0 = E.buildPendulum(pendArgs);
+  const pendGeo0 = memo(`pend0${JSON.stringify(pendArgs)}`, () => E.buildPendulum(pendArgs));
   const pz = E.escapementPendulumZ({ wheelWidth: wE, anchorWidth: wA, pendulumThickness: pendGeo0.bobThickness, gap: 2.5 * m });
   pendArgs.z = pz;
   const pivot = layout.pivot;
@@ -945,7 +964,7 @@ function tryMachine(seed, attempt, size, k, G0, weights, custom = false, useBala
   shafts.push(esc);
   const escWheel = {
     id: "escape", kind: "escapeWheel", shaft: esc, group: esc.id, meshesWith: [], draggable: true,
-    build: { fn: "buildEscapeWheel", module: "escapement.js", args: { teeth: Ne, radius: Re, width: wE, bore: ra }, result: E.buildEscapeWheel({ teeth: Ne, radius: Re, width: wE, bore: ra }) },
+    build: { fn: "buildEscapeWheel", module: "escapement.js", args: { teeth: Ne, radius: Re, width: wE, bore: ra }, result: memo(`wheel${Ne},${Re},${wE},${ra}`, () => E.buildEscapeWheel({ teeth: Ne, radius: Re, width: wE, bore: ra })) },
     motion: rotating(new Matrix4(), esc.theta, esc.lin),
   };
   esc.members = [{ part: escWheel, z0: -wE / 2, z1: wE / 2, axle: true, m0: 0.6 * m, m1: AXLE_END }];
@@ -968,7 +987,7 @@ function tryMachine(seed, attempt, size, k, G0, weights, custom = false, useBala
   if (!useBalance) {
     parts.push({
       id: "pendulum", kind: "pendulum", shaft: null, group: "anchor", meshesWith: [], draggable: false,
-      build: { fn: "buildPendulum", module: "escapement.js", args: pendArgs, result: E.buildPendulum(pendArgs) },
+      build: { fn: "buildPendulum", module: "escapement.js", args: pendArgs, result: memo(`pend${JSON.stringify(pendArgs)}`, () => E.buildPendulum(pendArgs)) },
       motion: { local: (q, a = 0) => fPivot.clone().multiply(rotZ(a)), lin: null, frame: fPivot, swing: true },
     });
     colliders.push({ shape: boxShape(fPivot, [0, -(pLen + bobR - pendGeo0.hubRadius) / 2, pz], [pLen * Math.sin(amp) + bobR * 1.02, (pLen + bobR + pendGeo0.hubRadius) / 2 * 1.01, ptz / 2 * 1.02]), tags: ["p:pendulum", "g:anchor"], ignore: [] });
@@ -990,12 +1009,12 @@ function tryMachine(seed, attempt, size, k, G0, weights, custom = false, useBala
     parts.push(
       {
         id: "lever", kind: "lever", shaft: null, group: "anchor", meshesWith: [], draggable: false,
-        build: { fn: "buildLever", module: "escapement.js", args: leverArgs, result: E.buildLever(leverArgs) },
+        build: { fn: "buildLever", module: "escapement.js", args: leverArgs, result: memo(`lever${JSON.stringify(leverArgs)}`, () => E.buildLever(leverArgs)) },
         motion: { local: (q, a = 0) => fPivot.clone().multiply(rotZ(a)).multiply(lev0), lin: null, frame: fLev, swing: true },
       },
       {
         id: "balance", kind: "balance", shaft: null, group: "balance", meshesWith: [], draggable: false,
-        build: { fn: "buildBalance", module: "escapement.js", args: balArgs, result: E.buildBalance(balArgs) },
+        build: { fn: "buildBalance", module: "escapement.js", args: balArgs, result: memo(`balance${JSON.stringify(balArgs)}`, () => E.buildBalance(balArgs)) },
         motion: { local: (q, a = 0) => fBal.clone().multiply(rotZ(swingOf(a))), lin: null, frame: fBal, swing: true },
       },
     );
