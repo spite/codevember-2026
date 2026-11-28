@@ -275,8 +275,7 @@ class Bolt {
       const below = (1 - u) * total;
       branch(main[i], lean(way, 0.4 + random() * 0.6), Math.min(2.8, below * (0.35 + random() * 0.75) + 0.25), i / last, 0.7, 0.55, 0);
     }
-    for (const attribute of Object.values(this.geometry.attributes)) attribute.clearUpdateRanges(), (attribute.needsUpdate = true);
-    this._fullUpload = true;
+    for (const attribute of Object.values(this.geometry.attributes)) attribute.needsUpdate = true;
     this.geometry.instanceCount = n;
     // The filaments go after the channel, rewritten while the charge gathers.
     this.fixed = n;
@@ -385,17 +384,7 @@ class Bolt {
     }
     // And where they all leave from.
     put(hit, tip.copy(hit).addScaledVector(normal, 0.01), 1.2, 0.5 + 0.5 * charge);
-    // Only the filaments' range goes up, unless the channel was just rewritten too.
-    const full = this._fullUpload;
-    this._fullUpload = false;
-    for (const name of Object.keys(this.arrays)) {
-      const attribute = this.geometry.attributes[name];
-      if (!full) {
-        if (n <= this.fixed) continue;
-        attribute.addUpdateRange(this.fixed * attribute.itemSize, (n - this.fixed) * attribute.itemSize);
-      }
-      attribute.needsUpdate = true;
-    }
+    for (const attribute of Object.values(this.geometry.attributes)) attribute.needsUpdate = true;
     this.geometry.instanceCount = n;
   }
 
