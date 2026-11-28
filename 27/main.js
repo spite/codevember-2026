@@ -420,7 +420,13 @@ applyUrlState();
 load.burrow.set(0.3);
 // A seed in the url has already started this piece's bake.
 if (!bake || currentKey !== sculptureKey()) startBake();
-applyVolume(await load.burrow.track(bake.promise));
+// R during the bake starts another: wait for whichever is current once it lands.
+let firstJob;
+do {
+  firstJob = bake;
+  await load.burrow.track(firstJob.promise);
+} while (bake !== firstJob);
+applyVolume(firstJob.vol);
 bake = null;
 if (hasUrlPour) {
   cycle.phase = "rest";
