@@ -396,11 +396,17 @@ function strikeAnywhere() {
 }
 
 const canvas = renderer.domElement;
-const press = { x: 0, y: 0, time: 0 };
-canvas.addEventListener("pointerdown", (e) => Object.assign(press, { x: e.clientX, y: e.clientY, time: performance.now() }));
+// Only a single primary-button press strikes: a second finger (a pinch) or another button cancels it.
+const press = { x: 0, y: 0, time: 0, id: null };
+canvas.addEventListener("pointerdown", (e) =>
+  Object.assign(press, { x: e.clientX, y: e.clientY, time: performance.now(), id: e.isPrimary && e.button === 0 ? e.pointerId : null }),
+);
+canvas.addEventListener("pointercancel", () => (press.id = null));
 canvas.addEventListener("pointerup", (e) => {
+  const tap = e.pointerId === press.id;
+  press.id = null;
   // A click, not the end of a drag.
-  if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > 6 || performance.now() - press.time > 500) return;
+  if (!tap || Math.hypot(e.clientX - press.x, e.clientY - press.y) > 6 || performance.now() - press.time > 500) return;
   const rect = canvas.getBoundingClientRect();
   strike(pick(((e.clientX - rect.left) / rect.width) * 2 - 1, 1 - ((e.clientY - rect.top) / rect.height) * 2));
 });
