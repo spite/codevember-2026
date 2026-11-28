@@ -222,11 +222,13 @@ gui.show();
 // Floating free: each new one turns up at its own angle.
 // It eases from the old angle to the new one over the morph.
 const tumble = new Quaternion(), tumbleFrom = new Quaternion(), tumbleTo = new Quaternion();
-// A new one is another solid at its own angle, with its own lights, glass flaws, haze and room light.
+// A new one is another solid at its own angle, with its own lights, glass flaws, haze and room light. The solid comes
+// from the seed alone, so a link reproduces it; live, a repeat of the one on show is replaced by a fresh seed.
+let live = false;
 onRandomize(() => {
   const r = Math.random;
-  const others = SOLIDS.filter((n) => n !== params.solid());
-  const solid = others[Math.floor(r() * others.length)];
+  const was = params.solid();
+  const solid = SOLIDS[Math.floor(r() * SOLIDS.length)];
   const axis = new Vector3(r() - 0.5, 0, r() - 0.5).normalize(), angle = r() * 0.6;
   const range = (a, b) => Math.round((a + r() * (b - a)) * 100) / 100;
   // Mostly empty inside; now and then a nested solid, which grows in.
@@ -236,7 +238,11 @@ onRandomize(() => {
   const names = Object.keys(LIGHTS);
   const lights = r() < 0.5 ? names[Math.floor(r() * 3)] : names[3 + Math.floor(r() * (names.length - 3))];
   const tubes = ["frosted", "neon", "filament"][Math.floor(r() * 3)];
-  startLook({ solid, inner, lights, tubes, brightness: range(0.7, 1.5), mirror: range(0.6, 0.8), warp: range(0, 0.2), ripple: range(0, 0.2), tilt: range(0, 0.2), haze: range(0.5, 1), spill: range(0.75, 2) }, axis, angle);
+  const look = { solid, inner, lights, tubes, brightness: range(0.7, 1.5), mirror: range(0.6, 0.8), warp: range(0, 0.2), ripple: range(0, 0.2), tilt: range(0, 0.2), haze: range(0.5, 1), spill: range(0.75, 2) };
+  // Which share of the windows is dark, per seed (drawn last, so the draws above keep their place).
+  lightSeed = r();
+  startLook(look, axis, angle);
+  if (live && solid === was) queueMicrotask(randomize);
 });
 
 // Moves to a look ({ param: value }): the solid morphs and the nested one grows in on their own, numbers and colours
@@ -1118,6 +1124,7 @@ let animPhase = 0;
 // Scene time, held while nothing moves so the pipeline sees a still frame.
 let heldTime = 0;
 render(({ dt }) => {
+  live = true;
   // Morphs and lights switching run on the wall clock, so a change made while paused still lands.
   const now = performance.now();
   const clock = Math.min((now - (lastNow ?? now)) / 1000, 0.1);
