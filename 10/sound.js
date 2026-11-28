@@ -58,11 +58,6 @@ function createSound({ base = "./sounds/", onProgress } = {}) {
     if (!paused && ctx.state !== "running") ctx.resume();
   };
   for (const type of ["pointerdown", "touchend", "click", "keydown"]) window.addEventListener(type, gesture, { capture: true });
-  // A hidden tab stops the frames that set the loops' levels: silence it rather than leave them at their last.
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) ctx.suspend();
-    else if (!paused && (navigator.userActivation?.hasBeenActive ?? true)) ctx.resume();
-  });
 
   const live = () => on && !paused && ctx.state === "running";
 

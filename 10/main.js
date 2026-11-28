@@ -1255,6 +1255,8 @@ const _axis = new Vector3();
 const drag = { active: false, id: -1, x: 0, y: 0, vx: 0, vy: 0, idle: 99 };
 const canvas = renderer.domElement;
 canvas.addEventListener("pointerdown", (e) => {
+  // A second finger (a pinch, which zooms) stops the spin drag, with no fling.
+  if (drag.active && e.pointerId !== drag.id) return void Object.assign(drag, { active: false, vx: 0, vy: 0 });
   if (drag.active || !isRunning() || e.button !== 0) return;
   drag.active = true;
   // Grabbing it ends the settling turn where it is.
