@@ -118,9 +118,22 @@ function createTracker() {
   function loadWorker() {
     return new Promise((resolve, reject) => {
       const w = new Worker(new URL(`./tracker-worker.js?v=${Date.now().toString(36)}`, import.meta.url));
+      // A failure before it's ready rejects (the caller then detects on this thread); a crash after it hands over to that.
+      const fail = (message) => {
+        w.terminate();
+        if (worker !== w) return reject(new Error(message));
+        console.warn("FaceLandmarker worker failed, detecting on the main thread", message);
+        worker = null;
+        busy = false;
+        loadLandmarker().then(
+          (l) => (landmarker = l),
+          (e) => Object.assign(state, { status: "failed", error: e.message }),
+        );
+      };
       w.onmessage = ({ data }) => {
         if (data.type === "ready") resolve(w);
-        else if (data.type === "error" && !worker) reject(new Error(data.message));
+        // A detection error after it's ready is followed by its (empty) result, so only a startup error counts here.
+        else if (data.type === "error" && worker !== w) fail(data.message);
         else if (data.type === "result") {
           busy = false;
           counts.results++;
@@ -128,7 +141,7 @@ function createTracker() {
           handle(data.found, data.matrix, data.shapes, data.time);
         }
       };
-      w.onerror = (e) => reject(new Error(e.message || "tracker worker failed"));
+      w.onerror = (e) => fail(e.message || "tracker worker failed");
       w.postMessage({ type: "init", vision: VISION, model: MODEL });
     });
   }
