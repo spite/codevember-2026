@@ -498,7 +498,8 @@ function requestCard(values) {
     },
     (err) => {
       console.error(err);
-      flip.state = "idle";
+      // Only the card still wanted settles the flip; a superseded one's failure leaves the newer flip alone.
+      if (id === flip.request) flip.state = "idle";
     },
   );
 }
@@ -573,32 +574,37 @@ let shapeRun = 1;
 let started = false;
 // Randomizes the panel, then narrows the bandwidth as the dispersion rises (the bands spread further apart), from
 // 20-40 nm at dispersion 1.5 down to 3-15 nm at 3, never under 3.
+// The look from the seed alone, so a link reproduces it.
 function randomizeLook() {
-  const scene = params.scene();
   gui.randomizeAll();
-  // Always a different scene from the one showing.
-  if (started && params.scene() === scene) {
-    const others = SCENES.filter((name) => name !== scene);
-    params.scene.set(others[Math.floor(Math.random() * others.length)]);
-  }
-  // Trading card or glass plate, even odds, but never three of one in a row.
-  if (started) {
-    const other = shown.shape === "card" ? "glass" : "card";
-    params.shape.set(shapeRun >= 2 || Math.random() < 0.5 ? other : shown.shape);
-  }
   const k = MathUtils.clamp((params.dispersion() - 1.5) / 1.5, 0, 1);
   const lo = MathUtils.lerp(20, 3, k), hi = MathUtils.lerp(40, 15, k);
   params.bandwidth.set(Math.max(3, Math.round(lo + Math.random() * (hi - lo))));
 }
-// The next card: randomized, then over (panel values) on top; with onBar it lands on the next bar line.
+// Live only, on top of the seed's look: always a different scene from the one showing, and trading card or glass
+// plate at even odds, but never three of one in a row.
+function liveRules(scene) {
+  if (params.scene() === scene) {
+    const others = SCENES.filter((name) => name !== scene);
+    params.scene.set(others[Math.floor(Math.random() * others.length)]);
+  }
+  const other = shown.shape === "card" ? "glass" : "card";
+  params.shape.set(shapeRun >= 2 || Math.random() < 0.5 ? other : shown.shape);
+}
+// The next card: randomized, then over (panel values) on top; with onBar it lands on the next bar line. The live rules
+// and the staging run just after the seed's values are recorded, so the url names whatever they change and a link
+// reproduces the card.
 function nextCard(over = {}, onBar = false) {
   const was = params.$snapshot();
   randomizeLook();
-  for (const [key, value] of Object.entries(over)) params[key]?.set(value);
-  const next = params.$snapshot();
-  params.$apply(was);
-  flip.onBar = onBar;
-  requestCard(next);
+  queueMicrotask(() => {
+    liveRules(was.scene);
+    for (const [key, value] of Object.entries(over)) params[key]?.set(value);
+    const next = params.$snapshot();
+    params.$apply(was);
+    flip.onBar = onBar;
+    requestCard(next);
+  });
 }
 // (The bar handler sets flip.onBar before randomizing, so its changes land on the beat.)
 onRandomize(() => (started ? nextCard({}, !!flip.onBar) : randomizeLook()));
@@ -610,8 +616,8 @@ const _halfTurn = new Matrix4().makeRotationY(Math.PI);
 const smearState = {};
 
 applyUrlState();
-// The first card is always gears (unless the link says otherwise).
-if (!new URLSearchParams(location.search).has("scene")) params.scene.set("gears");
+// The first card is always gears, unless the link has a seed or a scene of its own.
+if (!["scene", "seed"].some((k) => new URLSearchParams(location.search).has(k))) params.scene.set("gears");
 
 const fingerprintImage = load.prints.track(loadFingerprints());
 setLook(params.look(), true);
