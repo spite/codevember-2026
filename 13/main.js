@@ -556,15 +556,25 @@ function unpackGeometry({ attributes, index }) {
 const noiseBaked = new Promise((resolve) => {
   builder.onNoise = resolve;
 });
-buildWorker.postMessage({ type: "noise", size: shared.uNoiseVol.value.image.width });
-// A worker that fails to load can't build labyrinths: say so, rather than wait on it in silence.
+// Jobs go to the worker; if it fails to load, the page runs the same jobs itself (build-job.js), a frame later each.
+let postBuild = (message) => buildWorker.postMessage(message);
+let noiseDone = false;
+const noiseJob = { type: "noise", size: shared.uNoiseVol.value.image.width };
+postBuild(noiseJob);
 buildWorker.onerror = (e) => {
-  console.error("Labyrinth worker failed to load", e.message);
-  builder.onNoise();
+  console.error("Labyrinth worker failed to load; building on the page", e.message ?? "");
+  const job = import("./build-job.js");
+  postBuild = (message) =>
+    job.then(({ runJob }) => setTimeout(() => runJob(message, (answer) => buildWorker.onmessage({ data: answer })), 0));
+  // What the worker was asked for and never answered goes again.
+  if (!noiseDone) postBuild(noiseJob);
+  builder.requestedKey = "";
+  requestBuild();
 };
 
 buildWorker.onmessage = ({ data }) => {
   if (data.type === "noise") {
+    noiseDone = true;
     if (data.data) {
       shared.uNoiseVol.value.image.data = data.data;
       shared.uNoiseVol.value.needsUpdate = true;
@@ -595,7 +605,7 @@ function requestBuild() {
   if (key === builder.requestedKey) return;
   builder.requestedKey = key;
   builder.ready = null;
-  buildWorker.postMessage({
+  postBuild({
     key,
     seedKey: desiredMazeSeedKey(),
     options: {
