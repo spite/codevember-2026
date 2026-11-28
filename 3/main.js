@@ -540,6 +540,7 @@ await compiled;
 window.app = { canvas: renderer.domElement, camera, pipeline, controls, body, dropMesh, puddleMesh, drops, puddle, rotation, backdrop, scene, params, field, setShape, resetMelt, hit: hitBody, get shape() { return shape; }, get melt() { return melt; } };
 
 let wasPaused = false;
+let lastFrozenKey = null;
 render(({ time, dt, frame }) => {
   // The other shapes download once the first frame is up, so a change only waits to build one.
   if (frame === 1) prefetchShapes();
@@ -566,11 +567,15 @@ render(({ time, dt, frame }) => {
     else if (dt > 0) melt.step(dt, body);
   }
   field.setPoses(body);
-  melt?.upload(dt, body);
+  // Paused, with nothing changed since the last paused frame: the packed field and the bake are as they were.
+  const frozenKey = dt === 0 && melt && !melt.cold ? `${melt.seed}|${body.geometry.uuid}|${body.quaternion.toArray()}|${pipeline.shutter}|${JSON.stringify(params.$snapshot(params.$keys))}` : null;
+  const frozen = frozenKey !== null && frozenKey === lastFrozenKey;
+  lastFrozenKey = frozenKey;
+  if (!frozen) melt?.upload(dt, body);
   updateOccluders();
   if (settled) fitShadow();
   controls.update();
   backdrop.keepInsideCyc(camera, controls.target);
-  bake.render(renderer, body.geometry, pipeline.motionBlur && pipeline.motionBlurAvailable);
+  if (!frozen) bake.render(renderer, body.geometry, pipeline.motionBlur && pipeline.motionBlurAvailable);
   pipeline.render(scene, camera, time);
 });
